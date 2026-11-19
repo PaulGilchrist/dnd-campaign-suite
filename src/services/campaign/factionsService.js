@@ -45,6 +45,28 @@ export const saveFactions = async (campaignName, factions) => {
   }
 };
 
+// Player-facing standings (server/routes/factions.js /standings lane):
+// field-whitelisted rows only — { id, name, influence }; faction goals and
+// notes never arrive, and draft rows are dropped server-side. Read-only —
+// the quest board must never pair this with any write.
+export const loadFactionStandings = async (campaignName) => {
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/factions/standings`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error || 'Failed to load faction standings');
+    }
+    const body = await response.json();
+    return body.factions || [];
+  } catch (error) {
+    console.error('Error loading faction standings:', error);
+    throw error;
+  }
+};
+
 export const loadFaction = async (campaignName, factionId) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);

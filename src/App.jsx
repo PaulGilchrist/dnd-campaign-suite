@@ -35,6 +35,7 @@ import { usePostRestoreNotice } from './hooks/ui/usePostRestoreNotice.js';
 import { useBattleMasterSelectionVersion, battleMasterSelectionSerial } from './hooks/combat/battleMaster.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
+import QuestBoard from './components/quest-board/QuestBoard.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Settlements from './components/settlements/Settlements.jsx';
 import CampaignBuilder from './components/campaign-builder/CampaignBuilder.jsx';
@@ -392,6 +393,9 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     encounter: <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />,
     notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     quests: <Quests campaignName={campaignName} isLocalhost={isLocalhost} />,
+    // Player quest board — read-only shared-table theatre (open to visitors;
+    // the GM sees the same board plus the GM-only Quests planner above).
+    questBoard: <QuestBoard campaignName={campaignName} />,
     npcs: <NPCs campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
     settlements: <Settlements campaignName={campaignName} />,
     sessions: <Sessions campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
@@ -892,6 +896,7 @@ function App() {
           onMusicClick={() => setActiveView('music')}
           onNotesClick={handleNotesClick}
           onQuestsClick={handleQuestsClick}
+          onQuestBoardClick={() => setActiveView('questBoard')}
           onEncounterClick={handleEncounterClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}

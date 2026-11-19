@@ -17,6 +17,7 @@ const NAV_BUTTONS = [
   { label: 'Music', view: 'music', handler: 'onMusicClick' },
   { label: 'Notes', view: 'notes', handler: 'onNotesClick', localhostOnly: true },
   { label: 'NPCs', view: 'npcs', handler: 'onNPCsClick', localhostOnly: true },
+  { label: 'Quest Board', view: 'questBoard', handler: 'onQuestBoardClick' },
   { label: 'Quests', view: 'quests', handler: 'onQuestsClick', localhostOnly: true },
   { label: 'Sessions', view: 'sessions', handler: 'onSessionsClick', localhostOnly: true },
   { label: 'Settlements', view: 'settlements', handler: 'onSettlementsClick', localhostOnly: true },

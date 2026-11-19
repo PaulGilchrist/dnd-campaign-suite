@@ -9,16 +9,11 @@ import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import useDeleteRequest from '../common/useDeleteRequest.js';
+import InfluenceBadge from '../common/InfluenceBadge.jsx';
+import { influenceTierClass } from '../../services/campaign/influenceTierDisplay.js';
 import './Factions.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
-
-const INFLUENCE_COLORS = {
-  low: { bg: '#1a472a', color: '#90ee90', border: '#2d6a4f' },
-  medium: { bg: '#713f12', color: '#fde047', border: '#a16207' },
-  high: { bg: '#7c2d12', color: '#fed7aa', border: '#c2410c' },
-  extreme: { bg: '#7f1d1d', color: '#fecaca', border: '#b91c1c' },
-};
 
 function FactionsEmptyState({ searchQuery }) {
   return (
@@ -84,22 +79,6 @@ function truncateText(text, maxLength) {
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '…';
-}
-
-// Get influence badge styles
-function getInfluenceStyle(influence) {
-  let level;
-  if (influence <= 3) level = 'low';
-  else if (influence <= 6) level = 'medium';
-  else if (influence <= 8) level = 'high';
-  else level = 'extreme';
-
-  const colors = INFLUENCE_COLORS[level] || INFLUENCE_COLORS.medium;
-  return {
-    backgroundColor: colors.bg,
-    color: colors.color,
-    borderColor: colors.border,
-  };
 }
 
 function Factions({ campaignName }) {
@@ -360,13 +339,7 @@ function Factions({ campaignName }) {
                 <DraftFlag row={faction} />
                 <div className="ct-list-meta">
                   {faction.influence != null && (
-                    <span
-                      className="factions-list-influence"
-                      style={getInfluenceStyle(faction.influence)}
-                      title={`Influence: ${faction.influence}`}
-                    >
-                      {faction.influence}
-                    </span>
+                    <InfluenceBadge influence={faction.influence} />
                   )}
                   {/* Row-level delete affordance (mirrors the MapsManager
                       "Delete" chip): stopPropagation keeps the click from
@@ -471,8 +444,7 @@ function Factions({ campaignName }) {
                   onChange={(e) => handleFormChange('influence', parseInt(e.target.value))}
                 />
                 <span
-                  className="factions-influence-value"
-                  style={getInfluenceStyle(formData.influence)}
+                  className={`factions-influence-value ${influenceTierClass(formData.influence)}`}
                 >
                   {formData.influence}
                 </span>

@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { createJsonEntityRouter, loadEntityList } from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 import { publish } from '../utils/changeData.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
@@ -29,7 +30,8 @@ const baseRouter = createJsonEntityRouter('quests', {
 
 // ---------------------------------------------------------------------------
 // GM-only lane — the Quests planner is a GM-authoring surface (sidebar marks
-// it localhostOnly; there is no visitor read/write consumer). The reads were
+// it localhostOnly; the only visitor-facing door on this path is the narrow
+// /quests/board read above). The reads were
 // already fully GM-gated at the row level (transformList [] + authorizeRead
 // 403), but the factory write lanes (whole-array POST, per-row DELETE) had NO
 // origin gate: a visitor POST could never include the rows its own read was
@@ -49,7 +51,33 @@ function refuseUnlessGm(req, res) {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Player-facing board read lane (Item 9 — player quest board): the ONLY
+// visitor-open door on this path is this GET. The GM CRUD gate below stays
+// byte-unchanged (every other method on every /quests path still 403s for
+// non-localhost). The response is a field WHITELIST — GM `notes` never leave
+// the server, and unapproved AI draft rows are dropped for every origin
+// (the board is approved-content theatre; drafts surface only in the GM
+// planner/Drafts views, which badge them). Data changes reach players
+// through the existing `quests-list-<campaign>` SSE broadcast (publish()
+// fans out to all campaign subscribers regardless of origin).
+// ---------------------------------------------------------------------------
+const BOARD_FIELDS = ['id', 'name', 'status', 'description', 'rewards'];
+
+function toBoardRow(row) {
+  return BOARD_FIELDS.reduce((picked, field) => {
+    if (row[field] !== undefined) picked[field] = row[field];
+    return picked;
+  }, {});
+}
+
 const router = Router();
+router.get('/api/campaigns/:campaign/quests/board', asyncHandler((req, res) => {
+  const quests = loadEntityList(req.params.campaign, 'quests')
+    .filter(row => row && row.draft !== true)
+    .map(toBoardRow);
+  res.json({ quests });
+}));
 router.use('/api/campaigns/:campaign/quests', (req, res, next) => {
   if (!refuseUnlessGm(req, res)) return;
   next();

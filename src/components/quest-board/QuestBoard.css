@@ -1,0 +1,221 @@
+/* Player quest board — theme colors ride the global data-theme variables
+   (index.css :root + [data-theme="light"]). No literal hexes here: shared
+   pill/tier colors live in QuestStatusPill.css / InfluenceBadge.css and are
+   never re-declared. */
+
+/* ============ Faction standing strip ============ */
+
+.quest-board-standings {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.quest-board-standings-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--color-header);
+}
+
+.quest-board-standings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* One row per faction; wraps to a second column on wide layouts. */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px 20px;
+}
+
+.quest-board-standing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quest-board-standing-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+}
+
+/* Compact 10-segment influence meter; tier colors inherit the
+   influence-tier--* custom properties published on the row. */
+.quest-board-influence-meter {
+  display: flex;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.quest-board-influence-seg {
+  height: 8px;
+  width: 10px;
+  border-radius: 2px;
+  background: var(--border-color);
+}
+
+.quest-board-influence-seg--filled {
+  background: var(--influence-tier-color);
+}
+
+/* ============ Quest groups + cards ============ */
+
+.quest-board-error {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  background: var(--background-color-card);
+}
+
+.quest-board-group {
+  margin-bottom: 20px;
+}
+
+.quest-board-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--color-header);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.quest-board-group-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.quest-board-cards {
+  display: grid;
+  /* Responsive theatre: cards flow into as many columns as fit. */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.quest-board-card {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quest-board-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quest-board-card-name {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-header);
+  word-break: break-word;
+}
+
+.quest-board-card-description {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.quest-board-toggle {
+  align-self: flex-start;
+}
+
+/* Collapsed preview — the app's line-clamp idiom (mirrors
+   .quests-list-subtitle sizing in Quests.css). */
+.quest-board-description--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.quest-board-description {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Sanitized markdown inside cards reads at card scale, never document
+   scale (same law as the planner's .quests-list-subtitle typography). */
+.quest-board-description h1,
+.quest-board-rewards-text h1 {
+  font-size: 1rem;
+  margin: 4px 0;
+}
+
+.quest-board-description h2,
+.quest-board-rewards-text h2 {
+  font-size: 0.92rem;
+  margin: 4px 0;
+}
+
+.quest-board-description h3,
+.quest-board-rewards-text h3 {
+  font-size: 0.88rem;
+  margin: 4px 0;
+}
+
+.quest-board-description p,
+.quest-board-rewards-text p {
+  margin: 4px 0;
+}
+
+.quest-board-description ul,
+.quest-board-description ol,
+.quest-board-rewards-text ul,
+.quest-board-rewards-text ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.quest-board-description blockquote,
+.quest-board-rewards-text blockquote {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--border-color);
+}
+
+.quest-board-card-rewards {
+  border-top: 1px solid var(--border-color);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quest-board-rewards-title {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-header);
+}
+
+.quest-board-rewards-text {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}

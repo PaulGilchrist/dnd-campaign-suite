@@ -61,6 +61,30 @@ export async function saveQuests(campaignName, quests) {
 }
 
 /**
+ * Load the player-facing quest board (server/routes/quests.js /board lane).
+ * Field-whitelisted rows only — { id, name, status, description, rewards };
+ * GM notes never arrive, and draft rows are already dropped server-side.
+ * Read-only: the quest board must never pair this with any write.
+ * @param {string} campaignName
+ * @returns {Promise<Array>}
+ */
+export async function loadQuestBoard(campaignName) {
+  const url = `/api/campaigns/${encodeURIComponent(campaignName)}/quests/board`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load quest board');
+    }
+    const data = await response.json();
+    return data.quests || [];
+  } catch (error) {
+    console.error('Error loading quest board:', error);
+    throw error;
+  }
+}
+
+/**
  * Load a single quest by ID.
  * @param {string} campaignName
  * @param {string} questId

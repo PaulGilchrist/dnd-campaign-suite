@@ -86,7 +86,7 @@ describe('Factions', () => {
       expect(screen.queryByText(/No factions/)).not.toBeInTheDocument();
     });
 
-    it('renders influence badges with level-dependent colors and omits the badge when unset', () => {
+    it('renders influence badges with level-dependent tiers and omits the badge when unset', () => {
       factionsState.factions = [
         faction({ id: 'f1', name: 'Weak', influence: 2 }),
         faction({ id: 'f2', name: 'Strong', influence: 10 }),
@@ -97,8 +97,11 @@ describe('Factions', () => {
       const strong = screen.getByTitle('Influence: 10');
       expect(weak).toHaveTextContent('2');
       expect(strong).toHaveTextContent('10');
-      // level colors must differ (without pinning exact hex values)
-      expect(weak.style.backgroundColor).not.toBe(strong.style.backgroundColor);
+      // Tier-driven colors (shared influenceTierDisplay canon — colors moved
+      // out of inline styles into InfluenceBadge.css, so the contract is now
+      // the tier class, without pinning exact hex values).
+      expect(weak).toHaveClass('influence-tier--low');
+      expect(strong).toHaveClass('influence-tier--extreme');
       // exactly two badges in the list; f3 has no influence, so no badge
       expect(screen.queryAllByTitle(/Influence:/)).toHaveLength(2);
     });

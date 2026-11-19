@@ -17,6 +17,7 @@ const VIEW_LABELS = {
     notes: { label: 'Notes', icon: 'fa-book' },
     npcs: { label: 'NPCs', icon: 'fa-users' },
     quests: { label: 'Quests', icon: 'fa-scroll' },
+    questBoard: { label: 'Quest Board', icon: 'fa-list-check' },
     sessions: { label: 'Sessions', icon: 'fa-calendar-check' },
     settlements: { label: 'Settlements', icon: 'fa-city' },
     campaignBuilder: { label: 'Drafts', icon: 'fa-wand-magic-sparkles' },
@@ -58,6 +59,12 @@ const NAV_ITEMS = [
     { view: 'music', onClick: 'onMusicClick' },
     { view: 'notes', onClick: 'onNotesClick', localhostOnly: true, arenaHidden: true },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
+    // Player chrome (Item 9): the read-only quest board is open to visitors —
+    // it renders only the field-whitelisted /quests/board + /factions/standings
+    // lanes. localhost sees it too (same shared table — the GM's authoring
+    // stays in the separate GM-only "Quests" planner). arenaHidden like the
+    // planner: campaign-progress theatre, not part of an arena fight sandbox.
+    { view: 'questBoard', onClick: 'onQuestBoardClick', arenaHidden: true },
     { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true, arenaHidden: true },
     { external: true, icon: 'fa-book', label: 'Rules' },
     { view: 'sessions', onClick: 'onSessionsClick', localhostOnly: true, arenaHidden: true },
@@ -171,7 +178,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
     // Display-only Rules-launchpad feedback (popup blocked) — mirrors the
     // sessions/encounter/music toast idiom (auto-hide timer is a benign UI
@@ -205,7 +212,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
     const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
     const navItems = campaignType === 'arena'
         ? NAV_ITEMS.filter(item => !item.arenaHidden)

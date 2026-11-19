@@ -3,15 +3,17 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
+import { QUEST_STATUSES, questStatusLabel } from '../../services/campaign/questStatusDisplay.js';
 import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
+import QuestStatusPill from '../common/QuestStatusPill.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import './Quests.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
 
-const STATUS_OPTIONS = ['active', 'completed', 'failed'];
+const STATUS_OPTIONS = QUEST_STATUSES;
 
 // Truncate description for the row preview (mirrors Notes.jsx; markdown is
 // then rendered sanitized+clamped instead of printed raw).
@@ -45,12 +47,6 @@ function getDuplicateState({ modalOpen, formData, quests, editingQuest, saving, 
     showErrorReload: !duplicateNameError && errorIsConflict,
   };
 }
-
-const STATUS_COLORS = {
-  active: { bg: '#d1fae5', color: '#065f46', border: '#34d399' },
-  completed: { bg: '#dbeafe', color: '#1e40af', border: '#60a5fa' },
-  failed: { bg: '#fee2e2', color: '#991b1b', border: '#f87171' }
-};
 
 function QuestEmptyState({ searchQuery }) {
   return (
@@ -122,7 +118,7 @@ function QuestFormModal({ editingQuest, formData, setFormData, campaignName, sav
             onChange={(e) => onChange('status', e.target.value)}
           >
             {STATUS_OPTIONS.map(status => (
-              <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+              <option key={status} value={status}>{questStatusLabel(status)}</option>
             ))}
           </select>
 
@@ -403,9 +399,7 @@ function Quests({ campaignName, isLocalhost }) {
 
       {!loading && filteredQuests.length > 0 && (
         <ul className="ct-list">
-          {filteredQuests.map(quest => {
-            const statusColor = STATUS_COLORS[quest.status] || STATUS_COLORS.active;
-            return (
+          {filteredQuests.map(quest => (
               <li
                 key={quest.id}
                 className="ct-list-item"
@@ -423,13 +417,7 @@ function Quests({ campaignName, isLocalhost }) {
                   <span className="ct-list-name">{quest.name}</span>
                   <DraftFlag row={quest} />
                   <div className="ct-list-meta">
-                    <span
-                      className="quests-list-status"
-                      style={statusColor}
-                      title={quest.status}
-                    >
-                      {quest.status}
-                    </span>
+                    <QuestStatusPill status={quest.status} />
                   </div>
                 </div>
                 {quest.description && (
@@ -441,8 +429,7 @@ function Quests({ campaignName, isLocalhost }) {
                   </div>
                 )}
               </li>
-            );
-          })}
+            ))}
         </ul>
       )}
 

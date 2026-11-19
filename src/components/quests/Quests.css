@@ -1,17 +1,7 @@
 /* ============ Quests Unique Styles ============ */
 
-/* Status badge in list */
-.quests-list-status {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  border-radius: 10px;
-  border: 1px solid;
-  text-transform: capitalize;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
+/* Status badge in list — shape/colors moved to the shared QuestStatusPill.css
+   (common/), used by the player quest board's cards. */
 
 /* Description subtitle — sanitized markdown preview clamped to 2 lines
    (mirrors .notes-list-description .markdown-preview in Notes.css) */

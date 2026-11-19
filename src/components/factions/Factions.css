@@ -7,17 +7,8 @@
   padding: 4px 10px;
 }
 
-/* Influence badge in list */
-.factions-list-influence {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  border-radius: 10px;
-  border: 1px solid;
-  min-width: 28px;
-  text-align: center;
-}
+/* Influence badge in list — shape/colors moved to the shared
+   InfluenceBadge.css (common/), used by the quest board standing strip. */
 
 /* Description preview in list */
 .factions-list-preview {
@@ -65,7 +56,9 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* Influence value badge */
+/* Influence value badge — shape stays local to the editor row; the colors
+   come from the shared tier tokens (InfluenceBadge.css) via the class the
+   influenceTierClass() helper puts on the element. */
 .factions-influence-value {
   display: inline-flex;
   align-items: center;
@@ -78,6 +71,9 @@
   border-radius: 10px;
   border: 1px solid;
   flex-shrink: 0;
+  background-color: var(--influence-tier-bg);
+  color: var(--influence-tier-color);
+  border-color: var(--influence-tier-border);
 }
 
 

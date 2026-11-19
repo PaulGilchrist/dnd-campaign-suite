@@ -7,7 +7,7 @@ import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
-const ARENA_HIDDEN = ['Drafts', 'Factions', 'Inventory', 'Notes', 'Quests', 'Sessions', 'Settlements'];
+const ARENA_HIDDEN = ['Drafts', 'Factions', 'Inventory', 'Notes', 'Quest Board', 'Quests', 'Sessions', 'Settlements'];
 const ARENA_KEPT = ['Encounters', 'Initiative', 'Log', 'Maps', 'Music', 'NPCs', 'Rules', 'Admin'];
 
 function createProps(overrides = {}) {
@@ -27,6 +27,7 @@ function createProps(overrides = {}) {
     onMusicClick: handler(),
     onNotesClick: handler(),
     onQuestsClick: handler(),
+    onQuestBoardClick: handler(),
     onNPCsClick: handler(),
     onSessionsClick: handler(),
     onInventoryClick: handler(),

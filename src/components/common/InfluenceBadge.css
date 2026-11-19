@@ -1,0 +1,46 @@
+/* Faction influence tier tokens + badge — the shared color language for the
+   GM Factions planner and the player quest board standing strip. Tier
+   thresholds live in services/campaign/influenceTierDisplay.js; these hexes
+   are preserved verbatim from the planner's former inline INFLUENCE_COLORS
+   map. The tier class only publishes custom properties, so any surface
+   (badge chip, meter segment, form value chip) can paint itself with a row's
+   tier by carrying the class on the element or an ancestor. */
+
+.influence-tier--low {
+  --influence-tier-bg: #1a472a;
+  --influence-tier-color: #90ee90;
+  --influence-tier-border: #2d6a4f;
+}
+
+.influence-tier--medium {
+  --influence-tier-bg: #713f12;
+  --influence-tier-color: #fde047;
+  --influence-tier-border: #a16207;
+}
+
+.influence-tier--high {
+  --influence-tier-bg: #7c2d12;
+  --influence-tier-color: #fed7aa;
+  --influence-tier-border: #c2410c;
+}
+
+.influence-tier--extreme {
+  --influence-tier-bg: #7f1d1d;
+  --influence-tier-color: #fecaca;
+  --influence-tier-border: #b91c1c;
+}
+
+/* Badge shape preserved from the planner's former .factions-list-influence. */
+.influence-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid;
+  min-width: 28px;
+  text-align: center;
+  background-color: var(--influence-tier-bg);
+  color: var(--influence-tier-color);
+  border-color: var(--influence-tier-border);
+}

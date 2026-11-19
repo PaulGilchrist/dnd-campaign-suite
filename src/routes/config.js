@@ -68,6 +68,13 @@ export const VIEWS = {
     component: 'Quests',
     description: 'Quest tracking'
   },
+  QUEST_BOARD: {
+    name: 'questBoard',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'QuestBoard',
+    description: 'Player quest board — read-only quest progress theatre + faction standings'
+  },
     NPCS: {
       name: 'npcs',
       stateVar: 'activeView',
@@ -171,6 +178,7 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
   { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
+  { label: 'Quest Board', icon: 'fa-list-check', view: 'questBoard' },
   { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
   { label: 'Sessions', icon: 'fa-calendar-check', view: 'sessions' },
   { label: 'Inventory', icon: 'fa-boxes-stacked', view: 'partyInventory' },
@@ -184,4 +192,4 @@ export const SIDEBAR_BUTTONS = [
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'gmScreen', 'music', 'campaignRepair'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'questBoard', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'gmScreen', 'music', 'campaignRepair'];
