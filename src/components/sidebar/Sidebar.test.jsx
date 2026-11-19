@@ -1,5 +1,6 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai: 2026-11-18
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
@@ -175,6 +176,70 @@ describe('Sidebar', () => {
       const labels = [...container.querySelectorAll('nav > button.sidebar-section-header')]
         .map(b => b.textContent.trim().toLowerCase());
       expect(labels).toEqual([...labels].sort());
+    });
+  });
+
+  // MA 2026-11-18 backlog: view headers used to split across a button face and
+  // a headless div face (`div.sidebar-section-header-static` for Characters).
+  // Unified on the button tier — these tests pin zero div faces, keyboard
+  // reachability, and click/Enter/Space parity for the roster toggle.
+  describe('unified sidebar header tier', () => {
+    const rosterProps = { characters: [{ name: 'Aragorn' }, { name: 'Legolas' }] };
+
+    it('renders every view header as a button — zero div.sidebar-section-header faces', () => {
+      const { container } = renderSidebar({ ...rosterProps, isLocalhost: true });
+      expect(container.querySelectorAll('div.sidebar-section-header')).toHaveLength(0);
+      const charactersHeader = screen.getByRole('button', { name: 'Characters' });
+      expect(charactersHeader.tagName).toBe('BUTTON');
+      expect(charactersHeader).toHaveClass('sidebar-section-header');
+    });
+
+    it('the Characters header is keyboard-focusable and reachable by Tab', async () => {
+      const user = userEvent.setup();
+      const { container } = renderSidebar({ ...rosterProps, isLocalhost: true });
+      const charactersHeader = screen.getByRole('button', { name: 'Characters' });
+      // Tab order: Campaigns header first, Characters header immediately after.
+      expect(container.querySelector('.sidebar-section-header')).not.toBe(charactersHeader);
+      await user.tab();
+      await user.tab();
+      expect(document.activeElement).toBe(charactersHeader);
+    });
+
+    it('defaults to an expanded roster (mount renders identical to always-expanded)', () => {
+      const { container } = renderSidebar(rosterProps);
+      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Aragorn' })).toBeInTheDocument();
+    });
+
+    it('click toggles the roster closed and open again', () => {
+      const { container } = renderSidebar(rosterProps);
+      const header = screen.getByRole('button', { name: 'Characters' });
+      fireEvent.click(header);
+      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
+      fireEvent.click(header);
+      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
+    });
+
+    it('Enter and Space toggle the roster exactly like the click', async () => {
+      const user = userEvent.setup();
+      const { container } = renderSidebar(rosterProps);
+      const header = screen.getByRole('button', { name: 'Characters' });
+
+      await user.click(header); // focus without toggling twice in one pass
+      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
+      await user.click(header);
+      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
+
+      header.focus();
+      await user.keyboard('{Enter}');
+      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
+      await user.keyboard('{Enter}');
+      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
+
+      await user.keyboard(' ');
+      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
+      await user.keyboard(' ');
+      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
     });
   });
 });

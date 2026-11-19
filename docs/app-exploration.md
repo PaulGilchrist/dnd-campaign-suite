@@ -54,8 +54,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass he
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- *(MA 2026-11-18)* Sidebar view headers render as `<button class="sidebar-section-header">` OR `<div class="sidebar-section-header sidebar-section-header-stat">` depending on expandable state — keyboard users can't reach the div face at all (no role/tabindex) and automation must class-anchor around the inconsistency; unify on `<button>` (or add the button tier to the stat variant). `Sidebar` component family.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (auto-encounter Accept resets round without eviction) — code-confirmed and folded INTO `bug-clear-latch-eviction-resurrects-stamps.md`; live ride deferred for session budget (needs sandbox outdoor map + mounted HexMap + enforcement rig §97).

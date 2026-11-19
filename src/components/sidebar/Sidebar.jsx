@@ -110,48 +110,58 @@ function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRu
 }
 
 function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick, isLocalhost, deleteErrorName, onDismissDeleteError }) {
+    // Roster collapse is per-client display state (no localStorage lane — the
+    // header is a keyboard-focusable disclosure button, same tag tier as every
+    // other sidebar-section-header; defaults to expanded, matching the
+    // always-expanded mount behaviour of commit 9c3f99481).
+    const [rosterExpanded, setRosterExpanded] = useState(true);
     return (
         <div className="sidebar-section">
-            <div className="sidebar-section-header sidebar-section-header-static">
+            <button
+                className="sidebar-section-header"
+                onClick={() => setRosterExpanded((prev) => !prev)}
+            >
                 Characters
-            </div>
-            <div className="sidebar-submenu">
-                {/* GM-only (mirrors the CampaignSelection Add gate): creating
-                    characters is a localhost write; players see the roster only. */}
-                {isLocalhost && (
-                    <button className="sidebar-link add-character" onClick={onAddCharacter}>
-                        <i className="fa-solid fa-plus"></i> Add Character
-                    </button>
-                )}
-                {characters.map((char, index) => (
-                    <button
-                        key={`${char.name}-${index}`}
-                        className={`sidebar-link${activeView === 'charSheet' && activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
-                        onClick={() => onCharacterClick(char)}
-                    >
-                        {char.name}
-                    </button>
-                ))}
-                {/* Persistent counterpart to the transient delete-failure alert:
-                    a failed DELETE never broadcasts SSE, so nothing else heals
-                    the view — surface it here until dismissed or a later delete
-                    succeeds. The roster link itself stays live (char NOT deleted). */}
-                {deleteErrorName && (
-                    <div className="sidebar-delete-error" role="alert">
-                        <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                        <span className="sidebar-delete-error-text">
-                            Delete failed: {deleteErrorName} — server error; the character is still in the roster.
-                        </span>
-                        <button
-                            className="sidebar-delete-error-dismiss"
-                            aria-label={`Dismiss delete error for "${deleteErrorName}"`}
-                            onClick={onDismissDeleteError}
-                        >
-                            <i className="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+            {rosterExpanded && (
+                <div className="sidebar-submenu">
+                    {/* GM-only (mirrors the CampaignSelection Add gate): creating
+                        characters is a localhost write; players see the roster only. */}
+                    {isLocalhost && (
+                        <button className="sidebar-link add-character" onClick={onAddCharacter}>
+                            <i className="fa-solid fa-plus"></i> Add Character
                         </button>
-                    </div>
-                )}
-            </div>
+                    )}
+                    {characters.map((char, index) => (
+                        <button
+                            key={`${char.name}-${index}`}
+                            className={`sidebar-link${activeView === 'charSheet' && activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
+                            onClick={() => onCharacterClick(char)}
+                        >
+                            {char.name}
+                        </button>
+                    ))}
+                    {/* Persistent counterpart to the transient delete-failure alert:
+                        a failed DELETE never broadcasts SSE, so nothing else heals
+                        the view — surface it here until dismissed or a later delete
+                        succeeds. The roster link itself stays live (char NOT deleted). */}
+                    {deleteErrorName && (
+                        <div className="sidebar-delete-error" role="alert">
+                            <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span className="sidebar-delete-error-text">
+                                Delete failed: {deleteErrorName} — server error; the character is still in the roster.
+                            </span>
+                            <button
+                                className="sidebar-delete-error-dismiss"
+                                aria-label={`Dismiss delete error for "${deleteErrorName}"`}
+                                onClick={onDismissDeleteError}
+                            >
+                                <i className="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

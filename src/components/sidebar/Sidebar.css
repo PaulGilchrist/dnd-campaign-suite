@@ -29,10 +29,6 @@
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.sidebar-section-header.sidebar-section-header-static {
-  cursor: default;
-}
-
 .sidebar-section-header:hover {
   background-color: var(--background-color-card-hover);
   color: var(--color-hover);
