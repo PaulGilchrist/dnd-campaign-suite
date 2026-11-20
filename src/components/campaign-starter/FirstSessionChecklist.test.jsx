@@ -105,6 +105,37 @@ describe('FirstSessionChecklist', () => {
     expect(screen.getAllByText(/🤝 Allies/).length).toBeGreaterThan(0);
   });
 
+  // LAN-visitor dead-end bug 2026-11-20: the Build-heroes row opens the
+  // creation wizard, but character creation is GM-only (sidebar door,
+  // empty-state card, server POST refuseUnlessGm). A visitor must never get
+  // this door, even though App always passes onBuildHeroes.
+  it('hides the Build-heroes row from a visitor origin even when onBuildHeroes is provided', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    const onBuildHeroes = vi.fn();
+    render(
+      <FirstSessionChecklist
+        campaignName="qa-starter"
+        onNavigate={vi.fn()}
+        onBuildHeroes={onBuildHeroes}
+        isLocalhost={false}
+      />
+    );
+    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    expect(screen.queryByText('Build your heroes (+ Character)')).not.toBeInTheDocument();
+    // Shared steps still render for the visitor (only the dead-end door is gone).
+    expect(screen.getByText(/Review the starter quests/)).toBeInTheDocument();
+
+    render(
+      <FirstSessionChecklist
+        campaignName="qa-starter"
+        onNavigate={vi.fn()}
+        onBuildHeroes={onBuildHeroes}
+        isLocalhost
+      />
+    );
+    await waitFor(() => expect(screen.getAllByText('Build your heroes (+ Character)').length).toBeGreaterThan(0));
+  });
+
   it('dismiss hides the panel and writes nothing', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     const { container } = render(<FirstSessionChecklist campaignName="qa-starter" />);

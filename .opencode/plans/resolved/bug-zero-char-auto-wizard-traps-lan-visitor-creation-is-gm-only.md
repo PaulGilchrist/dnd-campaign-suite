@@ -29,3 +29,20 @@ Gate the auto-offer on the same `isLocalhost` flag App already computes (it is t
 
 ## Severity
 Minor UX issue / dead-end affordance — no data integrity risk (server guard holds, refusal is loud), but it walks a visitor through a long flow that is guaranteed to fail at the final save, and burns their offer key doing it.
+
+## Resolution
+FIXED 2026-11-20 (fix subagent run).
+
+**What was actually wrong.** The black-box diagnosis was confirmed in code, with one nuance: the root cause is exactly the ungated `loaded.length === 0` auto-wizard branch, but the fix site cannot use the destructured `isLocalhost` — that binding is declared (App.jsx:514) AFTER the `useEffect` whose callback registers the select handler, so referencing it in the effect's deps array would TDZ-throw during render. The fix reads the same boolean off `campaignRef.current` (the ref pattern the callback already uses for `charMgmtRef`/`wizardRef`; refs are also exempt from `react-hooks/exhaustive-deps`). The un-gated sibling was real too: `FirstSessionChecklist` already receives `isLocalhost` and gates its betrayal/regenerate rows with it, but pushed the "Build your heroes (+ Character)" step whenever `onBuildHeroes` was provided — which App always does.
+
+**Changes.**
+- `src/App.jsx` — select-callback branch is now `else if (campaignRef.current.isLocalhost && !isWizardOffered(name))`. `isLocalhost` first short-circuits for visitors BEFORE `markWizardOffered`, so no offer → no key burned → a later GM session on the same browser profile still gets its one offer.
+- `src/components/campaign-starter/FirstSessionChecklist.jsx` — Build-heroes push is now `if (onBuildHeroes && isLocalhost)`, mirroring the GM rows below it.
+- `src/App.wizard-offered.test.jsx` — +2 tests: visitor-origin zero-char select mounts NO wizard (`[class*=wizard]` census 0), shell stays navigable, offer key stays `null`; and visitor-then-GM on the same profile still fires the offer once (key burns only on the GM offer).
+- `src/components/campaign-starter/FirstSessionChecklist.test.jsx` — +1 test: Build-heroes row hidden with `isLocalhost={false}` even when `onBuildHeroes` is provided; shared steps untouched; row present for GM.
+
+**Live re-verification (Playwright, dev pair under `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter'`).** REPRO first: fresh `qa-starter` created via "New Starter Adventure" on localhost; LAN-origin tab (`http://192.168.0.44:5173`, isolated context) selecting it mounted `div.character-creation-wizard-overlay` (`Create New Character`) in ~1 s, stamped `character-wizard-offered:qa-starter` on the LAN origin, and the create-lane probe `POST /api/campaigns/qa-starter` answered `403 {"error":"Access denied: GM-only feature"}`; the checklist's Build-heroes step also opened the wizard on that tab. POST-FIX: fresh visitor context selects `qa-starter` → zero `[class*=wizard]` elements through an 8 s dwell, offer key reads `null`, checklist renders the 7 shared steps WITHOUT "Build your heroes", sidebar door correctly absent. GM sanity (fresh localhost context): wizard DOES auto-mount (`Create New Character`), key stamps `'1'`, checklist includes the Build-heroes row. Adjacent behavior (offer-once suppression, deliberate lanes) un-regressed by the full `App.wizard-offered` suite.
+
+**Test/lint results.** `npx vitest run` on `App.wizard-offered` + `FirstSessionChecklist` (13/13), `App.empty-campaign-state` + campaign-starter/ + campaign-empty-state/ (19/19), 4 more App suites (31/31), remaining 10 App suites (82/82) — all pass. `npm run lint` clean (zero warnings). `node .opencode/plans/no-timers-guard.mjs` OK.
+
+**Cleanup.** `qa-starter` throwaway API-DELETED (campaigns/ back to the 5 baseline folders, `git status --porcelain public/` empty); test-campaign change-data `{}` + log `[]` via the admin clear lanes. Dual-ruleset check: N/A — both fix sites are origin-gating UI, no ruleset module involved.

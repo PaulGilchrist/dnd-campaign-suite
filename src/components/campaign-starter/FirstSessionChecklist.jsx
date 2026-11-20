@@ -49,7 +49,11 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
   // betrayal tool and the regenerate deep link. Every step names the
   // GENERATED entities and deep-links a real view.
   const steps = [];
-  if (onBuildHeroes) {
+  // GM-origin gate (LAN-visitor bug 2026-11-20): character creation is
+  // localhost-only (sidebar door, empty-state card, server POST guard), so the
+  // Build-heroes row consults isLocalhost exactly like the rows below it —
+  // otherwise a visitor gets a door into a build that can never save.
+  if (onBuildHeroes && isLocalhost) {
     steps.push({ icon: 'fa-user-plus', label: 'Build your heroes (+ Character)', action: onBuildHeroes });
   }
   steps.push(

@@ -18,7 +18,11 @@
  *    flag still auto-opens (and stamps only its own key);
  *  - the pref never gates deliberate lanes: the sidebar Add Character button
  *    still opens the wizard for an already-stamped campaign;
- *  - the stamp is localStorage-only: no fetch hits the server with it.
+ *  - the stamp is localStorage-only: no fetch hits the server with it;
+ *  - a NON-localhost (LAN visitor) origin never gets the auto-open at all
+ *    (creation is GM-only everywhere else, server POST 403s) AND its offer
+ *    key stays unburned, so a later GM session on the same profile still
+ *    gets its one offer (LAN-visitor dead-end bug 2026-11-20).
  *
  * Harness mirrors App.runtime-events.test.jsx (shared mock doubles, campaign
  * Service stubbed at the network boundary). localStorage is NOT auto-cleared
@@ -317,5 +321,53 @@ describe('App - zero-character auto-wizard offered once per campaign', () => {
     await waitFor(() => {
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
     });
+  });
+
+  it('visitor origin (non-localhost): zero-character select does NOT mount the auto-wizard and burns no offer key', async () => {
+    // LAN-visitor dead-end bug 2026-11-20: character creation is GM-only
+    // (sidebar door, empty-state card, server POST refuseUnlessGm), so the
+    // offer-once auto-open must not mount for a visitor either.
+    Object.defineProperty(window, 'location', {
+      value: { hostname: '192.168.0.44', reload: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+    mockState.campaignName = 'qa-wiza';
+    render(<App />);
+    await selectCampaign();
+
+    expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('[class*=wizard]').length).toBe(0);
+    // The shell is navigable for the visitor (empty stage, not a dead end).
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    // No offer made ⇒ no key burned: visitors never trip markWizardOffered.
+    expect(localStorage.getItem(offeredKey('qa-wiza'))).toBeNull();
+  });
+
+  it('visitor select leaves the key unburned so a later GM session still gets its one offer', async () => {
+    mockState.campaignName = 'qa-wiza';
+    Object.defineProperty(window, 'location', {
+      value: { hostname: '192.168.0.44', reload: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+    render(<App />);
+    await selectCampaign();
+    expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+
+    // The same browser profile now runs as the GM (localhost origin): the
+    // untouched offer key means the auto-wizard still fires exactly once.
+    Object.defineProperty(window, 'location', {
+      value: { hostname: 'localhost', reload: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+    backToCampaigns();
+    await selectCampaign();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+    });
+    expect(localStorage.getItem(offeredKey('qa-wiza'))).toBe('1');
   });
 });

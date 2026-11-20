@@ -493,12 +493,17 @@ function App() {
       if (loaded.length > 0) {
         charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
         setActiveView('charSheet');
-      } else if (!isWizardOffered(name)) {
+      } else if (campaignRef.current.isLocalhost && !isWizardOffered(name)) {
         // Offer the creation wizard ONCE per campaign per client (localStorage
         // display pref, backlog KA 2026-11-18): re-selecting a zero-character
         // campaign after cancelling must not re-arm the modal that swallows
         // every next click. The shell stays navigable — the sidebar "Add
         // Character" button and starter checklist still open the wizard.
+        // GM-origin gate (LAN-visitor bug 2026-11-20): character creation is
+        // localhost-only (Sidebar CharacterList door, EmptyCampaignState add
+        // button, server POST refuseUnlessGm), so a visitor never gets the
+        // dead-end auto-open. isLocalhost first ⇒ no offer made means no key
+        // burned, so a later GM session on this browser still gets its offer.
         markWizardOffered(name);
         wizardRef.current.handleAddCharacter();
       }
