@@ -52,6 +52,7 @@ import ConcentrationPromptModal from './components/common/ConcentrationPromptMod
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
+import EmptyCampaignState from './components/campaign-empty-state/EmptyCampaignState.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
 import LevelUpCelebration from './components/level-up/LevelUpCelebration.jsx';
 
@@ -378,6 +379,23 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
   return null;
 }
 
+// Zero-character empty-state gate (backlog UM 2026-11-20): the card owns the
+// BLANK main stage only — an active view (any sidebar destination) or an open
+// creation/edit wizard (including the offer-once auto-wizard) means the stage
+// already has content. Hoisted to module level so App stays inside the
+// lint statement/complexity caps (MapsAreaView precedent).
+function EmptyCampaignStage({ activeView, characters, showCharacterWizard, showEditCharacterWizard, campaignName, onAddCharacter, onOpenChecklist, isLocalhost }) {
+  if (activeView || characters.length > 0 || showCharacterWizard || showEditCharacterWizard) return null;
+  return (
+    <EmptyCampaignState
+      campaignName={campaignName}
+      onAddCharacter={onAddCharacter}
+      onOpenChecklist={onOpenChecklist}
+      isLocalhost={isLocalhost}
+    />
+  );
+}
+
 // Starter-checklist deep links (backlog 2026-11-11 KW): plain steps just
 // switch views exactly like the sidebar handlers; the "Join <wave>" step
 // additionally fires the EncounterBuilder Load-modal signal so the saved-wave
@@ -427,9 +445,7 @@ function App() {
   const charMgmt = useCharacterManagement(campaignMgmt.campaignName);
   const wizard = useCharacterWizard(campaignMgmt.campaignName);
 
-  const charMgmtRef = useRef();
-  const campaignRef = useRef();
-  const wizardRef = useRef();
+  const charMgmtRef = useRef(), campaignRef = useRef(), wizardRef = useRef();
   useEffect(() => { charMgmtRef.current = charMgmt; campaignRef.current = campaignMgmt; wizardRef.current = wizard; }, [charMgmt, campaignMgmt, wizard]);
 
   const [activeView, setActiveView] = useState(null);
@@ -664,6 +680,13 @@ function App() {
   // Campaign type (standard | arena | starter) drives the sidebar chip and
   // arena nav gating (see useCampaignType).
   const campaignType = useCampaignType(campaignName);
+
+  // Starter-checklist remount epoch (backlog UM 2026-11-20): the empty-state
+  // card's "Open the starter checklist" affordance bumps this to re-mount
+  // FirstSessionChecklist, surfacing a checklist this client had dismissed
+  // (its dismiss flag is per-client UI state, reset by a remount — nothing
+  // is written to the server).
+  const [checklistEpoch, setChecklistEpoch] = useState(0);
 
   useEffect(() => {
     setActiveMapName(null);
@@ -931,7 +954,23 @@ function App() {
         {/* onNavigate forwards the step's optional intent (see the wave step
             in FirstSessionChecklist) — 'load' auto-opens the builder's
             saved-wave list; every other step navigates as before. */}
-        <FirstSessionChecklist campaignName={campaignName} onNavigate={(view, intent) => handleChecklistNavigate(view, intent, setActiveView)} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
+        <FirstSessionChecklist key={checklistEpoch} campaignName={campaignName} onNavigate={(view, intent) => handleChecklistNavigate(view, intent, setActiveView)} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
+        {/* Zero-character empty state (backlog UM 2026-11-20): once the
+            offer-once auto-wizard is consumed, selecting a campaign with no
+            characters used to leave the main stage fully blank (nav + dice
+            tray, no affordance). The card only owns the blank stage — any
+            real view (activeView set) or an open wizard replaces it; the
+            sidebar "Add Character" lane is untouched. */}
+        <EmptyCampaignStage
+          activeView={activeView}
+          characters={characters}
+          showCharacterWizard={showCharacterWizard}
+          showEditCharacterWizard={showEditCharacterWizard}
+          campaignName={campaignName}
+          onAddCharacter={handleAddCharacter}
+          onOpenChecklist={() => setChecklistEpoch(n => n + 1)}
+          isLocalhost={isLocalhost}
+        />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}

@@ -1,0 +1,13 @@
+/* Zero-character campaign empty-state card (scoped to .empty-campaign-state).
+   Layout, tint and button chrome come from the global .ct-container +
+   .ct-empty-state + .ct-btn classes; only the icon/label/button spacing
+   accents live here (mirrors MapUnavailable.css). */
+
+.empty-campaign-state .empty-campaign-add-btn {
+  font-style: normal;
+  margin-top: 8px;
+}
+
+.empty-campaign-state .empty-campaign-checklist-btn {
+  font-style: normal;
+}

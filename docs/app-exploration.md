@@ -55,7 +55,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass; d
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 (UM): a zero-character campaign whose offer-once wizard has been consumed lands on a FULLY BLANK main stage (qa-arena screenshot: nav + dice tray, zero content, no empty-state affordance) — an empty-state card ("Add your first character" / "Open the starter checklist" where seeded) would make the shell self-explanatory; the sidebar Add Character remains the only door.
 - 2026-11-20 (TL, TL-era #2–4 kept): visitor 3D scene header census line reads `… 1 monsters` while the token is culled/ghosted (consider origin-gating counts); visitor 3D ghost label renders bare name while 2D says `— last seen here` (memory-vs-sighting wording); edit-wizard header is un-named `Edit Character` (naming it `Edit "War_Cleric"` is a cheap detection aid).
 
 <!-- resolved 2026-11-20 UM (shipped 69c9c7b88, lived): wizard save-failure alert double-prefix — alert now verbatim single-owner copy. -->
