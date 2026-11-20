@@ -61,9 +61,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **campaigns: a seedless zero-char campaign is a dead panel for a visitor (WW):** on `qa-arena` the LAN tab shows `This campaign has no characters yet.` with ZERO affordances (add button `isLocalhost`-gated, no checklist because `{seed:null}`) and no explanation — post-90f441e88 the visitor is no longer trapped in a doomed wizard but now lands on a message that offers nothing. Add a GM-only-by-design hint (e.g. `Ask the GM to add the first character`) to the same card. `src/components/campaign-empty-state/`.
-- **gm-screen: the "No zones or markers on the table." line never mentions real zones (WW):** it keys off the `targetEffects` campaign key while spell-overlay circles (the thing a GM reads as a zone on the map) live in a different store entirely — adding an overlay leaves the panel claiming nothing is on the table. Either fold overlay zones into that section or rename the copy (e.g. `No ongoing effects`). `src/components/gm-screen/GMScreenInPlay.jsx` (~133-149).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.
