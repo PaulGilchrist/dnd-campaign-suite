@@ -9,7 +9,14 @@
 // (subscribeToSSE — never a new EventSource) and cues ONLY live appends:
 // there is no initial log GET, so a mount or campaign re-select can never
 // blast a backlog of old rolls. Every client fires its own cue, so an
-// SSE-driven remote attack sounds on every screen showing the tracker.
+// SSE-driven remote attack sounds on EVERY view of a mounted campaign tab.
+//
+// MOUNT LAW (owner ruling 2026-11-20): mounted ONCE at App level (beside the
+// root Subscriber/MapContextSync campaign consumers), NOT inside Initiative —
+// a tab parked on Characters/Map/Log must hear saves, deaths and its own
+// attack chain too. Exactly one pooled lane per campaign session: the mount
+// only ever exists on the campaign-selected shell, so the campaign-select
+// screen is cue-silent and the Initiative view never doubles the lane.
 //
 // Damage and heal cues do NOT fire here — HpFeedback owns the HP-movement
 // twin (heal), and damage deliberately stays silent on this lane because the

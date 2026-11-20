@@ -27,6 +27,7 @@ import useMapHistory from './hooks/management/useMapHistory.js';
 import { useCharacterWizard } from './hooks/wizard/useCharacterWizard.js';
 import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
+import CombatCues from './components/common/CombatCues.jsx';
 import CampaignReloadNotice from './components/common/CampaignReloadNotice/CampaignReloadNotice.jsx';
 import MapContextSync from './components/common/MapContextSync.jsx';
 import { replaceRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
@@ -1086,6 +1087,13 @@ function App() {
           onOpenWizard={(character) => openLevelUpWizard(character, { setActiveCharacter, handleEditCharacter })}
         />
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
+        {/* Sensory cues (roadmap Item 10): the SSE log-lane audio twin of the
+            outcome floaters, mounted ONCE on the campaign shell (owner ruling
+            2026-11-20) so every view — Characters, Map, Log, Initiative —
+            hears saves/deaths/attacks, not just the tracker. Live appends
+            only (no backlog blast); the SFX gate lives in audioCues. The heal
+            twin still fires at HpFeedback itself. */}
+        <CombatCues campaignName={campaignName} />
         <CampaignReloadNotice campaignName={campaignName} />
         <MapContextSync campaignName={campaignName} activeMapName={activeMapName} isLocalhost={isLocalhost} />
         {/* Blocking busy layer while the roster is being enriched (App.css

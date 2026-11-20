@@ -65,8 +65,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 YY: audio cues only exist while the Initiative view is mounted (`CombatCues` lives in `Initiative.jsx:935`) — a GM/PC tab parked on Characters/Map/Log hears nothing from saves, deaths or even its own attack chain; consider mounting the log-decode+play consumer at App level (one pooled lane, no per-view duplication) or documenting the seam as intentional in the users-guide.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.
