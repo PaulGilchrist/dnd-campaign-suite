@@ -2,7 +2,7 @@
 
 import { RULESET_REQUIRED_ERROR } from '../../config/utils.js';
 
-function WizardStepRules({ ruleset, errors, onRulesetChange, buildMode = 'custom', onBuildModeChange }) {
+function WizardStepRules({ ruleset, errors, onRulesetChange, buildMode = 'custom', onBuildModeChange, isEditing = false }) {
   // Inline blocker hint (parity with the step-2 name gate): visible while no
   // ruleset is chosen, clears the moment a card is picked. An explicit
   // validator message (errors.ruleset) takes precedence over the default copy.
@@ -16,28 +16,35 @@ function WizardStepRules({ ruleset, errors, onRulesetChange, buildMode = 'custom
     <div className="wizard-step">
       <h2>Select Rules System</h2>
 
-      <p className="step-description">Choose how to build your character:</p>
-      <div className="rules-selection-container">
-        <div
-          className={`rules-option ${buildMode === 'custom' ? 'selected' : ''}`}
-          onClick={() => selectBuildMode('custom')}
-          data-testid="build-mode-custom"
-        >
-          <div className="rules-option-icon"><i className="fa-solid fa-sliders"></i></div>
-          <h4>Custom build</h4>
-          <p>Fill every step of the wizard yourself, from scratch.</p>
-        </div>
+      {/* Build mode is a creation-time concept: a saved character is already
+          built, and the quick-build prefill lane is inert while editing, so
+          the cards stay hidden in the edit flow. */}
+      {!isEditing && (
+        <>
+          <p className="step-description">Choose how to build your character:</p>
+          <div className="rules-selection-container">
+            <div
+              className={`rules-option ${buildMode === 'custom' ? 'selected' : ''}`}
+              onClick={() => selectBuildMode('custom')}
+              data-testid="build-mode-custom"
+            >
+              <div className="rules-option-icon"><i className="fa-solid fa-sliders"></i></div>
+              <h4>Custom build</h4>
+              <p>Fill every step of the wizard yourself, from scratch.</p>
+            </div>
 
-        <div
-          className={`rules-option ${buildMode === 'quick' ? 'selected' : ''}`}
-          onClick={() => selectBuildMode('quick')}
-          data-testid="build-mode-quick"
-        >
-          <div className="rules-option-icon"><i className="fa-solid fa-bolt"></i></div>
-          <h4>Quick build</h4>
-          <p>Pick race and class as usual — abilities, skills, spells and equipment are suggested from the rules data. Every suggestion stays editable.</p>
-        </div>
-      </div>
+            <div
+              className={`rules-option ${buildMode === 'quick' ? 'selected' : ''}`}
+              onClick={() => selectBuildMode('quick')}
+              data-testid="build-mode-quick"
+            >
+              <div className="rules-option-icon"><i className="fa-solid fa-bolt"></i></div>
+              <h4>Quick build</h4>
+              <p>Pick race and class as usual — abilities, skills, spells and equipment are suggested from the rules data. Every suggestion stays editable.</p>
+            </div>
+          </div>
+        </>
+      )}
 
       <p className="step-description">Choose which D&D ruleset your character will follow:</p>
       <div className="rules-selection-container">

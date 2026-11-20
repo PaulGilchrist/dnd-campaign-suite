@@ -1,8 +1,9 @@
 
-function WizardProgressBar({ currentStep, totalSteps, isEditing }) {
-  const effectiveStep = isEditing ? currentStep - 1 : currentStep;
-  const effectiveTotal = isEditing ? totalSteps - 1 : totalSteps;
-  const progressWidth = ((effectiveStep - 1) / (effectiveTotal - 1)) * 100;
+// The step index is shared with the sidebar/headings (getVisibleSteps): the
+// Ruleset step counts in BOTH flows, so the bar needs no editing offset —
+// editing only changes the arrival step.
+function WizardProgressBar({ currentStep, totalSteps }) {
+  const progressWidth = ((currentStep - 1) / (totalSteps - 1)) * 100;
   
   return (
     <div className="progress-bar">

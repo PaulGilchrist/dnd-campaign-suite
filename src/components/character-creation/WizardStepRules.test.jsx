@@ -164,4 +164,17 @@ describe('WizardStepRules', () => {
     renderStep();
     expect(() => fireEvent.click(screen.getByTestId('build-mode-quick'))).not.toThrow();
   });
+
+  // Edit lane: a saved character is already built and the quick-build prefill
+  // is inert while editing, so the cards stay hidden — the ruleset cards and
+  // the ledger-guarded switch lane are the whole step.
+  it('edit mode hides the build-mode cards but keeps the ruleset cards', () => {
+    renderStep({ isEditing: true, ruleset: '2024' });
+
+    expect(screen.queryByTestId('build-mode-custom')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('build-mode-quick')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose how to build your character:')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rules-option-5e')).toBeInTheDocument();
+    expect(screen.getByTestId('rules-option-2024')).toHaveClass('selected');
+  });
 });

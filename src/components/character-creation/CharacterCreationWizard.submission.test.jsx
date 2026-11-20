@@ -243,9 +243,9 @@ vi.mock('../../config/steps-config.js', () => {
     getProps: () => ({}),
   }));
 
-  const mockGetVisibleSteps = ({ isEditing = false, ruleset } = {}) =>
+  const mockGetVisibleSteps = ({ ruleset } = {}) =>
     mockSteps
-      .filter((s) => !(isEditing && s.step === 1) && !(ruleset !== '2024' && s.step === 5))
+      .filter((s) => !(ruleset !== '2024' && s.step === 5))
       .map((s, i) => ({ ...s, displayNumber: i + 1 }));
 
   return {

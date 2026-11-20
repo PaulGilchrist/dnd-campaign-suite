@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **No ruleset-switch lane for EXISTING characters** (RG 2026-11-19, context): `WizardSidebar` hides the Ruleset step in edit mode, so the shipped ledger guard only protects fresh builds; a saved character cannot change rulesets at all. If that's intended (2024-vs-5e locked per char), the users-guide §14 gotcha text and plan Item 2 preamble should say so.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

@@ -29,12 +29,13 @@ export const WIZARD_STEPS = [
     step: 1,
     title: 'Ruleset',
     component: WizardStepRules,
-    getProps: ({ ruleset, errors, onRulesetChange, buildMode, onBuildModeChange }) => ({
+    getProps: ({ ruleset, errors, onRulesetChange, buildMode, onBuildModeChange, isEditing }) => ({
       ruleset,
       errors,
       onRulesetChange,
       buildMode,
       onBuildModeChange,
+      isEditing,
     }),
   },
   {
@@ -258,13 +259,15 @@ export const getTotalSteps = () => WIZARD_STEPS.length;
  * Get the steps actually walked for a given flow, numbered consecutively.
  * Single source of truth for both the sidebar indicator and the content
  * headings: `displayNumber` is 1-based over visible steps only.
- *  - isEditing: step 1 (Ruleset) is skipped.
  *  - ruleset !== '2024': step 5 (Background) is skipped (2024-only by design).
+ * The Ruleset step (1) is visible in BOTH flows: fresh builds choose it on
+ * arrival; edits reach it from the sidebar to switch the saved character's
+ * ruleset through the keep/remove ledger guard (RulesetSwitchConfirmModal).
+ * Editing only changes the ARRIVAL step (Basic Information), never the index.
  */
-export const getVisibleSteps = ({ isEditing = false, ruleset } = {}) =>
+export const getVisibleSteps = ({ ruleset } = {}) =>
   WIZARD_STEPS
     .filter((step) => {
-      if (isEditing && step.step === 1) return false;
       if (ruleset !== '2024' && step.step === 5) return false;
       return true;
     })
@@ -274,8 +277,8 @@ export const getVisibleSteps = ({ isEditing = false, ruleset } = {}) =>
  * Get the consecutive display number for a canonical step number in a given flow.
  * Returns undefined when the step is not part of the flow.
  */
-export const getDisplayNumber = (stepNumber, { isEditing = false, ruleset } = {}) =>
-  getVisibleSteps({ isEditing, ruleset }).find((step) => step.step === stepNumber)?.displayNumber;
+export const getDisplayNumber = (stepNumber, { ruleset } = {}) =>
+  getVisibleSteps({ ruleset }).find((step) => step.step === stepNumber)?.displayNumber;
 
 /**
  * Get the step configuration for a given step number.

@@ -36,7 +36,14 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
     if (!cls) return false;
     const subclasses = cls.subtypes || [];
     if (subclasses.length === 0) return true;
-    return !!(formData.class.subclass && formData.class.subclass.name);
+    const chosen = formData.class.subclass?.name || '';
+    // Membership in the CURRENT ruleset's list — not just "any non-empty
+    // name": a ruleset switch keeps the class choice but the same class can
+    // print its subclasses under different names ('Abjurer' vs 'Abjuration'),
+    // and the new-ruleset engine cannot resolve a stale one. The switch's
+    // ledger copy already says every step gets re-confirmed; this is the
+    // gate that makes the save wait for that re-confirmation.
+    return subclasses.some(s => (typeof s === 'string' ? s : s?.name) === chosen);
   }, [formData.class, classSubtypes]);
 
   // Walk order = the same shared step index the sidebar and content headings

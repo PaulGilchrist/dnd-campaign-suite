@@ -5,7 +5,6 @@ import WizardSidebar from './WizardSidebar.jsx';
 
 const createProps = (overrides = {}) => ({
   currentStep: 2,
-  isEditing: false,
   ruleset: '5e',
   getStepEnabled: () => true,
   goToStep: vi.fn(),
@@ -43,13 +42,13 @@ const ALL_TITLES = [
 ];
 
 describe('WizardSidebar', () => {
+  // The Ruleset tab is part of BOTH flows (edit switches rulesets through the
+  // ledger-guarded lane), so only the 2024-only Background step varies here.
   it.each([
-    ['5e', false, ALL_TITLES.filter((t) => t !== 'Background')],
-    ['2024', false, ALL_TITLES],
-    ['5e', true, ALL_TITLES.filter((t) => t !== 'Ruleset' && t !== 'Background')],
-    ['2024', true, ALL_TITLES.filter((t) => t !== 'Ruleset')],
-  ])('renders the exact ordered step list for ruleset %s (isEditing=%s)', (ruleset, isEditing, expected) => {
-    renderSidebar({ ruleset, isEditing });
+    ['5e', ALL_TITLES.filter((t) => t !== 'Background')],
+    ['2024', ALL_TITLES],
+  ])('renders the exact ordered step list for ruleset %s', (ruleset, expected) => {
+    renderSidebar({ ruleset });
     expect(stepTabTitles()).toEqual(expected);
   });
 

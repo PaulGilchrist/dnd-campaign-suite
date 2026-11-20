@@ -8,18 +8,20 @@ import { getVisibleSteps } from '../../config/steps-config.js';
  *
  * @param {Object} props
  * @param {number} props.currentStep - The currently active canonical step.
- * @param {boolean} props.isEditing - When true, hide step 1 (Ruleset).
  * @param {string} props.ruleset - The ruleset ('5e' or '2024'). When '5e', step 5 (Background) is hidden.
  * @param {function} props.getStepEnabled - Takes a canonical step number, returns boolean for whether that tab is clickable.
  * @param {function} props.goToStep - Takes a canonical step number, navigates to it.
  * @param {boolean} props.isSaveEnabled - Whether the save button is active.
  * @param {function} props.onSave - Called when the save tab is clicked.
  */
-export default function WizardSidebar({ currentStep, isEditing, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave }) {
-  const visibleSteps = getVisibleSteps({ isEditing, ruleset });
+export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave }) {
+  const visibleSteps = getVisibleSteps({ ruleset });
 
   return (
     <div className="wizard-sidebar">
+      {/* The Ruleset tab is visible in BOTH flows — edit rides the same
+          ledger-guarded switch lane as fresh builds (see the wizard's
+          handleRulesetChange). */}
       {visibleSteps.map(stepConfig => {
         const isActive = stepConfig.step === currentStep;
         const isEnabled = getStepEnabled(stepConfig.step);

@@ -313,7 +313,7 @@ Key differences you'll notice:
 - **Spells:** 2024 characters always have their spell list prepared; some 5e subclass-school restrictions don't apply.
 - **Class features & subclasses** come from the matching edition's catalog.
 
-**Gotcha:** switching a character's ruleset after creation clears spells, feats, and background choices and resets the wizard — re-select them from the correct edition's catalog. There is no automatic migration.
+**Switching a saved character's ruleset:** open the character's **Edit** wizard — the Ruleset step is in the sidebar there too (the edit opens on Basic Information; click **Ruleset** and the current edition is pre-selected). Picking the other edition arms a keep/remove ledger before anything changes: every spell, feat and background of the saved character is re-checked against the target edition's actual rules data and the dialog names exactly what is kept and what is removed (and why). Confirm restarts the wizard at Basic Information to re-confirm the steps under the new ruleset — saving stays gated until every step is valid there (e.g. a Background pick when switching TO 2024; a subclass re-pick when the new edition prints the same subclass under a different name). **✓ Save** then writes the switch (the removed rows genuinely disappear, kept rows survive). Cancel or closing the wizard writes nothing. There is no automatic migration: anything the new edition's data can't verify is removed and must be re-selected from that edition's catalog.
 
 ---
 

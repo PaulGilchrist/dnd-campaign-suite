@@ -223,6 +223,18 @@ describe('useWizardNavigation', () => {
       expect(result.current.isSaveEnabled).toBe(false);
     });
 
+    it('blocks save when the chosen subclass name is absent from the CURRENT ruleset list (stale switch pick), and clears once re-picked', async () => {
+      const classesWithSubclasses = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] }];
+      const stale = renderWizard(1, formDataWith({ class: { name: 'Fighter', subclass: { name: 'Martial Warrior' } } }), mockRacesData, classesWithSubclasses);
+      await flush();
+      expect(stale.result.current.getStepEnabled(8)).toBe(false);
+      expect(stale.result.current.isSaveEnabled).toBe(false);
+
+      const repicked = renderWizard(1, formDataWith({ class: { name: 'Fighter', subclass: { name: 'Champion' } } }), mockRacesData, classesWithSubclasses);
+      await flush();
+      expect(repicked.result.current.isSaveEnabled).toBe(true);
+    });
+
     it('blocks save when class subtype data has not loaded', async () => {
       const { result } = renderWizard(1, formDataWith(), mockRacesData, []);
       await flush();

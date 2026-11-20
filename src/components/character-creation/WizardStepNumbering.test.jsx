@@ -7,8 +7,11 @@
  *   WizardSidebar.test.jsx owns tab titles/enablement, useWizardNavigation.test.js
  *   owns validation/enablement semantics, and the ruleset walk-skip is delegated
  *   here by that hook's test header.
- * - 5e skips step 5 (Background); editing skips step 1 (Ruleset); display
- *   numbers stay consecutive 1..N over the visible steps only.
+ * - 5e skips step 5 (Background); the Ruleset step (1) is visible in BOTH
+ *   flows — editing reaches it to switch a saved character's ruleset through
+ *   the ledger guard, so the editing index equals the create index (editing
+ *   only changes the arrival step); display numbers stay consecutive 1..N
+ *   over the visible steps only.
  */
 import { render, screen } from '@testing-library/react';
 import { renderHook, act } from '@testing-library/react';
@@ -46,22 +49,22 @@ describe('wizard step numbering (indicator, headings, and walk share one index)'
       hidden: [5],
     },
     {
-      flow: '2024 editing (Ruleset absent, 2+ shift down)',
+      flow: '2024 editing (same index as create — Ruleset step stays visible)',
       ctx: { isEditing: true, ruleset: '2024' },
       pairs: [
-        [2, 1], [3, 2], [4, 3], [5, 4], [6, 5], [7, 6], [8, 7], [9, 8], [10, 9],
-        [11, 10], [12, 11], [13, 12], [14, 13], [15, 14], [16, 15], [17, 16],
+        [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9],
+        [10, 10], [11, 11], [12, 12], [13, 13], [14, 14], [15, 15], [16, 16], [17, 17],
       ],
-      hidden: [1],
+      hidden: [],
     },
     {
-      flow: '5e editing (both skips)',
+      flow: '5e editing (same index as create; Background absent)',
       ctx: { isEditing: true, ruleset: '5e' },
       pairs: [
-        [2, 1], [3, 2], [4, 3], [6, 4], [7, 5], [8, 6], [9, 7], [10, 8], [11, 9],
-        [12, 10], [13, 11], [14, 12], [15, 13], [16, 14], [17, 15],
+        [1, 1], [2, 2], [3, 3], [4, 4], [6, 5], [7, 6], [8, 7], [9, 8], [10, 9],
+        [11, 10], [12, 11], [13, 12], [14, 13], [15, 14], [16, 15], [17, 16],
       ],
-      hidden: [1, 5],
+      hidden: [5],
     },
   ])('$flow', ({ ctx, pairs, hidden }) => {
     it('numbers every visible step consecutively and hides non-flow steps', () => {
@@ -97,7 +100,9 @@ describe('wizard step numbering (indicator, headings, and walk share one index)'
 
     it.each([
       ['5e create', { ruleset: '5e' }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]],
-      ['5e editing', { isEditing: true, ruleset: '5e' }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]],
+      // Editing no longer drops the Ruleset tab: the sidebar has no isEditing
+      // input at all, so the 5e editing flow renders the create numbers.
+      ['5e editing', { isEditing: true, ruleset: '5e' }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]],
     ])('renders gap-free numbers for %s', (_label, ctx, expected) => {
       renderSidebar(ctx);
       expect(renderedNumbers()).toEqual(expected);

@@ -31,6 +31,7 @@ const WizardStepRenderer = React.memo(({
   currentStep,
   stepNumber,
   ruleset,
+  isEditing,
   errors,
   formData,
   campaignName,
@@ -100,6 +101,7 @@ const WizardStepRenderer = React.memo(({
   const StepComponent = stepConfig.component;
   const props = stepConfig.getProps({
     ruleset,
+    isEditing,
     errors,
     formData,
     campaignName,
@@ -410,13 +412,16 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
    const abilitiesWithinCap = Object.keys(abilityCapErrors).length === 0;
 
    // Handlers
-  // Ruleset switch (roadmap Item 2): never wipes silently. Every current
+  // Ruleset switch (roadmap Item 2): never wipes silently — in BOTH flows
+  // (fresh builds AND the edit lane on saved-character data). Every current
   // spells/feats/background row is first classified against the TARGET
   // ruleset's real data; when anything is selected the confirm modal names
   // exactly what stays ticked vs what is removed (and why) before any state
   // mutates. Cancel is inert. A draft with no rules-derived selections still
   // switches immediately (nothing can be lost), and clicking the already
-  // selected card no longer resets the flow at all.
+  // selected card no longer resets the flow at all. In edit mode the switch
+  // only touches the local draft until ✓ Save rides the existing edit-save
+  // PUT — the `rules` field flip and the ledger's removals land together.
   const [pendingRulesetSwitch, setPendingRulesetSwitch] = useState(null);
 
   const commitRulesetSwitch = useCallback((preview) => {
@@ -503,10 +508,12 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
   const totalSteps = WIZARD_STEPS.length;
 
   // Shared step index: drives both the sidebar indicator and the content
-  // headings so their numbering can never drift apart.
+  // headings so their numbering can never drift apart. The Ruleset step is
+  // part of both flows — editing a saved character switches rulesets through
+  // the same ledger-guarded lane as a fresh build.
   const visibleSteps = useMemo(
-    () => getVisibleSteps({ isEditing, ruleset }),
-    [isEditing, ruleset]
+    () => getVisibleSteps({ ruleset }),
+    [ruleset]
   );
   const lastCanonicalStep = visibleSteps[visibleSteps.length - 1]?.step;
   const stepNumber = visibleSteps.findIndex((step) => step.step === currentStep) + 1;
@@ -517,6 +524,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         currentStep={currentStep}
         stepNumber={stepNumber}
         ruleset={ruleset}
+        isEditing={isEditing}
         errors={errors}
         formData={formData}
         campaignName={campaignName}
@@ -581,6 +589,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     currentStep,
     stepNumber,
     ruleset,
+    isEditing,
     errors,
     formData,
     campaignName,
@@ -646,12 +655,10 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           <WizardProgressBar
           currentStep={currentStep}
           totalSteps={totalSteps}
-          isEditing={isEditing}
           />
           <div className="wizard-body">
             <WizardSidebar
               currentStep={currentStep}
-              isEditing={isEditing}
               ruleset={ruleset}
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
@@ -664,7 +671,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           </div>
           <WizardFooter
           currentStep={currentStep}
-          isFirstStep={isEditing ? currentStep === 2 : currentStep === 1}
+          isFirstStep={currentStep === 1}
           isLastStep={currentStep === lastCanonicalStep}
           onCancel={handleRequestClose}
           onPrevious={navigatePrevious}

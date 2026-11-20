@@ -185,10 +185,16 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
       rules: '5e',
     };
 
+    // The edit walk arrives at Basic Information, which is no longer the
+    // FIRST step (the Ruleset step is visible in edit mode too): one
+    // Previous reaches step 1, where the footer renders Cancel.
+    const backToFirstStep = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+
     it('prefilled unmodified draft: Cancel closes with no confirm', () => {
       const { onCancel } = renderWizard({ characterData, isEditing: true });
 
-      // Edit wizard starts on Basic Information — Cancel is right there.
+      backToFirstStep();
       fireEvent.click(cancelBtn());
 
       expect(confirmSpy).not.toHaveBeenCalled();
@@ -209,6 +215,7 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
 
       fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '3' } });
 
+      backToFirstStep();
       fireEvent.click(cancelBtn());
       expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Edgin"?');
       expect(onCancel).not.toHaveBeenCalled();
@@ -225,6 +232,7 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
       typeName('Edgin the Wise');
       typeName('Edgin');
 
+      backToFirstStep();
       fireEvent.click(cancelBtn());
 
       expect(confirmSpy).not.toHaveBeenCalled();
