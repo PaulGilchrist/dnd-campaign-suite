@@ -17,7 +17,12 @@ import './EmptyCampaignState.css';
  * off (`seed?.entities`), and the starter-seed GET answers 200 `{seed:null}`
  * for non-starter campaigns, so this lane never errors for arena/standard.
  * The add-character button mirrors the sidebar's GM-only "Add Character" door
- * (localhost-only, same gate as Sidebar.jsx).
+ * (localhost-only, same gate as Sidebar.jsx). On a VISITOR origin the add door
+ * is honestly absent, so the card gains a static hint line ("Ask the GM to add
+ * the first character") explaining the gate (backlog WW 2026-11-20: a seedless
+ * zero-char campaign was a dead panel — copy with zero affordances). The hint
+ * is plain text, never a button, and never shows on localhost where the GM
+ * holds the add door.
  */
 function EmptyCampaignState({ campaignName, onAddCharacter, onOpenChecklist, isLocalhost = false }) {
   const [hasStarterSeed, setHasStarterSeed] = useState(false);
@@ -45,6 +50,9 @@ function EmptyCampaignState({ campaignName, onAddCharacter, onOpenChecklist, isL
           <button type="button" className="ct-btn empty-campaign-checklist-btn" onClick={onOpenChecklist}>
             <i className="fa-solid fa-seedling" aria-hidden="true"></i> Open the starter checklist
           </button>
+        )}
+        {!isLocalhost && (
+          <span className="empty-campaign-hint">Ask the GM to add the first character.</span>
         )}
       </div>
     </div>

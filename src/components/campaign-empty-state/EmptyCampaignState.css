@@ -11,3 +11,11 @@
 .empty-campaign-state .empty-campaign-checklist-btn {
   font-style: normal;
 }
+
+/* Visitor-only static hint (backlog WW 2026-11-20): explains the GM-only add
+   door on a non-localhost origin. .travel-panel-hint idiom — smaller, dimmer,
+   italic — but stays plain text (never an affordance). */
+.empty-campaign-state .empty-campaign-hint {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
