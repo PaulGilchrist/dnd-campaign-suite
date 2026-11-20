@@ -124,6 +124,16 @@ function applyStoreUpdate(storeKey, data) {
       campaignStore.set(storeKey, data);
     }
     notify('campaign');
+  } else if (data === null) {
+    // Cleared-bucket echo (character-key DELETE publishes null): mirror it as a
+    // bucket REMOVE, exactly as the campaign branch above removes its key. The
+    // empty-object snapshot replace evicts every local key (server truth: the
+    // bucket is gone) and notify wakes the consumers so their declared defaults
+    // win — never a stored null (hex-arrival-null-echo crash precedent), never a
+    // re-POST (memory-only skipSync law). Without this arm the echo was silently
+    // dropped and every mounted tab kept phantom badges/rows until a page reload
+    // (bug-character-bucket-delete-echo-never-self-heals).
+    replaceRuntimeObject(storeKey, {});
   } else {
     // Full-bucket echo: adopt as REPLACE (evict keys absent from the payload —
     // the server route replaced the whole bucket with this snapshot).
@@ -165,10 +175,13 @@ function handleChangeKeyEvent(event, campaignName) {
     // (travel-mode, travel-lastMessage, …). Both must mirror into the campaign
     // store or other clients keep stale state — e.g. a resolved travel
     // EventDialog stays open on the second client (cross-tab staleness bug).
-    // Character stores are full-snapshot replaces, so a non-object payload
-    // there is corrupt noise and stays dropped; prompt lanes below need object
-    // data, so they are never reached by null/scalar echoes.
-    if (isCampaignKey(storeKey)) {
+    // Character stores are full-snapshot replaces, so a non-NULL non-object
+    // payload there is corrupt noise and stays dropped; a null echo honestly
+    // reports an evicted bucket and mirrors as a bucket REMOVE (see
+    // applyStoreUpdate) so mounted consumers self-heal without a reload
+    // (bug-character-bucket-delete-echo-never-self-heals). Prompt lanes below
+    // need object data, so they are never reached by null/scalar echoes.
+    if (isCampaignKey(storeKey) || event.data === null) {
       applyStoreUpdate(storeKey, event.data);
     }
     return;

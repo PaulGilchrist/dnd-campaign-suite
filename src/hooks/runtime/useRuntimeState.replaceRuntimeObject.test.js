@@ -82,6 +82,30 @@ describe('useRuntimeState — replaceRuntimeObject (full-bucket SSE echo adoptio
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
+  // Cleared-bucket echo lane (bug-character-bucket-delete-echo-never-self-heals):
+  // App.applyStoreUpdate mirrors a character-key null DELETE echo as
+  // replaceRuntimeObject(key, {}) — the empty snapshot must evict the WHOLE
+  // bucket and wake consumers so their declared defaults win. An empty store is
+  // an inert remove (no notify, no resurrected keys).
+  it('evicts the whole bucket on an empty {} snapshot (cleared-echo remove)', () => {
+    replaceRuntimeObject('ElderPaladin', { activeConditions: ['Poisoned'], currentHitPoints: 224 });
+    const listener = vi.fn();
+    addStorageChangeListener('ElderPaladin', listener);
+
+    replaceRuntimeObject('ElderPaladin', {});
+
+    expect(hasRuntimeValue('ElderPaladin', 'activeConditions')).toBe(false);
+    expect(hasRuntimeValue('ElderPaladin', 'currentHitPoints')).toBe(false);
+    expect(getRuntimeValue('ElderPaladin', 'activeConditions')).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    // Inert remove on an already-empty bucket: zero notify, nothing stored.
+    replaceRuntimeObject('ElderPaladin', {});
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(hasRuntimeValue('ElderPaladin', 'activeConditions')).toBe(false);
+  });
+
   it('does not notify when the echoed bucket equals the current store', () => {
     replaceRuntimeObject('test-char', { hp: 15, sp: '15' });
     const listener = vi.fn();

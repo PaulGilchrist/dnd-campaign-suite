@@ -25,8 +25,10 @@
  *       payload are evicted; memory-only, never re-POSTed). Null (cleared-key) echoes
  *       REMOVE the key from the campaign store (declared defaults win — never
  *       a raw null in the mirror); scalar echoes mirror into the campaign
- *       store; for character keys both stay dropped (snapshot lane).
- *     - Malformed events (null key, foreign campaigns, null/scalar data on
+ *       store. For character keys a null echo is an evicted-bucket REMOVE
+ *       (replaceRuntimeObject(<key>, {})); a non-null scalar stays dropped
+ *       (snapshot lane).
+ *     - Malformed events (null key, foreign campaigns, non-null scalar data on
  *       character keys) are ignored.
  *  2. Character CRUD through the App shell: landing after campaign
  *     selection, wizard cancel-then-create lifecycle, edit-wizard seeding,
@@ -730,13 +732,35 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('travel-lastMessage')).toHaveLength(0);
     });
 
-    it('keeps dropping null/scalar echoes for character-scoped keys (full-snapshot lane)', async () => {
+    // bug-character-bucket-delete-echo-never-self-heals: the wildcard DELETE
+    // evicts the whole character bucket server-side and publishes an
+    // unconditional null echo. Dropping it left phantom badges/rows on every
+    // mounted tab until a page reload. The echo must mirror as a bucket REMOVE
+    // — an empty-snapshot replace (full-eviction semantics pinned in
+    // useRuntimeState.replaceRuntimeObject.test.js), never a stored null, never
+    // a re-POST (memory-only skipSync law).
+    it('mirrors a character-key null cleared-bucket echo as an empty-snapshot bucket REMOVE', async () => {
       const campaignStore = new Map();
       getStore.mockImplementation(() => campaignStore);
 
       await dispatch({ key: 'change-test-campaign-Aragorn', data: null });
+
+      expect(replaceRuntimeObject).toHaveBeenCalledWith('Aragorn', {});
+      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('Aragorn', null);
+      expect(writesFor('Aragorn')).toHaveLength(0);
+      expect(campaignStore.size).toBe(0);
+      expect(notify).not.toHaveBeenCalledWith('campaign');
+    });
+
+    // Non-NULL scalars on character keys remain corrupt noise (bucket echoes
+    // are full objects): they must not evict anything.
+    it('keeps dropping non-null scalar echoes for character-scoped keys (full-snapshot lane)', async () => {
+      const campaignStore = new Map();
+      getStore.mockImplementation(() => campaignStore);
+
       await dispatch({ key: 'change-test-campaign-Aragorn', data: 'corrupt' });
 
+      expect(replaceRuntimeObject).not.toHaveBeenCalled();
       expect(writesFor('Aragorn')).toHaveLength(0);
       expect(campaignStore.size).toBe(0);
       expect(notify).not.toHaveBeenCalledWith('campaign');
@@ -744,7 +768,7 @@ describe('App - Runtime Events & State Management', () => {
 
     it.each([
       ['null key', { key: null, data: { hp: 1 } }],
-      ['null data', { key: 'change-test-campaign-Aragorn', data: null }],
+      ['undefined data', { key: 'change-test-campaign-Aragorn', data: undefined }],
       ['non-object data', { key: 'change-test-campaign-Aragorn', data: 'corrupt' }],
       ['another campaign pipeline key', { key: 'pipeline-other-campaign-damage:rolled', data: { total: 1 } }],
     ])('ignores runtime events with %s without crashing or touching state', async (_label, event) => {
