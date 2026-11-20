@@ -20,7 +20,11 @@ import { useMemo, useRef } from 'react';
 // the GM lane) the cache is DROPPED and `null` is returned — OFF is a
 // byte-identical no-op for rendering, and a later re-arm ghosts only from
 // positions the players genuinely see from then on, never from stale
-// pre-toggle knowledge.
+// pre-toggle knowledge. The CALLER owns the cache's lifetime: Map.jsx hoists
+// this hook above its 2D/3D conditional (SK 2026-11-19), so the memory — and
+// the ghost face — survives a viewMode flip while Map stays mounted, yet the
+// genuine page boundaries (reload, map navigation) still unmount Map and drop
+// it: ghosts re-arm only from newly-seen positions after remount.
 //
 // Creature lanes only: npc/monster placed tokens. Player tokens (mapData
 // .players) are the party itself and hidden-item law (`visible: false`) is

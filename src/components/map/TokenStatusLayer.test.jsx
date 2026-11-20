@@ -36,7 +36,7 @@ const sceneTree = ({
   placedItems = [],
   isLocalhost = true,
   fog = new Set(),
-  lastKnownMode,
+  ghostCells = null,
 }) => {
   const mapData = { players };
   const offsets = buildTokenStackOffsets({ mapData, placedItems });
@@ -58,7 +58,7 @@ const sceneTree = ({
         itemDragging={null}
         handleItemPointerDown={vi.fn()}
         tokenOffsets={offsets.items}
-        lastKnownMode={lastKnownMode}
+        ghostCells={ghostCells}
         {...shared}
       />
       <TokenStatusLayer
@@ -203,16 +203,18 @@ describe('TokenStatusLayer — visibility and ghost laws cull rows with the art'
 
   it('ghost law: a token frozen as .token-ghost leaks zero chip rows', () => {
     setRuntimeObject('Goblin 2', { activeConditions: ['poisoned'] }, CAMPAIGN, true);
-    // Visitor, toggle ON, token genuinely seen first (memory arms)…
+    // Visitor, token genuinely live first (no memory in play yet)…
     const { container, rerender } = renderScene({
-      placedItems: [goblin()], isLocalhost: false, lastKnownMode: true,
+      placedItems: [goblin()], isLocalhost: false,
     });
     expect(container.querySelectorAll('g.npc-group.token-ghost')).toHaveLength(0);
     expect(rows()).toHaveLength(1);
-    // …then the cell leaves the light: the art re-renders as a ghost at the
-    // last-seen cell and the chip layer (reading the TRUE cell) paints none.
+    // …then the cell leaves the light: the parent's hoisted pass hands down
+    // the last-seen memory, the art re-renders as a ghost at that cell and
+    // the chip layer (reading the TRUE cell) paints none.
     rerender(sceneTree({
-      placedItems: [goblin()], isLocalhost: false, lastKnownMode: true, fog: new Set(['2,3']),
+      placedItems: [goblin()], isLocalhost: false, fog: new Set(['2,3']),
+      ghostCells: new Map([['token-1', { gridX: 2, gridY: 3 }]]),
     }));
     expect(container.querySelectorAll('g.npc-group.token-ghost')).toHaveLength(1);
     expect(rows()).toHaveLength(0);

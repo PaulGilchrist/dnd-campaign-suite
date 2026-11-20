@@ -614,10 +614,12 @@ describe('Map container - selection preview bytes', () => {
 // ─── Last-known-position mode wiring (roadmap Item 7) ───
 // OWNED here: the container's two threads — (a) the GM toolbar press flips
 // the flag THROUGH the map document (setMapData updater → autosave PUT lane,
-// never a new store key/route), and (b) mapData.lastKnownMode threads to the
-// token layer so player clients ghost fogged creature tokens while the GM
-// lane paints truth. Ghost marker bytes themselves → PlacedItems.last-known.
-// test.jsx; flag-over-SSE merge → useSSESync.test.js.
+// never a new store key/route), and (b) mapData.lastKnownMode drives Map's
+// hoisted useLastKnownPositions pass (SK 2026-11-19) so player clients ghost
+// fogged creature tokens at the last-seen cell while the GM lane paints
+// truth. Ghost marker bytes themselves → PlacedItems.last-known.test.jsx;
+// flip persistence → Map.ghost-flip.test.jsx; flag-over-SSE merge →
+// useSSESync.test.js.
 describe('Map container - last-known-position wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();

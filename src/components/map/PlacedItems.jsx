@@ -9,7 +9,6 @@ import { itemSpriteHref } from '../../services/maps/itemSprites';
 // had the same gap, so the title rides every marker in both lanes.
 import { placedItemLabel } from './hooks/usePlacedItems.js';
 import { tokenStackTransform, isStackedToken } from '../../services/maps/tokenStackOffsets.js';
-import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 const RADIUS = 20;
 const SPRITE = 36;      // single-cell sprite edge (SVG units)
 const WIDE_SPRITE = 72; // two-cell sprite long edge at rotation 0
@@ -34,9 +33,10 @@ function propGeometry(item, opts, gridCenterX, gridCenterY) {
 
 // Last-known-position mode (roadmap Item 7) chrome hoists, keeping
 // renderCreature under the complexity cap: the ghost lookup (null on the GM
-// lane / toggle OFF, where useLastKnownPositions returns null) and the stale-
-// marked group classes + honest title. A ghost rides .token-ghost (Map.css:
-// dimmed, muted, dashed ring) and never the buried-stack fade.
+// lane / toggle OFF, where the parent's useLastKnownPositions pass returns
+// null) and the stale-marked group classes + honest title. A ghost rides
+// .token-ghost (Map.css: dimmed, muted, dashed ring) and never the
+// buried-stack fade.
 const creatureGhostCell = (ghostCells, item) =>
     (ghostCells ? ghostCells.get(item.id) || null : null);
 
@@ -58,17 +58,15 @@ function PlacedItems({
     itemDragging,
     handleItemPointerDown,
     tokenOffsets,
-    // Last-known-position mode (roadmap Item 7): a map-document flag the GM
-    // toggles (persisted via the autosave lane, received over the map-data
-    // SSE echo). Players' clients freeze creature tokens that sit in fogged
-    // (never-revealed) cells at their last-seen cell; undefined/OFF renders
-    // byte-identically to before.
-    lastKnownMode,
+    // Last-known-position mode (roadmap Item 7): the ghost lookup for this
+    // pass, computed by the PARENT (Map.jsx hoisted useLastKnownPositions so
+    // the per-client memory survives a 2D↔3D view flip — see Map.jsx). null
+    // on the GM lane and while the map-document flag is OFF (byte-identical
+    // to the historic fog cull); otherwise a Map of fogged creature-token
+    // itemId -> last-seen {gridX, gridY}. The flag itself stays a Map/toolbar
+    // concern; this lane is pure rendering.
+    ghostCells,
 }) {
-    // null on the GM lane and while OFF (see useLastKnownPositions); a Map of
-    // itemId -> last-seen {gridX, gridY} for fogged creature tokens otherwise.
-    const ghostCells = useLastKnownPositions(placedItems, fog, lastKnownMode, isLocalhost);
-
     const isVisible = (item) => {
         // A secret door is never shown as an icon to players: hidden it is a
         // wall (rendered by GridAndWalls), discovered it is an empty cell. The

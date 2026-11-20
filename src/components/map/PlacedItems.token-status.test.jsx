@@ -38,18 +38,15 @@ describe('PlacedItems — no chip DOM in the token lane (chips hoisted)', () => 
 
   it('ghost face: the frozen .token-ghost paints art but zero chips', () => {
     setRuntimeObject('Goblin 2', { activeConditions: ['poisoned'] }, CAMPAIGN, true);
-    // Arm the per-client position memory (visitor, toggle ON, cell visible)…
-    const { container, rerender } = renderItems([monster()], {
-      isLocalhost: false, lastKnownMode: true,
-    });
-    // …then fog the truth cell: the group re-renders as a ghost.
-    rerender(
+    // The parent's hoisted pass (Map.jsx) hands down the last-seen memory;
+    // with the truth cell fogged the group re-renders as a ghost.
+    const { container } = render(
       <PlacedItems
         {...baseProps}
         isLocalhost={false}
-        lastKnownMode
         campaignName={CAMPAIGN}
         fog={new Set(['3,3'])}
+        ghostCells={new Map([['token-1', { gridX: 3, gridY: 3 }]])}
         placedItems={[monster()]}
       />
     );

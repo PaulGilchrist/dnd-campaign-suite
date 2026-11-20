@@ -5,9 +5,12 @@
 // produced only for fogged (never-revealed-cell) creature tokens with a
 // memory, and the whole lane is null on the GM client and while the map
 // toggle is OFF (with the cache dropped — re-arm never leaks stale truth).
-// The rendering half (ghost marker/cull/live snap) lives in
-// PlacedItems.last-known.test.jsx; the map-data flag's SSE lane is pinned in
-// useSSESync.test.js.
+// The oracle is CACHE-CALLER-agnostic (a pure ref-cache hook): Map.jsx hoists
+// the call above its 2D/3D conditional so the memory survives view flips —
+// that flip-persistence seam (and the drop-at-unmount page-boundary law) is
+// pinned in Map.ghost-flip.test.jsx. The rendering half (ghost marker/cull/
+// live snap) lives in PlacedItems.last-known.test.jsx; the map-data flag's
+// SSE lane is pinned in useSSESync.test.js.
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import useLastKnownPositions from './useLastKnownPositions.js';

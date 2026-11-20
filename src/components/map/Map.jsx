@@ -53,6 +53,7 @@ import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
 import useIndoorPois from './hooks/useIndoorPois';
 import useFogOfWar from './hooks/useFogOfWar';
+import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import RulerOverlay from './RulerOverlay.jsx';
@@ -129,6 +130,13 @@ function selectionChromeFor(selectedItem, placedItems, viewMode, isLocalhost) {
 
 function getWalls(mapData) {
     return mapData?.walls;
+}
+
+// Null-safe read of the last-known-position doc flag (mirrors getWalls): keeps
+// the hoisted useLastKnownPositions call below the Map function's complexity
+// cap (an inline `mapData?.…` chain costs a branch inside Map).
+function getLastKnownMode(mapData) {
+    return mapData?.lastKnownMode;
 }
 
 // Returns the revealed set (as an array) with every cell from `visible` merged
@@ -373,6 +381,19 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     // change they DO receive via SSE (useSSESync); they just never author it.
     const revealed = mapData?.revealed;
     const { fog, visible } = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize, revealed);
+
+    // Last-known-position ghosts (roadmap Item 7): the per-client position
+    // memory is HOISTED here from PlacedItems so it survives a 2D→3D→2D view
+    // flip — Map stays mounted while the whole 2D tree (PlacedItems included)
+    // unmounts, so a creature still in fog re-enters 2D ghosting at its
+    // last-seen cell immediately, with no live re-sighting. This is still
+    // page-local derived state (a ref cache inside the hook, fed only by data
+    // this client already received): a reload or map navigation unmounts Map
+    // and drops it exactly as before, and the hook returns null on the GM
+    // lane and while the toggle is OFF (cache dropped — re-arm never ghosts
+    // from stale pre-toggle knowledge). No new persisted state of any kind.
+    const ghostCells = useLastKnownPositions(placedItems, fog, getLastKnownMode(mapData), isLocalhost);
+
     useEffect(() => {
         if (!isLocalhost) return;
         const next = mergeNewlyRevealed(visible, revealed);
@@ -576,8 +597,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         );
     }
 
-    const effectiveWalls = computeEffectiveWalls(mapData.walls, placedItems);
-
     // Click-select details dock / contextmenu menu split — see selectionChromeFor.
     const { menuSelection, dockItem } = selectionChromeFor(selectedItem, placedItems, viewMode, isLocalhost);
 
@@ -709,7 +728,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
 
                 <GridAndWalls
                     gridSize={gridSize}
-                    walls={effectiveWalls}
+                    // Single-use derive at the consumer (Map sits at its
+                    // max-statements cap since the ghost-cache hoist landed).
+                    walls={computeEffectiveWalls(mapData.walls, placedItems)}
                     isLocalhost={isLocalhost}
                     fog={fog}
                     bgFill={mapData.bgFill}
@@ -742,7 +763,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDownTracked}
                     tokenOffsets={tokenStackOffsets.items}
-                    lastKnownMode={mapData.lastKnownMode}
+                    // Computed at Map level so the memory survives the 3D
+                    // flip (see useLastKnownPositions call above); null on
+                    // the GM lane and while the toggle is OFF.
+                    ghostCells={ghostCells}
                 />
 
                 {/* Token status chips (Item 6) paint in their own layer ABOVE
