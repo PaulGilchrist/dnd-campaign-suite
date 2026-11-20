@@ -1,8 +1,10 @@
 // @maintained-by-ai
 // "In Play" strip contract: conditions and effects surface from the runtime
-// character stores and the campaign targetEffects key; the combat block
+// character stores and the campaign targetEffects key; spell-overlay zones
+// surface from the container-passed spellZones prop; the combat block
 // surfaces from the combatSummary lane (store echo AND cold-mount cache
-// fallback) without ever writing back.
+// fallback) without ever writing back. The empty line waits for BOTH
+// effect lanes to be empty.
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, afterEach } from 'vitest';
 import GMScreenInPlay from './GMScreenInPlay.jsx';
@@ -14,11 +16,22 @@ afterEach(() => {
     clearGMScreenStores(['Aragorn']);
 });
 
-function renderInPlay(party, campaignEffects = []) {
+function renderInPlay(party, campaignEffects = [], spellZones = []) {
     return render(
-        <GMScreenInPlay party={party} campaignName={CAMPAIGN} campaignEffects={campaignEffects} />
+        <GMScreenInPlay party={party} campaignName={CAMPAIGN} campaignEffects={campaignEffects} spellZones={spellZones} />
     );
 }
+
+// A transport-shape overlay row (what /spell-overlay GET/echo carries).
+const ZONE = {
+    id: 'zone-1',
+    shape: 'cylinder',
+    startGridX: 3,
+    startGridY: 4,
+    radiusFt: 20,
+    color: 'rgba(255,80,60,0.07)',
+    label: 'GMSieve Zone',
+};
 
 describe('GMScreenInPlay', () => {
     it('clean table: placeholder only — no phantom rows', () => {
@@ -52,6 +65,29 @@ describe('GMScreenInPlay', () => {
         ]);
         expect(screen.getByText('Unassigned effects')).toBeInTheDocument();
         expect(document.querySelector('.gm-inplay-line')).toHaveTextContent('Disadv On Next Attack Roll');
+    });
+
+    it('spell-overlay zones surface as a labelled badge row and lift the empty line', () => {
+        renderInPlay([makePartyMember()], [], [ZONE]);
+        const line = screen.getByText('Spell zones').closest('.gm-inplay-line');
+        expect(line).toHaveTextContent('GMSieve Zone');
+        // The empty line is gated on BOTH lanes: an overlay alone hides it.
+        expect(screen.queryByText('No zones or markers on the table.')).not.toBeInTheDocument();
+    });
+
+    it('anonymous zones fall back to the map controls Shape (x,y) convention', () => {
+        renderInPlay([makePartyMember()], [], [{ ...ZONE, label: undefined }]);
+        expect(screen.getByText('Cylinder (3,4)')).toBeInTheDocument();
+        expect(screen.queryByText('No zones or markers on the table.')).not.toBeInTheDocument();
+    });
+
+    it('both lanes empty is the only face that shows the placeholder', () => {
+        // targetEffects alone hides it (regression: that lane's behavior is
+        // unchanged) — asserted by the effects tests above; zones alone by
+        // the zone tests; both empty here via the clean-table case.
+        renderInPlay([makePartyMember()], [], []);
+        expect(screen.getByText('No zones or markers on the table.')).toBeInTheDocument();
+        expect(screen.queryByText('Spell zones')).not.toBeInTheDocument();
     });
 
     it('combat rows render from the live combatSummary store echo', () => {

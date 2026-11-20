@@ -1,11 +1,15 @@
 // "What's in play" strip: conditions and effects currently live across the
 // party (runtime character stores), campaign-level target effects (zones and
-// markers), and the initiative board when a combatSummary exists. Everything
-// derives from shared-store subscriptions — no local state, no writes.
+// markers), the spell-overlay zones on the table (passed down from the
+// container's shared-SSE subscription — a GM reads those circles as THE
+// zones), and the initiative board when a combatSummary exists. Everything
+// derives from props + shared-store subscriptions — no local state, no writes.
 import { useMemo } from 'react';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { normalizeConditionKeys } from '../../services/combat/conditions/conditionDisplay.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { SHAPE_LABELS } from '../../models/SpellOverlay.js';
+import CreatureBadge from '../common/CreatureBadge.jsx';
 import StatusBadges from './StatusBadges.jsx';
 
 // One party member's live line; renders nothing while the character carries
@@ -115,7 +119,21 @@ function CombatActivity({ party, campaignName, campaignEffects }) {
     );
 }
 
-export default function GMScreenInPlay({ party, campaignName, campaignEffects }) {
+// One spell-overlay zone badge: the caster's own label verbatim, falling
+// back to the map controls' `Shape (x,y)` chip convention when anonymous.
+function ZoneBadge({ zone }) {
+    const shapeLabel = SHAPE_LABELS[zone.shape] || zone.shape || 'Spell';
+    return (
+        <CreatureBadge
+            icon="fa-wand-magic-sparkles"
+            label={zone.label || `${shapeLabel} (${zone.startGridX},${zone.startGridY})`}
+            cls="effect-neutral"
+            tooltip={`${shapeLabel} zone at (${zone.startGridX}, ${zone.startGridY})`}
+        />
+    );
+}
+
+export default function GMScreenInPlay({ party, campaignName, campaignEffects, spellZones = [] }) {
     // Stable identity for the shared zones array (a fresh `|| []` each render
     // would break the memo below).
     const zones = useMemo(() => campaignEffects || [], [campaignEffects]);
@@ -143,7 +161,17 @@ export default function GMScreenInPlay({ party, campaignName, campaignEffects })
                     <StatusBadges targetEffects={campaignOnly} />
                 </div>
             )}
-            {zones.length === 0 && (
+            {spellZones.length > 0 && (
+                <div className="gm-inplay-line">
+                    <span className="gm-inplay-name">Spell zones</span>
+                    <div className="gm-status-badges">
+                        {spellZones.map(zone => (
+                            <ZoneBadge key={zone.id} zone={zone} />
+                        ))}
+                    </div>
+                </div>
+            )}
+            {zones.length === 0 && spellZones.length === 0 && (
                 <p className="gm-empty text-muted">No zones or markers on the table.</p>
             )}
         </section>
