@@ -6,9 +6,17 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FirstSessionChecklist from './FirstSessionChecklist.jsx';
 import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
+import { loadQuestBoard } from '../../services/campaign/questsService.js';
 
 vi.mock('../../services/campaign/starterSeedService.js', () => ({
   loadStarterSeed: vi.fn(),
+}));
+
+// Quest step counts the LIVE board rows (backlog 2026-11-20 VN) — mocked at
+// the service boundary so no fetch reaches a server; the SSE re-fetch leg is
+// pinned in FirstSessionChecklist.sse-sync.test.jsx.
+vi.mock('../../services/campaign/questsService.js', () => ({
+  loadQuestBoard: vi.fn(),
 }));
 
 // Shared SSE client is exercised in FirstSessionChecklist.sse-sync.test.jsx;
@@ -30,8 +38,16 @@ const SEED = {
   },
 };
 
+// Three whitelisted board rows — the honest live face on a fresh seed.
+const BOARD_ROWS = [
+  { id: 'q1', name: 'Starter — Into the Ruins', status: 'active' },
+  { id: 'q2', name: 'Starter — Trouble in Town', status: 'active' },
+  { id: 'q3', name: 'Starter — The Spoils', status: 'active' },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
+  loadQuestBoard.mockResolvedValue(BOARD_ROWS);
 });
 
 async function renderChecklist(props = {}) {
@@ -134,6 +150,54 @@ describe('FirstSessionChecklist', () => {
       />
     );
     await waitFor(() => expect(screen.getAllByText('Build your heroes (+ Character)').length).toBeGreaterThan(0));
+  });
+
+  // Backlog 2026-11-20 VN: the quest step must count the LIVE board, never
+  // seed.entities.quests.length — the seed doc is immutable, so a deleted or
+  // drafted-away quest must not keep the panel advertising a stale number.
+  it('counts the quest step from the live board GET, not the seed document', async () => {
+    loadStarterSeed.mockResolvedValue(SEED); // 3 quests named in the seed…
+    loadQuestBoard.mockResolvedValue(BOARD_ROWS.slice(0, 2)); // …but only 2 live on the board
+    const onNavigate = vi.fn();
+    render(<FirstSessionChecklist campaignName="qa-starter" onNavigate={onNavigate} />);
+
+    await waitFor(() => expect(screen.getByText('Review the starter quests (2 on the board)')).toBeInTheDocument());
+    expect(screen.queryByText(/seeded/)).not.toBeInTheDocument();
+    expect(loadQuestBoard).toHaveBeenCalledWith('qa-starter');
+    // The deep link into the quests view is unchanged.
+    fireEvent.click(screen.getByText('Review the starter quests (2 on the board)'));
+    expect(onNavigate).toHaveBeenCalledWith('quests');
+  });
+
+  it('shows no number while the board GET is pending, then the honest live count', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    let resolveBoard;
+    loadQuestBoard.mockReturnValue(new Promise(resolve => { resolveBoard = resolve; }));
+    render(<FirstSessionChecklist campaignName="qa-starter" />);
+
+    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    // Pending face: the step renders but fabricates no seed-time number.
+    expect(screen.getByText('Review the starter quests')).toBeInTheDocument();
+    expect(screen.queryByText(/\(\d/)).not.toBeInTheDocument();
+
+    resolveBoard(BOARD_ROWS);
+    await waitFor(() => expect(screen.getByText('Review the starter quests (3 on the board)')).toBeInTheDocument());
+  });
+
+  it('keeps the no-number face when the board GET fails, with nothing uncaught', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    loadQuestBoard.mockRejectedValue(new Error('board down'));
+    render(<FirstSessionChecklist campaignName="qa-starter" />);
+
+    await waitFor(() => expect(screen.getByText('Review the starter quests')).toBeInTheDocument());
+    await new Promise(r => setTimeout(r, 20));
+    // No fabricated count ever appears; the rejection is handled (logged once,
+    // never left as an uncaught rejection) and siblings keep their copy.
+    expect(screen.queryByText(/\(\d/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 
   it('dismiss hides the panel and writes nothing', async () => {

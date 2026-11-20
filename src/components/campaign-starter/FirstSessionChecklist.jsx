@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
+import { loadQuestBoard } from '../../services/campaign/questsService.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import './FirstSessionChecklist.css';
 
@@ -17,6 +18,27 @@ import './FirstSessionChecklist.css';
 function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLocalhost = false }) {
   const [seed, setSeed] = useState(null);
   const [dismissed, setDismissed] = useState(false);
+  // Live quest count from the board GET (backlog 2026-11-20 VN): the seed doc
+  // is immutable, so its `quests` list goes stale the moment the GM deletes or
+  // drafts a row. null = pending/failed — the step then shows NO number rather
+  // than a fabricated seed-time one.
+  const [questCount, setQuestCount] = useState(null);
+
+  // Read-only re-fetch of the whitelisted board rows (same lane the QuestBoard
+  // itself uses); a failed GET leaves questCount null (honest no-number face).
+  const refreshQuestCount = useCallback(() => {
+    loadQuestBoard(campaignName)
+      .then(rows => setQuestCount(rows.length))
+      .catch(error => {
+        console.error('Starter checklist quest count refresh failed:', error);
+        setQuestCount(null);
+      });
+  }, [campaignName]);
+
+  useEffect(() => {
+    setQuestCount(null);
+    refreshQuestCount();
+  }, [refreshQuestCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,15 +57,29 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
   // the one that issued the PUT — refreshes its named entities without a
   // reload. The payload is applied directly (never re-GET/re-POST the echo,
   // skipSync doctrine); subscription rides the ONE shared SSE client.
+  // Quest add/delete/status flips broadcast `quests-list-<campaign>` (see
+  // server/routes/quests.js) and re-fetch ONLY the board count — the sanctioned
+  // read-only refresh pattern of the QuestBoard twin (a GET echo is not a
+  // re-POST).
   useEffect(() => subscribeToSSE(campaignName, (event) => {
-    if (!event || event.key !== `starter-seed-${campaignName}`) return;
-    const updated = event.data?.seed;
-    if (updated && typeof updated === 'object') setSeed(updated);
-  }), [campaignName]);
+    if (!event) return;
+    if (event.key === `starter-seed-${campaignName}`) {
+      const updated = event.data?.seed;
+      if (updated && typeof updated === 'object') setSeed(updated);
+    } else if (event.key === `quests-list-${campaignName}`) {
+      refreshQuestCount();
+    }
+  }), [campaignName, refreshQuestCount]);
 
   if (dismissed || !seed?.entities) return null;
 
-  const { settlement, dungeonTitle, quests, encounters } = seed.entities;
+  const { settlement, dungeonTitle, encounters } = seed.entities;
+  // Quest step copy (backlog 2026-11-20 VN): the LIVE board count, never
+  // seed.entities.quests.length — once the board answers it prints the honest
+  // number; while the GET is pending or failed it prints NO number at all.
+  const questStepLabel = questCount === null
+    ? 'Review the starter quests'
+    : `Review the starter quests (${questCount} on the board)`;
   // Parent plan §4.2 walk: build a sheet → settlement lore → outdoor/fog move →
   // quests → join wave 1 → TV/teams → short rest → log; GM rows add the
   // betrayal tool and the regenerate deep link. Every step names the
@@ -59,7 +95,7 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
   steps.push(
     { icon: 'fa-house', label: `Meet the folk of ${settlement}`, view: 'settlements' },
     { icon: 'fa-map', label: `Lead your tokens from ${settlement} to the portal of ${dungeonTitle} through the fog`, view: 'mapsManager' },
-    { icon: 'fa-scroll', label: `Review the starter quests (${quests.length} seeded)`, view: 'quests' },
+    { icon: 'fa-scroll', label: questStepLabel, view: 'quests' },
     // backlog 2026-11-11 KW: the promise reads "Join <wave>", but saved waves
     // hide behind the builder's Load modal — the intent makes the deep link
     // open that wave list automatically (App wires it to a one-shot request

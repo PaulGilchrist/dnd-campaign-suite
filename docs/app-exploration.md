@@ -56,7 +56,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab clears; dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-20 VN] Starter checklist step copy reads `Review the starter quests (3 seeded)` even after every seeded quest is deleted/failed — the checklist names seed-time entities and never re-reads the board, so it can advertise content the Quest Board honestly shows as empty. Options: count live quests via the existing board GET when the panel mounts, or soften to `the starter quests: <names>`. (`src/components/campaign-starter/FirstSessionChecklist.jsx`)
 - [2026-11-20 VN] A visitor opening a never-explored indoor map in 3D gets the all-zero census line `0 walls · 0 items · 0 players · 0 npcs · 0 monsters` — truthful but noise; a `nothing revealed yet` face (or hiding the chip until >0) would read better. (`src/components/map/Map3D/Map3D.jsx`, `map3dCensus.js` buildCensusLine)
 
 <!-- resolved 2026-11-20 improve (lived, owner ruling this run): conditional ghost lift — the 3D last-seen cylinder sits at the live-token y-base on its memory cell while the cell stays out of the visitor fog set, and lifts above the fog roof ONLY when the cell re-fogs (fog.has(memoryCellKey) in _buildLastKnownTokens); live witnesses: grounded-on-open-floor + re-fogged-lift + re-revealed re-ground via the 2-PUT door dance. -->

@@ -32,6 +32,12 @@ vi.mock('../../services/campaign/seededCampaign.js', () => ({
 vi.mock('../../services/ui/sseClient.js', () => ({
     subscribeToSSE: vi.fn(() => () => {}),
 }));
+// The checklist counts its quest step from the live board GET (backlog
+// 2026-11-20 VN) — mocked so no fetch leaves jsdom; the count face itself is
+// pinned in the campaign-starter tests.
+vi.mock('../../services/campaign/questsService.js', () => ({
+    loadQuestBoard: vi.fn(async () => []),
+}));
 
 const CAMPAIGN = 'test-campaign';
 
