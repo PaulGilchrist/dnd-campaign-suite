@@ -1,4 +1,4 @@
-# bug: raceBuffService 5e lane throws on single-object `proficiency_choices`
+# bug (RESOLVED 2026-11-19): raceBuffService 5e lane throws on single-object `proficiency_choices`
 
 **Filed:** 2026-11-19 (e2e-improve run, from dev-pair log + data census; NOT yet fixed)
 **Severity:** crashes the rules lane during character validate/build — unhandled rejection.
@@ -67,3 +67,18 @@ Also check test fixtures pinning the object shape for the 5e lane.
   against the real `public/data/races.json` Dwarf/Half-Elf rows.
 - `docs/app-exploration.md` backlog: no bullet added — bugs live HERE per the
   ownership law (bugs take priority over improvements).
+
+## Resolution (2026-11-19)
+
+Fix option (b)-inverted — the census proved the "array canonical" premise WRONG:
+the single-object `{choose, from}` is the ONLY trait-level shape on disk in BOTH
+rulesets, and five consumer lanes (proficiencyUtils skill-cap, parse-skills,
+race-sources, limits, rules-proficiencies) all read the object; `add5eTrait-
+Proficiencies` was the lone array-expecting outlier. FIXED AT THE LANE:
+`add5eTraitProficiencies` now mirrors `addChoiceOptions2024`'s object reader
+(one combined isChoice entry, empty/missing `from` guarded). Legacy array
+fixture in `raceBuffService.test.js` migrated to the canonical object face,
+plus a disk-row regression pin (real Dwarf + Half-Elf rows via JSON import).
+Live in-page proof on the fixed module: computeRaceBuffs(Dwarf/Half-Elf) lands
+the choice entries and `validateAbilityTotals` (the exact crash chain) returns
+clean, zero console errors. No data change (races.json untouched).

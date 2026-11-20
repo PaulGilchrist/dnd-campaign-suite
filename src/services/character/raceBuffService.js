@@ -180,14 +180,19 @@ function add5eTraitProficiencies(trait, result) {
       result.proficiencies.push({ name: prof });
     });
   }
-  if (trait.proficiency_choices) {
-    trait.proficiency_choices.forEach(pc => {
-      result.proficiencies.push({
-        name: `${pc.choose} from: ${(pc.from || []).join(', ')}`,
-        isChoice: true,
-        choose: pc.choose,
-        from: pc.from,
-      });
+  // Canonical trait-level choice shape on disk (public/data/races.json): ONE
+  // {choose, from} object — the same face addChoiceOptions2024 reads and the
+  // skillValidation/proficiencyUtils consumers expect. (bug-racebuff-single-
+  // object-proficiency-choices-throws: this lane used to .forEach an array
+  // shape no 5e row ever carried — Dwarf Tool Proficiency and Half-Elf Skill
+  // Versatility threw unhandled TypeErrors through computeRaceBuffs.)
+  const pc = trait.proficiency_choices;
+  if (pc && pc.from && pc.from.length > 0) {
+    result.proficiencies.push({
+      name: `${pc.choose} from: ${pc.from.join(', ')}`,
+      isChoice: true,
+      choose: pc.choose,
+      from: pc.from,
     });
   }
 }

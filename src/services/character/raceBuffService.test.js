@@ -1,6 +1,7 @@
 // @maintained-by-ai
 import { describe, it, expect } from 'vitest';
 import { computeRaceBuffs, applyRaceBuffsToPlayerData } from './raceBuffService.js';
+import races5e from '../../../public/data/races.json';
 
 // Coverage notes (audited 2026-10-16):
 // - This file is the sole behavioral home for computeRaceBuffs: consumers
@@ -126,25 +127,50 @@ describe('raceBuffService', () => {
       expect(result.resistances).toEqual(['fire', 'cold']);
     });
 
-    it('builds 5e trait proficiencies from proficiencies arrays and proficiency_choices (including missing "from")', () => {
+    it('builds 5e trait proficiencies from proficiencies arrays and the canonical single-object proficiency_choices', () => {
+      // Canonical disk shape (public/data/races.json): ONE {choose, from}
+      // object per trait — never an array (bug-racebuff-single-object-
+      // proficiency-choices-throws retired the array fixture). A choice
+      // object without a usable "from" emits nothing (guarded like the
+      // 2024 sibling lane).
       const race = {
         traits: [
           { name: 'Skill Proficiency', proficiencies: ['Perception'] },
-          {
-            name: 'Skill Choice',
-            proficiency_choices: [
-              { choose: '2', from: ['Stealth', 'Athletics'] },
-              { choose: '1' }, // missing "from": placeholder entry, no crash
-            ],
-          },
+          { name: 'Skill Choice', proficiency_choices: { choose: 2, from: ['Skill: Stealth', 'Skill: Athletics'] } },
+          { name: 'Empty Choice', proficiency_choices: { choose: 1 } },
         ],
       };
       const result = computeRaceBuffs(race, {}, '5e');
       expect(result.proficiencies).toEqual([
         { name: 'Perception' },
-        { name: '2 from: Stealth, Athletics', isChoice: true, choose: '2', from: ['Stealth', 'Athletics'] },
-        { name: '1 from: ', isChoice: true, choose: '1' },
+        { name: '2 from: Skill: Stealth, Skill: Athletics', isChoice: true, choose: 2, from: ['Skill: Stealth', 'Skill: Athletics'] },
       ]);
+    });
+
+    it('regression: real 5e disk rows (Dwarf, Half-Elf) compute without throwing (single-object proficiency_choices)', () => {
+      // The live crash face: Dwarf "Tool Proficiency" and Half-Elf "Skill
+      // Versatility" carry single-object proficiency_choices; the 5e trait
+      // lane used to .forEach them (unhandled TypeError through
+      // validateAbilityTotals). The lane must read the rows AS SHIPPED and
+      // surface each choice group as one isChoice entry.
+      const dwarf = races5e.find(r => r.name === 'Dwarf');
+      const halfElf = races5e.find(r => r.name === 'Half-Elf');
+      expect(dwarf && halfElf).toBeTruthy();
+
+      const dwarven = computeRaceBuffs(dwarf, {}, '5e');
+      const toolChoice = dwarven.proficiencies.find(p => p.isChoice && p.from?.includes("Smith's Tools"));
+      expect(toolChoice).toEqual({
+        name: '1 from: Smith\'s Tools, Brewer\'s Supplies, Mason\'s Tools',
+        isChoice: true,
+        choose: 1,
+        from: ["Smith's Tools", "Brewer's Supplies", "Mason's Tools"],
+      });
+
+      const elven = computeRaceBuffs(halfElf, {}, '5e');
+      const skillChoice = elven.proficiencies.find(p => p.isChoice && p.choose === 2);
+      expect(skillChoice).toBeTruthy();
+      expect(skillChoice.from.length).toBe(18);
+      expect(skillChoice.name).toBe(`2 from: ${skillChoice.from.join(', ')}`);
     });
 
     it('pulls proficiencies and traits from subrace racial_traits', () => {
