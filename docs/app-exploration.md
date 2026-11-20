@@ -65,7 +65,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 YY: `POST /api/campaigns/:c/log` is schema-free AND origin-open — a forged-LAN-Host curl of ARBITRARY JSON (even `{"not even":"json-shaped"}`) lands 200, stamps id/timestamp, broadcasts `log-<c>` to every client and now feeds the shared audio lane; a visitor-crafted `{type:'hp_change',threshold:'dead'}` row can sound death table-wide and inject fake audit rows. Plausibly by-design shared-table doctrine (change-data is visitor-writable too) — needs an owner ruling; if it should be gated, the cheapest shape is a `type`-membership allowlist + non-empty required message.
 - 2026-11-20 YY: audio cues only exist while the Initiative view is mounted (`CombatCues` lives in `Initiative.jsx:935`) — a GM/PC tab parked on Characters/Map/Log hears nothing from saves, deaths or even its own attack chain; consider mounting the log-decode+play consumer at App level (one pooled lane, no per-view duplication) or documenting the seam as intentional in the users-guide.
 
 ## Blocked / Not Verified (fold-gate ledger)

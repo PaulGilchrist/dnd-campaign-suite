@@ -1,0 +1,261 @@
+// Schema gate on POST /api/campaigns/:campaign/log (owner ruling 2026-11-20,
+// backlog 2026-11-20 YY): the lane stays visitor-writable (shared-table
+// doctrine, like /spell-overlay) but is no longer schema-free. Forged shapes
+// — missing/non-allowlisted type, or no non-empty readable text — 400 with
+// plain-English copy and ZERO side effects (no row appended, no log-<c>
+// publish). Legitimate allowlisted rows pass byte-identically, extra unknown
+// fields included. Conventions mirror log.test.js.
+import express from 'express';
+import { request } from '../test-utils/localhostSupertest.js';
+import logRouter, { logCache, ALLOWED_LOG_TYPES } from './log.js';
+
+const mockFsState = { exists: new Set(), files: new Map() };
+
+vi.mock('fs', () => ({
+    default: {
+        existsSync: vi.fn((p) => mockFsState.exists.has(p)),
+        readFileSync: vi.fn((p) => {
+            if (mockFsState.files.has(p)) return mockFsState.files.get(p);
+            throw new Error('ENOENT');
+        }),
+        writeFileSync: vi.fn((p, data) => {
+            mockFsState.files.set(p, data);
+        }),
+    },
+    existsSync: vi.fn((p) => mockFsState.exists.has(p)),
+    readFileSync: vi.fn((p) => {
+        if (mockFsState.files.has(p)) return mockFsState.files.get(p);
+        throw new Error('ENOENT');
+    }),
+    writeFileSync: vi.fn((p, data) => {
+        mockFsState.files.set(p, data);
+    }),
+}));
+
+vi.mock('../utils/campaignPaths.js', () => ({
+    campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
+    campaignDir: (campaign) => `/mock/campaigns/${campaign}`,
+    ensureDataDir: vi.fn((name) => {
+        mockFsState.exists.add(`/mock/campaigns/${name}/data`);
+        return `/mock/campaigns/${name}/data`;
+    }),
+}));
+
+vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
+    publish: vi.fn(),
+}));
+
+function createTestApp() {
+    const app = express();
+    app.use(express.json());
+    app.use(logRouter);
+    return app;
+}
+
+const LOG_PATH = '/api/campaigns/test-campaign/log';
+
+beforeEach(() => {
+    logCache.set('test-campaign', []);
+    mockFsState.exists.add('/mock/campaigns/test-campaign');
+    mockFsState.exists.add('/mock/campaigns/test-campaign/data');
+});
+
+afterEach(() => {
+    logCache.clear();
+    mockFsState.files.clear();
+    mockFsState.exists.clear();
+    vi.clearAllMocks();
+});
+
+describe('POST /api/campaigns/:campaign/log — schema gate', () => {
+    // ── type membership ──────────────────────────────────────────────────────
+
+    it('400s a body missing "type" with plain-English copy, zero side effects', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app).post(LOG_PATH).send({ message: 'no type here' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Log entry requires a "type" string' });
+        expect(logCache.get('test-campaign')).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('400s a JSON object that is not log-shaped at all', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app).post(LOG_PATH).send({ 'not even': 'json-shaped' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Log entry requires a "type" string' });
+        expect(logCache.get('test-campaign')).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('400s a type NOT in the allowlist and names it in the copy', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app)
+            .post(LOG_PATH)
+            .send({ type: 'totally_fake_type', message: 'x' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({
+            error: 'Unknown log entry type: "totally_fake_type" is not a type the app writes to the campaign log',
+        });
+        expect(logCache.get('test-campaign')).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('400s a non-string type (number)', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .post(LOG_PATH)
+            .send({ type: 42, message: 'numeric type' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Log entry requires a "type" string' });
+    });
+
+    it('400s a whitespace-only type', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .post(LOG_PATH)
+            .send({ type: '   ', message: 'blank type' });
+
+        expect(res.status).toBe(400);
+    });
+
+    it('400s non-object bodies (array, JSON "null", JSON string primitive)', async () => {
+        const app = createTestApp();
+
+        const arr = await request(app).post(LOG_PATH).send([1, 2, 3]);
+        expect(arr.status).toBe(400);
+        expect(arr.body.error).toContain('must be a JSON object');
+
+        // JSON primitives never reach the route: express.json() strict mode
+        // rejects them with its own entity.parse.failed 400 — still a 400
+        // with zero side effects, just different copy.
+        const nul = await request(app)
+            .post(LOG_PATH)
+            .set('Content-Type', 'application/json')
+            .send('null');
+        expect(nul.status).toBe(400);
+
+        const str = await request(app)
+            .post(LOG_PATH)
+            .set('Content-Type', 'application/json')
+            .send('"just a string"');
+        expect(str.status).toBe(400);
+
+        expect(logCache.get('test-campaign')).toHaveLength(0);
+    });
+
+    // ── readable-text requirement ────────────────────────────────────────────
+
+    it.each([
+        ['missing any readable text field', { type: 'hp_change', threshold: 'dead' }],
+        ['empty message and no other text', { type: 'note', message: '' }],
+        ['whitespace-only message', { type: 'note', message: '   \t ' }],
+        ['non-string message', { type: 'note', message: 123 }],
+    ])('400s a valid type with %s, zero side effects', async (_label, body) => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app).post(LOG_PATH).send(body);
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({
+            error: 'Log entry requires non-empty human-readable text (a "message" or "description" field)',
+        });
+        expect(logCache.get('test-campaign')).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('blocks the forged death-cue row {type:hp_change, threshold:dead} table-wide', async () => {
+        // The exact attack from the backlog bullet: a visitor-crafted hp_change
+        // row with threshold 'dead' used to land 200 and feed cueForLogEntry.
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app)
+            .post(LOG_PATH)
+            .send({ type: 'hp_change', threshold: 'dead', isPlayer: true });
+
+        expect(res.status).toBe(400);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    // ── legitimate producer shapes stay byte-compatible ──────────────────────
+
+    it.each([
+        ['message', { type: 'roll', message: 'Attack roll', total: 17 }],
+        ['description', { type: 'write_rejected', description: 'Server rejected write' }],
+        ['noteText', { type: 'note', noteText: 'GM note', characterName: 'Anonymous' }],
+        ['summary', { type: 'info', summary: 'Summary-only row' }],
+        ['text', { type: 'info', text: "Maze blocked the attack" }],
+    ])('200s an allowlisted type carrying %s (existing producer lane)', async (_field, body) => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app).post(LOG_PATH).send(body);
+
+        expect(res.status).toBe(200);
+        expect(typeof res.body.id).toBe('string');
+        expect(typeof res.body.timestamp).toBe('number');
+        expect(res.body).toMatchObject(body);
+        expect(logCache.get('test-campaign')).toHaveLength(1);
+        expect(publish).toHaveBeenCalledWith(
+            'log-test-campaign',
+            expect.objectContaining(body),
+            'test-campaign'
+        );
+    });
+
+    it('200s a legit row with extra unknown fields — passthrough, stamped, broadcast', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        const res = await request(app)
+            .post(LOG_PATH)
+            .send({ type: 'hp_change', message: 'Goblin takes 7 damage', threshold: 'bloodied', extra: { any: 'shape' } });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            type: 'hp_change',
+            message: 'Goblin takes 7 damage',
+            threshold: 'bloodied',
+            extra: { any: 'shape' },
+        });
+        expect(publish).toHaveBeenCalledWith('log-test-campaign', res.body, 'test-campaign');
+    });
+
+    it('rejects before addEntry: no disk write is scheduled for a forged row', async () => {
+        const fsMock = await import('fs');
+        const app = createTestApp();
+        await request(app).post(LOG_PATH).send({ type: 'totally_fake_type', message: 'x' });
+
+        // The 1s debounce flush only persists cache contents — the cache never
+        // gained the forged row, so nothing about it can reach the file.
+        await new Promise((r) => setTimeout(r, 1100));
+        const written = mockFsState.files.get('/mock/campaigns/test-campaign/data/campaign-log.json');
+        expect(written === undefined || written.includes('totally_fake_type')).toBe(false);
+        expect(fsMock.default.writeFileSync).not.toHaveBeenCalledWith(
+            '/mock/campaigns/test-campaign/data/campaign-log.json',
+            expect.stringContaining('totally_fake_type')
+        );
+    });
+
+    // ── allowlist derivation sanity ──────────────────────────────────────────
+
+    it('allowlist covers the render-dispatch types (Log.jsx ENTRY_COMPONENTS)', () => {
+        for (const type of ['roll', 'note', 'hp_change', 'ability_use', 'automation',
+            'save_result', 'spell', 'music', 'write_rejected', 'ai_designer']) {
+            expect(ALLOWED_LOG_TYPES.has(type)).toBe(true);
+        }
+    });
+
+    it('allowlist covers the server-lane audit types', () => {
+        for (const type of ['write_rejected', 'inventory_transfer', 'ai_authoring',
+            'ai_draft_approved', 'ai_draft_rejected', 'adventure_regenerated']) {
+            expect(ALLOWED_LOG_TYPES.has(type)).toBe(true);
+        }
+    });
+});

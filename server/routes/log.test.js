@@ -100,8 +100,8 @@ describe('GET /api/campaigns/:campaign/log', () => {
     it('should return log entries when they exist on disk', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'combat', message: 'Encounter started', timestamp: Date.now() - 1000 },
-            { type: 'combat', message: 'Goblin attacked', timestamp: Date.now() - 500 },
+            { type: 'encounter', message: 'Encounter started', timestamp: Date.now() - 1000 },
+            { type: 'encounter', message: 'Goblin attacked', timestamp: Date.now() - 500 },
         ]);
 
         const app = createTestApp();
@@ -118,7 +118,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
         ensureCampaign('test-campaign');
         const entries = [];
         for (let i = 0; i < 600; i++) {
-            entries.push({ type: 'test', message: `Entry ${i}`, timestamp: Date.now() - i });
+            entries.push({ type: 'note', message: `Entry ${i}`, timestamp: Date.now() - i });
         }
         setLogFile('test-campaign', entries);
 
@@ -135,7 +135,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
         ensureCampaign('test-campaign');
         const entries = [];
         for (let i = 0; i < 10; i++) {
-            entries.push({ type: 'test', message: `Entry ${i}`, timestamp: Date.now() - i });
+            entries.push({ type: 'note', message: `Entry ${i}`, timestamp: Date.now() - i });
         }
         setLogFile('test-campaign', entries);
 
@@ -173,7 +173,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
     it('should cache the log in logCache after first read', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'test', message: 'Cached entry', timestamp: Date.now() },
+            { type: 'note', message: 'Cached entry', timestamp: Date.now() },
         ]);
 
         const app = createTestApp();
@@ -186,7 +186,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
     it('should use cached log on subsequent reads without re-reading file', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'test', message: 'Original', timestamp: Date.now() },
+            { type: 'note', message: 'Original', timestamp: Date.now() },
         ]);
 
         const app = createTestApp();
@@ -194,8 +194,8 @@ describe('GET /api/campaigns/:campaign/log', () => {
 
         // Modify the file on disk after caching
         setLogFile('test-campaign', [
-            { type: 'test', message: 'Original', timestamp: Date.now() },
-            { type: 'test', message: 'New entry', timestamp: Date.now() },
+            { type: 'note', message: 'Original', timestamp: Date.now() },
+            { type: 'note', message: 'New entry', timestamp: Date.now() },
         ]);
 
         const res = await request(app).get('/api/campaigns/test-campaign/log');
@@ -211,7 +211,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
         setLogFile('test-campaign', [
             {
                 id: 'entry-1',
-                type: 'combat',
+                type: 'encounter',
                 message: 'Dragon appeared',
                 timestamp: timestamp,
                 details: { creature: 'Red Dragon', hp: 250 },
@@ -224,7 +224,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
         expect(res.status).toBe(200);
         expect(res.body[0]).toEqual({
             id: 'entry-1',
-            type: 'combat',
+            type: 'encounter',
             message: 'Dragon appeared',
             timestamp: timestamp,
             details: { creature: 'Red Dragon', hp: 250 },
@@ -235,10 +235,10 @@ describe('GET /api/campaigns/:campaign/log', () => {
         ensureCampaign('campaign-a');
         ensureCampaign('campaign-b');
         setLogFile('campaign-a', [
-            { type: 'test', message: 'Campaign A entry', timestamp: Date.now() },
+            { type: 'note', message: 'Campaign A entry', timestamp: Date.now() },
         ]);
         setLogFile('campaign-b', [
-            { type: 'test', message: 'Campaign B entry', timestamp: Date.now() },
+            { type: 'note', message: 'Campaign B entry', timestamp: Date.now() },
         ]);
 
         const app = createTestApp();
@@ -254,7 +254,7 @@ describe('GET /api/campaigns/:campaign/log', () => {
     it('should handle campaign names with special characters', async () => {
         ensureCampaign('test-campaign-123');
         setLogFile('test-campaign-123', [
-            { type: 'test', message: 'Special campaign', timestamp: Date.now() },
+            { type: 'note', message: 'Special campaign', timestamp: Date.now() },
         ]);
 
         const app = createTestApp();
@@ -273,14 +273,14 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'combat', message: 'Encounter started' });
+            .send({ type: 'encounter', message: 'Encounter started' });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('id');
         expect(res.body).toHaveProperty('timestamp');
         expect(typeof res.body.id).toBe('string');
         expect(typeof res.body.timestamp).toBe('number');
-        expect(res.body.type).toBe('combat');
+        expect(res.body.type).toBe('encounter');
         expect(res.body.message).toBe('Encounter started');
     });
 
@@ -312,13 +312,13 @@ describe('POST /api/campaigns/:campaign/log', () => {
     it('should append the entry to existing log entries', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'combat', message: 'Previous entry', timestamp: Date.now() - 1000 },
+            { type: 'encounter', message: 'Previous entry', timestamp: Date.now() - 1000 },
         ]);
 
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'combat', message: 'New entry' });
+            .send({ type: 'encounter', message: 'New entry' });
 
         expect(res.status).toBe(200);
 
@@ -334,11 +334,11 @@ describe('POST /api/campaigns/:campaign/log', () => {
 
         const res1 = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'First' });
+            .send({ type: 'note', message: 'First' });
 
         const res2 = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Second' });
+            .send({ type: 'note', message: 'Second' });
 
         expect(res1.body.id).not.toBe(res2.body.id);
     });
@@ -349,63 +349,63 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Timestamp test' });
+            .send({ type: 'note', message: 'Timestamp test' });
         const after = Date.now();
 
         expect(res.body.timestamp).toBeGreaterThanOrEqual(before);
         expect(res.body.timestamp).toBeLessThanOrEqual(after);
     });
 
-    it('should handle empty request body', async () => {
+    it('rejects an empty request body with 400 and zero side effects (schema gate)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
+        const { publish } = await import('../utils/changeData.js');
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send({});
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('id');
-        expect(res.body).toHaveProperty('timestamp');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('Log entry requires a "type" string');
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
     });
 
-    it('should handle null request body', async () => {
+    it('rejects a null request body with 400 (schema gate)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send(null);
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('id');
-        expect(res.body).toHaveProperty('timestamp');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('must be a JSON object');
     });
 
-    it('should handle string request body', async () => {
+    it('rejects a string request body with 400 (schema gate)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send('plain text');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('id');
+        expect(res.status).toBe(400);
     });
 
-    it('should handle array request body', async () => {
+    it('rejects an array request body with 400 (schema gate)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send([1, 2, 3]);
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('id');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('must be a JSON object');
     });
 
     it('should handle nested objects in the entry', async () => {
         ensureCampaign('test-campaign');
         const nestedData = {
-            type: 'combat',
+            type: 'encounter',
             message: 'Complex event',
             combat: {
                 round: 5,
@@ -431,7 +431,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Cache test' });
+            .send({ type: 'note', message: 'Cache test' });
 
         expect(logModule.logCache.has('test-campaign')).toBe(true);
         const log = logModule.logCache.get('test-campaign');
@@ -445,12 +445,12 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'SSE test' });
+            .send({ type: 'note', message: 'SSE test' });
 
         expect(publish).toHaveBeenCalledWith(
             'log-test-campaign',
             expect.objectContaining({
-                type: 'test',
+                type: 'note',
                 message: 'SSE test',
             }),
             'test-campaign'
@@ -463,7 +463,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign-123/log')
-            .send({ type: 'test', message: 'Special' });
+            .send({ type: 'note', message: 'Special' });
 
         expect(publish).toHaveBeenCalledWith(
             'log-test-campaign-123',
@@ -482,7 +482,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Persistence test' });
+            .send({ type: 'note', message: 'Persistence test' });
 
         // Wait for the debounce timer
         await new Promise((r) => setTimeout(r, 1100));
@@ -500,14 +500,14 @@ describe('File persistence', () => {
         // Pre-populate cache with 510 entries
         const existingEntries = [];
         for (let i = 0; i < 510; i++) {
-            existingEntries.push({ type: 'test', message: `Entry ${i}`, timestamp: Date.now() - i });
+            existingEntries.push({ type: 'note', message: `Entry ${i}`, timestamp: Date.now() - i });
         }
         logModule.logCache.set('test-campaign', existingEntries);
 
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'New entry' });
+            .send({ type: 'note', message: 'New entry' });
 
         // Wait for debounce
         await new Promise((r) => setTimeout(r, 1100));
@@ -526,7 +526,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Valid JSON' });
+            .send({ type: 'note', message: 'Valid JSON' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -542,7 +542,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Indented' });
+            .send({ type: 'note', message: 'Indented' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -557,7 +557,7 @@ describe('File persistence', () => {
         ensureCampaign('test-campaign');
         const entries = [];
         for (let i = 0; i < 501; i++) {
-            entries.push({ type: 'test', message: `Entry ${i}`, timestamp: Date.now() - i });
+            entries.push({ type: 'note', message: `Entry ${i}`, timestamp: Date.now() - i });
         }
         setLogFile('test-campaign', entries);
 
@@ -575,12 +575,12 @@ describe('Phantom-campaign guard in flush', () => {
         const fsMock = await import('fs');
         ensureCampaign('live-campaign');
         // 'ghost-campaign' is in memory but its folder was renamed/deleted away
-        logModule.logCache.set('ghost-campaign', [{ type: 'test', message: 'Stale entry', timestamp: 1000 }]);
+        logModule.logCache.set('ghost-campaign', [{ type: 'note', message: 'Stale entry', timestamp: 1000 }]);
 
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/live-campaign/log')
-            .send({ type: 'test', message: 'Live entry' });
+            .send({ type: 'note', message: 'Live entry' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -605,7 +605,7 @@ describe('Phantom-campaign guard in flush', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/partial-campaign/log')
-            .send({ type: 'test', message: 'Recreate data dir' });
+            .send({ type: 'note', message: 'Recreate data dir' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -621,7 +621,7 @@ describe('Cache behavior', () => {
     it('should return cached entries on subsequent GET requests', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'test', message: 'Cached', timestamp: Date.now() },
+            { type: 'note', message: 'Cached', timestamp: Date.now() },
         ]);
 
         const app = createTestApp();
@@ -629,8 +629,8 @@ describe('Cache behavior', () => {
 
         // Modify file on disk
         setLogFile('test-campaign', [
-            { type: 'test', message: 'Cached', timestamp: Date.now() },
-            { type: 'test', message: 'Not cached', timestamp: Date.now() },
+            { type: 'note', message: 'Cached', timestamp: Date.now() },
+            { type: 'note', message: 'Not cached', timestamp: Date.now() },
         ]);
 
         const res = await request(app).get('/api/campaigns/test-campaign/log');
@@ -652,8 +652,8 @@ describe('Cache behavior', () => {
     it('should have separate caches for different campaigns', async () => {
         ensureCampaign('campaign-a');
         ensureCampaign('campaign-b');
-        setLogFile('campaign-a', [{ type: 'test', message: 'A', timestamp: Date.now() }]);
-        setLogFile('campaign-b', [{ type: 'test', message: 'B', timestamp: Date.now() }]);
+        setLogFile('campaign-a', [{ type: 'note', message: 'A', timestamp: Date.now() }]);
+        setLogFile('campaign-b', [{ type: 'note', message: 'B', timestamp: Date.now() }]);
 
         const app = createTestApp();
         await request(app).get('/api/campaigns/campaign-a/log');
@@ -675,7 +675,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: longMessage });
+            .send({ type: 'note', message: longMessage });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe(longMessage);
@@ -686,7 +686,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: '🐉 Dragon appeared! 日本語 テスト' });
+            .send({ type: 'note', message: '🐉 Dragon appeared! 日本語 テスト' });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('🐉 Dragon appeared! 日本語 テスト');
@@ -697,7 +697,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'combat', message: '⚔️ Battle started 🛡️' });
+            .send({ type: 'encounter', message: '⚔️ Battle started 🛡️' });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('⚔️ Battle started 🛡️');
@@ -708,7 +708,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Line 1\nLine 2\tTab "quotes" \'apostrophe\'' });
+            .send({ type: 'note', message: 'Line 1\nLine 2\tTab "quotes" \'apostrophe\'' });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Line 1\nLine 2\tTab "quotes" \'apostrophe\'');
@@ -720,7 +720,8 @@ describe('Edge cases and error handling', () => {
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send({
-                type: 'test',
+                type: 'note',
+                message: 'Scalar pass-through',
                 active: true,
                 count: 42,
                 nullable: null,
@@ -734,16 +735,18 @@ describe('Edge cases and error handling', () => {
         expect(res.body.flag).toBe(false);
     });
 
-    it('should handle entries with empty string fields', async () => {
+    it('rejects an entry with empty type and empty message (schema gate)', async () => {
         ensureCampaign('test-campaign');
+        const { publish } = await import('../utils/changeData.js');
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
             .send({ type: '', message: '', details: '' });
 
-        expect(res.status).toBe(200);
-        expect(res.body.type).toBe('');
-        expect(res.body.message).toBe('');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('Log entry requires a "type" string');
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
     });
 
     it('rejects a client-supplied timestamp: the server Date.now() always wins (bug-log-api-ghost-entries)', async () => {
@@ -752,7 +755,7 @@ describe('Edge cases and error handling', () => {
         const before = Date.now();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Custom time', timestamp: 9999999 });
+            .send({ type: 'note', message: 'Custom time', timestamp: 9999999 });
 
         expect(res.status).toBe(200);
         // Regression pin: the entry spread comes FIRST and id/timestamp are forced
@@ -766,7 +769,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ id: 'my-custom-id', type: 'test', message: 'Custom id' });
+            .send({ id: 'my-custom-id', type: 'note', message: 'Custom id' });
 
         expect(res.status).toBe(200);
         // Regression pin: client-forged ids are overridden by the server uuid.
@@ -809,9 +812,9 @@ describe('Entry ordering', () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
 
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'test', message: 'First' });
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'test', message: 'Second' });
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'test', message: 'Third' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'First' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'Second' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'Third' });
 
         const log = logModule.logCache.get('test-campaign');
         expect(log).toHaveLength(3);
@@ -823,9 +826,9 @@ describe('Entry ordering', () => {
     it('should return entries in chronological order from GET', async () => {
         ensureCampaign('test-campaign');
         setLogFile('test-campaign', [
-            { type: 'test', message: 'First', timestamp: 1000 },
-            { type: 'test', message: 'Second', timestamp: 2000 },
-            { type: 'test', message: 'Third', timestamp: 3000 },
+            { type: 'note', message: 'First', timestamp: 1000 },
+            { type: 'note', message: 'Second', timestamp: 2000 },
+            { type: 'note', message: 'Third', timestamp: 3000 },
         ]);
 
         const app = createTestApp();
