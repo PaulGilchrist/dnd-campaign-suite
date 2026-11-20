@@ -164,6 +164,38 @@ function MusicDiscardChangesModal({ pending, message, onCancel, onConfirm }) {
   );
 }
 
+// Owner-teardown release (bug-music-owner-window-gone-claims-playing-elsewhere):
+// the unmount lane below never runs on a page reload or tab close — React is
+// not there to run it — so the shared key used to keep playing:true while the
+// sole frame died with the page, and every surviving tab kept claiming
+// "Playing in another window" for table-wide silence. Mirror the savePrompt
+// liveness precedent (savePrompt.js evictOwnSaveListenerLivenessMarkers):
+// `pagehide` (the only reload/close/shared unload event, zero wall-clock —
+// No-Game-Timers compliant) fires keepalive POSTs so the write survives
+// navigation. Guard and bytes mirror the unmount lane exactly: only the tab
+// that OWNS the frame while playing releases, writing the stopCommit state
+// and the left-campaign audit row. Accepted residual (same documented limit
+// the savePrompt lane carries): a hard crash skips pagehide and leaves the
+// ghost — never compensated for with a wall-clock guess.
+function releaseOwnedAmbience(campaignName, state) {
+  if (!state || !state.playerMounted || !state.music.playing) return;
+  const base = `/api/campaigns/${encodeURIComponent(campaignName)}`;
+  fetch(`${base}/music`, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: stopCommit(state.music) }),
+    keepalive: true,
+  }).catch((e) => console.error('[MusicPlayer] Error releasing owned ambience on unload:', e));
+  fetch(`${base}/log`, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'music', action: 'stop', message: 'Stopped ambience (left campaign)' }),
+    keepalive: true,
+  }).catch((e) => console.error('[MusicPlayer] Error logging ambience release on unload:', e));
+}
+
 // Display-only save/reset confirmation toast — moved out of MusicPlayer's
 // render body (complexity budget, improve 2026-11-07); markup unchanged.
 function MusicToast({ toast }) {
@@ -341,6 +373,16 @@ function MusicPlayer({ campaignName, visible = true }) {
     addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left campaign)' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reload/tab-close twin of the unmount lane above (see releaseOwnedAmbience):
+  // pagehide fires on every real page teardown, and keepalive carries the two
+  // writes past navigation. A bfcache resume re-reads the released state via
+  // the normal SSE echo, so no double row on a later SPA unmount.
+  useEffect(() => {
+    const release = () => releaseOwnedAmbience(campaignName, leaveViewRef.current);
+    window.addEventListener('pagehide', release);
+    return () => window.removeEventListener('pagehide', release);
+  }, [campaignName]);
 
   useEffect(() => {
     youtubePlayer.setVolume(volume);
