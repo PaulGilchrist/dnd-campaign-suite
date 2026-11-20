@@ -2,6 +2,7 @@ import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../../config/mapConfig.js';
 import { getAssetUrl } from './map3dAssets.js';
 import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
+import { isItemVisible, isCreatureToken, isPlayerVisible } from './map3dVisibility.js';
 
 // 1 grid cell in world units = exactly 5' (matches CELL_SIZE / 2D map scale)
 const WALL_H = 80; // 10' = 2 cells tall (a realistic dungeon wall)
@@ -27,23 +28,9 @@ const LAST_KNOWN = { body: 0x9a9a9a, ring: 0x7a7a7a };
 const LAST_KNOWN_LIFT = WALL_H + 16;
 const MATERIAL_TEXTURE_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'alphaMap'];
 
-// Mirrors src/components/map/PlacedItems.jsx visibility rules:
-// the GM sees everything; a player sees an item only when it is not hidden
-// (visible === false) and not inside fogged cells.
-export function isItemVisible(item, fog, isLocalhost) {
-    return isLocalhost || (item.visible && !fog.has(`${item.gridX},${item.gridY}`));
-}
-
-// Creature markers share the token render lane (2D PlacedItems parity):
-// palette/AI-Dress npc rows and AI-Dress monster rows become token meshes,
-// everything else is a placed prop model.
-const isCreatureToken = (item) => item.type === 'npc' || item.type === 'monster';
-
-// Mirrors src/components/map/Players.jsx: the GM sees every player; a player
-// cannot see a player token standing in a fogged cell.
-export function isPlayerVisible(player, fog, isLocalhost) {
-    return isLocalhost || !fog.has(`${player.gridX},${player.gridY}`);
-}
+// Per-origin visibility predicates (isItemVisible/isCreatureToken/isPlayerVisible)
+// live in ./map3dVisibility.js — shared with the Map3D.jsx header census so the
+// header mirror law and the build dispatch can never drift apart.
 
 export class Map3DScene {
     constructor(container) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Map3DScene } from './map3dScene.js';
-import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
+import { buildCensusLine } from './map3dCensus.js';
 import './Map3D.css';
 
 // Mirrors Players.jsx getPlayerImage: resolve a player's portrait to a
@@ -122,23 +122,19 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         sceneRef.current?.topDown();
     }, []);
 
-    const counts = useMemo(() => {
-        const wallCount = walls ? computeEffectiveWalls(walls, placedItems).size : 0;
-        // Creature tokens (npc + dress monsters) share the token render lane —
-        // mirror map3dScene's _buildNpcs/_buildPlacedItems dispatch in the counts.
-        // The copy mirrors getCensus() buckets (backlog 2026-11-11 IF): npc and
-        // monster tokens are counted SEPARATELY (kind 'npcs' vs 'monsters'),
-        // and props — registered types (census `items`) plus unregistered ghost
-        // types (census `fallback`) — share the one `items` figure, matching
-        // _buildPlacedItems which renders every non-token prop.
-        const isToken = (i) => i.type === 'npc' || i.type === 'monster';
-        const items = (placedItems || []).filter((i) => !isToken(i)).length;
-        const tokens = (placedItems || []).filter(isToken);
-        const npcs = tokens.filter((i) => i.type === 'npc').length;
-        const monsters = tokens.filter((i) => i.type === 'monster').length;
-        const playerCount = (players || []).length;
-        return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs · ${monsters} monsters`;
-    }, [walls, placedItems, players]);
+    // Header census: mirrors the LIVE scene per origin (owner ruling
+    // 2026-11-20 "count only live-visible"). map3dCensus derives every term
+    // from the same visibility predicates the scene's _buildNpcs/
+    // _buildPlacedItems/_buildLastKnownTokens dispatch applies, so a token
+    // culled (hidden/fogged) or ghosted for a visitor never masquerades as a
+    // live count — ghosts surface as a separate `N last known` term. The GM
+    // lane passes every gate, so it keeps the full doc counts. Reactive deps
+    // are exactly the scene-rebuild inputs, so the line live-updates on
+    // token/fog/ghost changes with no remount.
+    const counts = useMemo(
+        () => buildCensusLine({ walls, placedItems, players, fog, isLocalhost, ghostCells: ghostCells || null }),
+        [walls, placedItems, players, fog, isLocalhost, ghostCells]
+    );
 
     return (
         <div className="map3d">
