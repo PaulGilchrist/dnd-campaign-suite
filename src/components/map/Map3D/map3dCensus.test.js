@@ -116,8 +116,37 @@ describe('map3dCensus.buildCensusLine (plural + ghost term)', () => {
         expect(line).toBe('1 wall · 1 item · 1 player · 1 npc · 1 monster · 1 last known');
     });
 
-    it('zero uses plural and the ghost term disappears at zero (GM line shape unchanged)', () => {
-        expect(buildCensusLine(data())).toBe('0 walls · 0 items · 0 players · 0 npcs · 0 monsters');
+    it('all-zero census reads the single nothing-revealed face, same for every origin (GM on an empty map too)', () => {
+        expect(buildCensusLine(data())).toBe('Nothing revealed yet');
+        expect(buildCensusLine(data({ isLocalhost: true }))).toBe('Nothing revealed yet');
+    });
+
+    it('each count breaking zero on its own keeps the normal line (no nothing-revealed face)', () => {
+        expect(buildCensusLine(data({ walls: new Set(['0,0']) })))
+            .toBe('1 wall · 0 items · 0 players · 0 npcs · 0 monsters');
+        expect(buildCensusLine(data({
+            placedItems: [{ id: 'b1', type: 'barrel', gridX: 3, gridY: 3, visible: true }],
+        }))).toBe('0 walls · 1 item · 0 players · 0 npcs · 0 monsters');
+        expect(buildCensusLine(data({
+            players: [{ id: 'p1', name: 'Aria', gridX: 1, gridY: 2 }],
+        }))).toBe('0 walls · 0 items · 1 player · 0 npcs · 0 monsters');
+        expect(buildCensusLine(data({
+            placedItems: [{ id: 'n1', type: 'npc', name: 'Orc', gridX: 2, gridY: 1, visible: true }],
+        }))).toBe('0 walls · 0 items · 0 players · 1 npc · 0 monsters');
+        expect(buildCensusLine(data({ placedItems: [monster()] })))
+            .toBe('0 walls · 0 items · 0 players · 0 npcs · 1 monster');
+    });
+
+    it('last-known-only renders the normal line with the ghost tail, never the nothing-revealed face', () => {
+        const line = buildCensusLine(data({
+            fog: new Set(['8,2']),
+            placedItems: [monster({ id: 'm1', gridX: 8, gridY: 2 })],
+            ghostCells: new Map([['m1', { gridX: 1, gridY: 1 }]]),
+        }));
+        expect(line).toBe('0 walls · 0 items · 0 players · 0 npcs · 0 monsters · 1 last known');
+    });
+
+    it('plural zeros survive beside a live term and the ghost term disappears at zero (GM line shape unchanged)', () => {
         expect(buildCensusLine(data({
             isLocalhost: true,
             placedItems: [monster(), monster({ id: 'm2' })],

@@ -14,11 +14,17 @@
 //             present) — ghosted tokens surface here instead of masquerading
 //             as live creatures. null on the GM/toggle-OFF lane.
 // The GM (isLocalhost) short-circuits every gate, so GM lines keep the full
-// doc counts; only the plural wording changed.
+// doc counts; only the plural wording changed. When EVERY count is zero (a
+// never-explored map on a fresh origin, or a genuinely empty map for the GM)
+// the zero-row `0 walls · 0 items · …` is truthful but noise, so the seam
+// returns a single honest nothing-revealed face instead (owner ruling
+// 2026-11-20 improve). The face is a pure function of the counts.
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
 import { isItemVisible, isCreatureToken, isPlayerVisible } from './map3dVisibility.js';
 
 const plural = (count, noun) => `${count} ${count === 1 ? noun : `${noun}s`}`;
+
+export const NOTHING_REVEALED_LINE = 'Nothing revealed yet';
 
 export function censusCounts({ walls, placedItems, players, fog, isLocalhost, ghostCells }) {
     const items = placedItems || [];
@@ -41,6 +47,9 @@ export function censusCounts({ walls, placedItems, players, fog, isLocalhost, gh
 
 export function buildCensusLine(data) {
     const c = censusCounts(data);
+    if (!c.walls && !c.items && !c.players && !c.npcs && !c.monsters && !c.lastKnown) {
+        return NOTHING_REVEALED_LINE;
+    }
     const terms = [
         plural(c.walls, 'wall'),
         plural(c.items, 'item'),

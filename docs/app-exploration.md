@@ -56,8 +56,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab clears; dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-20 VN] A visitor opening a never-explored indoor map in 3D gets the all-zero census line `0 walls · 0 items · 0 players · 0 npcs · 0 monsters` — truthful but noise; a `nothing revealed yet` face (or hiding the chip until >0) would read better. (`src/components/map/Map3D/Map3D.jsx`, `map3dCensus.js` buildCensusLine)
-
 <!-- resolved 2026-11-20 improve (lived, owner ruling this run): conditional ghost lift — the 3D last-seen cylinder sits at the live-token y-base on its memory cell while the cell stays out of the visitor fog set, and lifts above the fog roof ONLY when the cell re-fogs (fog.has(memoryCellKey) in _buildLastKnownTokens); live witnesses: grounded-on-open-floor + re-fogged-lift + re-revealed re-ground via the 2-PUT door dance. -->
 
 <!-- resolved 2026-11-20 improve (lived): visitor 3D ghost label wording — _buildLastKnownTokens now stamps `${placedItemLabel(item)} — last seen here` (same law as the 2D twin, nameless face included); pinned via sprite userData.labelText in map3dScene.last-known.test.js + live visitor-3D screenshot. -->
