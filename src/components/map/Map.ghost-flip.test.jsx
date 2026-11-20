@@ -30,6 +30,10 @@ const SSE_KEY = `map-data-test-campaign-${MAP_NAME}`;
 // vi.hoisted: the Subscriber mock runs during module import, before the
 // plain-const TDZ window would allow closing over it.
 const sse = vi.hoisted(() => ({ handle: null }));
+// 3D seam capture (Item 7 parity): the Map3D mock records the props Map hands
+// it, so the flip tests can prove the hoisted ghostCells memory is delivered
+// to the 3D surface — the same value the 2D PlacedItems lane consumes.
+const map3d = vi.hoisted(() => ({ props: null }));
 
 vi.mock('../../services/maps/mapsService.js', () => ({
     toKebabCase: (name) => name,
@@ -52,11 +56,14 @@ vi.mock('../common/Subscriber.jsx', () => ({
 }));
 vi.mock('../hex-map/HexMap.jsx', () => ({ default: () => <div data-testid="hex-map" /> }));
 vi.mock('./Map3D/Map3D.jsx', () => ({
-    default: ({ onExit }) => (
-        <div data-testid="map3d">
-            <button onClick={onExit}>2D</button>
-        </div>
-    ),
+    default: (props) => {
+        map3d.props = props;
+        return (
+            <div data-testid="map3d">
+                <button onClick={props.onExit}>2D</button>
+            </div>
+        );
+    },
 }));
 vi.mock('../encounter/MonsterCardModal.jsx', () => ({ default: () => null }));
 
@@ -124,6 +131,7 @@ describe('Map — last-known memory survives the 2D↔3D view flip', () => {
         vi.clearAllMocks();
         clearRuntimeState('test-campaign');
         sse.handle = null;
+        map3d.props = null;
     });
 
     afterEach(() => {
@@ -136,11 +144,16 @@ describe('Map — last-known memory survives the 2D↔3D view flip', () => {
         const cx = ghost.querySelector('circle.npc-circle').getAttribute('cx');
         const cy = ghost.querySelector('circle.npc-circle').getAttribute('cy');
 
-        // Flip to 3D: the whole 2D tree unmounts (3D culls fogged creatures —
-        // the EXPECTED current face; 3D ghost rendering is a separate item).
+        // Flip to 3D: the whole 2D tree unmounts (the 3D scene repaints the
+        // ghost from the hoisted memory — the prop handoff is pinned below;
+        // the scene-side rendering is owned by map3dScene.last-known.test.js).
         fireEvent.click(screen.getByRole('button', { name: 'View map in 3D' }));
         expect(screen.getByTestId('map3d')).toBeInTheDocument();
         expect(view.container.querySelectorAll('g.npc-group')).toHaveLength(0);
+        // Item 7 3D parity data law: Map3D receives the SAME hoisted ghostCells
+        // value — no second position tracker reaches the scene.
+        expect(map3d.props.ghostCells.has('gob-1')).toBe(true);
+        expect(map3d.props.ghostCells.get('gob-1')).toEqual({ gridX: 2, gridY: 2 });
 
         // Back to 2D: the cache lived at Map level, so the ghost is instant —
         // zero SSE snapshots between the two paints.
@@ -246,6 +259,9 @@ describe('Map — last-known memory survives the 2D↔3D view flip', () => {
             .toHaveAttribute('cx', String(CENTER(4))); // truth cell, fogged or not
 
         fireEvent.click(screen.getByRole('button', { name: 'View map in 3D' }));
+        // GM lane never ghosts — the hoisted value is null, so the 3D scene
+        // can only paint truth meshes (criterion 5, data side).
+        expect(map3d.props.ghostCells).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: '2D' }));
         expect(view.container.querySelector('.token-ghost')).toBeNull();
         expect(view.container.querySelector('g.npc-group circle.npc-circle'))

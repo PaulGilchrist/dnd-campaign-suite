@@ -17,6 +17,14 @@ const FOG_GM = { color: 0x000000, opacity: 0.45, transparent: true };
 // rather than blending into the dark floor), mirroring the 2D player fog.
 const FOG_PLAYER = { color: 0x3a3a42, opacity: 1, transparent: false };
 const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 0xc0392b, npcStroke: 0xe74c3c, monster: 0x6c3483, monsterStroke: 0xa569bd };
+// Last-seen ghost token palette: neutral greys — the 3D analogue of the 2D
+// .token-ghost's grayscale(0.85) wash. Memory of a creature, not its faction truth.
+const LAST_KNOWN = { body: 0x9a9a9a, ring: 0x7a7a7a };
+// The player fog is an OPAQUE full-cell column with its cap at WALL_H and a
+// renderOrder above every token, so a ground-level ghost would be buried
+// inside it. The memory token floats just above the fog roof at its cell —
+// the 3D analogue of 2D, where the ghost paints over the fog layer.
+const LAST_KNOWN_LIFT = WALL_H + 16;
 const MATERIAL_TEXTURE_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'alphaMap'];
 
 // Mirrors src/components/map/PlacedItems.jsx visibility rules:
@@ -393,7 +401,7 @@ export class Map3DScene {
         const gen = ++this.buildGen;
         const {
             gridSize, walls, items, players, fog, isLocalhost,
-            npcImages, playerAvatars, bgFill,
+            npcImages, playerAvatars, bgFill, lastKnown,
         } = data;
         this.gridSize = gridSize;
         this.half = (gridSize * CELL_SIZE) / 2;
@@ -408,6 +416,7 @@ export class Map3DScene {
         if (gen !== this.buildGen || this.disposed) return;
         this._buildPlayers(players, fog, isLocalhost, playerAvatars, gen);
         this._buildNpcs(items, fog, isLocalhost, npcImages, gen);
+        this._buildLastKnownTokens(items, fog, isLocalhost, lastKnown);
         this._buildPointLights(items, fog, isLocalhost);
         this._buildFog(fog, isLocalhost);
         this._frameCamera(gridSize);
@@ -428,6 +437,9 @@ export class Map3DScene {
             players: 0,
             npcs: 0,
             monsters: 0,
+            lastKnown: 0,
+            lastKnownDimmed: 0,
+            lastKnownCells: [],
             avatars: 0,
             textured: 0,
             fallback: 0,
@@ -448,6 +460,21 @@ export class Map3DScene {
                     census.avatars += 1;
                     const map = obj.material && obj.material.map;
                     if (map && map.image) census.textured += 1;
+                } else if (tag.kind === 'lastKnown') {
+                    // Last-seen ghost lane: count + a live-material dim proof,
+                    // mirroring the avatar/textured split (reads the scene,
+                    // never a build-time flag) so a future ride can prove the
+                    // muted face without pixels.
+                    census.lastKnown += 1;
+                    // Which cell the memory sits on (pin-law proof without
+                    // pixels) — read off the live object's tag, mirroring how
+                    // the items bucket is derived.
+                    census.lastKnownCells.push(tag.cell);
+                    const meshes = obj.children.filter((o) => o.isMesh && o.material);
+                    if (meshes.length && meshes.every((o) => o.material.transparent
+                        && o.material.opacity === HIDDEN_MARKER_OPACITY)) {
+                        census.lastKnownDimmed += 1;
+                    }
                 } else {
                     census[tag.kind] += tag.count ?? (obj.isInstancedMesh ? obj.count : 1);
                 }
@@ -651,6 +678,35 @@ export class Map3DScene {
                     token.add(this._makeAvatar(tex));
                 });
             }
+        }
+    }
+
+    // Last-seen ghost lane (Item 7 3D parity, owner ruling 2026-11-19):
+    // `lastKnown` is the ghostCells Map hoisted in Map.jsx (itemId → the last
+    // cell THIS client saw the token on), null on the GM lane and whenever the
+    // toggle is OFF — so this lane is visitor-only by construction. A creature
+    // the visitor watched walk into never-revealed fog keeps a MUTED memory
+    // token at the remembered cell: same cylinder+ring machinery as the live
+    // token, GM hidden-marker dim treatment (_setDimmed, the established 3D
+    // dim idiom) for the 2D .token-ghost's heavy-dim look, neutral grey
+    // palette for its grayscale wash. No avatar art, no status chips (3D
+    // tokens never carried them anyway) — memory, not presence. The fog-cull
+    // law stays authoritative: _buildNpcs still renders nothing for fogged
+    // tokens, and a memory for a token whose CURRENT cell is visible is
+    // skipped here so the truth mesh is never shadowed or doubled. Named
+    // lastKnown throughout — "ghost" already means unregistered-prop fallback
+    // meshes in this file (census `fallback`).
+    _buildLastKnownTokens(items, fog, isLocalhost, lastKnown) {
+        if (!lastKnown) return;
+        for (const item of items || []) {
+            if (!isCreatureToken(item) || !lastKnown.has(item.id)) continue;
+            if (isItemVisible(item, fog, isLocalhost)) continue; // truth token owns it
+            const cell = lastKnown.get(item.id);
+            const token = this._makeToken(item.name || 'NPC', LAST_KNOWN.body, LAST_KNOWN.ring);
+            token.userData.census = { kind: 'lastKnown', cell: `${cell.gridX},${cell.gridY}` };
+            token.position.set(this.cellX(cell.gridX), LAST_KNOWN_LIFT, this.cellZ(cell.gridY));
+            this._setDimmed(token);
+            this.mapGroup.add(token);
         }
     }
 

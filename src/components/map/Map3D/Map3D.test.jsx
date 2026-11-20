@@ -192,11 +192,31 @@ describe('Map3D', () => {
             npcImages: { Orc: 'https://example.com/orc.jpg' },
             playerAvatars: { p1: 'campaigns/test-campaign/avatars/aria.png' },
             bgFill: '#1a1a1a',
+            // Last-seen ghost lane: no ghostCells prop (GM/no-mode default) → null.
+            lastKnown: null,
         });
         // Overlays are NOT part of the full-build payload (they patch in place).
         expect(buildMapMock.mock.calls[0][0]).not.toHaveProperty('overlays');
         // An empty overlays prop still paints the (empty) sub-layer once ready.
         expect(updateOverlaysMock).toHaveBeenCalledWith([]);
+    });
+
+    it('forwards the hoisted ghostCells memory to the scene as lastKnown, and repaints on memory change', async () => {
+        // Item 7 3D parity: Map3D is a pure CONSUMER of the ghostCells value
+        // derived once in Map.jsx (useLastKnownPositions hoisted above the
+        // viewMode conditional) — it lands in the full-build payload under the
+        // scene vocabulary `lastKnown` (never the fallback-prop "ghost" word)
+        // and a memory change rebuilds so the ghost face follows the pin law.
+        const memory = new Map([['i2', { gridX: 6, gridY: 6 }]]);
+        const { props, rerender } = renderMap3D({ ghostCells: memory });
+        await act(async () => {});
+        expect(buildMapMock.mock.calls[0][0].lastKnown).toBe(memory);
+
+        buildMapMock.mockClear();
+        const memory2 = new Map([['i2', { gridX: 7, gridY: 1 }]]);
+        await act(async () => { rerender(<Map3D {...props} ghostCells={memory2} />); });
+        expect(buildMapMock).toHaveBeenCalledTimes(1);
+        expect(buildMapMock.mock.calls[0][0].lastKnown).toBe(memory2);
     });
 
     it('shows the WebGL error in the viewport and never builds when init rejects', async () => {

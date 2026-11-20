@@ -20,7 +20,7 @@ function computePlayerAvatars(players, characters, campaignName) {
     return avatars;
 }
 
-function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fog, npcImages, overlays, onExit }) {
+function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fog, npcImages, overlays, ghostCells, onExit }) {
     const containerRef = useRef(null);
     const sceneRef = useRef(null);
     const [ready, setReady] = useState(false);
@@ -76,8 +76,15 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
             npcImages,
             playerAvatars,
             bgFill,
+            // Last-seen ghost lane (Item 7 3D parity): the SAME hoisted
+            // ghostCells value the 2D PlacedItems lane consumes (computed in
+            // Map.jsx above the viewMode conditional — no second position
+            // model). null on the GM/toggle-OFF lane; the scene key is named
+            // lastKnown so it never entangles with the fallback-prop "ghost"
+            // vocabulary in map3dScene.js.
+            lastKnown: ghostCells || null,
         });
-    }, [ready, mapData, gridSize, walls, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars]);
+    }, [ready, mapData, gridSize, walls, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, ghostCells]);
 
     // Labels/Torch are visibility flags applied by setToggles — no rebuild.
     // Declared after the build effect so the first build sees the flags set.

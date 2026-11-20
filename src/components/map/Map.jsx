@@ -617,6 +617,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     fog={fog}
                     npcImages={npcImages}
                     overlays={overlays}
+                    // Hoisted last-known lane (Item 7): the exact ghostCells
+                    // value the 2D PlacedItems receives — the 3D ghost face is
+                    // the same derived memory, never a second tracker.
+                    ghostCells={ghostCells}
                     onExit={() => setViewMode('2d')}
                 />
             ) : (

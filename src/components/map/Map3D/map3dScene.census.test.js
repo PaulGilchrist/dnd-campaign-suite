@@ -99,6 +99,9 @@ describe('Map3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
             players: 2,
             npcs: 1,
             monsters: 1,
+            lastKnown: 0, // lane never invoked here (GM flags) — bucket pinned present
+            lastKnownDimmed: 0,
+            lastKnownCells: [],
             avatars: 0, // no avatar maps passed → no token-nested discs
             textured: 0,
             fallback: 1, // ghostProp → _fallbackBox lane, bucketed not named
