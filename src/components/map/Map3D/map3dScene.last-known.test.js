@@ -8,8 +8,12 @@
 // (cull law), and for tokens whose current cell is visible (upgrade law — the
 // truth mesh owns it, the ghost never shadows or doubles it). Position pin law:
 // the ghost sits at the LAST-SEEN cell, never the fogged live cell (no leak).
-// Lift law: the player fog is an opaque full-cell column capped at WALL_H, so a
-// ground ghost would be buried — the memory floats above the fog roof.
+// CONDITIONAL LIFT law (owner ruling 2026-11-20): a memory cell is recorded at
+// a VISIBLE cell, so while it stays OUT of the fog set the ghost sits at ground
+// level (the live-token y-base 0) anchored on its cell. Only when the memory
+// cell has RE-FOGGED does it lift above the fog roof — the player fog is an
+// opaque full-cell column capped at WALL_H that buries ground meshes
+// (FOG-BURIAL law, authoritative for the re-fog face; never buried either way).
 // Real THREE headless scene, seam copied from the sibling census/hidden-dim tests.
 import * as THREE from 'three';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -75,8 +79,10 @@ describe('Map3DScene._buildLastKnownTokens (visitor last-seen ghost lane)', () =
         // Pinned at the MEMORY cell, never the fogged live cell.
         expect(ghost.position.x).toBeCloseTo(scene.cellX(2));
         expect(ghost.position.z).toBeCloseTo(scene.cellZ(2));
-        // Floating above the opaque fog roof so it is actually visible.
-        expect(ghost.position.y).toBeGreaterThan(FOG_TOP);
+        // GROUNDED face (CONDITIONAL LIFT law): the memory cell (2,2) is NOT
+        // in the fog set, so the token sits at ground level on its cell —
+        // never hovering detached over open floor.
+        expect(ghost.position.y).toBe(0);
         // Dim + muted treatment (shared _setDimmed idiom, grey palette).
         const meshes = ghost.children.filter((o) => o.isMesh && o.material);
         expect(meshes.length).toBeGreaterThan(0);
@@ -115,15 +121,57 @@ describe('Map3DScene._buildLastKnownTokens (visitor last-seen ghost lane)', () =
         expect(census.lastKnown).toBe(0); // the ghost representation is gone
     });
 
+    // CONDITIONAL LIFT faces (owner ruling 2026-11-20): grounded while the
+    // memory cell stays revealed, lifted only once it RE-FOGGES — and the
+    // lift face keeps the FOG-BURIAL law (never buried under the opaque
+    // FOG_PLAYER cap) for that face.
+    const ghostIn = (scene) =>
+        scene.mapGroup.children.find((o) => o.userData.census?.kind === 'lastKnown');
+
+    it('re-fogged face: a memory cell that re-entered the fog set lifts above the fog roof (never buried)', () => {
+        const scene = builtScene();
+        // The monster walked off and the door closed: (2,2) is fogged again.
+        scene._buildLastKnownTokens([monster()], new Set(['8,2', '2,2']), false,
+            new Map([['m1', { gridX: 2, gridY: 2 }]]));
+        const ghost = ghostIn(scene);
+        expect(ghost.position.y).toBe(FOG_TOP + 16); // LAST_KNOWN_LIFT, above the cap
+        expect(scene.getCensus().lastKnownCells).toEqual(['2,2']); // same cell law
+    });
+
+    it('grounded face y matches the live-token y-base exactly (anchor, not a new magic height)', () => {
+        const scene = builtScene();
+        // A live creature on an open cell (no fog) and a grounded ghost side by side.
+        scene._buildNpcs([monster({ id: 'm2', name: 'Live', gridX: 1, gridY: 1 })],
+            new Set(['8,2']), false, null, scene.buildGen);
+        scene._buildLastKnownTokens([monster()], new Set(['8,2']), false,
+            new Map([['m1', { gridX: 2, gridY: 2 }]]));
+        const live = scene.mapGroup.children.find((o) => o.userData.census?.kind === 'monsters');
+        expect(ghostIn(scene).position.y).toBe(live.position.y); // same ground idiom
+    });
+
+    it('transition across rebuilds: grounded → re-fogged lift → grounded again (no stale lift)', () => {
+        const scene = builtScene();
+        const lastKnown = new Map([['m1', { gridX: 2, gridY: 2 }]]);
+        // Face 1: memory cell revealed → grounded.
+        scene._buildLastKnownTokens([monster()], new Set(['8,2']), false, lastKnown);
+        expect(ghostIn(scene).position.y).toBe(0);
+        // Rebuild with the cell re-fogged (fog is a build input) → lifted.
+        scene.clearMap();
+        scene._buildLastKnownTokens([monster()], new Set(['8,2', '2,2']), false, lastKnown);
+        expect(ghostIn(scene).position.y).toBe(FOG_TOP + 16);
+        // Re-reveal rebuild → grounded again, no stale lift persists.
+        scene.clearMap();
+        scene._buildLastKnownTokens([monster()], new Set(['8,2']), false, lastKnown);
+        expect(ghostIn(scene).position.y).toBe(0);
+        expect(scene.getCensus().lastKnown).toBe(1); // exactly one ghost on the board
+    });
+
     // Wording law (backlog 2026-11-20 TL): the ghost label mirrors the 2D
     // twin's title (PlacedItems.jsx creatureGroupChrome) —
     // `${placedItemLabel(item)} — last seen here`, not the bare name. Canvas
     // pixels are unreadable in jsdom, so _makeLabel stamps the rendered text
     // into sprite.userData.labelText — that seam is what these pins assert.
-    const ghostLabel = (scene) => {
-        const ghost = scene.mapGroup.children.find((o) => o.userData.census?.kind === 'lastKnown');
-        return ghost.children.find((o) => o.userData.isTokenLabel);
-    };
+    const ghostLabel = (scene) => ghostIn(scene).children.find((o) => o.userData.isTokenLabel);
 
     it('ghost label wording: "<Name> — last seen here" (same suffix law as the 2D twin)', () => {
         const scene = builtScene();

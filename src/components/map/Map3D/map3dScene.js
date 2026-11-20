@@ -27,10 +27,14 @@ const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 
 const LAST_KNOWN = { body: 0x9a9a9a, ring: 0x7a7a7a };
 // Token-label sizing (see _makeLabel for the snug-canvas + cap laws).
 const LABEL = { canvasH: 128, fontPx: 64, minFontPx: 24, padX: 40, maxCanvasW: 1024, worldH: 14 };
-// The player fog is an OPAQUE full-cell column with its cap at WALL_H and a
-// renderOrder above every token, so a ground-level ghost would be buried
-// inside it. The memory token floats just above the fog roof at its cell —
-// the 3D analogue of 2D, where the ghost paints over the fog layer.
+// CONDITIONAL LIFT (owner ruling 2026-11-20): a memory cell is by definition
+// recorded at a VISIBLE cell, so most ghosts sit over open floor and belong at
+// ground level (the live-token y-base) on their anchor cell — a constant float
+// reads detached (camera parallax amplifies it). The lift applies ONLY when
+// the memory cell has RE-FOGGED (closed door / LOS break): the player fog is
+// an OPAQUE full-cell column capped at WALL_H with a renderOrder above every
+// token, so a ground ghost there would be buried — it floats just above the
+// fog roof instead (the FOG-BURIAL law stays authoritative for that face).
 const LAST_KNOWN_LIFT = WALL_H + 16;
 const MATERIAL_TEXTURE_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'alphaMap'];
 
@@ -725,6 +729,7 @@ export class Map3DScene {
             if (!isCreatureToken(item) || !lastKnown.has(item.id)) continue;
             if (isItemVisible(item, fog, isLocalhost)) continue; // truth token owns it
             const cell = lastKnown.get(item.id);
+            const cellKey = `${cell.gridX},${cell.gridY}`;
             // Memory wording, not a bare sighting name: the SAME title law the
             // 2D twin applies (PlacedItems.jsx creatureGroupChrome) —
             // placedItemLabel base + " — last seen here" suffix, including the
@@ -732,8 +737,14 @@ export class Map3DScene {
             const token = this._makeToken(
                 `${placedItemLabel(item)} — last seen here`,
                 LAST_KNOWN.body, LAST_KNOWN.ring);
-            token.userData.census = { kind: 'lastKnown', cell: `${cell.gridX},${cell.gridY}` };
-            token.position.set(this.cellX(cell.gridX), LAST_KNOWN_LIFT, this.cellZ(cell.gridY));
+            token.userData.census = { kind: 'lastKnown', cell: cellKey };
+            // CONDITIONAL LIFT (see LAST_KNOWN_LIFT): grounded on the memory
+            // cell while it stays out of the visitor's fog set (same y-base
+            // the live tokens use); lifted above the fog roof only once the
+            // cell has re-fogged, where a ground mesh would be buried.
+            token.position.set(this.cellX(cell.gridX),
+                fog.has(cellKey) ? LAST_KNOWN_LIFT : 0,
+                this.cellZ(cell.gridY));
             this._setDimmed(token);
             this.mapGroup.add(token);
         }

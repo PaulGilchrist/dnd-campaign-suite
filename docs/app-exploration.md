@@ -55,7 +55,8 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass; d
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 (owner, live during improve run): the 3D last-seen ghost cylinder floats UNCONDITIONALLY (y = WALL_H + 16) — but a memory cell is by definition recorded at a VISIBLE cell (`useLastKnownPositions` logs the last-seen position), so the ghost normally hovers over open floor and reads detached from its anchor cell (camera parallax amplifies it). OWNER RULING this run — CONDITIONAL LIFT: the cylinder sits at ground level on the memory cell when that cell is NOT in the visitor's fog set; it lifts above the fog roof ONLY when the memory cell has re-fogged (closed door / LOS break), never buried (FOG-BURIAL law stays authoritative for the re-fog face). The position pins in `map3dScene.last-known.test.js` adopt the new law.
+
+<!-- resolved 2026-11-20 improve (lived, owner ruling this run): conditional ghost lift — the 3D last-seen cylinder sits at the live-token y-base on its memory cell while the cell stays out of the visitor fog set, and lifts above the fog roof ONLY when the cell re-fogs (fog.has(memoryCellKey) in _buildLastKnownTokens); live witnesses: grounded-on-open-floor + re-fogged-lift + re-revealed re-ground via the 2-PUT door dance. -->
 
 <!-- resolved 2026-11-20 improve (lived): visitor 3D ghost label wording — _buildLastKnownTokens now stamps `${placedItemLabel(item)} — last seen here` (same law as the 2D twin, nameless face included); pinned via sprite userData.labelText in map3dScene.last-known.test.js + live visitor-3D screenshot. -->
 <!-- resolved 2026-11-20 improve (lived): edit-wizard header is named — title renders `Edit "<name>"` from the CAPTURED characterData (draft rename never retitles), create face unchanged; pinned by CharacterCreationWizard.header.test.jsx, live-witnessed verbatim on War_Cleric. -->
