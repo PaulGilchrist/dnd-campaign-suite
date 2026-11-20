@@ -23,6 +23,11 @@ function stampLineageRuntime(originalCharacter, characterData, campaignName) {
 export function useCharacterWizard(campaignName) {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   const [showEditCharacterWizard, setShowEditCharacterWizard] = useState(false);
+  // Captured edit-session seed: set ONLY by handleEditCharacter and cleared when the
+  // session closes. The edit wizard renders from this instead of the live
+  // activeCharacter, so a remount (campaign re-select, view churn) can never silently
+  // re-target a different character (2026-11-20 reattach bug).
+  const [editingCharacter, setEditingCharacter] = useState(null);
   const callbacksRef = useRef({ setCharacters: null, setActiveCharacter: null });
   const originalCharacterRef = useRef(null);
 
@@ -56,17 +61,33 @@ export function useCharacterWizard(campaignName) {
       callbacksRef.current.setCharacters(newCharacters);
     } catch (error) {
       console.error('Error creating character:', error);
-      alert(`Failed to create character: ${error.message}`);
+      // Single-owner prefix (mirrors the delete lane, App.jsx wrapper): the
+      // service's Error already carries "Failed to create character: " on HTTP
+      // failures, so alerting the message verbatim avoids the doubled prefix.
+      alert(error.message);
     }
   }, [campaignName]);
 
   const handleEditCharacter = useCallback((originalCharacter) => {
     originalCharacterRef.current = originalCharacter;
+    setEditingCharacter(originalCharacter);
     setShowEditCharacterWizard(true);
   }, []);
 
   const handleEditWizardCancel = useCallback(() => {
     setShowEditCharacterWizard(false);
+    setEditingCharacter(null);
+  }, []);
+
+  // Campaign-switch seam (App.jsx handleCampaignSelect / back-to-Campaigns): the
+  // wizard open-flags are App-level state on a never-unmounted component, so
+  // leaving and re-entering a campaign would otherwise resurrect a stale wizard
+  // session — the edit lane re-seeded from the new activeCharacter. Close both
+  // lanes and drop the captured edit seed.
+  const closeWizards = useCallback(() => {
+    setShowCharacterWizard(false);
+    setShowEditCharacterWizard(false);
+    setEditingCharacter(null);
   }, []);
 
   const handleEditWizardComplete = useCallback(async (characterData) => {
@@ -99,17 +120,23 @@ export function useCharacterWizard(campaignName) {
       stampLineageRuntime(originalCharacter, savedData, campaignName);
       callbacksRef.current.setActiveCharacter(cloneDeep(savedData));
       setShowEditCharacterWizard(false);
+      setEditingCharacter(null);
       const { setCharacters } = callbacksRef.current;
       setCharacters(prev => prev.map(char => char.name === originalCharacter.name ? savedData : char));
     } catch (error) {
       console.error('Error updating character:', error);
-      alert(`Failed to update character: ${error.message}`);
+      // Single-owner prefix (see the create catch above): surface the service's
+      // already-prefixed message verbatim — no "Failed to update character:
+      // Failed to update character: Not Found" doubling.
+      alert(error.message);
     }
   }, [campaignName]);
 
   return {
     showCharacterWizard,
     showEditCharacterWizard,
+    editingCharacter,
+    closeWizards,
     handleAddCharacter,
     handleWizardComplete,
     handleWizardCancel,

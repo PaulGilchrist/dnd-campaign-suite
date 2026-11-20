@@ -242,9 +242,10 @@ function isMountedMapActive(activeMapName, mountedMapName) {
 // Level-up celebration handoff (roadmap Item 8): opens the EXISTING edit
 // wizard for the crossing character — the same lane the sheet's "Edit"
 // button uses (the edit wizard's first visible step is Basic Information,
-// which owns the Level field: the level-up editing entry). The edit wizard
-// renders from activeCharacter, so arm that first (cloneDeep, mirroring
-// handleCharacterClick). No new wizard flow.
+// which owns the Level field: the level-up editing entry). The wizard seeds
+// from the character passed to handleEditCharacter; setActiveCharacter arms
+// the sheet view behind it (mirroring handleCharacterClick, cloneDeep).
+// No new wizard flow.
 function openLevelUpWizard(character, { setActiveCharacter, handleEditCharacter }) {
   setActiveCharacter(cloneDeep(character));
   handleEditCharacter(character);
@@ -496,7 +497,7 @@ function App() {
 
   const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
   const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, deleteErrorName, dismissDeleteError, inputRef } = charMgmt;
-  const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
+  const { showCharacterWizard, showEditCharacterWizard, editingCharacter, closeWizards, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
    // Compute full stats for all characters through the rules engine
     const [computedCharacters, setComputedCharacters] = useState([]);
@@ -617,10 +618,17 @@ function App() {
   // bucket into the new campaign's change-data (ghost buckets). Drop the view
   // and the held character here too; the select callback above re-arms
   // activeView='charSheet' + activeCharacter once the new roster has loaded.
+  // Regression (2026-11-20, wizard-reattach bug): the same reset law must cover the
+  // wizard open-flags. They live on the never-unmounted App, so leaving + re-entering
+  // a campaign resurrected a stale wizard session — and the edit lane re-seeded from
+  // the NEW campaign-load activeCharacter (first roster entry), silently re-targeting
+  // the GM's edit at the wrong character file. closeWizards() runs BEFORE the select
+  // callback below, so the intentional zero-character wizard offer still opens.
   const handleCampaignSelect = (campaign, characters) => {
     setCombatSummaryLoaded(false);
     setActiveView(null);
     setActiveCharacter(null);
+    closeWizards();
     campaignMgmt.handleCampaignSelect(campaign, characters);
   };
 
@@ -888,7 +896,13 @@ function App() {
           activeCharacter={activeCharacter}
           deleteErrorName={deleteErrorName}
           onDismissDeleteError={dismissDeleteError}
-          onBackToCampaigns={handleBackToCampaigns}
+          onBackToCampaigns={() => {
+            // Campaign-switch law (see handleCampaignSelect): both seams close the
+            // wizard lanes — leaving the campaign must not leave a resurrectable
+            // open-flag behind on the never-unmounted App.
+            closeWizards();
+            handleBackToCampaigns();
+          }}
           onAddCharacter={handleAddCharacter}
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
@@ -994,7 +1008,12 @@ function App() {
         <TvExitButton />
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} existingCharacters={characters} />}
-        {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={activeCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}
+        {/* characterData is the CAPTURED editingCharacter (set by handleEditCharacter
+            at Edit-click time), never the live activeCharacter — a mid-session change
+            of the active character can't re-target the mounted wizard (2026-11-20
+            reattach bug); keying by name makes a re-edit of a different character a
+            clean remount (fresh seed) rather than a mixed draft. */}
+        {showEditCharacterWizard && <CharacterCreationWizard key={editingCharacter?.name} onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={editingCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}
         <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />

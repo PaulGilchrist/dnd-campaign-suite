@@ -113,7 +113,9 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: No campaign selected');
+      // Single-owner prefix law (mirrors the delete lane): the hook alerts the
+      // Error message VERBATIM — no hook-side "Failed to create character: " wrap.
+      expect(window.alert).toHaveBeenCalledWith('No campaign selected');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -134,7 +136,8 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to create character:'));
+      // The SERVICE owns the single prefix; verbatim alert (no doubling).
+      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Internal Server Error');
     });
 
     it('alerts on fetch rejection', async () => {
@@ -150,7 +153,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Network failure');
+      expect(window.alert).toHaveBeenCalledWith('Network failure');
     });
 
     it('alerts on second fetch failure (after successful create)', async () => {
@@ -176,7 +179,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Second fetch failed');
+      expect(window.alert).toHaveBeenCalledWith('Second fetch failed');
     });
   });
 
@@ -384,7 +387,8 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to update character: No campaign selected');
+      // Single-owner prefix law (mirrors the delete lane): verbatim message.
+      expect(window.alert).toHaveBeenCalledWith('No campaign selected');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -408,7 +412,9 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to update character:'));
+      // The SERVICE owns the single prefix; the alert carries it EXACTLY once
+      // (bug-face "Failed to update character: Failed to update character: …").
+      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Bad Request');
     });
 
     it('alerts on fetch rejection', async () => {
@@ -427,7 +433,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Network failure');
+      expect(window.alert).toHaveBeenCalledWith('Network failure');
     });
   });
 });
