@@ -7,17 +7,26 @@
 // synthesized cues, no licensing/network dependency.
 //
 // Format recipe (kept tiny on purpose): mono, 16-bit PCM, 22050 Hz, one WAV
-// per cue, ≤1 s per one-shot (~6 s for the weather loop only). All output is
+// per cue, ≤1 s per one-shot (≤1.5 s for the two ceremonial cues — levelup
+// and player-death; ~6 s for the weather loop only). All output is
 // peak-normalized per cue with a headroom target, so relative cue loudness is
 // set by the target column below, not by luck.
 //
 // Cue inventory (also documented in public/audio/README.md):
-//   crit.wav          bright ascending sine flourish (660→1760 Hz arpeggio)
-//   hit.wav           short low thud (150→55 Hz pitch-drop + noise transient)
+//   crit.wav          heavy DOUBLE thud — two stacked hit-style impacts, 2×
+//                     the duration of hit and the pack's loudest one-shot
+//   hit.wav           short low thud (150→55 Hz pitch-drop + noise transient,
+//                     normalized under crit so a crit reads louder)
 //   miss.wav          dull descending filtered-noise whoosh (quiet)
 //   fumble.wav        dissonant low buzz wobble (110/116.5 Hz beat pair)
 //   heal.wav          soft high bell shimmer (G5/B5/D6 staggered decay)
-//   levelup.wav       4-note ascending bell fanfare (C5 E5 G5 C6)
+//   levelup.wav       brass fanfare — fast C5-E5-G5 run into a sustained,
+//                     vibrato'd C-major chord with a high sparkle tail
+//   save-success.wav  bright quick two-note ping (C6→G6 bell, quiet)
+//   save-failure.wav  dull low descending thud (180→70 Hz slide, quiet)
+//   monster-death.wav collapsing drop — saw growl 180→35 Hz + noise wash
+//   player-down.wav   soft falling minor-fourth bells (D5→A4, quiet/sad)
+//   player-death.wav  slow funeral knell — A3/C4 minor-third bell tolls
 //   weather-wind.wav  seamless wind-bed loop (harmonics of exactly 6 s)
 //
 // Usage: node scripts/generate-audio-cues.mjs
@@ -95,6 +104,8 @@ function lowpassNoise(rng, count, cutoffFn) {
 // ── Cue builders ──────────────────────────────────────────────────────────
 
 // hit: short thud — fast pitch-drop low sine plus a 40 ms noise transient.
+// Normalized at 0.7 (was 0.9) so crit can read as a genuine 2× louder
+// impact without clipping.
 function buildHit() {
     const n = seconds(0.22);
     const rng = makeRng(0x4817);
@@ -108,27 +119,34 @@ function buildHit() {
         const noiseEnv = t < 0.04 ? Math.exp(-t * 90) : 0;
         out[i] = Math.sin(phase) * env * 0.85 + (rng() * 2 - 1) * noiseEnv * 0.5;
     }
-    return normalize(out, 0.9);
+    return normalize(out, 0.7);
 }
 
-// crit: bright ascending flourish — four overlapping decaying sine notes an
-// octave-and-a-half apart, each with a soft octave harmonic.
+// crit: a HIT, hit harder — the same thud body as hit.wav stacked as a
+// DOUBLE impact (second blow 60 ms later, heavier and deeper: the audible
+// twin of doubled damage dice). Exactly 2× hit's length, normalized to full
+// scale (the pack's loudest cue), so it is longer AND louder than a plain hit.
 function buildCrit() {
-    const notes = [660, 880, 1320, 1760];
-    const noteLen = 0.22;
-    const n = seconds(0.72);
+    const n = seconds(0.44);
+    const rng = makeRng(0xc112);
     const out = new Float64Array(n);
-    notes.forEach((freq, idx) => {
-        const start = idx * 0.11;
-        for (let i = Math.floor(start * SAMPLE_RATE); i < n; i++) {
-            const t = i / SAMPLE_RATE - start;
-            if (t > noteLen) break;
-            const env = Math.exp(-t * 14) * (1 - Math.exp(-t * 300));
-            out[i] += (Math.sin(2 * Math.PI * freq * t)
-                + 0.3 * Math.sin(2 * Math.PI * freq * 2 * t)) * env * 0.6;
+    const impacts = [
+        { start: 0, f0: 165, f1: 55, drop: 18, decay: 16, noise: 0.6, gain: 1.0 },
+        { start: 0.06, f0: 150, f1: 48, drop: 16, decay: 12, noise: 0.55, gain: 1.15 },
+    ];
+    for (const imp of impacts) {
+        let phase = 0;
+        for (let i = Math.floor(imp.start * SAMPLE_RATE); i < n; i++) {
+            const t = i / SAMPLE_RATE - imp.start;
+            const freq = imp.f1 + (imp.f0 - imp.f1) * Math.exp(-t * imp.drop);
+            phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+            const env = Math.exp(-t * imp.decay) * (1 - Math.exp(-t * 300));
+            const noiseEnv = t < 0.05 ? Math.exp(-t * 80) : 0;
+            out[i] += (Math.sin(phase) * env
+                + (rng() * 2 - 1) * noiseEnv * imp.noise) * imp.gain * 0.6;
         }
-    });
-    return normalize(out, 0.9);
+    }
+    return normalize(out, 1.0);
 }
 
 // miss: dull descending whoosh — low-passed noise whose cutoff slides down,
@@ -183,24 +201,155 @@ function buildHeal() {
     return normalize(out, 0.55);
 }
 
-// levelup: 4-note ascending bell fanfare (C5 E5 G5 C6), last note sustained.
+// levelup: triumphant brass fanfare — a fast C5–E5–G5 run landing on a
+// sustained, vibrato'd C-major chord (C4 C5 E5 G5 C6) with a high sparkle
+// shimmer. Deliberately brass-voiced (harmonic stack, fast attack) to keep it
+// a world away from heal.wav's soft staggered sine bells.
 function buildLevelUp() {
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    const starts = [0, 0.14, 0.28, 0.44];
-    const n = seconds(0.95);
+    const n = seconds(1.3);
     const out = new Float64Array(n);
-    notes.forEach((freq, idx) => {
-        const tail = idx === notes.length - 1 ? 0.51 : 0.22;
-        for (let i = Math.floor(starts[idx] * SAMPLE_RATE); i < n; i++) {
-            const t = i / SAMPLE_RATE - starts[idx];
-            if (t > tail) break;
-            const env = Math.exp(-t * (idx === notes.length - 1 ? 4.5 : 12))
-                * (1 - Math.exp(-t * 250));
-            out[i] += (Math.sin(2 * Math.PI * freq * t)
-                + 0.4 * Math.sin(2 * Math.PI * freq * 3 * t) * Math.exp(-t * 6)) * env * 0.65;
+    // Weighted harmonic stack ≈ muted brass.
+    const brass = (freq, t, vib) => {
+        const f = freq * (1 + vib * Math.sin(2 * Math.PI * 5.5 * t));
+        const partials = [1, 0.55, 0.38, 0.26, 0.16, 0.1];
+        let s = 0;
+        for (let h = 0; h < partials.length; h++) {
+            s += partials[h] * Math.sin(2 * Math.PI * f * (h + 1) * t);
+        }
+        return s;
+    };
+    const run = [523.25, 659.25, 783.99];
+    const runStarts = [0, 0.09, 0.18];
+    run.forEach((freq, idx) => {
+        for (let i = Math.floor(runStarts[idx] * SAMPLE_RATE); i < n; i++) {
+            const t = i / SAMPLE_RATE - runStarts[idx];
+            if (t > 0.16) break;
+            const env = Math.exp(-t * 22) * (1 - Math.exp(-t * 400));
+            out[i] += brass(freq, t, 0) * env * 0.5;
         }
     });
+    const chordStart = 0.3;
+    const chord = [261.63, 523.25, 659.25, 783.99, 1046.5];
+    const fade = seconds(0.03);
+    for (let i = Math.floor(chordStart * SAMPLE_RATE); i < n; i++) {
+        const t = i / SAMPLE_RATE - chordStart;
+        const env = (1 - Math.exp(-t * 18)) * Math.exp(-t * 3.5)
+            * Math.min(1, (n - i) / fade);
+        let s = 0;
+        for (const freq of chord) s += brass(freq, t, 0.004);
+        out[i] += s * env * 0.16;
+        out[i] += Math.sin(2 * Math.PI * 2093 * t) * env * 0.05
+            * (0.5 + 0.5 * Math.sin(2 * Math.PI * 7 * t));
+    }
+    return normalize(out, 0.95);
+}
+
+// save-success: bright quick ping — two fast rising bell notes (C6→G6) with
+// a shimmer partial, short and quiet so a failed-save AoE volley of pings
+// never shouts over the attack lane.
+function buildSaveSuccess() {
+    const notes = [1046.5, 1568];
+    const n = seconds(0.28);
+    const out = new Float64Array(n);
+    notes.forEach((freq, idx) => {
+        const start = idx * 0.07;
+        for (let i = Math.floor(start * SAMPLE_RATE); i < n; i++) {
+            const t = i / SAMPLE_RATE - start;
+            if (t > 0.2) break;
+            const env = Math.exp(-t * 16) * (1 - Math.exp(-t * 500));
+            out[i] += (Math.sin(2 * Math.PI * freq * t)
+                + 0.3 * Math.sin(2 * Math.PI * freq * 2.76 * t) * Math.exp(-t * 25)) * env * 0.6;
+        }
+    });
+    return normalize(out, 0.6);
+}
+
+// save-failure: dull low descending thud — a short pitch-slide (180→70 Hz)
+// with a beating detuned twin, heavily damped. Quiet per the miss doctrine:
+// it marks the moment without out-shouting the damage that follows.
+function buildSaveFailure() {
+    const n = seconds(0.35);
+    const out = new Float64Array(n);
+    let phase = 0;
+    for (let i = 0; i < n; i++) {
+        const t = i / SAMPLE_RATE;
+        const freq = 70 + 110 * Math.exp(-t * 14);
+        phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+        const env = Math.exp(-t * 9) * (1 - Math.exp(-t * 250));
+        out[i] = (Math.sin(phase) + 0.7 * Math.sin(phase * 1.03)) * env * 0.7;
+    }
+    return normalize(out, 0.55);
+}
+
+// monster-death: a collapsing drop — a harmonically-rich growl sliding
+// 180→35 Hz while a low-passed noise wash drains away under it. Reads as the
+// body hitting the ground.
+function buildMonsterDeath() {
+    const n = seconds(0.6);
+    const rng = makeRng(0xd347);
+    const noise = lowpassNoise(rng, n, t => Math.max(0.05, 0.3 - t * 0.45));
+    const out = new Float64Array(n);
+    let phase = 0;
+    for (let i = 0; i < n; i++) {
+        const t = i / SAMPLE_RATE;
+        const freq = 35 + 145 * Math.exp(-t * 7);
+        phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+        const env = Math.exp(-t * 5) * (1 - Math.exp(-t * 150));
+        const wobble = 1 + 0.25 * Math.sin(2 * Math.PI * 9 * t);
+        const growl = (Math.sin(phase) + 0.5 * Math.sin(2 * phase) + 0.25 * Math.sin(3 * phase)) * wobble;
+        out[i] = growl * env * 0.55 + noise[i] * env * 1.6;
+    }
     return normalize(out, 0.85);
+}
+
+// player-down: soft, sad — two gentle low bells falling a fourth (D5→A4),
+// slow-attack and quiet: an alarm the table should feel, not flinch at.
+function buildPlayerDown() {
+    const notes = [587.33, 440];
+    const n = seconds(0.7);
+    const out = new Float64Array(n);
+    notes.forEach((freq, idx) => {
+        const start = idx * 0.22;
+        for (let i = Math.floor(start * SAMPLE_RATE); i < n; i++) {
+            const t = i / SAMPLE_RATE - start;
+            if (t > 0.45) break;
+            const env = Math.exp(-t * 6) * (1 - Math.exp(-t * 60));
+            out[i] += (Math.sin(2 * Math.PI * freq * t)
+                + 0.2 * Math.sin(2 * Math.PI * freq * 2.76 * t) * Math.exp(-t * 12)) * env * 0.55;
+        }
+    });
+    return normalize(out, 0.45);
+}
+
+// player-death: a slow funeral knell — two bell tolls a minor third apart
+// (A3, C4) with inharmonic bell partials and a low drone under the second.
+// The saddest, heaviest cue in the pack.
+function buildPlayerDeath() {
+    const n = seconds(1.4);
+    const tolls = [
+        { start: 0, freq: 220 },
+        { start: 0.45, freq: 261.63 },
+    ];
+    const out = new Float64Array(n);
+    for (const toll of tolls) {
+        for (let i = Math.floor(toll.start * SAMPLE_RATE); i < n; i++) {
+            const t = i / SAMPLE_RATE - toll.start;
+            if (t > 0.95) break;
+            const env = Math.exp(-t * 3.2) * (1 - Math.exp(-t * 200));
+            out[i] += (Math.sin(2 * Math.PI * toll.freq * t)
+                + 0.45 * Math.sin(2 * Math.PI * toll.freq * 2.76 * t) * Math.exp(-t * 5)
+                + 0.2 * Math.sin(2 * Math.PI * toll.freq * 5.4 * t) * Math.exp(-t * 9)) * env * 0.6;
+        }
+    }
+    const fade = seconds(0.04);
+    const droneStart = 0.45;
+    for (let i = Math.floor(droneStart * SAMPLE_RATE); i < n; i++) {
+        const t = i / SAMPLE_RATE - droneStart;
+        const env = Math.exp(-t * 2.8) * (1 - Math.exp(-t * 40))
+            * Math.min(1, (n - i) / fade);
+        out[i] += Math.sin(2 * Math.PI * 110 * t) * env * 0.35;
+    }
+    return normalize(out, 0.9);
 }
 
 // weather-wind: seamless loop bed. Every component is a sinusoid at an
@@ -246,6 +395,11 @@ const CUES = [
     ['fumble.wav', buildFumble()],
     ['heal.wav', buildHeal()],
     ['levelup.wav', buildLevelUp()],
+    ['save-success.wav', buildSaveSuccess()],
+    ['save-failure.wav', buildSaveFailure()],
+    ['monster-death.wav', buildMonsterDeath()],
+    ['player-down.wav', buildPlayerDown()],
+    ['player-death.wav', buildPlayerDeath()],
     ['weather-wind.wav', buildWeatherLoop()],
 ];
 

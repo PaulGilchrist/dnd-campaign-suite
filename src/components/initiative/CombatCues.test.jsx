@@ -1,12 +1,13 @@
 // @maintained-by-ai
-// Roadmap Item 10 (sensory cues) — the log-lane attack-outcome consumer.
+// Roadmap Item 10 (sensory cues) — the log-lane outcome consumer.
 // subscribeToSSE is the only seam mocked (the shared-singleton law is its own
-// suite's job); the cueForRollEntry decode runs for real, only playCue is
-// spied. Pins: one subscription per campaign, cue per live attack append
-// (crit/hit/miss/fumble through the real decoder), silence for everything
-// else (damage entries, notes, log-clear data:null, other keys), and clean
-// unsubscribe on unmount. There is deliberately NO initial GET — mounts
-// never replay a backlog.
+// suite's job); the cueForLogEntry decode runs for real, only playCue is
+// spied. Pins: one subscription per campaign, cue per live attack/save/death
+// append (crit/hit/miss/fumble, save success/failure, monster-death,
+// player-down, player-death through the real decoder), silence for everything
+// else (damage entries, concentration saves, notes, log-clear data:null,
+// other keys), and clean unsubscribe on unmount. There is deliberately NO
+// initial GET — mounts never replay a backlog.
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CombatCues from './CombatCues.jsx';
@@ -67,10 +68,25 @@ describe('CombatCues', () => {
         expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(['hit', 'crit', 'fumble', 'miss']);
     });
 
-    it('stays silent on damage/save entries, notes, log-clears and foreign keys', () => {
+    it('cues save outcomes and deaths off live log appends', () => {
+        render(<CombatCues campaignName='test-campaign' />);
+        emit(logEvent({ type: 'roll', rollType: 'save', saveResult: 'success' }));
+        emit(logEvent({ type: 'roll', rollType: 'save', saveResult: 'failure' }));
+        emit(logEvent({ type: 'hp_change', threshold: 'dead', targetName: 'Goblin' }));
+        emit(logEvent({ type: 'hp_change', threshold: 'dead', targetName: 'Thorin', isPlayer: true }));
+        emit(logEvent({ type: 'death_save', characterName: 'Thorin', result: 'dead' }));
+        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual([
+            'save-success', 'save-failure', 'monster-death', 'player-down', 'player-death',
+        ]);
+    });
+
+    it('stays silent on damage entries, concentration saves, notes, log-clears and foreign keys', () => {
         render(<CombatCues campaignName='test-campaign' />);
         emit(logEvent({ type: 'roll', rollType: 'damage', isCrit: true, hit: true }));
+        emit(logEvent({ type: 'roll', rollType: 'save', name: 'Concentration Save', saveResult: 'success' }));
         emit(logEvent({ type: 'roll', rollType: 'save' }));
+        emit(logEvent({ type: 'hp_change', threshold: 'bloodied', targetName: 'Goblin' }));
+        emit(logEvent({ type: 'death_save', characterName: 'Thorin', success: true }));
         emit(logEvent({ type: 'note' }));
         emit(logEvent(null));
         emit({ key: 'combatSummary-test-campaign', data: { type: 'roll', rollType: 'attack', hit: true } });

@@ -40,6 +40,11 @@ export const CUE_URLS = {
     fumble: '/audio/fumble.wav',
     heal: '/audio/heal.wav',
     levelup: '/audio/levelup.wav',
+    'save-success': '/audio/save-success.wav',
+    'save-failure': '/audio/save-failure.wav',
+    'monster-death': '/audio/monster-death.wav',
+    'player-down': '/audio/player-down.wav',
+    'player-death': '/audio/player-death.wav',
     weather: '/audio/weather-wind.wav',
 };
 
@@ -208,20 +213,50 @@ export function stopLoop(key) {
     el.currentTime = 0;
 }
 
+// roll-entry branch of the decoder: attack outcomes + raw save results.
+function cueForRollEntry(entry) {
+    if (entry.rollType === 'attack') {
+        if (entry.isNatural1) return 'fumble';
+        if (entry.isCrit) return 'crit';
+        if (entry.hit === true) return 'hit';
+        if (entry.hit === false) return 'miss';
+        return null;
+    }
+    if (entry.rollType === 'save' && entry.name !== 'Concentration Save') {
+        if (entry.saveResult === 'success') return 'save-success';
+        if (entry.saveResult === 'failure') return 'save-failure';
+    }
+    return null;
+}
+
 /**
- * Decode one already-synced log entry into a combat cue key, or null for
- * "stay silent". Pure twin of the attack-outcome badges the log/TV panel
- * already render (RollAttackBadges/RollModeBadges read the same flags):
- * natural-1 fumbles outrank everything, then crits, then plain hit/miss.
- * Damage/save/initiative entries deliberately produce nothing — their HP
- * movement gets its audio twin at the floater seam instead (HpFeedback),
- * so no moment is ever double-voiced.
+ * Decode one already-synced log entry into a cue key, or null for "stay
+ * silent". Pure twin of the outcome badges the log/TV panel already render
+ * (RollAttackBadges/RollModeBadges read the same flags):
+ *
+ * - attack rolls: natural-1 fumbles outrank everything, then crits, then
+ *   plain hit/miss. Damage/initiative rolls produce nothing — damage's HP
+ *   movement gets its audio twin at the floater seam instead (HpFeedback),
+ *   so no moment is ever double-voiced.
+ * - saving-throw rolls (saveResult 'success'/'failure'): the one moment no
+ *   other lane voices (failed-save damage is silent here, successful saves
+ *   have no floater). Concentration saves are EXCLUDED — they re-voice every
+ *   hit taken and would machine-gun the table. Special outcomes (e.g.
+ *   'soulstitch_auto_success') are not raw save results: they stay silent.
+ * - hp_change stamped threshold 'dead': a monster falls silent forever
+ *   ('monster-death'); a player at 0 HP is DYING, not dead (5e), so the
+ *   softer 'player-down' sounds — the entry's isPlayer stamp written by the
+ *   damage/GM-override lanes is what tells them apart.
+ * - death_save result 'dead' (the fatal third failure): the true player
+ *   death — the serious 'player-death' knell. Rolls/stabilize/clear stay
+ *   silent; the table already hears the dice.
  */
-export function cueForRollEntry(entry) {
-    if (!entry || entry.type !== 'roll' || entry.rollType !== 'attack') return null;
-    if (entry.isNatural1) return 'fumble';
-    if (entry.isCrit) return 'crit';
-    if (entry.hit === true) return 'hit';
-    if (entry.hit === false) return 'miss';
+export function cueForLogEntry(entry) {
+    if (!entry) return null;
+    if (entry.type === 'roll') return cueForRollEntry(entry);
+    if (entry.type === 'hp_change' && entry.threshold === 'dead') {
+        return entry.isPlayer ? 'player-down' : 'monster-death';
+    }
+    if (entry.type === 'death_save' && entry.result === 'dead') return 'player-death';
     return null;
 }

@@ -1304,6 +1304,9 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
     isUnconscious: isDead,
    };
   if (threshold) entry.threshold = threshold;
+  // Players at 0 HP are DYING, not dead (5e) — the audio lane needs the
+  // player/monster distinction to voice 'player-down' vs 'monster-death'.
+  if (creature.type === 'player') entry.isPlayer = true;
 
   if (creature.type === 'player') {
     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);

@@ -502,6 +502,9 @@ function writeDamageResults({ campaignName, target, totalDamageDealt, newHp, old
             damageBreakdown,
         };
         if (threshold) hpEntry.threshold = threshold;
+        // Players at 0 HP are DYING, not dead (5e) — see logDamageApplication:
+        // the audio lane voices 'player-down' vs 'monster-death' off this stamp.
+        if (target.type === 'player') hpEntry.isPlayer = true;
         addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
     }
 

@@ -272,7 +272,7 @@ describe('applyDamageToTarget', () => {
     expect(dispatched).toBe(true);
     expect(hpLog('Alchemist')).toEqual({
       type: 'hp_change', targetName: 'Alchemist', delta: -8, currentHp: 17, maxHp: 30,
-      isHealing: false, isUnconscious: false,
+      isHealing: false, isUnconscious: false, isPlayer: true,
     });
     expect(sendConcentrationPrompt).not.toHaveBeenCalled();
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
@@ -461,7 +461,7 @@ describe('applyDamageToTarget', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'deathFailures', [false, false, false], CAMPAIGN);
     expect(hpLog('Fighter')).toEqual({
       type: 'hp_change', targetName: 'Fighter', delta: -5, currentHp: 0, maxHp: 30,
-      isHealing: false, isUnconscious: true, threshold: 'dead',
+      isHealing: false, isUnconscious: true, threshold: 'dead', isPlayer: true,
     });
 
     // already at 0: the HP write still happens, but prompt/deathSaves/log stay silent

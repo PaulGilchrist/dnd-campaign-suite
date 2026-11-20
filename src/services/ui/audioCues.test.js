@@ -16,7 +16,7 @@ import {
     isSfxEnabled, setSfxEnabled,
     getSfxVolume, setSfxVolume,
     playCue, startLoop, stopLoop,
-    cueForRollEntry,
+    cueForLogEntry,
     resetAudioCues,
 } from './audioCues.js';
 
@@ -53,14 +53,15 @@ afterEach(() => {
 describe('asset census', () => {
     it('every cue URL resolves to a real file in public/audio/', () => {
         const keys = Object.keys(CUE_URLS);
-        expect(keys.length).toBeGreaterThanOrEqual(7);
+        expect(keys.length).toBeGreaterThanOrEqual(12);
         for (const key of keys) {
             const file = join(process.cwd(), 'public', CUE_URLS[key].slice(1));
             expect(existsSync(file), `${key} → ${CUE_URLS[key]} must exist on disk`).toBe(true);
         }
     });
 
-    it('one-shots are ≤1 s and the weather bed is a 4–7 s loop (16-bit mono PCM header)', () => {
+    it('one-shots are ≤1 s (ceremonial cues ≤1.5 s) and the weather bed is a 4–7 s loop (16-bit mono PCM header)', () => {
+        const ceremonial = new Set(['levelup', 'player-death']);
         for (const [key, url] of Object.entries(CUE_URLS)) {
             const wav = readFileSync(join(process.cwd(), 'public', url.slice(1)));
             expect(wav.subarray(0, 4).toString()).toBe('RIFF');
@@ -70,6 +71,8 @@ describe('asset census', () => {
             if (key === 'weather') {
                 expect(seconds, 'weather loop length').toBeGreaterThanOrEqual(4);
                 expect(seconds).toBeLessThanOrEqual(7);
+            } else if (ceremonial.has(key)) {
+                expect(seconds, `${key} ceremonial length`).toBeLessThanOrEqual(1.5);
             } else {
                 expect(seconds, `${key} length`).toBeLessThanOrEqual(1);
             }
@@ -86,25 +89,61 @@ describe('cue map / decoder', () => {
             fumble: '/audio/fumble.wav',
             heal: '/audio/heal.wav',
             levelup: '/audio/levelup.wav',
+            'save-success': '/audio/save-success.wav',
+            'save-failure': '/audio/save-failure.wav',
+            'monster-death': '/audio/monster-death.wav',
+            'player-down': '/audio/player-down.wav',
+            'player-death': '/audio/player-death.wav',
             weather: '/audio/weather-wind.wav',
         });
     });
 
     it('decode table: attack entries resolve fumble > crit > hit > miss', () => {
-        expect(cueForRollEntry(attack({ isNatural1: true, hit: false }))).toBe('fumble');
-        expect(cueForRollEntry(attack({ isCrit: true, isNatural20: true }))).toBe('crit');
-        expect(cueForRollEntry(attack())).toBe('hit');
-        expect(cueForRollEntry(attack({ hit: false }))).toBe('miss');
-        expect(cueForRollEntry(attack({ hit: false, isAutoMiss: true }))).toBe('miss');
+        expect(cueForLogEntry(attack({ isNatural1: true, hit: false }))).toBe('fumble');
+        expect(cueForLogEntry(attack({ isCrit: true, isNatural20: true }))).toBe('crit');
+        expect(cueForLogEntry(attack())).toBe('hit');
+        expect(cueForLogEntry(attack({ hit: false }))).toBe('miss');
+        expect(cueForLogEntry(attack({ hit: false, isAutoMiss: true }))).toBe('miss');
     });
 
-    it('decode: anything that is not an attack outcome stays silent (no double-voice)', () => {
-        expect(cueForRollEntry(attack({ hit: undefined }))).toBeNull();
-        expect(cueForRollEntry({ type: 'roll', rollType: 'damage', hit: true, isCrit: true })).toBeNull();
-        expect(cueForRollEntry({ type: 'roll', rollType: 'save' })).toBeNull();
-        expect(cueForRollEntry({ type: 'roll', rollType: 'initiative' })).toBeNull();
-        expect(cueForRollEntry({ type: 'note' })).toBeNull();
-        expect(cueForRollEntry(null)).toBeNull();
+    it('decode: raw save results cue success/failure; special outcomes stay silent', () => {
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save', saveResult: 'success' })).toBe('save-success');
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save', saveResult: 'failure' })).toBe('save-failure');
+        // Special (non-raw) outcomes are not the table's save moment — silent.
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save', saveResult: 'soulstitch_auto_success' })).toBeNull();
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save', saveResult: { success: true } })).toBeNull();
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save' })).toBeNull();
+        // Concentration saves re-voice every hit taken — never a second cue.
+        expect(cueForLogEntry({ type: 'roll', rollType: 'save', name: 'Concentration Save', saveResult: 'success' })).toBeNull();
+        // End-of-turn condition repeats (rollType 'condition-save', boolean
+        // success) fire every round per effect — machine-gun, stay silent.
+        expect(cueForLogEntry({ type: 'roll', rollType: 'condition-save', success: true })).toBeNull();
+    });
+
+    it('decode: dead-threshold HP changes cue monster-death vs player-down', () => {
+        expect(cueForLogEntry({ type: 'hp_change', threshold: 'dead', targetName: 'Goblin' })).toBe('monster-death');
+        expect(cueForLogEntry({ type: 'hp_change', threshold: 'dead', targetName: 'Thorin', isPlayer: true })).toBe('player-down');
+        // No dead threshold (plain damage, bloodied, heals) stays silent —
+        // the floater/heal lane already voices HP movement.
+        expect(cueForLogEntry({ type: 'hp_change', threshold: 'bloodied' })).toBeNull();
+        expect(cueForLogEntry({ type: 'hp_change', delta: -5 })).toBeNull();
+        expect(cueForLogEntry({ type: 'hp_change', delta: 5, isHealing: true })).toBeNull();
+    });
+
+    it('decode: the fatal third death save cues player-death; other tracks silent', () => {
+        expect(cueForLogEntry({ type: 'death_save', characterName: 'Thorin', result: 'dead' })).toBe('player-death');
+        expect(cueForLogEntry({ type: 'death_save', characterName: 'Thorin', result: 'stable' })).toBeNull();
+        expect(cueForLogEntry({ type: 'death_save', characterName: 'Thorin', result: 'removed' })).toBeNull();
+        // Plain death-save rolls (success boolean, no terminal result) silent.
+        expect(cueForLogEntry({ type: 'death_save', success: false, totalFailures: 2 })).toBeNull();
+    });
+
+    it('decode: anything that is not a voiced moment stays silent (no double-voice)', () => {
+        expect(cueForLogEntry(attack({ hit: undefined }))).toBeNull();
+        expect(cueForLogEntry({ type: 'roll', rollType: 'damage', hit: true, isCrit: true })).toBeNull();
+        expect(cueForLogEntry({ type: 'roll', rollType: 'initiative' })).toBeNull();
+        expect(cueForLogEntry({ type: 'note' })).toBeNull();
+        expect(cueForLogEntry(null)).toBeNull();
     });
 });
 

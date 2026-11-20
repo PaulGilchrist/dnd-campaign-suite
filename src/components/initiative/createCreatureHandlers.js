@@ -143,6 +143,9 @@ function logManualHpOverride({ campaignName, creature, oldHp, newHp }) {
     }
     const threshold = resolveOverrideThreshold(oldHp, newHp, maxHp)
     if (threshold) entry.threshold = threshold
+    // Players at 0 HP are DYING, not dead (5e) — see logDamageApplication:
+    // the audio lane voices 'player-down' vs 'monster-death' off this stamp.
+    if (isPlayer) entry.isPlayer = true
     addEntry(campaignName, entry)
         .catch((e) => { console.error('[handleCreatureHpChange] hp_change log failed:', e) })
 }
