@@ -12,9 +12,11 @@
  * non-delete reuse precedent as FriendlyFireConfirmModal/SpellOverlayConfirm):
  * .modal-shell-* chrome + focus trap + Escape/backdrop dismiss come from it.
  * Its body slot renders children inside a <p>, so every line here is a
- * display:block <span> — valid inline content, styled by this component's
- * own scoped CSS (no inline styles, house convention).
+ * display:block <span> (or the fold's display:block <button> — both are
+ * valid inline content), styled by this component's own scoped CSS (no
+ * inline styles, house convention).
  */
+import { useState } from 'react';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import { RULESET_LABELS, NAME_LIST_VISIBLE_CAP } from '../../services/character/rulesetSwitchPreview.js';
 import './RulesetSwitchConfirmModal.css';
@@ -40,17 +42,29 @@ function LedgerRow({ row }) {
 }
 
 // Capped row list: first NAME_LIST_VISIBLE_CAP rows by name, remainder folded
-// into an honest "+N more" line (the kept/removed counts above never cap).
+// behind a "+N more" disclosure button (the QuestBoardCard show-more idiom:
+// type="button" + aria-expanded + useState) so every dropped row's name AND
+// reason stays reachable — nothing vanishes un-named. The kept/removed counts
+// above never cap, and collapsing restores the exact capped face.
 function CappedRows({ rows, singular }) {
-  const visible = rows.slice(0, NAME_LIST_VISIBLE_CAP);
-  const overflow = rows.length - visible.length;
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? rows : rows.slice(0, NAME_LIST_VISIBLE_CAP);
+  const overflow = rows.length - NAME_LIST_VISIBLE_CAP;
+  const noun = singular.toLowerCase() + (overflow > 1 ? 's' : '');
   return (
     <>
       {visible.map(row => (
         <LedgerRow key={`${row.kept ? 'kept' : 'drop'}-${row.name}`} row={row} />
       ))}
       {overflow > 0 && (
-        <span className="ruleset-switch-more">+{overflow} more {singular.toLowerCase()}{overflow > 1 ? 's' : ''}</span>
+        <button
+          type="button"
+          className="ruleset-switch-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(prev => !prev)}
+        >
+          {expanded ? 'Show less' : `+${overflow} more ${noun}`}
+        </button>
       )}
     </>
   );
