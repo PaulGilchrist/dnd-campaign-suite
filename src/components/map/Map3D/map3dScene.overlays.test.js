@@ -134,7 +134,7 @@ describe('Map3DScene overlay/toggle/camera lane (camera-reset fix)', () => {
         it('tokens always carry a label sprite (hidden when showLabels=false) so toggling never needs a rebuild', () => {
             // jsdom has no 2D canvas — stub the drawing context; the sprite
             // tagging/visibility lane below is what this test pins.
-            const ctxStub = { font: '', textAlign: '', textBaseline: '', lineWidth: 0, strokeStyle: '', fillStyle: '', strokeText: vi.fn(), fillText: vi.fn() };
+            const ctxStub = { font: '', textAlign: '', textBaseline: '', lineWidth: 0, strokeStyle: '', fillStyle: '', strokeText: vi.fn(), fillText: vi.fn(), measureText: (t) => ({ width: t.length * 40 }) };
             const gctx = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctxStub);
             scene.showLabels = false;
             const token = scene._makeToken('Aria', 0x4a90d9, 0x2c5f8a);

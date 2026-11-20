@@ -3,6 +3,10 @@ import { getAssetUrl } from './map3dAssets.js';
 import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
 import { isItemVisible, isCreatureToken, isPlayerVisible } from './map3dVisibility.js';
+// One label law shared with the 2D twin (PlacedItems.jsx imports the same fn):
+// the ghost title base is placedItemLabel(item), so the nameless-token face
+// reads identically on both surfaces.
+import { placedItemLabel } from '../hooks/usePlacedItems.js';
 
 // 1 grid cell in world units = exactly 5' (matches CELL_SIZE / 2D map scale)
 const WALL_H = 80; // 10' = 2 cells tall (a realistic dungeon wall)
@@ -21,6 +25,8 @@ const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 
 // Last-seen ghost token palette: neutral greys — the 3D analogue of the 2D
 // .token-ghost's grayscale(0.85) wash. Memory of a creature, not its faction truth.
 const LAST_KNOWN = { body: 0x9a9a9a, ring: 0x7a7a7a };
+// Token-label sizing (see _makeLabel for the snug-canvas + cap laws).
+const LABEL = { canvasH: 128, fontPx: 64, minFontPx: 24, padX: 40, maxCanvasW: 1024, worldH: 14 };
 // The player fog is an OPAQUE full-cell column with its cap at WALL_H and a
 // renderOrder above every token, so a ground-level ghost would be buried
 // inside it. The memory token floats just above the fog roof at its cell —
@@ -187,26 +193,56 @@ export class Map3DScene {
     }
 
     // ---- labels ----------------------------------------------------------------
+    // Snug-canvas law (improve 2026-11-20 round 2): the fixed 512×128 canvas
+    // CLIPPED any string wider than it — symmetrically at both edges under
+    // textAlign 'center' — so every ghost label ('<Name> — last seen here')
+    // rendered truncated. The canvas is now sized to the MEASURED text:
+    //   • width = ceil(measured + LABEL.padX) to a 4px step; height fixed;
+    //   • sprite keeps the legacy px→world ratio (14 world units over 128px
+    //     — 512px landed on exactly 56 wide as before), so glyph SIZE is
+    //     byte-stable and short names lose only transparent margin;
+    //   • cap law: a label never outgrows LABEL.maxCanvasW (1024px = 112
+    //     world units ≈ 2.8 cells); past it the FONT shrinks to fit instead
+    //     of the sprite ballooning across the board (floor minFontPx keeps
+    //     glyphs readable).
     _makeLabel(text) {
         const THREE = this.THREE;
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
+        canvas.height = LABEL.canvasH;
+        canvas.width = LABEL.maxCanvasW; // provisional — measured size assigned below
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 64px -apple-system, sans-serif';
+        const measure = (fontPx) => {
+            ctx.font = `bold ${fontPx}px -apple-system, sans-serif`;
+            return ctx.measureText(text).width + LABEL.padX;
+        };
+        let fontPx = LABEL.fontPx;
+        let w = measure(fontPx);
+        if (w > LABEL.maxCanvasW) {
+            fontPx = Math.max(LABEL.minFontPx, Math.floor(fontPx * LABEL.maxCanvasW / w));
+            w = LABEL.maxCanvasW;
+        }
+        canvas.width = Math.ceil(w / 4) * 4;
+        // Assigning canvas.width RESETS the 2D context state — re-apply the
+        // measured font before painting.
+        ctx.font = `bold ${fontPx}px -apple-system, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.lineWidth = 10;
         ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeText(text, 256, 64);
+        ctx.strokeText(text, canvas.width / 2, LABEL.canvasH / 2);
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(text, 256, 64);
+        ctx.fillText(text, canvas.width / 2, LABEL.canvasH / 2);
         const tex = new THREE.CanvasTexture(canvas);
         tex.anisotropy = 4;
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-        sprite.scale.set(56, 14, 1);
+        sprite.scale.set((LABEL.worldH * canvas.width) / LABEL.canvasH, LABEL.worldH, 1);
         sprite.renderOrder = 999; // just under the fog volume so fogged labels are covered
         sprite.userData.isTokenLabel = true;
+        // Test/probe seam: canvas pixels are not assertable (jsdom has no 2D
+        // context, and the live __map3d lane reads userData), so the rendered
+        // label TEXT is stamped here — the last-known suite pins wording
+        // through it.
+        sprite.userData.labelText = text;
         sprite.visible = this.showLabels;
         return sprite;
     }
@@ -689,7 +725,13 @@ export class Map3DScene {
             if (!isCreatureToken(item) || !lastKnown.has(item.id)) continue;
             if (isItemVisible(item, fog, isLocalhost)) continue; // truth token owns it
             const cell = lastKnown.get(item.id);
-            const token = this._makeToken(item.name || 'NPC', LAST_KNOWN.body, LAST_KNOWN.ring);
+            // Memory wording, not a bare sighting name: the SAME title law the
+            // 2D twin applies (PlacedItems.jsx creatureGroupChrome) —
+            // placedItemLabel base + " — last seen here" suffix, including the
+            // nameless-token face (`NPC (x,y)` disambiguation).
+            const token = this._makeToken(
+                `${placedItemLabel(item)} — last seen here`,
+                LAST_KNOWN.body, LAST_KNOWN.ring);
             token.userData.census = { kind: 'lastKnown', cell: `${cell.gridX},${cell.gridY}` };
             token.position.set(this.cellX(cell.gridX), LAST_KNOWN_LIFT, this.cellZ(cell.gridY));
             this._setDimmed(token);

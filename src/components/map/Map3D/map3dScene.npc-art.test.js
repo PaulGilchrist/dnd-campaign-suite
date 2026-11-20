@@ -57,6 +57,7 @@ const avatarDisc = (token) =>
 const CANVAS_CTX = {
     font: '', textAlign: '', textBaseline: '', lineWidth: 0, strokeStyle: '', fillStyle: '',
     strokeText: vi.fn(), fillText: vi.fn(),
+    measureText: (t) => ({ width: t.length * 40 }), // snug-canvas sizing (40px/char mock)
 };
 
 describe('Map3DScene._buildNpcs inline imageUrl parity with 2D (backlog 2026-11-11 IE)', () => {
