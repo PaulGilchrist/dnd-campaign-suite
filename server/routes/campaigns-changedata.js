@@ -6,6 +6,10 @@ import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
 import { isInvalidCampaignName } from '../utils/campaignReadGuard.js';
 import { addEntry as addLogEntry } from './log.js';
+// Built-in mood catalogue: same shared-module pattern as maps.js importing
+// src/config/outdoorConfig.js — one source of truth, the server reads the
+// client's MOODS keys directly (musicConfig.js is pure ESM, browser-free).
+import { MOODS } from '../../src/services/ui/musicConfig.js';
 
 const router = express.Router();
 
@@ -146,7 +150,47 @@ function validateCustomCategories(customCategories) {
 }
 
 // Whole-payload shape guard for the POST /music route (both PATCH intents).
-function validateMusicPayload(incoming) {
+// Transport fields (mood/playing/volume) are validated only WHEN PRESENT —
+// their absence is the editor PATCH intent (see the route comment below).
+// `customCategories` is the mood's validity map (the payload's own wholesale
+// replacement when it carries one, else the stored doc's), so a custom mood
+// may only name a `custom-<slug>` key that actually exists in the campaign.
+const BUILTIN_MOOD_KEYS = new Set(MOODS.map(m => m.key));
+const MOOD_ERROR = 'music.mood must be null or a mood key from the campaign catalogue (built-in or a stored custom-<slug> category)';
+
+function validateVolume(volume) {
+    if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) {
+        return 'music.volume must be a number between 0 and 1';
+    }
+    return null;
+}
+
+function validateMood(mood, customCategories) {
+    if (typeof mood !== 'string') return MOOD_ERROR;
+    if (BUILTIN_MOOD_KEYS.has(mood)) return null;
+    const knownCustom = customCategories && typeof customCategories === 'object'
+        && Object.prototype.hasOwnProperty.call(customCategories, mood);
+    return knownCustom ? null : MOOD_ERROR;
+}
+
+// Transport trio validated only WHEN PRESENT (absent keys are handled by the
+// caller's `'x' in incoming` gates — that absence IS the editor PATCH intent).
+function validateTransportFields(incoming, customCategories) {
+    if ('volume' in incoming) {
+        const error = validateVolume(incoming.volume);
+        if (error) return error;
+    }
+    if ('mood' in incoming && incoming.mood !== null) {
+        const error = validateMood(incoming.mood, customCategories);
+        if (error) return error;
+    }
+    if ('playing' in incoming && typeof incoming.playing !== 'boolean') {
+        return 'music.playing must be a boolean';
+    }
+    return null;
+}
+
+function validateMusicPayload(incoming, customCategories) {
     if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
         return 'music payload must be an object';
     }
@@ -154,9 +198,10 @@ function validateMusicPayload(incoming) {
         return 'music.overrides must be an object';
     }
     if ('customCategories' in incoming) {
-        return validateCustomCategories(incoming.customCategories);
+        const categoriesError = validateCustomCategories(incoming.customCategories);
+        if (categoriesError) return categoriesError;
     }
-    return null;
+    return validateTransportFields(incoming, customCategories);
 }
 
 // POST /api/campaigns/:campaign/music - Shared ambience state (GM or delegated
@@ -178,14 +223,19 @@ function validateMusicPayload(incoming) {
 router.post('/api/campaigns/:campaign/music', asyncHandler(async (req, res) => {
     const { campaign } = req.params;
     let incoming = ('value' in req.body ? req.body.value : req.body);
-    const payloadError = validateMusicPayload(incoming);
-    if (payloadError) {
-        return res.status(400).json({ error: payloadError });
-    }
     const current = characterChangeData.get(campaign)?.music;
     const base = (current && typeof current === 'object' && !Array.isArray(current))
         ? current
         : { mood: null, playing: false, volume: 0.6, overrides: {}, customCategories: {} };
+    // Mood validity rides the SAME map the merge will land: the payload's own
+    // wholesale customCategories replacement when it carries one, else stored truth.
+    const payloadError = validateMusicPayload(
+        incoming,
+        'customCategories' in incoming ? incoming.customCategories : base.customCategories
+    );
+    if (payloadError) {
+        return res.status(400).json({ error: payloadError });
+    }
     if ('overrides' in incoming) {
         incoming = { ...incoming, overrides: await resolveOverrideTitles(incoming.overrides, base.overrides) };
     }

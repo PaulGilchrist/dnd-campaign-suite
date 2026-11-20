@@ -221,6 +221,110 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
             expect(res.body.error).toContain('at most 20');
         });
     });
+
+    /* Transport-field hardening (WW backlog 2026-11-20): mood/playing/volume are
+     * validated only WHEN PRESENT — absence is the editor PATCH intent above.
+     * Out-of-range/forged values REJECT with honest 400s (no silent clamping:
+     * only forged API writes can produce these bytes, and the doctrine is no
+     * silent fallbacks for unauthored values). */
+    describe('transport field validation', () => {
+        const FULL_TRANSPORT = { mood: 'tavern', playing: true, volume: 0.6, overrides: {} };
+
+        it('rejects out-of-range volume (-5, 1.5) naming music.volume and writes nothing', async () => {
+            seedMusic({ ...STOPPED });
+            for (const volume of [-5, 1.5]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, volume } });
+                expect(res.status, String(volume)).toBe(400);
+                expect(res.body.error).toContain('music.volume');
+            }
+            expect(characterChangeData.get('test-campaign').music).toEqual({ ...STOPPED });
+        });
+
+        it('rejects non-number volume ("loud", null, array-shaped) and accepts boundary 0 and 1', async () => {
+            seedMusic({ ...STOPPED });
+            for (const volume of ['loud', null, [0.5]]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, volume } });
+                expect(res.status, JSON.stringify(volume)).toBe(400);
+                expect(res.body.error).toContain('music.volume');
+            }
+            for (const volume of [0, 1]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, volume } });
+                expect(res.status, String(volume)).toBe(200);
+                expect(res.body.music.volume).toBe(volume);
+            }
+        });
+
+        it('accepts every built-in mood key and mood:null; rejects unknown keys naming music.mood', async () => {
+            seedMusic({ ...STOPPED });
+            for (const mood of ['town', 'outdoors', 'combat', 'dungeon', 'tavern', null]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, mood } });
+                expect(res.status, JSON.stringify(mood)).toBe(200);
+                expect(res.body.music.mood).toBe(mood);
+            }
+            for (const mood of ['bogus-mood', 42, 'Custom-Crypt']) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, mood } });
+                expect(res.status, JSON.stringify(mood)).toBe(400);
+                expect(res.body.error).toContain('music.mood');
+            }
+        });
+
+        it('accepts a custom-<slug> mood present in stored customCategories; rejects absent and retired keys', async () => {
+            seedMusic({ ...STOPPED, customCategories: { 'custom-crypt': { label: 'Crypt' } } });
+            const ok = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ value: { ...FULL_TRANSPORT, mood: 'custom-crypt' } });
+            expect(ok.status).toBe(200);
+
+            const absent = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ value: { ...FULL_TRANSPORT, mood: 'custom-never-made' } });
+            expect(absent.status).toBe(400);
+            expect(absent.body.error).toContain('music.mood');
+
+            // A wholesale customCategories replacement that drops the entry
+            // invalidates the mood in the same payload (merge lands the new map).
+            const retired = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ value: { ...FULL_TRANSPORT, mood: 'custom-crypt', customCategories: {} } });
+            expect(retired.status).toBe(400);
+            expect(retired.body.error).toContain('music.mood');
+
+            // ...while creating the category and playing it in ONE payload lands.
+            const created = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ value: { ...FULL_TRANSPORT, mood: 'custom-grove', customCategories: { 'custom-grove': { label: 'Grove' } } } });
+            expect(created.status).toBe(200);
+        });
+
+        it('rejects non-boolean playing naming music.playing; booleans pass', async () => {
+            seedMusic({ ...STOPPED });
+            for (const playing of ['yes', 1, null]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, playing } });
+                expect(res.status, JSON.stringify(playing)).toBe(400);
+                expect(res.body.error).toContain('music.playing');
+            }
+            expect(characterChangeData.get('test-campaign').music).toEqual({ ...STOPPED });
+            for (const playing of [true, false]) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send({ value: { ...FULL_TRANSPORT, playing } });
+                expect(res.status, String(playing)).toBe(200);
+                expect(res.body.music.playing).toBe(playing);
+            }
+        });
+    });
 });
 
 /* Save-time oEmbed title resolution (backlog 2026-10-24 — editor stamps
