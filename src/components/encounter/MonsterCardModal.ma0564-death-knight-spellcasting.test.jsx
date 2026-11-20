@@ -9,9 +9,13 @@
 // name (headers byte-kept, "(Necrotic)" parenthetical OUTSIDE the tag,
 // strip-tags byte-equality) + trailing row-level numeric save_dc 18 +
 // save_type "Charisma" pair (MA-0454/MA-0421).
-// DUAL-RULES RESOLUTION: Destructive Wave is 2024-only — findMonsterSpell
-// is 5e-first with a 2024 fallback, so this 5e-path monster still resolves
-// it without cross-file spell copies (MA-0536 homebrew precedent unused).
+// DUAL-RULES RESOLUTION: findMonsterSpell is 5e-first with a 2024 fallback.
+// As authored (MA-0564 era) Destructive Wave was 2024-only and the death
+// knight reached it through the fallback; the 2026-11-19 subclass-spell
+// census added the canonical 2014 row to the 5e table (PHB Tempest domain
+// cleric-9 grant), so the 5e-first lane now resolves it directly. The
+// mocked chip legs below keep the fallback branch exercised; the live face
+// for this row is the 5e entry (WIS save, DC still the row's authored 18).
 // Trimmed per REC #654: exact toEqual maps subsume tier-header/at-Will
 // negatives (#653); refusals + repeated at-Will castable owned by
 // spellcasting.test.jsx :281/:317; spell-shape null legs owned by
@@ -181,9 +185,19 @@ describe('MA-0564 monsters.json data lock: Death Knight Spellcasting row', () =>
     expect(stripTags(dkRow.description)).toBe(DK_PLAIN_ORIGINAL);
   });
 
-  it('Destructive Wave is 2024-only — 5e-first fallback resolves without cross-file spell copies', () => {
-    expect(spells5e.some(s => s.name === 'Destructive Wave')).toBe(false);
-    expect(spells2024.some(s => s.name === 'Destructive Wave')).toBe(true);
+  it('Destructive Wave now resolves 5e-first — canonical 2014 row in the 5e table, 2024 row intact (census 2026-11-19)', () => {
+    const row5e = spells5e.find(s => s.name === 'Destructive Wave');
+    expect(row5e, '5e table carries the PHB Tempest-domain cleric-9 grant').toBeDefined();
+    expect(row5e.index).toBe('destructive-wave');
+    expect(row5e.level).toBe(5);
+    expect(row5e.school).toBe('Evocation');
+    expect(row5e.casting_time).toBe('1 action');
+    expect(row5e.duration).toBe('Instantaneous');
+    expect(row5e.concentration).toBe(false);
+    expect(row5e.components).toStrictEqual(['V']);
+    expect(row5e.dc).toEqual({ dc_type: 'WIS', dc_success: 'half' }); // 2014 face: NOT the 2024 CON save
+    expect(row5e.classes).toStrictEqual(['Paladin']);
+    expect(spells2024.find(s => s.name === 'Destructive Wave').dc).toEqual({ dc_type: 'CON', dc_success: 'half' }); // 2024 face stays for the 2024 lane
   });
 });
 

@@ -2873,8 +2873,8 @@
               }
             ],
             "spell": {
-              "index": "barskin",
-              "name": "Barskin"
+              "index": "barkskin",
+              "name": "Barkskin"
             }
           },
           {
@@ -3272,7 +3272,7 @@
             ],
             "spell": {
               "index": "charm-person",
-              "name": "Charm person"
+              "name": "Charm Person"
             }
           },
           {
@@ -3283,8 +3283,8 @@
               }
             ],
             "spell": {
-              "index": "disquise-self",
-              "name": "Disquise Self"
+              "index": "disguise-self",
+              "name": "Disguise Self"
             }
           },
           {
@@ -8045,7 +8045,7 @@
             ],
             "spell": {
               "index": "protection-from-energy",
-              "name": "Protection from Energy"
+              "name": "Protection From Energy"
             }
           },
           {
@@ -8081,7 +8081,7 @@
             ],
             "spell": {
               "index": "commune-with-nature",
-              "name": "Commune with Nature"
+              "name": "Commune With Nature"
             }
           },
           {
@@ -8249,7 +8249,7 @@
             ],
             "spell": {
               "index": "protection-from-energy",
-              "name": "Protection from Energy"
+              "name": "Protection From Energy"
             }
           },
           {
@@ -12710,8 +12710,8 @@
               }
             ],
             "spell": {
-              "index": "dissonant-wispers",
-              "name": "Dissonant Wispers"
+              "index": "dissonant-whispers",
+              "name": "Dissonant Whispers"
             }
           },
           {
