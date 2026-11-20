@@ -15,7 +15,7 @@
 
 ## Priority Targets (next descent)
 
-> **Roadmap discovery funnel:** `~/.opencode/plan/` still does not exist (funnel CONSUMED since SK). VN consumed the entire post-UM improve tail (40d7549c0/c2ad526d7/608c38507/53f7e483d/d0fa7da11 — last one is 3D-scene only, its faces pinned by unit tests + owner-witnessed in the improve run's note; VN spot-checked the census twin live). Next run: discovery via `git log --since d0fa7da11` tails, plus the VN bug's fix if it ships.
+> **Roadmap discovery funnel:** `.opencode/plan/` still does not exist (funnel CONSUMED since SK). VN consumed the entire post-UM improve tail (40d7549c0/c2ad526d7/608c38507/53f7e483d/d0fa7da11 — last one is 3D-scene only, its faces pinned by unit tests + owner-witnessed in the improve run's note; VN spot-checked the census twin live). Next run: discovery via `git log --since d0fa7da11` tails, plus the VN bug's fix if it ships.
 
 1. **VN bug fix-verify** (`bug-zero-char-auto-wizard-traps-lan-visitor-creation-is-gm-only`) — if an improve/fix run ships the `isLocalhost` gate: first descent on the LAN-origin zero-char select (NO overlay mounts, offer key NOT burned → a later GM-on-same-browser session still gets its one offer) + the checklist `Build your heroes` step face on the visitor tab.
 2. **3D ghost faces under the new grounded-lift law (d0fa7da11)** — the conditional lift (ghost grounded while memory cell visible, lifts only on re-fog) is unit-pinned + improve-run-witnessed but has NO explore-run live face with a real fog door-dance; cheapest honest lane is a throwaway/sandbox map, never the owner fixtures.
