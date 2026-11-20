@@ -400,6 +400,21 @@ function MusicPlayer({ campaignName, visible = true }) {
   }, [music.overrides, seedDraft]);
 
   const selectMood = useCallback((moodKey) => {
+    // improve 2026-11-20 backlog: re-clicking the chip of an ALREADY-PLAYING
+    // mood used to pay a full arm again — an identical POST /music, a second
+    // byte-identical `Set ambience: …` row, and a playTracks restart from
+    // track 1. The active chip (render law: `playing && music.mood === key`)
+    // is now inert until transport actually changes: Pause first (or a stop/
+    // remote takeover, both of which flip these bytes) re-arms the click.
+    // Reads localMusicRef (stamped SYNCHRONOUSLY by commitMusic, and mirrored
+    // from shared bytes by the adoption effect), not the `music` closure:
+    // back-to-back clicks in one tick run before React re-renders, so a
+    // rapid double-click's second handler would still hold stale bytes — the
+    // ref is the one source that can never miss this tab's own last commit.
+    // Safe as the FIRST branch: a mood armed+playing necessarily has tracks,
+    // so the empty-custom editor-seed arm below can never be its intent.
+    const seen = localMusicRef.current || { mood: music.mood, playing: music.playing };
+    if (seen.mood === moodKey && seen.playing) return;
     const tracks = getTracksForMood(moodKey, music.overrides);
     if (tracks.length === 0) {
       // A brand-new custom category starts empty: clicking it goes straight
