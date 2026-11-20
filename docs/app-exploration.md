@@ -58,8 +58,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 XX · **Music: local Stop/delete-active leaves the silent `.yt-music-frame` div mounted** (`stopMusic`/`executeDeleteCategory` call `youtubePlayer.stop()` + stopCommit but never `setPlayerMounted(false)` — only the REMOTE-adoption effect unmounts). Harmless audio-wise (self-heals on the next remote arm) but it makes frame-count an unreliable ownership witness for the last actor tab and keeps a dead embed alive until the tab navigates; consider unmounting on the local stop lane too (mirror the remote-release bytes). Files: `src/components/music/MusicPlayer.jsx` (~471, ~729).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.

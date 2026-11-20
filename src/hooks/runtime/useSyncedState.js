@@ -59,12 +59,17 @@ export function useSyncedState(characterKey, propertyName, defaultValue, campaig
         const currentValue = currentValueRef.current;
         resolvedValue = newValue(currentValue);
       }
-      setRuntimeValue(characterKey, propertyName, resolvedValue, campaignName);
+      // Campaign-key writes return the server POST's promise (other lanes
+      // return undefined) so callers can serialize a second write to the
+      // same key behind it (music delete-while-playing evict order,
+      // improve 2026-11-20); every existing caller ignores the return.
+      const posted = setRuntimeValue(characterKey, propertyName, resolvedValue, campaignName);
       const store = getStore(characterKey);
       store.set(propertyName, resolvedValue);
-      if (resolvedValue === currentValueRef.current) return;
+      if (resolvedValue === currentValueRef.current) return posted;
       currentValueRef.current = resolvedValue;
       setValue(resolvedValue);
+      return posted;
     },
     [characterKey, propertyName, campaignName],
   );

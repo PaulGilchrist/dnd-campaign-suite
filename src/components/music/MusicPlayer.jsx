@@ -296,10 +296,13 @@ function MusicPlayer({ campaignName, visible = true }) {
   leaveViewRef.current = { music, playerMounted };
 
   // All mood/playing transitions go through here so the adoption guard stays
-  // in step with what this tab committed.
+  // in step with what this tab committed. Returns the store POST's promise
+  // (undefined for the no-op/character-key lanes) so a caller that fires a
+  // SECOND write at the same key can serialize behind it — see
+  // executeDeleteCategory's evict order.
   const commitMusic = useCallback((next) => {
     localMusicRef.current = { mood: next.mood ?? null, playing: !!next.playing };
-    setMusic(next);
+    return setMusic(next);
   }, [setMusic]);
 
   // Remote-state adoption (mirrors the useTravelToolSync adopt lane): the
@@ -468,8 +471,17 @@ function MusicPlayer({ campaignName, visible = true }) {
     }
   }, [music, commitMusic, playerMounted, addEntry, moodLabel]);
 
+  // Local Stop mirrors the remote-release bytes (improve 2026-11-20 backlog):
+  // the adoption lane tears the frame down (stop + setPlayerMounted(false) →
+  // mount-effect cleanup disposes) whenever ANOTHER tab stops; this tab's own
+  // commit skips that guard by design, so without the unmount the silent
+  // .yt-music-frame stayed mounted until the next remote arm — making frame-
+  // count an unreliable ownership witness and keeping a dead embed alive.
+  // Bytes and log row are untouched; the pagehide guard (playerMounted &&
+  // playing) simply sees an already-released tab and writes nothing on reload.
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
+    setPlayerMounted(false);
     commitMusic(stopCommit(music));
     addEntry(stopLogEntry());
   }, [music, commitMusic, addEntry]);
@@ -730,10 +742,19 @@ function MusicPlayer({ campaignName, visible = true }) {
     const label = moodLabel(moodKey);
     // Deleting the ACTIVE mood silences this tab's player first, then the
     // transport un-arms the shared mood (stop button's honest state). Other
-    // tabs release theirs via the existing remote-adoption lane.
+    // tabs release theirs via the existing remote-adoption lane. The unmount
+    // mirrors stopMusic/the remote-release bytes (improve 2026-11-20 backlog)
+    // so the acting tab never keeps a dead frame after the evict.
+    // The stop commit is AWAITED before the evict PATCH dispatches: both ride
+    // the same /music merge ({...base, ...incoming} last-write-wins), and the
+    // full transport POST carries the not-yet-deleted category maps — fired
+    // concurrently, it can overtake the PATCH and resurrect them (live 2026-11-20:
+    // 6/6 replay of the two byte-identical bodies). Awaiting keeps the chain the
+    // documented order (stopCommit THEN single evict PATCH) deterministically.
     if (music.mood === moodKey) {
       youtubePlayer.stop();
-      commitMusic(stopCommit(music));
+      setPlayerMounted(false);
+      await commitMusic(stopCommit(music));
     }
     const customCategories = { ...music.customCategories };
     delete customCategories[moodKey];
