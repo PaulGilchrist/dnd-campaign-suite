@@ -170,16 +170,32 @@ describe('MusicPlayer campaign-specific categories', () => {
         expect(screen.queryByText('A category named "qa jazz" already exists.')).toBeNull();
       });
 
-      it('does NOT block a label matching a BUILT-IN mood (out of scope — only custom labels collide)', async () => {
-        const { posts } = mount(seed);
+      // Built-in labels collide too (improve 2026-11-20 backlog): the old
+      // guard read only customCategories, so `tavern` created beside built-in
+      // `Tavern` — two same-reading chips, different track lists. The guard
+      // now scans the merged catalogue and echoes the built-in's canonical
+      // label. This test REPLACES the retired "built-ins out of scope" pin.
+      it.each([
+        ['Town', 'Town'],
+        ['tavern', 'Tavern'],
+        ['  TAVERN  ', 'Tavern'],
+        ['COMBAT', 'Combat'],
+      ])('blocks a built-in-label clone %o, echoing the canonical label', async (typed, canonical) => {
+        const { posts, server } = mount(seed);
 
         openCreateForm();
-        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Town' } });
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: typed } });
         fireEvent.click(screen.getByText('Create'));
 
-        await waitFor(() => expect(categoryForm()).toBeNull());
-        expect(posts.filter(p => 'customCategories' in p)).toHaveLength(1);
-        expect(musicState().customCategories['custom-town']).toEqual({ label: 'Town', icon: 'fa-music' });
+        expect(await screen.findByText(`A category named "${canonical}" already exists.`)).toBeInTheDocument();
+        expect(categoryForm()).not.toBeNull();
+        expect(screen.getByLabelText('Category name').value).toBe(typed);
+        // zero writes: no PATCH, server + store customCategories untouched
+        expect(posts.filter(p => 'customCategories' in p)).toHaveLength(0);
+        expect(server().customCategories).toEqual(seed.customCategories);
+        expect(musicState().customCategories).toEqual(seed.customCategories);
+        // no twin chip rendered beside the built-in mood
+        expect(screen.queryAllByTitle(`Play ${canonical} ambience`)).toHaveLength(1);
       });
 
       it('typing after a block clears the error and a distinct label still creates', async () => {

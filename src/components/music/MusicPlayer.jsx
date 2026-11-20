@@ -654,15 +654,17 @@ function MusicPlayer({ campaignName, visible = true }) {
     // rendered the identical visible label and the DJ could not tell them
     // apart. Block in-form instead, mirroring the custom-magic-items lane's
     // getCustomNameConflict copy style. Trim + case-insensitive, matching
-    // buildMoodList's label normalization; built-in mood labels are out of
-    // scope (the server already forbids shadowing their keys). Echo the
-    // existing entry's CANONICAL label (improve 2026-11-08 EM backlog): a
-    // variant query like "  qa jazz  " must read back `QA Jazz`, not the
-    // normalized input, so the DJ sees which stored category collided.
+    // buildMoodList's label normalization. Scan the FULL merged catalogue
+    // (improve 2026-11-20 backlog): the old guard read only
+    // `music.customCategories`, so a custom could share a BUILT-IN's label —
+    // `tavern` beside `Tavern` rendered two same-reading chips with different
+    // track lists (the server forbids shadowing built-in KEYS, but the visible
+    // collision is what confused the DJ). Echo the existing entry's CANONICAL
+    // label (improve 2026-11-08 EM backlog): a variant query like "  TAVERN  "
+    // must read back `Tavern`, not the normalized input, so the DJ sees which
+    // category collided.
     const lower = label.toLowerCase();
-    const existing = Object.values(music.customCategories || {}).find(
-      entry => entry && typeof entry.label === 'string' && entry.label.trim().toLowerCase() === lower
-    );
+    const existing = moods.find(m => m.label.trim().toLowerCase() === lower);
     if (existing) {
       setCategoryError(`A category named "${existing.label}" already exists.`);
       return;
