@@ -649,7 +649,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       <div className="character-creation-wizard-overlay">
         <div className="character-creation-wizard">
           <WizardHeader
-          title={isEditing ? "Edit Character" : "Create New Character"}
+          title={isEditing ? `Edit "${characterData?.name}"` : "Create New Character"}
           onClose={handleRequestClose}
           />
           <WizardProgressBar

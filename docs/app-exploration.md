@@ -55,10 +55,10 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass; d
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 (TL, TL-era #2–4 kept): visitor 3D scene header census line reads `… 1 monsters` while the token is culled/ghosted (consider origin-gating counts); edit-wizard header is un-named `Edit Character` (naming it `Edit "War_Cleric"` is a cheap detection aid).
 - 2026-11-20 (owner, live during improve run): the 3D last-seen ghost cylinder floats UNCONDITIONALLY (y = WALL_H + 16) — but a memory cell is by definition recorded at a VISIBLE cell (`useLastKnownPositions` logs the last-seen position), so the ghost normally hovers over open floor and reads detached from its anchor cell (camera parallax amplifies it). OWNER RULING this run — CONDITIONAL LIFT: the cylinder sits at ground level on the memory cell when that cell is NOT in the visitor's fog set; it lifts above the fog roof ONLY when the memory cell has re-fogged (closed door / LOS break), never buried (FOG-BURIAL law stays authoritative for the re-fog face). The position pins in `map3dScene.last-known.test.js` adopt the new law.
 
 <!-- resolved 2026-11-20 improve (lived): visitor 3D ghost label wording — _buildLastKnownTokens now stamps `${placedItemLabel(item)} — last seen here` (same law as the 2D twin, nameless face included); pinned via sprite userData.labelText in map3dScene.last-known.test.js + live visitor-3D screenshot. -->
+<!-- resolved 2026-11-20 improve (lived): edit-wizard header is named — title renders `Edit "<name>"` from the CAPTURED characterData (draft rename never retitles), create face unchanged; pinned by CharacterCreationWizard.header.test.jsx, live-witnessed verbatim on War_Cleric. -->
 <!-- resolved 2026-11-20 (shipped per-origin census, re-witnessed live by the ghost-label improve run): visitor header reads honest culled counts — `0 monsters · 1 last known` while a token is ghosted. -->
 
 <!-- resolved 2026-11-20 UM (shipped 69c9c7b88, lived): wizard save-failure alert double-prefix — alert now verbatim single-owner copy. -->
