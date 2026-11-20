@@ -20,10 +20,14 @@ const CHIP_SPACING = 18;
  * hook's value-equality guard) and a position storm never recomputes it
  * for a token that didn't change props (memo).
  *
- * Rendered INSIDE the token's <g> so it rides the same stacking transform
- * and fog culling as the token art itself.
+ * Rendered by the hoisted TokenStatusLayer (after every token <g> in the
+ * SVG), NOT inside the token group: chips inside the token group were buried
+ * under any later-drawn token disc — the cell-below neighbour occluded the
+ * whole row (backlog RG 2026-11-19). The layer feeds this component its own
+ * token's cell centre plus the SAME stacking transform (`stack`) a buried
+ * token rides, so a row stays glued to the art it belongs to.
  */
-function TokenStatusIndicators({ campaignName, creatureName, cx, cy }) {
+function TokenStatusIndicators({ campaignName, creatureName, cx, cy, stack }) {
     const activeConditions = useRuntimeValue(creatureName, 'activeConditions', campaignName);
     const targetEffects = useRuntimeValue('campaign', 'targetEffects', campaignName);
     const indicators = useMemo(
@@ -49,7 +53,7 @@ function TokenStatusIndicators({ campaignName, creatureName, cx, cy }) {
     const firstChipX = cx - ((chips.length - 1) * CHIP_SPACING) / 2;
 
     return (
-        <g className="token-status-indicators" data-testid="token-status-indicators">
+        <g className="token-status-indicators" data-testid="token-status-indicators" data-creature={creatureName} transform={stack}>
             {chips.map((chip, i) => (
                 <g
                     key={chip.id}

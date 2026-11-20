@@ -1,8 +1,11 @@
 // @maintained-by-ai
-// Lane: token status + ownership tint on the player-token layer (roadmap
-// Item 6). Seeded via the REAL runtime store so the same SSE-echo lane the
-// app uses is what arms the indicators; tint cases pin the visitor-vs-GM
-// decision (Players.jsx isTokenOwnedHere).
+// Lane: the player-token lane after the chip hoist (backlog RG 2026-11-19
+// occlusion fix). Status chips no longer live inside the token <g> — the
+// shared derived row set lives in TokenStatusLayer.jsx (chip laws pinned by
+// TokenStatusLayer.test.jsx + TokenStatusIndicators.test.jsx). This file
+// pins that Players itself keeps ZERO chip DOM (a reintroduced in-group row
+// would re-open the occlusion face) and the ownership-tint decision
+// (Players.jsx isTokenOwnedHere: visitor-vs-GM).
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Players from './Players.jsx';
@@ -37,38 +40,22 @@ const renderLayer = (props = {}) =>
 
 const tokenGroup = (container, playerIndex) => container.querySelectorAll('g.creature-group')[playerIndex];
 
-describe('Players — token status indicators', () => {
+describe('Players — no chip DOM in the token lane (chips hoisted)', () => {
   beforeEach(() => {
     getStore('Thorin').clear();
     getStore('Gimli').clear();
     getStore('campaign').clear();
   });
 
-  it('paints the Prone/Poisoned chips on the token for GM and visitor alike (acceptance)', () => {
+  it('a seeded creature paints NO indicator DOM inside (or beside) Players', () => {
     setRuntimeObject('Thorin', { activeConditions: ['prone', 'poisoned'] }, CAMPAIGN, true);
+    setRuntimeObject('campaign', { targetEffects: [{ target: 'Gimli', effect: 'web', source: 'Spider' }] }, CAMPAIGN, true);
     for (const isLocalhost of [true, false]) {
       const { container, unmount } = renderLayer({ isLocalhost });
-      const chips = tokenGroup(container, 0).querySelectorAll('g.token-status-chip');
-      expect(chips, `isLocalhost=${isLocalhost}`).toHaveLength(2);
-      expect(chips[0]).toHaveAttribute('data-label', 'Prone');
-      expect(chips[1]).toHaveAttribute('data-label', 'Poisoned');
+      expect(container.querySelectorAll('g.token-status-indicators')).toHaveLength(0);
+      expect(container.querySelectorAll('g.token-status-chip')).toHaveLength(0);
       unmount();
     }
-  });
-
-  it('leaves tokens with a clear status free of indicator DOM', () => {
-    setRuntimeObject('Gimli', { activeConditions: ['poisoned'] }, CAMPAIGN, true);
-    const { container } = renderLayer();
-    expect(tokenGroup(container, 0).querySelectorAll('g.token-status-chip')).toHaveLength(0);
-    expect(tokenGroup(container, 1).querySelectorAll('g.token-status-chip')).toHaveLength(1);
-  });
-
-  it('shows campaign targetEffect chips on the creature they target', () => {
-    setRuntimeObject('campaign', { targetEffects: [{ target: 'Gimli', effect: 'web', source: 'Spider' }] }, CAMPAIGN, true);
-    const { container } = renderLayer();
-    const chip = tokenGroup(container, 1).querySelector('g.token-status-chip');
-    expect(chip).toHaveAttribute('data-label', 'Web');
-    expect(chip.querySelector('title').textContent).toContain('from Spider');
   });
 });
 

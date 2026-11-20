@@ -37,6 +37,7 @@ import IndoorPoiContextMenu from './IndoorPoiContextMenu.jsx';
 import LandmarkSVG from '../hex-map/svg/LandmarkSVG.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
+import TokenStatusLayer from './TokenStatusLayer.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
 import ItemDetailsDock from './ItemDetailsDock.jsx';
@@ -741,8 +742,26 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDownTracked}
                     tokenOffsets={tokenStackOffsets.items}
-                    campaignName={campaignName}
                     lastKnownMode={mapData.lastKnownMode}
+                />
+
+                {/* Token status chips (Item 6) paint in their own layer ABOVE
+                    every token disc (backlog RG 2026-11-19: chips inside the
+                    token <g> were occluded by any later-drawn disc — every
+                    monster paints after every player). Rows are positioned at
+                    their own token's cell centre with the same stack offset;
+                    the drawn-last placement mirrors the fog/spell/ruler
+                    top-layer idiom below. */}
+                <TokenStatusLayer
+                    campaignName={campaignName}
+                    players={mapData.players}
+                    placedItems={placedItems}
+                    isLocalhost={isLocalhost}
+                    fog={fog}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    playerOffsets={tokenStackOffsets.players}
+                    itemOffsets={tokenStackOffsets.items}
                 />
 
                 {/* Indoor POIs (labelled points of interest, same lane the

@@ -30,8 +30,9 @@ export const STACK_OFFSET_PX = CELL_SIZE / 4; // 10px on the 40px cell
 export const MAX_STACK_OFFSET_STEPS = 2; // caps the fan inside one cell + margin
 
 // placedItem creature-token types (props/doors/POIs are out of scope — the
-// GA ambiguity was tokens grabbing each other).
-const CREATURE_ITEM_TYPES = ['monster', 'npc'];
+// GA ambiguity was tokens grabbing each other). Exported so the hoisted
+// chip layer (TokenStatusLayer.jsx) enumerates exactly the token classes.
+export const CREATURE_ITEM_TYPES = ['monster', 'npc'];
 
 function finiteTokens(list, layer, draggedId) {
     return (list || [])

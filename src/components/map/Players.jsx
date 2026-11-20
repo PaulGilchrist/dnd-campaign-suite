@@ -1,6 +1,5 @@
 
 import { tokenStackTransform } from '../../services/maps/tokenStackOffsets.js';
-import TokenStatusIndicators from './TokenStatusIndicators.jsx';
 
 const RADIUS = 20;
 
@@ -145,12 +144,9 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                         >
                             {player.name}
                         </text>
-                        <TokenStatusIndicators
-                            campaignName={campaignName}
-                            creatureName={player.name}
-                            cx={cx}
-                            cy={cy}
-                        />
+                        {/* Status chips paint in the hoisted TokenStatusLayer
+                            (Map.jsx) above every token disc — RG 2026-11-19
+                            occlusion fix; this lane keeps no chip DOM. */}
                     </g>
                 );
             })}

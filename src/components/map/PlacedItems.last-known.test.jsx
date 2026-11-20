@@ -103,8 +103,13 @@ describe('PlacedItems — last-known-position ghosts', () => {
 
     it('a ghost clones no live status chips (stale ground leaks no current conditions)', () => {
         setRuntimeObject('Goblin 1', { activeConditions: ['blinded'] }, CAMPAIGN, true);
+        // RG 2026-11-19 occlusion fix: chips moved to the hoisted
+        // TokenStatusLayer (Map.jsx renders it after this lane), so this
+        // component owns no chip DOM on ANY face — live or ghost. The live
+        // chip + ghost-zero-row laws through the real composition are pinned
+        // in TokenStatusLayer.test.jsx.
         const view = lan([monster()], new Set(), { lastKnownMode: true });
-        expect(view.container.querySelectorAll('g.token-status-chip')).toHaveLength(1); // live token
+        expect(view.container.querySelectorAll('g.token-status-chip')).toHaveLength(0);
 
         view.rerender(
             <PlacedItems {...baseProps} isLocalhost={false} campaignName={CAMPAIGN}

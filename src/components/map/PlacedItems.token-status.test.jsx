@@ -1,9 +1,11 @@
 // @maintained-by-ai
-// Lane: token status indicators on the placed creature-token layer (roadmap
-// Item 6) — NPC and monster rows ride the same derived chips as player
-// tokens, keyed by the token name (the runtime bucket conditions are
-// granted to). Visibility law unchanged: a token a LAN player can't see
-// (hidden/fogged) also paints no chips.
+// Lane: the placed-creature-token lane after the chip hoist (backlog
+// RG 2026-11-19 occlusion fix). Monster/NPC status chips moved to the shared
+// hoisted TokenStatusLayer (chip laws + visibility/ghost cull pinned by
+// TokenStatusLayer.test.jsx). This file pins that PlacedItems itself keeps
+// ZERO chip DOM on every face — live tokens, ghosts, hidden rows and props —
+// so no second, occludable chip mechanism can creep back into the token
+// groups.
 import { render } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import PlacedItems, { baseProps } from './PlacedItems.test-utils';
@@ -17,36 +19,42 @@ const monster = (over) => ({
 });
 
 const renderItems = (items, over = {}) =>
-  render(<PlacedItems {...baseProps} campaignName={CAMPAIGN} {...over} placedItems={items} />);
+  render(<PlacedItems {...baseProps} {...over} placedItems={items} />);
 
-describe('PlacedItems — creature-token status chips', () => {
+describe('PlacedItems — no chip DOM in the token lane (chips hoisted)', () => {
   beforeEach(() => {
     getStore('Goblin 2').clear();
     getStore('campaign').clear();
   });
 
-  it('renders condition + targetEffect chips inside the monster token group', () => {
+  it('GM lane: a seeded monster group carries no indicator DOM', () => {
     setRuntimeObject('Goblin 2', { activeConditions: ['blinded'] }, CAMPAIGN, true);
     setRuntimeObject('campaign', { targetEffects: [{ target: 'Goblin 2', effect: 'sanctuary', source: 'Cleric' }] }, CAMPAIGN, true);
     const { container } = renderItems([monster()]);
-    const chips = container.querySelectorAll('g.npc-group g.token-status-chip');
-    expect(chips).toHaveLength(2);
-    expect(chips[0]).toHaveAttribute('data-label', 'Blinded');
-    expect(chips[0]).toHaveClass('effect-condition');
-    expect(chips[1]).toHaveAttribute('data-label', 'Sanctuary');
-    expect(chips[1]).toHaveClass('effect-buff');
+    expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
+    expect(container.querySelectorAll('g.token-status-indicators')).toHaveLength(0);
+    expect(container.querySelectorAll('g.token-status-chip')).toHaveLength(0);
   });
 
-  it('NPC tokens get the same treatment', () => {
+  it('ghost face: the frozen .token-ghost paints art but zero chips', () => {
     setRuntimeObject('Goblin 2', { activeConditions: ['poisoned'] }, CAMPAIGN, true);
-    const { container } = renderItems([monster({ id: 'npc-1', type: 'npc' })]);
-    expect(container.querySelectorAll('g.npc-group g.token-status-chip')).toHaveLength(1);
-  });
-
-  it('a token LAN players cannot see paints no chips (visibility law first)', () => {
-    setRuntimeObject('Goblin 2', { activeConditions: ['poisoned'] }, CAMPAIGN, true);
-    const lan = renderItems([monster({ visible: false })], { isLocalhost: false });
-    expect(lan.container.querySelectorAll('g.token-status-chip')).toHaveLength(0);
+    // Arm the per-client position memory (visitor, toggle ON, cell visible)…
+    const { container, rerender } = renderItems([monster()], {
+      isLocalhost: false, lastKnownMode: true,
+    });
+    // …then fog the truth cell: the group re-renders as a ghost.
+    rerender(
+      <PlacedItems
+        {...baseProps}
+        isLocalhost={false}
+        lastKnownMode
+        campaignName={CAMPAIGN}
+        fog={new Set(['3,3'])}
+        placedItems={[monster()]}
+      />
+    );
+    expect(container.querySelectorAll('g.npc-group.token-ghost')).toHaveLength(1);
+    expect(container.querySelectorAll('g.token-status-chip')).toHaveLength(0);
   });
 
   it('props (non-creature rows) carry no indicator DOM', () => {

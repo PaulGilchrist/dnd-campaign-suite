@@ -9,7 +9,6 @@ import { itemSpriteHref } from '../../services/maps/itemSprites';
 // had the same gap, so the title rides every marker in both lanes.
 import { placedItemLabel } from './hooks/usePlacedItems.js';
 import { tokenStackTransform, isStackedToken } from '../../services/maps/tokenStackOffsets.js';
-import TokenStatusIndicators from './TokenStatusIndicators.jsx';
 import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 const RADIUS = 20;
 const SPRITE = 36;      // single-cell sprite edge (SVG units)
@@ -59,7 +58,6 @@ function PlacedItems({
     itemDragging,
     handleItemPointerDown,
     tokenOffsets,
-    campaignName,
     // Last-known-position mode (roadmap Item 7): a map-document flag the GM
     // toggles (persisted via the autosave lane, received over the map-data
     // SSE echo). Players' clients freeze creature tokens that sit in fogged
@@ -262,7 +260,8 @@ function PlacedItems({
     // token snaps to truth the moment its current cell leaves the fog set
     // (re-reveal or re-entry). The ghost is inert: no drag chrome exists off
     // localhost anyway, stacking fan and live status chips are deliberately
-    // NOT cloned onto stale ground (a ghost leaks no current conditions).
+    // NOT cloned onto stale ground (the hoisted TokenStatusLayer derives rows
+    // only for tokens whose TRUE cell is visible — a ghost leaks none).
     // Resolution/chrome bytes hoisted (creatureGhostCell / creatureGroupChrome)
     // to keep this renderer under the complexity cap.
     const renderCreature = (item, isMonster) => {
@@ -330,14 +329,9 @@ function PlacedItems({
                 >
                     {item.name}
                 </text>
-                {!ghost && (
-                    <TokenStatusIndicators
-                        campaignName={campaignName}
-                        creatureName={item.name}
-                        cx={cx}
-                        cy={cy}
-                    />
-                )}
+                {/* Status chips (live tokens only, ghosts excluded) paint in
+                    the hoisted TokenStatusLayer above every token disc —
+                    RG 2026-11-19 occlusion fix; this lane keeps no chip DOM. */}
                 {isHidden(item) && hiddenRing(cx, cy, 48, 48, true)}
                 {isLocalhost && (
                     <>
