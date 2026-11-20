@@ -65,7 +65,7 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **5e spell data omits SRD-5.1/PHB staples** (RG 2026-11-19): `public/data/spells.json` (331 rows) lacks `Hex`, `Chromatic Orb`, `Blade Ward`, `Mind Sliver`, `Tasha's Hideous Laughter` (all present in the 2024 data; the file is self-consistent — no dangling class refs — so nothing breaks, but a 5e warlock literally has no Hex and 2024→5e switches drop these with a truthful-looking "not in the 5e spell data" reason). Owner scoping call; if broadening, add rows to `public/data/spells.json` (no client change).
+- **5e `classes.json` subclass spell lists carry ~17 dangling refs** (found 2026-11-19 improve 5e-spells-srd-gaps): pre-existing (NOT introduced by the 5-spell addition — the `tashas-hideous-laughter` ref that addition repaired was one of them) — subclass entries reference spell names/indices that resolve in neither `public/data/spells.json` nor `/2024/` (e.g. `Barskin`, `Disquise Self`, `Dissonant Wispers` typos, plus name/index mismatches). A subclass row naming a nonexistent spell silently offers nothing selectable. Census + fix in `public/data/classes.json` (data-only, no client change expected).
 - **No ruleset-switch lane for EXISTING characters** (RG 2026-11-19, context): `WizardSidebar` hides the Ruleset step in edit mode, so the shipped ledger guard only protects fresh builds; a saved character cannot change rulesets at all. If that's intended (2024-vs-5e locked per char), the users-guide §14 gotcha text and plan Item 2 preamble should say so.
 
 ## Blocked / Not Verified (fold-gate ledger)

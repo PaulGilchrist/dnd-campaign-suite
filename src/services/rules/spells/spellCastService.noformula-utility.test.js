@@ -324,7 +324,7 @@ const ROWS = [
   { spell: 'Stinking Cloud', span: ':311', rulesets: ['5e', '2024'], route: 'service', trigger: triggerStinkingCloud, shape: 'saveDc', consume: 'swallow' },
   { spell: 'Sleet Storm', span: ':312', rulesets: ['5e', '2024'], route: 'service', trigger: triggerSleetStorm, shape: 'saveDc', consume: 'swallow' },
   { spell: 'Faerie Fire', span: ':313', rulesets: ['5e', '2024'], route: 'service', trigger: triggerFaerieFire, shape: 'saveDc', consume: 'forward' },
-  { spell: "Tasha's Hideous Laughter", span: ':314', rulesets: ['2024'], route: 'service', trigger: triggerTashasHideousLaughter, shape: 'saveDc', consume: 'forward' }, // fix#358: raw-forward quirk retired — host wraps { automationPopup } per faerie template
+  { spell: "Tasha's Hideous Laughter", span: ':314', rulesets: ['5e', '2024'], route: 'service', trigger: triggerTashasHideousLaughter, shape: 'saveDc', consume: 'forward' }, // fix#358: raw-forward quirk retired — host wraps { automationPopup } per faerie template; 5e row migrated to the canonical name (5e spell-data completeness pass), both rulesets route
   { spell: 'Imprisonment', span: ':315', rulesets: ['5e', '2024'], route: 'service', trigger: triggerImprisonment, shape: 'saveDc', consume: 'forward' },
   { spell: 'Heroism', span: ':316', rulesets: ['5e', '2024'], route: 'execute', arity: 5, action: (e) => ({ name: 'Heroism', spell: e, automation: { type: 'heroism' } }), consume: 'forward' },
   { spell: 'Holy Aura', span: ':317', rulesets: ['5e', '2024'], route: 'service', trigger: triggerHolyAura, shape: 'raw', consume: 'swallow' },
@@ -506,7 +506,7 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
       '5e': {
         'Ray of Enfeeblement': 'clean', 'Compelled Duel': 'clean', 'Globe of Invulnerability': 'strip',
         Forcecage: 'strip', 'Stinking Cloud': 'clean', 'Sleet Storm': 'clean', 'Faerie Fire': 'clean',
-        "Tasha's Hideous Laughter": 'absent', Imprisonment: 'clean', Heroism: 'strip', 'Holy Aura': 'strip',
+        "Tasha's Hideous Laughter": 'clean', Imprisonment: 'clean', Heroism: 'strip', 'Holy Aura': 'strip',
         Longstrider: 'clean', 'Spare the Dying': 'clean', 'Enhance Ability': 'clean',
         'Protection from Energy': 'absent', 'Protection from Poison': 'strip', 'Remove Curse': 'strip',
         Resistance: 'strip', 'Mass Cure Wounds': 'clean', 'Mass Healing Word': 'strip',

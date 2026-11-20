@@ -25,19 +25,25 @@
 /*                            row: type save_only + effects.fail) DECL  */
 /*   effects.success      -> DECLINE arm is a DEAD TWIN on disk:      */
 /*                            census pins 0 rows with automation        */
-/*                            .effects.success in BOTH files (5e 331 /  */
+/*                            .effects.success in BOTH files (5e 335 /  */
 /*                            2024 393 rows) — guarded synthetically    */
 /*                            against future disk bytes (#1472 arm       */
 /*                            class; early-chain-caught names never      */
 /*                            reach this gate — earlyReturns :275        */
 /*                            reachability census, cited not re-grown). */
-/*   SERVICE_HANDLED      -> ALL 18 members REAL-imported set (:42-   */
+/*   SERVICE_HANDLED      -> ALL 17 members REAL-imported set (:42-    */
 /*                            :57, never retyped, #1473 canon) DECLINE; */
 /*                            disk-truth map re-verified #1472/#1483    */
-/*                            close (2026-10-23): otto's/otiluke's/     */
-/*                            crown/tasha's/hex = 2024-only presence,   */
-/*                            irresistible dance/resilient sphere/      */
-/*                            hideous laughter = 5e-only, rest BOTH —   */
+/*                            close (2026-10-23), tasha's/hex legs      */
+/*                            re-closed by the 5e spell-data            */
+/*                            completeness pass (2026-11-19):           */
+/*                            otto's/otiluke's + irresistible dance/    */
+/*                            resilient sphere + tasha's hideous        */
+/*                            laughter = BOTH-edition name pairs (the   */
+/*                            5e bare-'hideous laughter' twin MIGRATED  */
+/*                            to the canonical name, so its dual        */
+/*                            literal was retired from the registry),   */
+/*                            crown = 2024-only, hex now BOTH —         */
 /*                            zero members match no disk row at all, so */
 /*                            NO typo'd dead rows; shields over the 4   */
 /*                            ottos_dance/resilient_sphere disk rows are */
@@ -95,7 +101,7 @@
 /*  Security (#1446 kiro scan): no injected content found.            */
 /*                                                                     */
 /*  Kill matrix (mutations -> killer): drop SERVICE_HANDLED arm -> T5  */
-/*  all 18 members dispatch; drop lowerCase -> T5 TitleCase arms       */
+/*  all 17 members dispatch; drop lowerCase -> T5 TitleCase arms       */
 /*  dispatch; effects key-presence instead of truthiness -> T4 falsy   */
 /*  rows wrongly decline; drop effects.success arm -> T4 guard row     */
 /*  dispatches; drop effects.fail arm -> T4 disk Color Spray rows      */
@@ -252,12 +258,12 @@ describe('handleGenericAutomation — :455 gate truth table + :462 arity (direct
     }
   });
 
-  it('SERVICE_HANDLED census via REAL import (never retyped): all 18 members decline lowercase AND TitleCase bytes, zero dispatch; non-member control consumes', async () => {
+  it('SERVICE_HANDLED census via REAL import (never retyped): all 17 members decline lowercase AND TitleCase bytes, zero dispatch; non-member control consumes', async () => {
     // byte census of triggerSpells.js:42-:66 as of 2026-10-23 disk state —
     // 17 historical members + fix#132 'regenerate' live shield (#1483).
     // if the set rotates, update the count (members are iterated live, not
     // hand-listed, so coverage never rots).
-    expect(SERVICE_HANDLED_SPELLS.size).toBe(18);
+    expect(SERVICE_HANDLED_SPELLS.size).toBe(17);
 
     const executeHandler = recorder({ popup: 'would-be-handled' });
     for (const member of SERVICE_HANDLED_SPELLS) {
@@ -281,18 +287,21 @@ describe('handleGenericAutomation — :455 gate truth table + :462 arity (direct
   it('disk-alignment census (#1472/#1483 closing): EVERY SERVICE_HANDLED member matches an exactly-named disk row in >=1 edition — zero dead typo rows; shield live on real disk bytes where automation rides; zero-name-fold hijacks decline and route on; Regenerate lawful-generic', async () => {
     // Per-entry name census against REAL disk bytes, both editions.
     // Pre-fix#109 the 5e disk row was 'Hideous Laughter' vs the singleton
-    // "tasha's hideous laughter" literal -> inert shield (#1423). Post-fix
-    // dual-literals, every member must touch disk SOMEWHERE: a member with
-    // zero rows in BOTH files is a typo'd dead row (delete-or-align per
-    // verdict) — this pin goes red on any future such drift.
+    // "tasha's hideous laughter" literal -> inert shield (#1423). The 5e
+    // spell-data completeness pass (2026-11-19) MIGRATED that disk row to
+    // the canonical name, so the dual literal is retired and Tasha's is a
+    // BOTH-edition single-name row. Every member must still touch disk
+    // SOMEWHERE: a member with zero rows in BOTH files is a typo'd dead
+    // row (delete-or-align per verdict) — this pin goes red on any future
+    // such drift.
     for (const member of SERVICE_HANDLED_SPELLS) {
       const rows5e = spells5e.filter(s => (s.name || '').toLowerCase() === member);
       const rows24 = spells2024.filter(s => (s.name || '').toLowerCase() === member);
       expect(rows5e.length + rows24.length,
         `dead registry row: "${member}" matches no disk name in either edition`).toBeGreaterThan(0);
       // fix#109 law: edition-differing names must BOTH be listed — every
-      // dual pair (otto's/irresistible dance, otiluke's/resilient sphere,
-      // tasha's/hideous laughter) is disk-backed in its own edition.
+      // dual pair (otto's/irresistible dance, otiluke's/resilient sphere)
+      // is disk-backed in its own edition.
       if (rows5e.length) expect(rows5e.every(r => r.name), `${member} 5e disk canonical TitleCase`).toBeTruthy();
       if (rows24.length) expect(rows24.every(r => r.name), `${member} 2024 disk canonical TitleCase`).toBeTruthy();
 

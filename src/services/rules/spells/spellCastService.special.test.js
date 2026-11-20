@@ -50,11 +50,13 @@ import spells2024 from '../../../../public/data/2024/spells.json'
 /*  must dispatch to the SAME service with the SAME stamped tuple, and */
 /*  despite their raw disk automation.type they must NEVER be hijacked */
 /*  by :710 (SERVICE_HANDLED_SPELLS shield, triggerSpells.js:42-57).  */
-/*  #1423 gate-mismatch FIXED (#1423 resolution): the Tasha span gate   */
-/*  (:387) is now the DUAL-literal canonical set "tasha's hideous         */
-/*  laughter" || 'hideous laughter' — 5e disk 'Hideous Laughter' and 2024 */
-/*  disk "Tasha's Hideous Laughter" BOTH route to the same span with the   */
-/*  same stamped tuple (per-ruleset real-name arm table below; mirrors     */
+/*  #1423 gate-mismatch FIXED (#1423 resolution), re-closed by the 5e    */
+/*  spell-data completeness pass: the Tasha span gate (:395) is the      */
+/*  canonical SINGLE-literal set "tasha's hideous laughter" — the 5e    */
+/*  laughter" — the 5e disk row migrated from bare 'Hideous Laughter' to */
+/*  the canonical "Tasha's Hideous Laughter" (5e spell-data completeness  */
+/*  pass), so BOTH rulesets' disk names route to the same span with the   */
+/*  same stamped tuple (per-ruleset real-name arm table below; mirrors    */
 /*  the Otto :210 / sphere :218 edition-rename idiom). 2024 disk index      */
 /*  corruption 'tashas-hIDEOUS-LAUGHTER' (only uppercase index in the      */
 /*  whole table, present since the first 2024 import) repaired to           */
@@ -336,12 +338,12 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
   // stamped tuple; fix#358 (#1459) retires the RAW-forward identity —
   // the host now wraps { automationPopup } per the faerie-sibling
   // guard (triggerSpells.js:385-389, host mirror at :403-407).
-  // SERVICE_HANDLED (:53) already carried both literals — post-fix they
-  // are LIVE shields for the routed 5e cast, not inert entries.
+  // SERVICE_HANDLED (:53) carries the canonical literal — post-migration it
+  // is the LIVE shield for BOTH rulesets' routed casts.
   // ------------------------------------------------------------------
   it.each([
-    ['Hideous Laughter', '5e', 'real 5e disk name — second literal, previously slipped'],
-    ["Tasha's Hideous Laughter", '2024', 'real 2024 disk name — first literal'],
+    ["Tasha's Hideous Laughter", '5e', 'real 5e disk name — migrated to the canonical SRD name'],
+    ["Tasha's Hideous Laughter", '2024', 'real 2024 disk name — same canonical bytes'],
   ])('#1423 fixed: %s (%s) opens the Tasha modal span, exact stamped tuple, automationPopup-wrapped forward', async (name, ruleset) => {
     const envelope = diskRow(name, ruleset)
     const services = makeServices({ playerStats: makePlayerStats({ rules: ruleset }) })
@@ -368,12 +370,11 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
   // Case-variance arms run the REAL gate DIRECT (triggerSpells.js:387,
   // mocked leaf) — the hub's lookupFullSpell (:179) is exact-case, so
   // non-disk casing would trip its console.error trail, not the gate.
+  // The retired bare 'hideous laughter' literals are pinned REJECTING by
+  // the migration-twin arm below (disk migration removed the twin).
   it.each([
-    ['Hideous Laughter', 'real 5e disk bytes'],
-    ['hideous laughter', 'all-lowercase 5e variant'],
-    ['HIDEOUS LAUGHTER', 'all-uppercase 5e variant'],
-    ["Tasha's Hideous Laughter", 'real 2024 disk bytes'],
-    ["tasha's HIDEOUS laughter", 'mixed-case 2024 variant'],
+    ["Tasha's Hideous Laughter", 'real 5e + 2024 disk bytes'],
+    ["tasha's HIDEOUS laughter", 'mixed-case variant'],
   ])('#1423 case-arm: gate at :387 accepts "%s" (%s)', async (name) => {
     vi.clearAllMocks()
     const gateRes = await handleTashasHideousLaughter({
@@ -384,6 +385,17 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
     expect(gateRes.handled).toBe(true)
     expect(triggerTashasHideousLaughter).toHaveBeenCalledTimes(1)
     expect(triggerTashasHideousLaughter.mock.calls[0][0].name).toBe(name) // envelope echoed verbatim (T2)
+  })
+
+  it('migration twin: the retired bare "Hideous Laughter" bytes no longer open the gate (handled:false, zero dispatch)', async () => {
+    vi.clearAllMocks()
+    const gateRes = await handleTashasHideousLaughter({
+      spell: { name: 'Hideous Laughter', level: 1 }, metaCtx: {}, spellSaveDc: SAVE_DC,
+      playerStats: makePlayerStats(), campaignName: CAMPAIGN, mapName: MAP,
+    })
+
+    expect(gateRes).toStrictEqual({ handled: false })
+    expect(triggerTashasHideousLaughter).not.toHaveBeenCalled()
   })
 
   it.each([

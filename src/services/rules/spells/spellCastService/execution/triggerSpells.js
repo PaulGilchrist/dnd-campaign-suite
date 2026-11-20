@@ -50,7 +50,7 @@ const SERVICE_HANDLED_SPELLS = new Set([
     'dominate beast',
     'dominate monster',
     'dominate person',
-    'tasha\'s hideous laughter', 'hideous laughter',
+    'tasha\'s hideous laughter',
     'ray of enfeeblement',
     'hex',
     'command',
@@ -392,7 +392,7 @@ async function handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, camp
 }
 
 async function handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
-    if (spell.name && (spell.name.toLowerCase() === "tasha's hideous laughter" || spell.name.toLowerCase() === 'hideous laughter')) {
+    if (spell.name && spell.name.toLowerCase() === "tasha's hideous laughter") {
         // fix#358 (#1459): the retired RAW-forward (`return { handled:true, result }`)
         // shipped the service's modal envelope UNWRAPPED — every consumer of the
         // unified popup shape (.result.automationPopup) missed it. Now mirrors the

@@ -21,7 +21,9 @@
 /*  falsy-collapse arm (the service's unconditional truthy return is  */
 /*  producer behavior, the host stays three-state per sibling law).    */
 /*  Fixtures: REAL disk rows BOTH rulesets — 2024 'Tasha's Hideous    */
-/*  Laughter', 5e 'Hideous Laughter' (dual literals, fix#109) —       */
+/*  Laughter', 5e 'Tasha's Hideous Laughter' (canonical SRD name —     */
+/*  the bare 'Hideous Laughter' twin migrated in the 5e spell-data     */
+/*  completeness pass) —                                   */
 /*  existence-first + drift-throw (#1503/#1504). Synthetic decline     */
 /*  names match no gate (#1492). Campaign 'test-campaign' lockdown.    */
 /*  NO-CLOCK: instantaneous dispatch; zero Date/timers here.           */
@@ -42,11 +44,11 @@ import { handleTashasHideousLaughter } from './triggerSpells.js';
 
 /* existence-census-first (#1503): REAL disk rows or throw. */
 const tasha2024 = spells2024.find(s => s.name === "Tasha's Hideous Laughter");
-const laughter5e = spells5e.find(s => s.name === 'Hideous Laughter');
+const laughter5e = spells5e.find(s => s.name === "Tasha's Hideous Laughter");
 const fireBolt5e = spells5e.find(s => s.name === 'Fire Bolt');
 for (const [label, row] of [
   ['Tasha\'s Hideous Laughter 2024', tasha2024],
-  ['Hideous Laughter 5e', laughter5e],
+  ['Tasha\'s Hideous Laughter 5e', laughter5e],
   ['Fire Bolt 5e', fireBolt5e],
 ]) {
   if (!row) throw new Error(`disk drift: ${label} missing from public/data/ disk JSON`);
@@ -85,7 +87,7 @@ describe('handleTashasHideousLaughter — fix#358 guard three-state (faerie-sibl
     expect(result.result).not.toBe(m); // the wrapper is new; the RAW-forward (result===m) is gone
   });
 
-  it('5e dual-literal name "Hideous Laughter" dispatches identically (gate folds case, payload propagates wrapped)', async () => {
+  it('5e disk row (canonical SRD name post-migration) dispatches identically (gate folds case, payload propagates wrapped)', async () => {
     const m = modal();
     triggerTashasHideousLaughter.mockResolvedValueOnce(m);
 

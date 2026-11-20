@@ -8,7 +8,8 @@
 // pass. Row already carried save_dc 22 + save_type "Intelligence" (§89).
 // Phantasmagoria is ABSENT from BOTH spells.json (MA-0599 junk-log lane) —
 // it stays PLAIN TEXT: emphasis marks resolvable names only, no fake chip.
-// Blade Ward is 2024-only — casts live via the 5e→2024 fallback (§207).
+// Blade Ward joined the 5e index (5e spell-data completeness pass, 2026-11-19)
+// — casts now resolve 5e-exact-first; the §207 fallback lane is cited history.
 // Lane owns Spellcasting-ROW bytes only: Fire Bolt legendary-cast lane is
 // ma1853, Dread Word DC 22 chip lane is ma1855 — cited, not absorbed.
 // Generic owners cited (not duplicated here): 1/Day spend+refusal
@@ -51,7 +52,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 // §177: loadSpells mock MUST branch on the ruleset arg — findMonsterSpell is
-// 5e-exact-first, Blade Ward only ever resolves through the 2024 fallback.
+// 5e-exact-first; Blade Ward now resolves in the 5e index itself (both tables
+// carry it since the 5e spell-data completeness pass), fallback cited not used.
 const NAMES_5E = CHIP_NAMES.filter(n => spells5e.some(s => s.name === n));
 const SPELLS_5E = NAMES_5E.map(n => spells5e.find(s => s.name === n));
 const SPELLS_2024 = CHIP_NAMES.map(n => spells2024.find(s => s.name === n)).filter(Boolean);
@@ -170,10 +172,10 @@ describe('MA-1850 monsters.json data lock: Archlich Spellcasting row', () => {
     expect(monsterSpellAttackBonus(archlichRow)).toBe(14);
   });
 
-  it('spell-DB pins: Phantasmagoria absent from BOTH spells.json (why it stays unmarked); Blade Ward 2024-only (§207 fallback). Lightning Bolt half/8d6 shape owned by spellcasting.test.jsx:227-242', () => {
+  it('spell-DB pins: Phantasmagoria absent from BOTH spells.json (why it stays unmarked); Blade Ward now rides BOTH indexes — it joined the 5e table in the 5e spell-data completeness pass (2026-11-19), so the §207 fallback no longer owns its resolution. Lightning Bolt half/8d6 shape owned by spellcasting.test.jsx:227-242', () => {
     expect(spells5e.some(s => s.name === 'Phantasmagoria')).toBe(false);
     expect(spells2024.some(s => s.name === 'Phantasmagoria')).toBe(false);
-    expect(spells5e.some(s => s.name === 'Blade Ward')).toBe(false);
+    expect(spells5e.some(s => s.name === 'Blade Ward')).toBe(true);
     expect(spells2024.some(s => s.name === 'Blade Ward')).toBe(true);
   });
 });

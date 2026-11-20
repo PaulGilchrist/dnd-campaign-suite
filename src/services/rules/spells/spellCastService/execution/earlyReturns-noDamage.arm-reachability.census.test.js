@@ -604,9 +604,13 @@ describe('fix#355(a) census — deleted arms stay dead (dead-arm-deletion-census
     // fix#132 shield byte + fix#121(b) ownership machinery, verbatim:
     const trig = fs.readFileSync(path.join(HERE, 'triggerSpells.js'), 'utf8');
     expect(trig).toContain("'regenerate',");
-    for (const literal of ["otto's irresistible dance", "otiluke's resilient sphere", "'blur'", "'expeditious retreat'", "'friends'", "'crown of madness'", "'animal friendship'", "'dominate beast'", "'dominate monster'", "'dominate person'", "tasha's hideous laughter", "'hideous laughter'", "'ray of enfeeblement'", "'hex'", "'command'"]) {
+    for (const literal of ["otto's irresistible dance", "otiluke's resilient sphere", "'blur'", "'expeditious retreat'", "'friends'", "'crown of madness'", "'animal friendship'", "'dominate beast'", "'dominate monster'", "'dominate person'", "tasha's hideous laughter", "'ray of enfeeblement'", "'hex'", "'command'"]) {
       expect(trig.includes(literal), `SERVICE_HANDLED_SPELLS literal drifted: ${literal}`).toBe(true);
     }
+    // The bare-'hideous laughter' dual literal (fix#109 era) was RETIRED by the
+    // 5e spell-data completeness pass (2026-11-19): the 5e disk row migrated to
+    // the canonical "Tasha's Hideous Laughter", leaving no legacy bytes to shield.
+    expect(trig.includes("'hideous laughter'"), 'retired literal must stay retired').toBe(false);
     expect(host).toContain("const MASS_HEAL_CONFIRM_AUTOMATION_TYPES = new Set(['mass_healing_word', 'prayer_of_healing', 'mass_cure_wounds']);");
     expect(host).toContain("if (healRidersRun !== 'pair' && healRidersRun !== 'self') {");
     expect(host).toContain("if (healRidersRun !== 'pair') {");

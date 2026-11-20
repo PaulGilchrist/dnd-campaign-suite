@@ -100,7 +100,9 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 // §158/§207: names absent from the 5e index that resolve only via the
 // findMonsterSpell 5e→2024 fallback — and which the dataLoader mock below
 // MUST serve on the '2024' branch (§177 ruleset-branch pitfall).
-const ONLY_2024 = ['Befuddlement', "Tasha's Hideous Laughter", 'Mind Spike'];
+// ("Tasha's Hideous Laughter" joined the 5e index in the 5e spell-data
+// completeness pass — canonical name + index — so it byte-matches BOTH now.)
+const ONLY_2024 = ['Befuddlement', 'Mind Spike'];
 const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES, ...SN_NAMES, ...SS_NAMES, ...SV_NAMES, ...SG_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries(ONLY_2024.map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
@@ -316,12 +318,16 @@ describe('MA-0421-family data lock: Spellcasting rows — BY-name extraction + e
     ['sphinx-of-lore', 'sphinx-of-secrets', 'sphinx-of-valor', 'storm-giant'].forEach(index => expect('save_effect' in spellRow(index)).toBe(false));
   });
 
-  it('§207/§158 dual-index lane: Befuddlement + Tasha\'s Hideous Laughter + Mind Spike are 5e-absent/exact-2024 (findMonsterSpell fallback); all other family names byte-match BOTH indexes', () => {
+  it('§207/§158 dual-index lane: Befuddlement + Mind Spike are 5e-absent/exact-2024 (findMonsterSpell fallback); all other family names byte-match BOTH indexes', () => {
     ONLY_2024.forEach(n => {
       expect(spells5e.some(s => s.name === n)).toBe(false);
       expect(spells2024.some(s => s.name === n)).toBe(true);
     });
-    expect(spells5e.some(s => s.name === 'Hideous Laughter')).toBe(true);
+    // Legacy bare 'Hideous Laughter' 5e disk row migrated to the canonical
+    // SRD name/index ("Tasha's Hideous Laughter"/tashas-hideous-laughter) in
+    // the 5e spell-data completeness pass — the old bytes are gone for good.
+    expect(spells5e.some(s => s.name === 'Hideous Laughter')).toBe(false);
+    expect(spells5e.some(s => s.index === 'hideous-laughter')).toBe(false);
     const b = spells2024.find(s => s.name === 'Befuddlement');
     expect(b.index).toBe('befuddlement');
     expect(b.level).toBe(8);
