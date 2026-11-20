@@ -1,10 +1,13 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai: 2026-11-20
 /* Lane: mood un-arm on 'music-queue-exhausted' (bug-music-dead-track-infinite-skip-loop).
  * When youtubePlayer reports every track failed back-to-back, the component
  * must flip the synced 'music' key to { mood:null, playing:false } (honest
  * server-first write, not a local lie), toast naming the mood, and log a
  * no_playable_tracks campaign row. The fetch stub mirrors the server music
- * route's intent-split merge (see MusicPlayer.toast.test.jsx). */
+ * route's intent-split merge (see MusicPlayer.toast.test.jsx).
+ * Frame release (bug-music-queue-exhausted-leaves-dead-frame-mounted): the
+ * un-arm is a stop, so the owner tab must also drop its .yt-music-frame
+ * (1→0) like the local Stop lane (047efa4e1 law) — no dead embed survives. */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -93,6 +96,35 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
       mood: 'town',
       message: 'Ambience stopped — no playable tracks for Town (Me9VLOSaJkg)'
     }));
+  });
+
+  it('exhaustion releases the frame like a stop — 1→0, bytes and row untouched, re-arm re-mounts fresh', () => {
+    const stub = stubMusicServer();
+    const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    fireEvent.click(townButton());
+    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(1);
+
+    dispatchExhausted(['Me9VLOSaJkg']);
+
+    // The un-arm is a stop: setPlayerMounted(false) → mount-effect cleanup
+    // disposes the embed, so frame-count stays a trustworthy ownership witness.
+    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(0);
+    expect(youtubePlayer.dispose).toHaveBeenCalledTimes(1);
+    // shared bytes land exactly as before the fix: arm POST then stopCommit POST
+    expect(musicState()).toMatchObject({ mood: null, playing: false });
+    expect(stub.posts).toHaveLength(2);
+    expect(stub.posts.at(-1)).toMatchObject({ mood: null, playing: false });
+    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'music',
+      action: 'no_playable_tracks',
+      mood: 'town',
+      message: 'Ambience stopped — no playable tracks for Town (Me9VLOSaJkg)'
+    }));
+
+    // re-arming after the released frame freshly re-mounts exactly one frame
+    fireEvent.click(townButton());
+    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(1);
+    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(2);
   });
 
   it('a fresh mood click after exhaustion re-arms and replays the queue normally', () => {

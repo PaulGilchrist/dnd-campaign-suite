@@ -490,10 +490,18 @@ function MusicPlayer({ campaignName, visible = true }) {
   // back-to-back — un-arm the mood and tell the listener honestly instead of the
   // transport claiming it is playing dead videos. Toast lane mirrors the
   // editor-save errors; the log row follows the set_ambience/stop pattern.
+  // Exhaustion is a stop, so it releases the frame exactly like stopMusic
+  // (improve 2026-11-20 backlog, 047efa4e1 law): the transport already ran its
+  // own stop() inside handleError before dispatching, so setPlayerMounted(false)
+  // alone lets the mount-effect cleanup dispose the embed — no dead
+  // .yt-music-frame survives on the owner tab and frame-count stays a
+  // trustworthy ownership witness. Bytes/rows untouched; the pagehide guard
+  // sees an already-released tab and writes nothing on reload.
   useEffect(() => {
     const handleQueueExhausted = (event) => {
       const label = music.mood ? moodLabel(music.mood) : 'this mood';
       const failedIds = (event.detail || {}).videoIds || [];
+      setPlayerMounted(false);
       commitMusic(stopCommit(music));
       showToast(`No playable tracks for ${label} ambience`, true);
       addEntry({
