@@ -19,6 +19,37 @@ export function getDistanceFeet(pos1, pos2) {
   return toFeet(gridDistance(pos1.gridX, pos1.gridY, pos2.gridX, pos2.gridY))
 }
 
+// Bestiary dual notation "80/320 ft." (normal/long). Optional unit suffix —
+// the 79 authored dual range fields all carry "ft." but unit-less "30/120"
+// (MA-0436 dual-mode rows) parses here too; band split lives in
+// rangePairToFeet, the scalar answer is the NORMAL figure.
+const DUAL_RANGE_RE = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/
+
+/**
+ * Split a range value into its authoritative { normal, long } feet pair.
+ * Dual notation ("80/320 ft.") carries the REAL long figure; a single value
+ * keeps the RAW normal = long/2 convention (long = normal × 2).
+ * Returns null when no range is derivable (self/special/unparseable/absent).
+ */
+export function rangePairToFeet(range) {
+  if (typeof range === 'number') return { normal: range, long: range * 2 }
+  if (!range || typeof range !== 'string') return null
+
+  const normalized = range.toLowerCase().trim().replace(/_/g, ' ')
+  if (normalized === 'touch') return { normal: MELEE_RANGE_FT, long: MELEE_RANGE_FT }
+  if (normalized === 'sight' || normalized === 'unlimited') return { normal: Infinity, long: Infinity }
+
+  const dualMatch = normalized.match(DUAL_RANGE_RE)
+  if (dualMatch) {
+    const normal = parseFloat(dualMatch[1])
+    return { normal, long: Math.max(parseFloat(dualMatch[2]), normal) }
+  }
+
+  const feet = rangeToFeet(range)
+  if (feet == null) return null
+  return { normal: feet, long: feet * 2 }
+}
+
 export function rangeToFeet(range) {
   if (typeof range === 'number') return range
   if (!range || typeof range !== 'string') return null
@@ -35,6 +66,11 @@ export function rangeToFeet(range) {
   const match = normalized.match(/^(-?\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/)
   if (match) return parseFloat(match[1])
 
+  // Dual notation ("80/320 ft.") → the scalar consumers want the normal band;
+  // rangePairToFeet above keeps the long figure for range-band adjudication.
+  const dualMatch = normalized.match(DUAL_RANGE_RE)
+  if (dualMatch) return parseFloat(dualMatch[1])
+
   // Anchored twin of the feet regex above (fix#1224): same boundary law on
   // both fields — exact full-string unit token only, garbage suffix → null.
   const mileMatch = normalized.match(/^(-?\d+(?:\.\d+)?)\s*(miles|mile)$/)
@@ -44,8 +80,8 @@ export function rangeToFeet(range) {
 }
 
 export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
-  const numericRange = rangeToFeet(attackRange)
-  if (numericRange == null) {
+  const pair = rangePairToFeet(attackRange)
+  if (pair == null) {
     return { mode: 'normal' }
   }
 
@@ -53,6 +89,7 @@ export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
     return { mode: 'normal' }
   }
 
+  const { normal: numericRange } = pair
   if (numericRange <= MELEE_RANGE_FT) {
     const meleeReachBonus = featEffects.meleeReachBonus || 0
     const effectiveRange = MELEE_RANGE_FT + meleeReachBonus
@@ -65,8 +102,11 @@ export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
     }
   }
 
-  const effectiveRange = numericRange * (featEffects.rangeMultiplier || 1)
-  const longRange = effectiveRange * 2
+  const rangeMultiplier = featEffects.rangeMultiplier || 1
+  const effectiveRange = numericRange * rangeMultiplier
+  // Authored dual notation (e.g. 80/320) replaces the ×2 model with the REAL
+  // long figure; single values already carry long = normal × 2 (rangePairToFeet).
+  const longRange = Math.max(pair.long * rangeMultiplier, effectiveRange)
 
   if (featEffects.ignoresLongRangeDisadvantage) {
     if (distanceFt <= effectiveRange) {

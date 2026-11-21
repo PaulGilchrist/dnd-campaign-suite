@@ -20,7 +20,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, extractSpellNamesFromSpellcasting, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveTargetEffect, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, extractSpellNamesFromSpellcasting, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveTargetEffect, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow, resolveAttackRange } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { SaveVariantChooserModal } from './SaveVariantChooserModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
@@ -1714,10 +1714,11 @@ function buildAttackRollOptions(v) {
   };
 }
 
-function resolveAttackRange(action) {
-  if (action?.reach) return rangeToFeet(action.reach);
-  if (action?.range) return rangeToFeet(action.range);
-  return 30;
+// Press-lane melee discriminator for a resolved range token: a NULL range
+// (nothing derivable) is unknown, never melee — the band stays LENIENT
+// instead of a fabricated figure (bug-monster-ranged-attack-wrong-range-bands).
+function isMeleePressRange(attackRangeFt) {
+  return attackRangeFt != null && attackRangeFt <= 5;
 }
 
 function extractConditionKeys(creature) {
@@ -2659,8 +2660,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }
 
     const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
+    // RAW range token (structured reach/range or authored prose; dual notation
+    // kept intact for computeMapRangeState → rangePairToFeet). attackRangeFt is
+    // the NORMAL-band feet for melee discriminators — null when nothing is
+    // derivable, which stays LENIENT (never a fabricated 30 ft band).
     const attackRange = resolveAttackRange(action);
-    const isMeleeAttack = attackRange <= 5;
+    const attackRangeFt = rangeToFeet(attackRange);
+    const isMeleeAttack = isMeleePressRange(attackRangeFt);
 
     const { grazeDamage, grazeAbilityMod } = computeGrazeSettings(isMeleeAttack, monsterCharacter);
     const { targetComputed, resistanceNotice } = resolveTargetDefense(target, creatures, primaryDamageType);
@@ -2677,9 +2683,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
     const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 
-    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name);
+    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRangeFt, target?.name);
 
-    const isMelee = attackRange <= 5
+    const isMelee = isMeleeAttack
     const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft
 
     // Spatial measure for the press — resolution-time token positions for

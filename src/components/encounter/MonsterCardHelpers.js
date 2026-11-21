@@ -1208,6 +1208,18 @@ export function parseRangedBand(range) {
   return { normalFt: Number(match[1]), longFt: Number(match[2]) };
 }
 
+// Bestiary attack rows carry the range either structured (`reach`/`range`) or
+// authored in prose ("Ranged Weapon Attack: … range 80/320 ft., …"). Resolve
+// the RAW range token (string/number) so dual notation survives to
+// rangePairToFeet for band adjudication; when nothing is derivable return
+// null → the band stays LENIENT (never invent a numeric limit).
+export function resolveAttackRange(action) {
+  if (action?.reach) return action.reach;
+  if (action?.range) return action.range;
+  const prose = /(?:\breach|\brange)\s+(\d+(?:\s*\/\s*\d+)?)\s*(?:feet|ft\.?)/i.exec(action?.description || '');
+  return prose ? `${prose[1].replace(/\s+/g, '')} ft.` : null;
+}
+
 // MA-0529: dice-identical dual-mode rows (Cult Fanatic Dagger "1d4 + 2" in
 // BOTH modes) still carry a RAW 20/60 band — the mode CHOICE is enforced even
 // when no dice swap exists, so an authored "N/M" band arms the chooser with

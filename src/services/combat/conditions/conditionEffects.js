@@ -856,6 +856,16 @@ function getNetAttackMode(attackAdvantageCount, attackDisadvantageCount, restore
   return 'normal'
 }
 
+// 5-ft range riders need a KNOWN range to fold at all: a null attackRange
+// (no derivable reach/range on the action) stays LENIENT and folds NEITHER.
+// Module-level so combineAttackModes keeps its complexity budget.
+function foldFiveFootRangeRiders(adv, dis, targetEffects, attackRange) {
+  if (attackRange == null) return [adv, dis]
+  if (targetEffects.targetAdvantageIfWithin5ft && attackRange <= 5) adv++
+  if (targetEffects.targetDisadvantageIfBeyond5ft && attackRange > 5) dis++
+  return [adv, dis]
+}
+
 function combineAttackModes(attackerEffects, targetEffects, attackRange, targetName = null) {
   let adv = attackerEffects.attackAdvantageCount + targetEffects.targetAdvantageCount
   let dis = attackerEffects.attackDisadvantageCount + (attackerEffects.targetAttackDisadvantageCount || 0) + targetEffects.targetDisadvantageCount
@@ -863,8 +873,7 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange, targetN
   if (attackerEffects.vexAdvantageTargets && targetName && attackerEffects.vexAdvantageTargets.includes(targetName)) {
     adv++
   }
-  if (targetEffects.targetAdvantageIfWithin5ft && attackRange <= 5) adv++
-  if (targetEffects.targetDisadvantageIfBeyond5ft && attackRange > 5) dis++
+  ;[adv, dis] = foldFiveFootRangeRiders(adv, dis, targetEffects, attackRange)
 
   if (attackerEffects.attacksOtherDisadvantageSource && targetName && targetName !== attackerEffects.attacksOtherDisadvantageSource) {
     dis++
