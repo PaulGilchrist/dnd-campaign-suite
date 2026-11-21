@@ -871,8 +871,9 @@ describe('Entry ordering', () => {
 // ─── Manual-author gate (owner ruling 2026-11-21) ────────────────────────────
 // note/narrative compose rows name a real author, never Anonymous; the GM tab
 // (localhost Host) may post as GM / any player / any initiative creature; a
-// network origin may post ONLY as a player on the roster. Automated rows keep
-// their existing visitor-writable shared-table shapes untouched.
+// network origin may post ONLY notes, as a player on the roster (narrative is
+// the GM/referee voice — FFF gate). Automated rows keep their existing
+// visitor-writable shared-table shapes untouched.
 
 const NO_AUTHOR_COPY = 'Log notes and narrative rows must name an author (the GM, a player, or an initiative creature) — Anonymous posting is not allowed';
 
@@ -953,7 +954,8 @@ describe('POST /log — manual-author gate', () => {
         expect(publish).not.toHaveBeenCalled();
     });
 
-    it('403s a visitor narrative row the same way (the compose gate covers both types)', async () => {
+    it('403s a visitor narrative row naming the GM with the narrative-voice copy, zero side effects', async () => {
+        const { publish } = await import('../utils/changeData.js');
         ensureCampaign('test-campaign');
         setRoster('test-campaign', ['Frodo']);
         const app = createTestApp();
@@ -963,6 +965,82 @@ describe('POST /log — manual-author gate', () => {
             .send({ type: 'narrative', characterName: 'GM', description: 'Fake GM prose' });
 
         expect(res.status).toBe(403);
+        expect(res.body).toEqual({
+            error: 'Narrative rows are written by the GM (the referee) — visitors may post notes as a player character',
+        });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    // FFF gate (backlog 2026-11-21): the composer shows the Note|Narrative
+    // toggle GM-only, so a visitor forging type:'narrative' — even with a
+    // LEGIT roster author, the case the old roster check let land 200 — must
+    // be refused too. Players post notes; the GM/referee writes narrative.
+    it.each(['Frodo', 'Nobody'])(
+        '403s a visitor narrative row as %s (narrative is GM-origin-only, whatever the author)',
+        async (author) => {
+            const { publish } = await import('../utils/changeData.js');
+            ensureCampaign('test-campaign');
+            setRoster('test-campaign', ['Frodo']);
+            const app = createTestApp();
+
+            const res = await request(app).post('/api/campaigns/test-campaign/log')
+                .set('Host', VISITOR_HOST)
+                .send({ type: 'narrative', characterName: author, description: 'FORGED visitor narrative' });
+
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({
+                error: 'Narrative rows are written by the GM (the referee) — visitors may post notes as a player character',
+            });
+            expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+            expect(publish).not.toHaveBeenCalled();
+        }
+    );
+
+    it('the visitor narrative gate keeps its face across narrative shapes (noteText body too)', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'narrative', characterName: 'Frodo', noteText: 'narrative riding a note field' });
+
+        expect(res.status).toBe(403);
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+    });
+
+    it('a visitor narrative with NO author still 400s first (author check precedes the origin gate)', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'narrative', description: 'anonymous visitor prose' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: NO_AUTHOR_COPY });
+    });
+
+    it('GM-origin narrative lanes are unchanged (roster author, off-roster creature, session stamping)', async () => {
+        const { characterChangeData } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        characterChangeData.set('test-campaign', { sessionState: { name: 'Session 9' } });
+        const app = createTestApp();
+
+        const asPlayer = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ type: 'narrative', characterName: 'Frodo', description: 'GM voices a PC' });
+        const asCreature = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ type: 'narrative', characterName: 'Goblin', description: 'off-roster creature prose' });
+
+        expect(asPlayer.status).toBe(200);
+        expect(asPlayer.body.session).toBe('Session 9');
+        expect(asCreature.status).toBe(200);
+        expect(asCreature.body.session).toBe('Session 9');
     });
 
     it('automated rows are NOT manual-author rows — a visitor chip-combat roll with a creature author still lands', async () => {

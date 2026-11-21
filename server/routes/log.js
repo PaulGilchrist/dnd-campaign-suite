@@ -202,9 +202,15 @@ function validateLogEntryBody(body) {
 //     character, or any creature in the initiative tracker. The server does not
 //     re-derive the initiative board here — the GM origin IS the trust
 //     boundary (same posture as every other refuseUnlessGm lane).
-//   • a non-GM (network) origin may post ONLY as a player character on the
-//     campaign roster (readParty — the character files are the single source
-//     of truth). No GM impersonation, no creature attribution, no Anonymous.
+//   • a non-GM (network) origin may post ONLY NOTES, and only as a player
+//     character on the campaign roster (readParty — the character files are
+//     the single source of truth). No GM impersonation, no creature
+//     attribution, no Anonymous.
+//   • `narrative` is the GM/referee voice (owner ruling 2026-11-21, backlog
+//     2026-11-21 FFF): a visitor-origin narrative POST 403s whatever author it
+//     names — the composer already shows the Note|Narrative toggle GM-only and
+//     the doctrine is "players post notes, the GM/referee writes narrative".
+//     The server mirrors the UI so a hand-forged body can't bypass it.
 //   • the AI lanes are NOT affected by this gate: they call addEntry()
 //     server-side (campaigns-ai.js injects it), which is the "AI acting as
 //     GM/referee may add narrative rows at any time as the GM" rule. The
@@ -227,6 +233,12 @@ function validateManualAuthor(campaign, req, body) {
     };
   }
   if (isLocalhost(req)) return null;
+  if (body.type === 'narrative') {
+    return {
+      status: 403,
+      error: 'Narrative rows are written by the GM (the referee) — visitors may post notes as a player character',
+    };
+  }
   const roster = new Set(readParty(campaign).map((member) => member.name));
   if (!roster.has(author)) {
     return {
