@@ -1,7 +1,9 @@
-import { useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useLog from '../../hooks/runtime/useLog.js';
+import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import './Log.css';
-import { filterLogEntries, formatEntryTypeLabel, getRollTypeOptions, LOG_WINDOW_SIZE } from './log-utils.js';
+import { filterLogEntries, formatEntryTypeLabel, getRollTypeOptions, buildAuthorOptions, LOG_WINDOW_SIZE } from './log-utils.js';
 import { GenericEntry } from './LogGenericEntry.jsx';
 // Type→component dispatch registry, extracted to a plain .js module so the
 // server allowlist pin test can derive the rendered types (see entryComponents.js).
@@ -88,22 +90,106 @@ function LogFilterBar({ filters, typeOptions, rollTypeOptions, characterOptions,
   );
 }
 
-export default function Log({ campaignName, characters }) {
+// The compose card — author census by origin, GM-only Note|Narrative type,
+// and the disabled-with-hint face for a visitor in a character-less campaign
+// (the server mirrors this refusal on note/narrative POSTs). Presentational:
+// all state lives in Log.
+function LogComposer({ isLocalhost, authorOptions, author, composeType, noteText, onSelectAuthor, onComposeType, onNoteText, onPost, onKeyDown }) {
+  const canPost = authorOptions.length > 0;
+  return (
+    <>
+      <div className="log-add-note no-print">
+        {canPost && (
+          <>
+            <label className="log-post-as-label" htmlFor="log-note-author">Post as:</label>
+            <select
+              id="log-note-author"
+              value={author}
+              onChange={(e) => onSelectAuthor(e.target.value)}
+            >
+              {authorOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            {isLocalhost && (
+              <>
+                <label className="log-post-as-label" htmlFor="log-note-type">As:</label>
+                <select
+                  id="log-note-type"
+                  value={composeType}
+                  onChange={(e) => onComposeType(e.target.value)}
+                  title="Notes are shared tabletop chatter; narrative is GM/storytelling prose"
+                >
+                  <option value="note">Note</option>
+                  <option value="narrative">Narrative</option>
+                </select>
+              </>
+            )}
+          </>
+        )}
+        <textarea
+          placeholder="Add a note to the log..."
+          value={noteText}
+          onChange={(e) => onNoteText(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={!canPost}
+        />
+        <button className="log-add-btn" onClick={onPost} disabled={!canPost || !noteText.trim()} title="Post note" aria-label="Post note"><i className="fas fa-plus"></i></button>
+      </div>
+      {!canPost && (
+        <div className="log-post-disabled-hint no-print">
+          <i className="fas fa-circle-info"></i> A player character must exist in this campaign before you can post to the log.
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function Log({ campaignName, characters, isLocalhost }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
-  const [selectedCharacter, setSelectedCharacter] = useState('');
+  const [composeType, setComposeType] = useState('note');
+  const [selectedAuthor, setSelectedAuthor] = useState('');
   // Display-only filter + render-window state (local UI state per server-first policy)
   const [filters, setFilters] = useState({ text: '', type: '', character: '', rollType: '' });
   const [windowSize, setWindowSize] = useState(LOG_WINDOW_SIZE);
-  const noteRef = useRef(null);
+  const [creatureNames, setCreatureNames] = useState([]);
+
+  const characterNames = useMemo(() => characters.map(ch => ch.name), [characters]);
+  const authorOptions = useMemo(
+    () => buildAuthorOptions({ isLocalhost, characterNames, creatureNames }),
+    [isLocalhost, characterNames, creatureNames]
+  );
+  // An unselected composer falls to the first option: 'GM' on the GM tab, the
+  // first character for a visitor. Empty authorOptions (a visitor in a
+  // character-less campaign) means there is nothing to post as at all.
+  const author = selectedAuthor || authorOptions[0] || '';
+
+  // Initiative-tracker creature census (GM tab only — visitors never author
+  // creatures). Mount read plus SSE mirror of the combatSummary change-data
+  // key, the same source the Initiative board renders from.
+  useEffect(() => {
+    if (!isLocalhost || !campaignName) return undefined;
+    let cancelled = false;
+    const applyCensus = (summary) => {
+      if (!cancelled) setCreatureNames((summary?.creatures || []).map(c => c.name).filter(Boolean));
+    };
+    loadCombatSummary(campaignName)
+      .then(applyCensus)
+      .catch(err => console.error('Failed to load initiative creatures for the log author list:', err));
+    const unsubscribe = subscribeToSSE(campaignName, (event) => {
+      if (event.key !== `change-${campaignName}-combatSummary`) return;
+      applyCensus(event.data);
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, [campaignName, isLocalhost]);
 
   const handleAddNote = async () => {
-    if (!noteText.trim()) return;
-    await addEntry({
-      type: 'note',
-      characterName: selectedCharacter || 'Anonymous',
-      noteText: noteText.trim()
-    });
+    if (!noteText.trim() || !author) return;
+    const text = noteText.trim();
+    await addEntry(composeType === 'narrative' && isLocalhost
+      ? { type: 'narrative', characterName: author, description: text }
+      : { type: 'note', characterName: author, noteText: text });
     setNoteText('');
   };
 
@@ -150,31 +236,18 @@ export default function Log({ campaignName, characters }) {
         <h2><i className="fas fa-scroll"></i> Campaign Log</h2>
       </div>
 
-        <div className="log-add-note no-print">
-            {characters.length > 0 && (
-              <>
-                <label className="log-post-as-label" htmlFor="log-note-author">Post as:</label>
-                <select
-                  id="log-note-author"
-                  value={selectedCharacter}
-                  onChange={(e) => setSelectedCharacter(e.target.value)}
-                >
-                  <option value="">Anonymous</option>
-                  {characters.map(ch => (
-                    <option key={ch.name} value={ch.name}>{ch.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            <textarea
-              ref={noteRef}
-              placeholder="Add a note to the log..."
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            <button className="log-add-btn" onClick={handleAddNote} disabled={!noteText.trim()} title="Post note" aria-label="Post note"><i className="fas fa-plus"></i></button>
-          </div>
+        <LogComposer
+          isLocalhost={isLocalhost}
+          authorOptions={authorOptions}
+          author={author}
+          composeType={composeType}
+          noteText={noteText}
+          onSelectAuthor={setSelectedAuthor}
+          onComposeType={setComposeType}
+          onNoteText={setNoteText}
+          onPost={handleAddNote}
+          onKeyDown={handleKeyDown}
+        />
 
       {initialized && logEntries.length > 0 && (
         <LogFilterBar

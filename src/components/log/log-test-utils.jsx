@@ -1,7 +1,7 @@
 import { render, cleanup } from '@testing-library/react';
 import { vi } from 'vitest';
 
-const mockState = vi.hoisted(() => ({ logEntries: [], initialized: true }));
+const mockState = vi.hoisted(() => ({ logEntries: [], initialized: true, combatSummary: null }));
 const mockAddEntry = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock('../../hooks/runtime/useLog.js', () => ({
@@ -10,6 +10,16 @@ vi.mock('../../hooks/runtime/useLog.js', () => ({
     initialized: mockState.initialized,
     addEntry: mockAddEntry,
   })),
+}));
+
+// Log's GM-tab initiative census (author dropdown creature list) reads the
+// combatSummary lane through these two seams; tests set
+// mockState.combatSummary to feed it.
+vi.mock('../../services/encounters/combatData.js', () => ({
+  loadCombatSummary: vi.fn(async () => mockState.combatSummary),
+}));
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: vi.fn(() => () => {}),
 }));
 
 export { mockState, mockAddEntry, cleanup };
@@ -28,6 +38,13 @@ export const roll = (o = {}) => ({
 export const note = (o = {}) => ({
   id: 'n', type: 'note', characterName: 'Frodo', timestamp: Date.now(),
   noteText: 'Quest begins.', ...o,
+});
+
+// Narrative rows carry the canonical `description` field (composer + world
+// producer law, server/routes/log.js text-split comment).
+export const narrative = (o = {}) => ({
+  id: 'nv', type: 'narrative', characterName: 'GM', timestamp: Date.now(),
+  description: 'The gate groans open.', ...o,
 });
 
 export const travel = (o = {}) => ({
@@ -118,16 +135,17 @@ export const rest = (o = {}) => ({
 // ── Q helpers so we don't repeat code ───────────────────────
 export const q = (sel) => document.querySelector(sel);
 
-export function setup(Log, entries, initialized, characters) {
+export function setup(Log, entries, initialized, characters, isLocalhost = true) {
   mockState.logEntries.length = 0;
   if (entries) mockState.logEntries.push(...entries);
   mockState.initialized = initialized ?? true;
-  return render(<Log campaignName="test-campaign" characters={characters ?? CHARS} />);
+  return render(<Log campaignName="test-campaign" characters={characters ?? CHARS} isLocalhost={isLocalhost} />);
 }
 
 export function beforeEachSetup() {
   cleanup();
   mockState.logEntries.length = 0;
   mockState.initialized = true;
+  mockState.combatSummary = null;
   mockAddEntry.mockClear();
 }

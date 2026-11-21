@@ -1,9 +1,11 @@
 import express from 'express';
 import fs from 'fs';
 import guid from 'guid';
-import { publish } from '../utils/changeData.js';
+import { publish, characterChangeData } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDataFile, campaignDir, ensureDataDir } from '../utils/campaignPaths.js';
+import { isLocalhost } from '../utils/gmGuard.js';
+import { readParty } from '../services/ai/authoring/party.js';
 
 const router = express.Router();
 
@@ -28,6 +30,12 @@ function loadLog(campaign) {
   return [];
 }
 
+// Persist budget (owner vision 2026-11-21 — "the log is AI memory"): the disk
+// file is the campaign's durable narrative + combat history and is NEVER
+// trimmed; only the served GET window is capped (500). At the ~100 bytes/row
+// a combat row costs, a whole long campaign's log stays well under a few MB,
+// so unbounded disk is intentional; archival/rotation is a future concern
+// (see .opencode/plans/campaign-log-ai-memory-roadmap.md).
 function saveLogFile() {
   if (saveLogFile._timer) clearTimeout(saveLogFile._timer);
   saveLogFile._timer = setTimeout(() => {
@@ -41,8 +49,7 @@ function saveLogFile() {
       const file = campaignDataFile(campaign, 'campaign-log.json');
       try {
         const log = logCache.get(campaign);
-        const trimmed = log.slice(-500);
-        fs.writeFileSync(file, JSON.stringify(trimmed, null, 2));
+        fs.writeFileSync(file, JSON.stringify(log, null, 2));
       } catch (err) {
         console.error(`Failed to save log for campaign ${campaign}:`, err.message);
       }
@@ -51,16 +58,31 @@ function saveLogFile() {
   }, 1000);
 }
 
+// Active-session stamp (memory-prep, owner vision 2026-11-21): every row
+// records the session the table is currently playing, read from the campaign's
+// runtime `sessionState` key in the server change-data cache (the same cache
+// the POST /:key lane keeps synchronously current, so a just-set active
+// session is visible to the very next row). Stamped SERVER-side so every
+// producer lane (client POSTs, AI sinks, roll/inventory routes) is stamped
+// without touching ~200 producers, and a client can never forge or omit it.
+// Rows written outside any tracked session carry `session: null`.
+function activeSessionName(campaign) {
+  const state = characterChangeData.get(campaign)?.sessionState;
+  return typeof state?.name === 'string' && state.name.trim() ? state.name : null;
+}
+
 // Exported for L5 server-dice (campaigns-roll.js) — one log pipeline.
 export function addEntry(campaign, entry) {
   const log = loadLog(campaign);
-  // id/timestamp are server-controlled audit fields: spread the incoming entry
-  // FIRST so a client-supplied id or timestamp can never forge identity or
-  // ordering of the shared campaign log.
+  // id/timestamp/session are server-controlled audit fields: spread the
+  // incoming entry FIRST so a client-supplied id, timestamp, or session can
+  // never forge identity, ordering, or session attribution of the shared
+  // campaign log.
   const newEntry = {
     ...entry,
     id: guid.create().toString(),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    session: activeSessionName(campaign)
   };
   log.push(newEntry);
   logCache.set(campaign, log);
@@ -77,7 +99,9 @@ export function addEntry(campaign, entry) {
 // (src/services/ui/logService.js stampAuditText), while the quick-spawn join
 // trio's initiative (`roll`) and party-seed (`automation`) rows carry a
 // producer-written `description`. This is NOT a legacy dual-write: each row
-// family writes exactly one field, by design. Consumers must never grep a
+// family writes exactly one field, by design. Narrative rows (manual GM
+// composer posts and the world-console confirm lane) canonically carry
+// `description`. Consumers must never grep a
 // single field — canonical reads go through getEntryText
 // (src/components/log/log-utils.js), which resolves the split with one
 // documented precedence (message → description → noteText → summary).
@@ -133,7 +157,8 @@ export const ALLOWED_LOG_TYPES = new Set([
   'hp_change', 'info', 'inventory_transfer', 'long_rest', 'loot',
   'map_regenerated', 'material_consumed', 'metamagic', 'metamagic_use',
   'music', 'narrative', 'note', 'psionic_sorcery', 'roll', 'save_result',
-  'session-played', 'session_phase', 'short_rest', 'spell', 'spell_effect',
+  'session_active', 'session-played', 'session_phase', 'short_rest',
+  'spell', 'spell_effect',
   'summons', 'travel', 'ward_absorbed', 'write_rejected',
 ]);
 
@@ -162,18 +187,65 @@ function validateLogEntryBody(body) {
   return null;
 }
 
+// ── Manual-author gate (owner ruling 2026-11-21) ──
+// Compose-lane rows — the `note` and `narrative` types a human picks an author
+// for in the Log view — must name a real author, never Anonymous:
+//   • localhost (the GM tab, gmGuard.isLocalhost) may post as `GM`, any player
+//     character, or any creature in the initiative tracker. The server does not
+//     re-derive the initiative board here — the GM origin IS the trust
+//     boundary (same posture as every other refuseUnlessGm lane).
+//   • a non-GM (network) origin may post ONLY as a player character on the
+//     campaign roster (readParty — the character files are the single source
+//     of truth). No GM impersonation, no creature attribution, no Anonymous.
+//   • the AI lanes are NOT affected by this gate: they call addEntry()
+//     server-side (campaigns-ai.js injects it), which is the "AI acting as
+//     GM/referee may add narrative rows at any time as the GM" rule. The
+//     world-console confirm lane stamps its narrative rows `characterName:
+//     'GM'` for exactly this reason.
+// Automated/chip rows (roll, hp_change, delegated monster attacks, music,
+// write_rejected, AI audit rows…) are NOT manual-author rows and keep their
+// existing shapes byte-compatible. Refusals append NO row and fire NO
+// broadcast — validation runs strictly before addEntry(), like the shape gate.
+const MANUAL_AUTHOR_TYPES = new Set(['note', 'narrative']);
+
+// Returns { status, error } on refusal, or null when the author is valid.
+function validateManualAuthor(campaign, req, body) {
+  if (!MANUAL_AUTHOR_TYPES.has(body.type)) return null;
+  const author = typeof body.characterName === 'string' ? body.characterName.trim() : '';
+  if (!author || author.toLowerCase() === 'anonymous') {
+    return {
+      status: 400,
+      error: 'Log notes and narrative rows must name an author (the GM, a player, or an initiative creature) — Anonymous posting is not allowed',
+    };
+  }
+  if (isLocalhost(req)) return null;
+  const roster = new Set(readParty(campaign).map((member) => member.name));
+  if (!roster.has(author)) {
+    return {
+      status: 403,
+      error: `Visitors may post to the campaign log only as a player character — "${author}" is not on the "${campaign}" roster`,
+    };
+  }
+  return null;
+}
+
 // GET /api/campaigns/:campaign/log - returns full log (last 500 entries)
 router.get('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
   const log = loadLog(req.params.campaign);
   res.json(log.slice(-500));
 }));
 
-// POST /api/campaigns/:campaign/log - add a new log entry (shape-gated, see
-// ALLOWED_LOG_TYPES above; visitor-writable for legitimate row shapes)
+// POST /api/campaigns/:campaign/log - add a new log entry (shape-gated +
+// manual-author-gated, see ALLOWED_LOG_TYPES and validateManualAuthor above;
+// automated lanes stay visitor-writable, compose-lane notes/narrative do not)
 router.post('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
   const rejection = validateLogEntryBody(req.body);
   if (rejection) {
     return res.status(400).json({ error: rejection });
+  }
+  const authorRejection = validateManualAuthor(req.params.campaign, req, req.body);
+  if (authorRejection) {
+    return res.status(authorRejection.status).json({ error: authorRejection.error });
   }
   const entry = addEntry(req.params.campaign, req.body);
   res.json(entry);

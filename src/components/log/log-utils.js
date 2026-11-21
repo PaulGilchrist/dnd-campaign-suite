@@ -91,6 +91,22 @@ export function getRollTypeOptions(entries) {
   )].sort();
 }
 
+// ── Compose-lane author census (owner ruling 2026-11-21) ──
+// Mirrors the server manual-author gate (server/routes/log.js
+// validateManualAuthor): the GM tab (localhost) may post as 'GM' first, then
+// any player character, then any creature in the initiative tracker (merged
+// combatSummary boards also carry player rows, so names dedupe against the
+// roster); a network visitor may author as player characters ONLY. Anonymous
+// exists nowhere in the compose lane.
+export function buildAuthorOptions({ isLocalhost, characterNames, creatureNames }) {
+  if (!isLocalhost) return [...characterNames];
+  const names = ['GM', ...characterNames];
+  creatureNames.forEach(name => {
+    if (!names.includes(name)) names.push(name);
+  });
+  return names;
+}
+
 // Whole-word initialisms corrected by formatEntryTypeLabel.
 const LABEL_INITIALISMS = { gm: 'GM', ai: 'AI' };
 

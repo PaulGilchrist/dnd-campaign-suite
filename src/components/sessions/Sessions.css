@@ -50,6 +50,14 @@
   color: #a8d5a2;
 }
 
+/* Active session (log memory stamp, 2026-11-21): the one session new
+   campaign log rows carry. */
+.sessions-status-active {
+  background: rgba(212, 160, 23, 0.18);
+  border-color: #d4a017;
+  color: #e8c96a;
+}
+
 .sessions-list-links,
 .sessions-list-contingencies,
 .sessions-list-notes {

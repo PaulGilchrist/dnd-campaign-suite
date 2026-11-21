@@ -1,7 +1,26 @@
 import { checklistProgress, countLinks, hasNotes } from '../../services/campaign/sessionPlannerUtils.js';
 import DraftFlag from '../common/DraftFlag.jsx';
 
-function SessionListItem({ session, onEdit }) {
+// Status badges, extracted so SessionListItem stays under the complexity
+// ceiling; the Active badge marks the session new campaign log rows are
+// stamped with (log memory lane, 2026-11-21).
+function SessionMetaBadges({ played, isActive }) {
+  return (
+    <div className="ct-list-meta">
+      {isActive && (
+        <span className="sessions-status-badge sessions-status-active" title="Active session — new campaign log rows are stamped with this name">
+          <i className="fa-solid fa-book-open" /> Active
+        </span>
+      )}
+      <span className={`sessions-status-badge${played ? ' sessions-status-played' : ' sessions-status-planned'}`}>
+        <i className={`fa-solid ${played ? 'fa-circle-check' : 'fa-hourglass-half'}`} />
+        {played ? 'Played' : 'Planned'}
+      </span>
+    </div>
+  );
+}
+
+function SessionListItem({ session, isActive = false, onEdit }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       onEdit(session);
@@ -28,12 +47,7 @@ function SessionListItem({ session, onEdit }) {
           <DraftFlag row={session} />
           {session.date && <span className="sessions-list-date"><i className="fa-solid fa-calendar" /> {session.date}</span>}
         </div>
-        <div className="ct-list-meta">
-          <span className={`sessions-status-badge${played ? ' sessions-status-played' : ' sessions-status-planned'}`}>
-            <i className={`fa-solid ${played ? 'fa-circle-check' : 'fa-hourglass-half'}`} />
-            {played ? 'Played' : 'Planned'}
-          </span>
-        </div>
+        <SessionMetaBadges played={played} isActive={isActive} />
       </div>
       <div className="ct-list-details">
         <div className="sessions-progress" role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={total} aria-label={`Checklist ${done} of ${total} complete`}>

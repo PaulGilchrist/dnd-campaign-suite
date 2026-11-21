@@ -470,6 +470,16 @@ describe('P4-a sessionState validation (§10.1)', () => {
         expect((await post('encounter')).status).toBe(400);
         expect((await post({ phase: 'encounter', changedAt: 'soon' })).status).toBe(400);
     });
+
+    it('accepts an active-session name (string or null) and refuses junk (log memory stamp, 2026-11-21)', async () => {
+        expect((await post({ phase: 'exploration', name: 'Session 3 — The Long Dark' })).status).toBe(200);
+        expect(characterChangeData.get('test-campaign').sessionState.name).toBe('Session 3 — The Long Dark');
+        expect((await post({ phase: 'exploration', name: null })).status).toBe(200);
+        expect(characterChangeData.get('test-campaign').sessionState.name).toBeNull();
+        const junk = await post({ phase: 'exploration', name: 42 });
+        expect(junk.status).toBe(400);
+        expect(junk.body.error).toMatch(/name must be a string or null/);
+    });
 });
 
 // P4-b (§10.2): auto-encounters rides the enforcement flag set.

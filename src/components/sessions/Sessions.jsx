@@ -19,6 +19,8 @@ import { activateMap } from '../../services/maps/mapsService.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { setActiveSession } from '../../services/combat/sessionService.js';
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
 import NpcUnarmedConfirmModal from '../npcs/NpcUnarmedConfirmModal.jsx';
@@ -65,7 +67,17 @@ async function loadResourceOptions(campaignName) {
   return { options, complete };
 }
 
-function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, onViewInitiative }) {
+// sessionState.name projection + GM-only handler gate (kept module-scope so
+// the Sessions component body stays under the complexity ceiling).
+function activeNameFrom(sessionState) {
+  return typeof sessionState?.name === 'string' && sessionState.name.trim() ? sessionState.name : null;
+}
+
+function activeSessionHandlerFor(isLocalhost, handler) {
+  return isLocalhost ? handler : undefined;
+}
+
+function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative }) {
   const { items: sessions, loading, loadItems, deleteItem: deleteSessionAction } =
     useEntityManagement(campaignName, { load: loadSessions, save: saveSessions, delete: deleteSession }, { responseKey: 'sessions', loadOnMount: false });
 
@@ -447,6 +459,27 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     }));
   };
 
+  // ── Active session (log memory stamp, 2026-11-21) ──
+  // sessionState.name: the one Session the table is playing right now. Every
+  // campaign log row is stamped with it server-side (server/routes/log.js
+  // addEntry), which is what later lets the AI mine "everything from Session
+  // N" for a recap. GM (localhost) orchestrates it, like the phase pills.
+  const sessionState = useRuntimeValue('campaign', 'sessionState', campaignName);
+  const activeSession = activeNameFrom(sessionState);
+
+  const handleSetActiveSession = async () => {
+    if (!editingSession || !formData) return;
+    const name = formData.name.trim() || editingSession.name;
+    const next = activeSession === name ? null : name;
+    try {
+      await setActiveSession({ campaignName, name: next });
+      showToast(next ? `“${next}” is the active session — log rows are stamped with it` : 'Active session cleared');
+    } catch (err) {
+      console.error('Failed to set the active session:', err);
+      showError(err.message || 'Failed to set the active session');
+    }
+  };
+
   const handleMarkPlayed = async () => {
     if (!editingSession || !formData) return;
     const recap = prompt('Session recap (optional) — added to the campaign log:');
@@ -462,6 +495,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     };
     try {
       await saveSession(campaignName, updated, editingSession.name);
+      if (activeSession === playedName) {
+        // Playing it ends it: stop stamping log rows with a session that is
+        // now archived (the clear writes its own session_active audit row).
+        await setActiveSession({ campaignName, name: null });
+      }
       await addEntry(campaignName, {
         type: 'session-played',
         text: `Session “${playedName}” marked as played${recap.trim() ? ` — ${recap.trim()}` : ''}`,
@@ -542,6 +580,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
             <SessionListItem
               key={session.name}
               session={session}
+              isActive={activeSession != null && session.name === activeSession}
               onEdit={handleEditSession}
             />
           ))}
@@ -578,6 +617,8 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
           onAddChecklistItem={handleAddChecklistItem}
           onRemoveChecklistItem={handleRemoveChecklistItem}
           onMarkPlayed={handleMarkPlayed}
+          activeSession={activeSession}
+          onSetActiveSession={activeSessionHandlerFor(isLocalhost, handleSetActiveSession)}
         />
       )}
 

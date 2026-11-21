@@ -6,18 +6,12 @@
 // Transport (useLog/addEntry) is mocked at its seam, consumers-exact (#875 style):
 // we pin the FULL dispatched payload, never objectContaining, and count dispatches
 // (short-circuit-0 leak watch, #882). Timestamps: fixed TS, regex-pinned HH:MM:SS
-// (#876 family convention). Toolbar combobox presence/hiding is owned by
+// (#876 family convention). Toolbar combobox presence/census is owned by
 // LogToolbar.test.jsx — not re-pinned here.
 //
-// old->new map (8 add tests -> 4, +1 absorbed content test):
-//   "submits trimmed text" + "uses selected character as author" +
-//   "clears textarea after submit" → one exact-payload submit (trim + author + clear)
-//   "uses Anonymous when no characters" → anonymous dispatch, no combobox
-//   "whitespace not submitted" + "preserves textarea when whitespace" → one short-circuit test
-//   "ctrl+enter submits" + "plain enter does not" → one keyboard test (plain leg first,
-//     then ctrl leg; call-count pin covers both without mock surgery)
-// Added later: disable-until-valid post-button pins (empty/whitespace/text/clear states +
-//   disabled-click zero-dispatch) mirroring the .ct-* Save-button canon.
+// 2026-11-21 author-authority law: Anonymous dispatch is DEAD — every compose
+// payload names a real author (GM default on localhost, first player on a
+// visitor tab). Narrative dispatch (GM type select) is owned here too.
 
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { beforeEach } from 'vitest';
@@ -26,6 +20,8 @@ import { q, setup, note, beforeEachSetup, mockAddEntry } from './log-test-utils.
 import Log from './Log.jsx';
 
 const textarea = () => screen.getByPlaceholderText('Add a note to the log...');
+const authorSelect = () => screen.getByLabelText('Post as:');
+const typeSelect = () => screen.getByLabelText('As:');
 
 describe('Log notes', () => {
   beforeEach(() => {
@@ -42,11 +38,21 @@ describe('Log notes', () => {
     expect(q('.log-note i.fa-comment-dots')).toBeInTheDocument();
   });
 
+  it('renders the active-session badge only when the row carries a session stamp', () => {
+    setup(Log, [
+      note({ id: 's1', characterName: 'Frodo', session: 'Session 3 — The Long Dark' }),
+      note({ id: 's2', characterName: 'Aragorn', session: null }),
+    ]);
+    const badges = document.querySelectorAll('.log-entry-session');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toBe('Session 3 — The Long Dark');
+  });
+
   // ── ADD-NOTE FLOW ──
   it('submits exact payload with trimmed text and selected author, then clears the textarea', async () => {
     setup(Log, []);
     fireEvent.change(textarea(), { target: { value: ' Hello ' } });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Aragorn' } });
+    fireEvent.change(authorSelect(), { target: { value: 'Aragorn' } });
     fireEvent.click(q('.log-add-btn'));
     await waitFor(() => {
       expect(mockAddEntry).toHaveBeenCalledTimes(1);
@@ -56,15 +62,45 @@ describe('Log notes', () => {
     expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Aragorn', noteText: 'Hello' });
   });
 
-  it('dispatches as Anonymous when no characters provide a combobox', async () => {
+  it('GM tab defaults the author to GM and dispatches under that name', async () => {
     setup(Log, [], true, []);
     fireEvent.change(textarea(), { target: { value: 'hi' } });
     fireEvent.click(q('.log-add-btn'));
     await vi.waitFor(() => {
-      expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Anonymous', noteText: 'hi' });
+      expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'GM', noteText: 'hi' });
     });
   });
 
+  it('visitor dispatches under the selected player only (no GM/Anonymous voice exists)', async () => {
+    setup(Log, [], true, undefined, false);
+    fireEvent.change(textarea(), { target: { value: 'by the fire' } });
+    fireEvent.change(authorSelect(), { target: { value: 'Aragorn' } });
+    fireEvent.click(q('.log-add-btn'));
+    await vi.waitFor(() => {
+      expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Aragorn', noteText: 'by the fire' });
+    });
+  });
+
+  it('visitor with zero characters: disabled composer dispatches nothing', () => {
+    setup(Log, [], true, [], false);
+    fireEvent.change(textarea(), { target: { value: 'hello?' } });
+    fireEvent.click(q('.log-add-btn'));
+    expect(mockAddEntry).not.toHaveBeenCalled();
+  });
+
+  // ── NARRATIVE DISPATCH (GM type select, canonical `description` field) ──
+  it('GM narrative face dispatches exact payload with type narrative and description text', async () => {
+    setup(Log, []);
+    fireEvent.change(typeSelect(), { target: { value: 'narrative' } });
+    fireEvent.change(textarea(), { target: { value: ' The gate groans open. ' } });
+    fireEvent.click(q('.log-add-btn'));
+    await vi.waitFor(() => {
+      expect(mockAddEntry).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAddEntry).toHaveBeenCalledWith({ type: 'narrative', characterName: 'GM', description: 'The gate groans open.' });
+  });
+
+  // ── SHORT-CIRCUITS ──
   it('short-circuits whitespace input: zero dispatches, textarea preserved', () => {
     setup(Log, []);
     fireEvent.change(textarea(), { target: { value: '   ' } });
@@ -105,7 +141,7 @@ describe('Log notes', () => {
     expect(btn).toHaveAttribute('title', 'Post note');
   });
 
-  it('plain Enter never submits; Ctrl+Enter submits exact payload', async () => {
+  it('plain Enter never submits; Ctrl+Enter submits exact payload as the default GM author', async () => {
     setup(Log, []);
     const box = textarea();
     fireEvent.change(box, { target: { value: 'x' } });
@@ -115,6 +151,6 @@ describe('Log notes', () => {
     await vi.waitFor(() => {
       expect(mockAddEntry).toHaveBeenCalledTimes(1);
     });
-    expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Anonymous', noteText: 'x' });
+    expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'GM', noteText: 'x' });
   });
 });

@@ -78,6 +78,10 @@ export async function applyWorldProposal({ campaignName, proposal }) {
     if (result.applied && proposal.kind !== 'quest_draft') {
         await addEntry(campaignName, {
             type: 'narrative',
+            // The AI narrates AS the GM (owner ruling 2026-11-21): this lane
+            // runs on the GM machine, and the server manual-author gate
+            // requires every narrative row to name a real author.
+            characterName: 'GM',
             name: proposal.kind === 'npc_dialogue' ? proposal.npcName : 'World keeper',
             description: result.detail,
         }).catch((e) => { console.error('[applyWorldProposal:log]', e) })

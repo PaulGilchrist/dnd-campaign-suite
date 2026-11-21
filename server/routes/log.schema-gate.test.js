@@ -46,9 +46,12 @@ vi.mock('../utils/campaignPaths.js', () => ({
     }),
 }));
 
+// characterChangeData: real Map shared with the SUT for addEntry's
+// active-session stamp (empty ⇒ rows stamp session: null).
 vi.mock('../utils/changeData.js', () => ({
     warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
+    characterChangeData: new Map(),
 }));
 
 function createTestApp() {
@@ -195,7 +198,7 @@ describe('POST /api/campaigns/:campaign/log — schema gate', () => {
     it.each([
         ['message', { type: 'roll', message: 'Attack roll', total: 17 }],
         ['description', { type: 'write_rejected', description: 'Server rejected write' }],
-        ['noteText', { type: 'note', noteText: 'GM note', characterName: 'Anonymous' }],
+        ['noteText', { type: 'note', noteText: 'GM note', characterName: 'GM' }],
         ['summary', { type: 'info', summary: 'Summary-only row' }],
         ['text', { type: 'info', text: "Maze blocked the attack" }],
     ])('200s an allowlisted type carrying %s (existing producer lane)', async (_field, body) => {

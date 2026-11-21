@@ -431,11 +431,11 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     questBoard: <QuestBoard campaignName={campaignName} />,
     npcs: <NPCs campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
     settlements: <Settlements campaignName={campaignName} />,
-    sessions: <Sessions campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
+    sessions: <Sessions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onViewInitiative={() => setActiveView('initiative')} />,
     factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
-    campaignLog: <Log campaignName={campaignName} characters={characters} />,
+    campaignLog: <Log campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}

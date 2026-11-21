@@ -261,11 +261,14 @@ function validateRechargeMapProp(recharge) {
 
 function validateSessionState(value) {
     if (value === null) return { ok: true }; // unset ⇒ exploration default (today's behavior)
-    if (!isPlainObject(value)) return { ok: false, reason: 'sessionState must be null or { phase, changedBy, changedAt }' };
+    if (!isPlainObject(value)) return { ok: false, reason: 'sessionState must be null or { phase, changedBy, changedAt, name }' };
     const phases = ['exploration', 'encounter', 'travel', 'roleplay'];
     if (!phases.includes(value.phase)) return { ok: false, reason: `sessionState.phase must be one of: ${phases.join(', ')}` };
     if (value.changedBy !== undefined && typeof value.changedBy !== 'string') return { ok: false, reason: 'sessionState.changedBy must be a string' };
     if (value.changedAt !== undefined && !Number.isFinite(Number(value.changedAt))) return { ok: false, reason: 'sessionState.changedAt must be a number' };
+    // `name` is the active session (owner vision 2026-11-21 — the campaign log
+    // stamps every row with it; log.js addEntry reads it server-side).
+    if (value.name !== undefined && value.name !== null && typeof value.name !== 'string') return { ok: false, reason: 'sessionState.name must be a string or null' };
     return { ok: true };
 }
 

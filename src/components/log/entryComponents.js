@@ -6,6 +6,7 @@
 // POST /log schema gate. Adding a key? Add it to the Set in the same change.
 import { RollEntry } from './LogRollEntry.jsx';
 import { NoteEntry } from './LogNoteEntry.jsx';
+import { NarrativeEntry } from './LogNarrativeEntry.jsx';
 import { LootEntry } from './LogLootEntry.jsx';
 import { TravelEntry } from './LogTravelEntry.jsx';
 import { ConditionEntry } from './LogConditionEntry.jsx';
@@ -29,6 +30,7 @@ import { WriteRejectedEntry } from './LogWriteRejectedEntry.jsx';
 export const ENTRY_COMPONENTS = {
   roll: RollEntry,
   note: NoteEntry,
+  narrative: NarrativeEntry,
   travel: TravelEntry,
   loot: LootEntry,
   condition: ConditionEntry,

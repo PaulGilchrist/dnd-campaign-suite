@@ -205,9 +205,32 @@ function ChecklistSection({ checklist, onToggle, onAddItem, onRemoveItem }) {
   );
 }
 
+// Active-session orchestration is GM-only (Sessions.jsx passes the handler on
+// localhost alone; a visitor gets no button at all). The label keys off the
+// LIVE form name so setting it straight from a just-typed name works without
+// a save round-trip.
+function ActiveSessionToggle({ editingSession, formData, activeSession, onSetActiveSession }) {
+  if (!onSetActiveSession || !editingSession) return null;
+  const isActive = Boolean(activeSession)
+    && activeSession === (formData.name.trim() || editingSession.name);
+  return (
+    <button
+      className="ct-btn sessions-active-btn"
+      onClick={onSetActiveSession}
+      title={isActive
+        ? 'Clear the active session — log rows stop being stamped with it'
+        : 'Make this the active session — campaign log rows are stamped with its name'}
+    >
+      <i className={`fa-solid ${isActive ? 'fa-toggle-on' : 'fa-toggle-off'}`} /> {isActive ? 'Active session — clear' : 'Set active session'}
+    </button>
+  );
+}
+
 function SessionModalFooter({
   editingSession, formData, setFormData, campaignName, saving, deleting,
   onClose, onSave, onDelete, onMarkPlayed,
+  activeSession = null,
+  onSetActiveSession = null,
 }) {
   const canMarkPlayed = editingSession && editingSession.status !== 'played';
   return (
@@ -249,6 +272,12 @@ function SessionModalFooter({
             <i className="fa-solid fa-circle-check" /> Mark as Played
           </button>
         )}
+        <ActiveSessionToggle
+          editingSession={editingSession}
+          formData={formData}
+          activeSession={activeSession}
+          onSetActiveSession={onSetActiveSession}
+        />
       </div>
       <div className="ct-modal-buttons">
         <button className="ct-btn" onClick={onClose} disabled={saving}>Cancel</button>
@@ -293,6 +322,8 @@ function SessionPlannerModal({
   onAddChecklistItem,
   onRemoveChecklistItem,
   onMarkPlayed,
+  activeSession,
+  onSetActiveSession,
 }) {
   const [copied, setCopied] = useState('');
 
@@ -450,6 +481,8 @@ function SessionPlannerModal({
           onSave={onSave}
           onDelete={onDelete}
           onMarkPlayed={onMarkPlayed}
+          activeSession={activeSession}
+          onSetActiveSession={onSetActiveSession}
         />
       </div>
     </div>

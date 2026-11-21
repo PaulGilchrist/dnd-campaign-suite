@@ -3,7 +3,7 @@ import { request } from '../test-utils/localhostSupertest.js';
 import logRouter from './log.js';
 import * as logModule from './log.js';
 
-const mockFsState = { exists: new Set(), files: new Map() };
+const mockFsState = { exists: new Set(), files: new Map(), dirs: new Map() };
 
 vi.mock('fs', () => ({
     default: {
@@ -15,6 +15,7 @@ vi.mock('fs', () => ({
         writeFileSync: vi.fn((p, data) => {
             mockFsState.files.set(p, data);
         }),
+        readdirSync: vi.fn((p) => mockFsState.dirs.get(p) || []),
     },
     existsSync: vi.fn((p) => mockFsState.exists.has(p)),
     readFileSync: vi.fn((p) => {
@@ -24,6 +25,7 @@ vi.mock('fs', () => ({
     writeFileSync: vi.fn((p, data) => {
         mockFsState.files.set(p, data);
     }),
+    readdirSync: vi.fn((p) => mockFsState.dirs.get(p) || []),
 }));
 
 vi.mock('../utils/campaignPaths.js', () => ({
@@ -35,9 +37,13 @@ vi.mock('../utils/campaignPaths.js', () => ({
     }),
 }));
 
+// characterChangeData is the REAL Map instance the SUT and every test share:
+// addEntry's active-session stamp reads sessionState.name from it (server
+// change-data cache stand-in).
 vi.mock('../utils/changeData.js', () => ({
     warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
+    characterChangeData: new Map(),
 }));
 
 function createTestApp() {
@@ -67,11 +73,31 @@ function clearLogCache() {
 function clearLogFiles() {
     mockFsState.files.clear();
     mockFsState.exists.clear();
+    mockFsState.dirs.clear();
 }
 
-afterEach(() => {
+// Player-roster fixture for the visitor manual-author gate: readParty
+// (server/services/ai/authoring/party.js) reads the campaign ROOT *.json
+// files and keeps only character-shaped rows (name + level + class.name).
+function setRoster(campaign, names) {
+    const base = `/mock/campaigns/${campaign}`;
+    mockFsState.exists.add(base);
+    mockFsState.dirs.set(base, names.map((n) => `${n}.json`));
+    names.forEach((n) => {
+        mockFsState.files.set(`${base}/${n}.json`, JSON.stringify({ name: n, level: 1, class: { name: 'Fighter' } }));
+    });
+}
+
+// Origin faces ride the Host header (gmGuard follows req.hostname, mirroring
+// the Vite proxy's changeOrigin:false law): supertest's default Host is the
+// 127.0.0.1 bind ⇒ GM; a LAN-style Host header ⇒ network visitor.
+const VISITOR_HOST = '192.168.1.50:5173';
+
+afterEach(async () => {
     clearLogCache();
     clearLogFiles();
+    const { characterChangeData } = await import('../utils/changeData.js');
+    characterChangeData.clear();
     vi.clearAllMocks();
 });
 
@@ -334,11 +360,11 @@ describe('POST /api/campaigns/:campaign/log', () => {
 
         const res1 = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'First' });
+            .send({ type: 'note', characterName: 'GM', message: 'First' });
 
         const res2 = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Second' });
+            .send({ type: 'note', characterName: 'GM', message: 'Second' });
 
         expect(res1.body.id).not.toBe(res2.body.id);
     });
@@ -349,7 +375,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Timestamp test' });
+            .send({ type: 'note', characterName: 'GM', message: 'Timestamp test' });
         const after = Date.now();
 
         expect(res.body.timestamp).toBeGreaterThanOrEqual(before);
@@ -431,7 +457,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Cache test' });
+            .send({ type: 'note', characterName: 'GM', message: 'Cache test' });
 
         expect(logModule.logCache.has('test-campaign')).toBe(true);
         const log = logModule.logCache.get('test-campaign');
@@ -445,7 +471,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'SSE test' });
+            .send({ type: 'note', characterName: 'GM', message: 'SSE test' });
 
         expect(publish).toHaveBeenCalledWith(
             'log-test-campaign',
@@ -463,7 +489,7 @@ describe('POST /api/campaigns/:campaign/log', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign-123/log')
-            .send({ type: 'note', message: 'Special' });
+            .send({ type: 'note', characterName: 'GM', message: 'Special' });
 
         expect(publish).toHaveBeenCalledWith(
             'log-test-campaign-123',
@@ -482,7 +508,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Persistence test' });
+            .send({ type: 'note', characterName: 'GM', message: 'Persistence test' });
 
         // Wait for the debounce timer
         await new Promise((r) => setTimeout(r, 1100));
@@ -493,11 +519,11 @@ describe('File persistence', () => {
         expect(lastCall[0]).toBe('/mock/campaigns/test-campaign/data/campaign-log.json');
     });
 
-    it('should only save the last 500 entries to disk', async () => {
+    it('should persist the FULL log to disk — the file is never trimmed (log-as-memory law, 2026-11-21)', async () => {
         const fsMock = await import('fs');
         ensureCampaign('test-campaign');
 
-        // Pre-populate cache with 510 entries
+        // Pre-populate cache with 510 entries; the file must carry all 511.
         const existingEntries = [];
         for (let i = 0; i < 510; i++) {
             existingEntries.push({ type: 'note', message: `Entry ${i}`, timestamp: Date.now() - i });
@@ -507,7 +533,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'New entry' });
+            .send({ type: 'note', characterName: 'GM', message: 'New entry' });
 
         // Wait for debounce
         await new Promise((r) => setTimeout(r, 1100));
@@ -515,9 +541,9 @@ describe('File persistence', () => {
         const writeCalls = fsMock.default.writeFileSync.mock.calls;
         const lastCall = writeCalls[writeCalls.length - 1];
         const writtenData = JSON.parse(lastCall[1]);
-        expect(writtenData).toHaveLength(500);
-        expect(writtenData[0].message).toBe('Entry 11');
-        expect(writtenData[499].message).toBe('New entry');
+        expect(writtenData).toHaveLength(511);
+        expect(writtenData[0].message).toBe('Entry 0');
+        expect(writtenData[510].message).toBe('New entry');
     });
 
     it('should write valid JSON to the file', async () => {
@@ -526,7 +552,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Valid JSON' });
+            .send({ type: 'note', characterName: 'GM', message: 'Valid JSON' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -542,7 +568,7 @@ describe('File persistence', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Indented' });
+            .send({ type: 'note', characterName: 'GM', message: 'Indented' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -580,7 +606,7 @@ describe('Phantom-campaign guard in flush', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/live-campaign/log')
-            .send({ type: 'note', message: 'Live entry' });
+            .send({ type: 'note', characterName: 'GM', message: 'Live entry' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -605,7 +631,7 @@ describe('Phantom-campaign guard in flush', () => {
         const app = createTestApp();
         await request(app)
             .post('/api/campaigns/partial-campaign/log')
-            .send({ type: 'note', message: 'Recreate data dir' });
+            .send({ type: 'note', characterName: 'GM', message: 'Recreate data dir' });
 
         await new Promise((r) => setTimeout(r, 1100));
 
@@ -675,7 +701,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: longMessage });
+            .send({ type: 'note', characterName: 'GM', message: longMessage });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe(longMessage);
@@ -686,7 +712,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: '🐉 Dragon appeared! 日本語 テスト' });
+            .send({ type: 'note', characterName: 'GM', message: '🐉 Dragon appeared! 日本語 テスト' });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('🐉 Dragon appeared! 日本語 テスト');
@@ -708,7 +734,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Line 1\nLine 2\tTab "quotes" \'apostrophe\'' });
+            .send({ type: 'note', characterName: 'GM', message: 'Line 1\nLine 2\tTab "quotes" \'apostrophe\'' });
 
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Line 1\nLine 2\tTab "quotes" \'apostrophe\'');
@@ -721,6 +747,7 @@ describe('Edge cases and error handling', () => {
             .post('/api/campaigns/test-campaign/log')
             .send({
                 type: 'note',
+                characterName: 'GM',
                 message: 'Scalar pass-through',
                 active: true,
                 count: 42,
@@ -755,7 +782,7 @@ describe('Edge cases and error handling', () => {
         const before = Date.now();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'note', message: 'Custom time', timestamp: 9999999 });
+            .send({ type: 'note', characterName: 'GM', message: 'Custom time', timestamp: 9999999 });
 
         expect(res.status).toBe(200);
         // Regression pin: the entry spread comes FIRST and id/timestamp are forced
@@ -769,7 +796,7 @@ describe('Edge cases and error handling', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ id: 'my-custom-id', type: 'note', message: 'Custom id' });
+            .send({ id: 'my-custom-id', type: 'note', characterName: 'GM', message: 'Custom id' });
 
         expect(res.status).toBe(200);
         // Regression pin: client-forged ids are overridden by the server uuid.
@@ -784,7 +811,7 @@ describe('Edge cases and error handling', () => {
         const { publish } = await import('../utils/changeData.js');
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ id: 'FORGED-ID', timestamp: 1, type: 'note', message: 'TS FORGE PROBE' });
+            .send({ id: 'FORGED-ID', timestamp: 1, type: 'note', characterName: 'GM', message: 'TS FORGE PROBE' });
 
         expect(res.body.type).toBe('note');
         expect(res.body.message).toBe('TS FORGE PROBE');
@@ -812,9 +839,9 @@ describe('Entry ordering', () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
 
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'First' });
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'Second' });
-        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', message: 'Third' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', characterName: 'GM', message: 'First' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', characterName: 'GM', message: 'Second' });
+        await request(app).post('/api/campaigns/test-campaign/log').send({ type: 'note', characterName: 'GM', message: 'Third' });
 
         const log = logModule.logCache.get('test-campaign');
         expect(log).toHaveLength(3);
@@ -838,5 +865,168 @@ describe('Entry ordering', () => {
         expect(res.body[0].timestamp).toBe(1000);
         expect(res.body[1].timestamp).toBe(2000);
         expect(res.body[2].timestamp).toBe(3000);
+    });
+});
+
+// ─── Manual-author gate (owner ruling 2026-11-21) ────────────────────────────
+// note/narrative compose rows name a real author, never Anonymous; the GM tab
+// (localhost Host) may post as GM / any player / any initiative creature; a
+// network origin may post ONLY as a player on the roster. Automated rows keep
+// their existing visitor-writable shared-table shapes untouched.
+
+const NO_AUTHOR_COPY = 'Log notes and narrative rows must name an author (the GM, a player, or an initiative creature) — Anonymous posting is not allowed';
+
+describe('POST /log — manual-author gate', () => {
+    it('GM origin: note as GM, as a creature, and narrative rows all land', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const gmNote = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ type: 'note', characterName: 'GM', noteText: 'Goblins at the door' });
+        const creatureNote = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ type: 'note', characterName: 'Goblin', noteText: 'Me want shiny' });
+        const narrative = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ type: 'narrative', characterName: 'GM', description: 'The gate groans open…' });
+
+        expect(gmNote.status).toBe(200);
+        expect(creatureNote.status).toBe(200);
+        expect(narrative.status).toBe(200);
+        expect(narrative.body.description).toBe('The gate groans open…');
+    });
+
+    it.each([
+        ['missing characterName', { type: 'note', noteText: 'hi' }],
+        ['blank characterName', { type: 'note', characterName: '   ', noteText: 'hi' }],
+        ['Anonymous (the retired default)', { type: 'note', characterName: 'Anonymous', noteText: 'hi' }],
+        ['anonymous case-variants', { type: 'narrative', characterName: 'ANONYMOUS', description: 'hi' }],
+    ])('400s a compose row with %s from any origin, zero side effects', async (_label, body) => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const asGm = await request(app).post('/api/campaigns/test-campaign/log').set('Host', 'localhost:80').send(body);
+        const asVisitor = await request(app).post('/api/campaigns/test-campaign/log').set('Host', VISITOR_HOST).send(body);
+
+        expect(asGm.status).toBe(400);
+        expect(asGm.body).toEqual({ error: NO_AUTHOR_COPY });
+        expect(asVisitor.status).toBe(400);
+        expect(asVisitor.body).toEqual({ error: NO_AUTHOR_COPY });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('visitor origin: posts as a rostered player land (any player, no identity binding)', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo', 'Aragorn']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'note', characterName: 'Aragorn', noteText: 'I am Aragorn, son of Arathorn' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.characterName).toBe('Aragorn');
+    });
+
+    it.each([
+        ['GM impersonation', 'GM'],
+        ['creature attribution', 'Goblin'],
+        ['off-roster name', 'Nobody'],
+    ])('403s a visitor note posted as %s with plain-English copy', async (_label, author) => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo', 'Aragorn']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'note', characterName: author, noteText: 'forged' });
+
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual({
+            error: `Visitors may post to the campaign log only as a player character — "${author}" is not on the "test-campaign" roster`,
+        });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('403s a visitor narrative row the same way (the compose gate covers both types)', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'narrative', characterName: 'GM', description: 'Fake GM prose' });
+
+        expect(res.status).toBe(403);
+    });
+
+    it('automated rows are NOT manual-author rows — a visitor chip-combat roll with a creature author still lands', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'roll', characterName: 'Goblin', rollType: 'attack', message: 'Goblin attacks Frodo with Scimitar: 15 +4 vs AC 15 — HIT' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.characterName).toBe('Goblin');
+    });
+
+    it('visitor origin with an empty roster: every named author 403s (a character-less campaign has no player voice)', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'note', characterName: 'Frodo', noteText: 'hello?' });
+
+        expect(res.status).toBe(403);
+    });
+});
+
+// ─── Active-session stamp (log-as-memory, 2026-11-21) ────────────────────────
+
+describe('POST /log — active-session stamp', () => {
+    it('stamps every row with the campaign sessionState.name (server-side, every lane)', async () => {
+        const { characterChangeData } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        characterChangeData.set('test-campaign', { sessionState: { phase: 'exploration', name: 'Session 3 — The Long Dark' } });
+        const app = createTestApp();
+
+        const compose = await request(app).post('/api/campaigns/test-campaign/log')
+            .send({ type: 'note', characterName: 'GM', noteText: 'lantern out' });
+        const automated = await request(app).post('/api/campaigns/test-campaign/log')
+            .send({ type: 'roll', message: 'initiative 17' });
+
+        expect(compose.body.session).toBe('Session 3 — The Long Dark');
+        expect(automated.body.session).toBe('Session 3 — The Long Dark');
+    });
+
+    it('stamps null when no active session is tracked', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .send({ type: 'note', characterName: 'GM', noteText: 'no session yet' });
+
+        expect(res.body.session).toBeNull();
+    });
+
+    it('a client-forged session field is overwritten — the server owns session attribution', async () => {
+        const { characterChangeData } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        characterChangeData.set('test-campaign', { sessionState: { name: 'Real Session' } });
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .send({ type: 'note', characterName: 'GM', noteText: 'forge try', session: 'Forged Session' });
+
+        expect(res.body.session).toBe('Real Session');
+        expect(logModule.logCache.get('test-campaign').at(-1).session).toBe('Real Session');
     });
 });
