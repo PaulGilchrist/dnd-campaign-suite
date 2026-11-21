@@ -8,6 +8,7 @@
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 import logRouter, { logCache, ALLOWED_LOG_TYPES } from './log.js';
+import { stampAuditText } from '../../src/services/ui/logService.js';
 
 const mockFsState = { exists: new Set(), files: new Map() };
 
@@ -258,4 +259,94 @@ describe('POST /api/campaigns/:campaign/log — schema gate', () => {
             expect(ALLOWED_LOG_TYPES.has(type)).toBe(true);
         }
     });
+});
+
+// ── REAL producer-body replay (bug-log-schema-gate-rejects-app-own-combat-rows) ──
+// The gate's launch regression: its accept fixtures were hand-written WITH a
+// `message`, so the textless shapes the app's own combat producers actually POST
+// were never replayed and every real attack row silently 400'd. These bodies are
+// byte-exact captures from a live 2026-11-20 fetch spy (Goblin Scimitar chip
+// commit + quick-spawn in test-campaign) plus the traced death_save/condition
+// producer literals. The client lane (src/services/ui/logService.js
+// stampAuditText) stamps a derived audit message onto textless rows before the
+// POST; this pins BOTH halves of the lane contract: the raw textless producer
+// shape is still exactly what the gate FORBES (a forger crafting the same row by
+// hand 400s — the death-cue forgery defense survives), while the stamped wire
+// body the app actually sends lands 200 with the broadcast.
+const REAL_PRODUCER_BODIES = {
+    'roll:attack': {
+        type: 'roll', characterName: 'Goblin', rollType: 'attack', name: 'Scimitar',
+        rolls: [15], mode: 'normal', total: 15, bonus: 4, bonusDetail: '(+4 to hit)',
+        baneRoll: null, isNatural20: false, isNatural1: false,
+        targetName: 'ElderPaladin', targetAc: 19, effectiveAc: 19,
+        shieldAcBonus: 0, hit: true, isAutoMiss: false, isCrit: false,
+        damageType: 'Slashing', coverAcBonus: 0,
+    },
+    'roll:damage': {
+        type: 'roll', characterName: 'Goblin', rollType: 'damage', name: 'Scimitar',
+        formula: '1d6 + 2', rolls: [6], total: 8, modifier: 2,
+        damageType: 'Slashing', targetName: 'ElderPaladin', finalDamage: 8,
+        note: 'combined_damage_roll', isCrit: false, gwfApplied: false,
+        resistanceReduction: 0,
+    },
+    'hp_change': {
+        type: 'hp_change', targetName: 'ElderPaladin', delta: -8, currentHp: 216,
+        maxHp: 224, isHealing: false, isUnconscious: false,
+        damageBreakdown: [{ damageType: 'Slashing', amount: 8, resisted: false, status: null }],
+        isPlayer: true,
+    },
+    'encounter joined': {
+        type: 'encounter', action: 'joined', encounterName: 'Quick spawn',
+        monsters: ['1x Goblin'],
+    },
+    'death_save finality': {
+        type: 'death_save', characterName: 'EvasiveFighter', result: 'dead',
+        totalSuccesses: 1, totalFailures: 3,
+    },
+    'condition applied': {
+        type: 'condition', action: 'applied', characterName: 'ElderPaladin',
+        condition: 'Prone', reason: 'Scimitar — until the start of Goblin’s next turn',
+        note: 'Falls prone.',
+    },
+};
+
+describe('POST /api/campaigns/:campaign/log — real producer bodies vs the gate', () => {
+    it.each(Object.entries(REAL_PRODUCER_BODIES))(
+        'raw textless %s body (a hand-forged attack) still 400s — defense intact',
+        async (_label, body) => {
+            const { publish } = await import('../utils/changeData.js');
+            const app = createTestApp();
+            const res = await request(app).post(LOG_PATH).send(body);
+
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({
+                error: 'Log entry requires non-empty human-readable text (a "message" or "description" field)',
+            });
+            expect(logCache.get('test-campaign')).toHaveLength(0);
+            expect(publish).not.toHaveBeenCalled();
+        }
+    );
+
+    it.each(Object.entries(REAL_PRODUCER_BODIES))(
+        'stamped %s body (what logService.addEntry sends) lands 200, broadcast',
+        async (_label, body) => {
+            const { publish } = await import('../utils/changeData.js');
+            const app = createTestApp();
+            const wire = stampAuditText(body);
+
+            expect(typeof wire.message).toBe('string');
+            expect(wire.message.trim().length).toBeGreaterThan(0);
+
+            const res = await request(app).post(LOG_PATH).send(wire);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ ...body, message: wire.message });
+            expect(logCache.get('test-campaign')).toHaveLength(1);
+            expect(publish).toHaveBeenCalledWith(
+                'log-test-campaign',
+                expect.objectContaining({ type: body.type, message: wire.message }),
+                'test-campaign'
+            );
+        }
+    );
 });

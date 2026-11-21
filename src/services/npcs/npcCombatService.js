@@ -102,6 +102,9 @@ function logInitiativeRoll(campaignName, characterName, roll, initBonus) {
       mode: 'normal',
       isNatural20: roll === 20,
       isNatural1: roll === 1,
+      // POST-lane gate (server/routes/log.js) requires readable text; this lane
+      // bypasses logService.addEntry, so it stamps its own audit message.
+      message: `${characterName} rolls initiative: ${roll} (${initBonus >= 0 ? '+' : ''}${initBonus})`,
       timestamp: Date.now(),
       id: utils.guid(),
     }),

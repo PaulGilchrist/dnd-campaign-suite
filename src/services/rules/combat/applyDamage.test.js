@@ -273,6 +273,8 @@ describe('applyDamageToTarget', () => {
     expect(hpLog('Alchemist')).toEqual({
       type: 'hp_change', targetName: 'Alchemist', delta: -8, currentHp: 17, maxHp: 30,
       isHealing: false, isUnconscious: false, isPlayer: true,
+      // POST-lane audit text stamped by logService (server gate companion)
+      message: 'Alchemist takes 8 damage (17/30 HP)',
     });
     expect(sendConcentrationPrompt).not.toHaveBeenCalled();
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
@@ -313,6 +315,7 @@ describe('applyDamageToTarget', () => {
     expect(hpLog('Orc')).toEqual({
       type: 'hp_change', targetName: 'Orc', delta: -4, currentHp: 16, maxHp: 20,
       isHealing: false, isUnconscious: false,
+      message: 'Orc takes 4 damage (16/20 HP)',
     });
 
     vi.clearAllMocks();
@@ -462,6 +465,7 @@ describe('applyDamageToTarget', () => {
     expect(hpLog('Fighter')).toEqual({
       type: 'hp_change', targetName: 'Fighter', delta: -5, currentHp: 0, maxHp: 30,
       isHealing: false, isUnconscious: true, threshold: 'dead', isPlayer: true,
+      message: 'Fighter takes 5 damage (0/30 HP) — falls unconscious',
     });
 
     // already at 0: the HP write still happens, but prompt/deathSaves/log stay silent
@@ -482,6 +486,7 @@ describe('applyDamageToTarget', () => {
     expect(hpLog('Orc')).toEqual({
       type: 'hp_change', targetName: 'Orc', delta: -15, currentHp: 15, maxHp: 40,
       isHealing: false, isUnconscious: false, threshold: 'bloodied',
+      message: 'Orc takes 15 damage (15/40 HP) — Bloodied',
     });
 
     vi.clearAllMocks();
@@ -491,6 +496,7 @@ describe('applyDamageToTarget', () => {
     expect(hpLog('Goblin')).toEqual({
       type: 'hp_change', targetName: 'Goblin', delta: -2, currentHp: 1, maxHp: 10,
       isHealing: false, isUnconscious: false,
+      message: 'Goblin takes 2 damage (1/10 HP)',
     });
   });
 

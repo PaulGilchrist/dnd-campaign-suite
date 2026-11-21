@@ -83,8 +83,13 @@ export function addEntry(campaign, entry) {
 //      noteText/summary (directAuditText in src/components/log/log-utils.js)
 //      plus the info-lane `text` field (src/hooks/combat/attackBlockers.js).
 // Extra unknown non-required fields pass through untouched so every existing
-// producer stays byte-compatible. Refusals append NO row and fire NO
-// broadcast — validation runs strictly before addEntry().
+// producer stays byte-compatible. Client-side companion: the shared POST lane
+// (src/services/ui/logService.js stampAuditText) derives a plain-English
+// `message` for the app's own textless structured rows (roll/hp_change/death_
+// save/condition/encounter), so real combat audits land while a hand-forged
+// textless row like the death-cue attack above stays a 400.
+// Refusals append NO row and fire NO broadcast — validation runs strictly
+// before addEntry().
 //
 // ALLOWED_LOG_TYPES — derived by enumerating every producer of this lane:
 //   - client logService.addEntry/useLog callers and direct POST /log fetches

@@ -37,3 +37,58 @@ Investigate which types the Log renders via structured components (`src/componen
 
 ## Severity
 **Broken feature / data integrity risk.** Every weapon attack, save-damage application, quick-spawn, and death-save finality currently produces zero audit rows table-wide while game state still mutates; the death/save audio lane and TV roll panel are silently dead for those moments. The prior XX-era backlog concern (forged death-cue rows) is real, but the shipped gate trades a forgery hole for destroying the app's own combat audit trail — strictly worse than the problem it solved.
+
+## Resolution
+**FIXED 2026-11-20 (fix run on HEAD 66191d3c3).**
+
+What was actually wrong: the "Likely location" held up exactly — the gate's universal
+`hasReadableText` check vs. structured textless producers. The blast radius was LARGER
+than the traced eight sites: `grep type: 'hp_change'` alone shows dozens of producers,
+and whole families (condition rows carrying only `reason`/`note`, prayer/heal rows
+carrying `note`, damage roll rows carrying `note:'combined_damage_roll'`) were equally
+400-killed. That ruled out hand-stamping individual producers (suggested fix #2's
+"cheapest first move" would have left the untraced sites silently dead) and ruled out
+suggested fix #1 (a type-aware exemption re-opens the exact `{hp_change,threshold:'dead'}`
+forgery the gate was built to stop).
+
+The shipped fix is suggested fix #2 applied at the ONE chokepoint every client producer
+already funnels through: `src/services/ui/logService.js` `addEntry` now stamps a
+plain-English `message` derived from the row's own structured bytes whenever the entry
+carries no canonical text (new pure `stampAuditText`/`deriveAuditText`, per-type builders
+mirroring the Log renderers' family voice: `HIT/MISS/Critical Hit!`, `Defeated/Bloodied`,
+`Stabilized!/Has Perished!`, `Encounter Joined`, `Condition Applied`). Entries that already
+carry readable text pass byte-identically. The SERVER GATE IS UNTOUCHED — a hand-forged
+textless POST never runs client code and still 400s, so the death-cue forgery defense
+survives verbatim. `npcCombatService.logInitiativeRoll` is the only textless producer that
+bypasses the lane (direct fetch) and now stamps its own `message`; the MusicPlayer keepalive
+lane already carries one.
+
+Files changed:
+- `src/services/ui/logService.js` — audit-text stamp lane (`stampAuditText`/`deriveAuditText`).
+- `src/services/npcs/npcCombatService.js` — direct-lane initiative row carries its own `message`.
+- `server/routes/log.js` — gate COMMENT documents the client companion (no behavior change).
+- `src/services/ui/logService.test.js` — contract re-pinned + real captured producer bodies replayed through the stamp.
+- `server/routes/log.schema-gate.test.js` — NEW replay suite: 6 real live-captured bodies (roll:attack, roll:damage, hp_change, encounter joined, death_save finality, condition applied) asserted RAW→400 zero-write (defense) AND `stampAuditText`-wire→200+broadcast (lane contract), replacing the hand-written accept fixtures' blind spot.
+- `src/services/rules/combat/applyDamage.test.js` — 5 full-wire-byte pins now include the stamped `message` (this file rides the real addEntry through a fetch stub).
+- `src/services/npcs/npcCombatService.test.js` — initiative payload pin gains the `message` byte.
+
+Verification:
+- Pre-fix live repro (test-campaign, :5173): Goblin quick-spawn join row → 400
+  (`[quickMonsterSpawn] joined log failed`); Scimitar chip commit → `roll:attack`,
+  `roll:damage`, `hp_change(delta:-6)` ALL 400 while ElderPaladin's bucket moved 224→218;
+  GET /log held only the two `description`-bearing rows. Fetch-spy bodies captured verbatim.
+- Post-fix live re-verify (same rig, real UI): join row 200 (`Encounter Joined — Quick
+  spawn: 1x Goblin`); 4 attack + 1 damage + 1 hp_change rows ALL 200 with derived audit text,
+  census 1:1; play-spy heard `miss.wav`×3 + `hit.wav` for the echoed rows; Log view renders
+  the HIT/MISS badges + join row. Death-save lane: GM HP override → `player-down.wav` +
+  `hp_change` override row 200; DSP modal (Math.random-wrapped forced failures) → death_save
+  roll rows 200, `result:'dead'` finality row 200 ("EvasiveFighter Has Perished — three
+  death save failures (0 successes, 3 failures)") + `player-death.wav`. Post-refactor reload
+  re-proof: nat-1 fumble attack row landed 200 with "— Critical Miss!" + `fumble.wav`.
+- Forgery regression re-proved origin-neutral over HTTP: `{type:'hp_change',threshold:'dead',
+  isPlayer:true}` → 400 verbatim text copy; raw textless `roll:attack` → 400; unknown type →
+  400; missing type → 400.
+- Tests: `npx vitest run` full suite **3454 files / 36748 tests all passing**; the four
+  touched files 99/99. `npm run lint` clean (zero warnings); `no-timers-guard` OK.
+- Cleanup: closed-tab admin clears GET-verified change-data `{}` + log `[]`, disk files
+  absent; dev pair killed by PID, ports dark.

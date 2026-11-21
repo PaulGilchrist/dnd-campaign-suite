@@ -296,7 +296,9 @@ describe('npcCombatService - addNPCToInitiative', () => {
   });
 
   // Exact log payload #app mandate — full-body toEqual per natural-roll row.
-  // total is the raw die (bonus is carried separately by design).
+  // total is the raw die (bonus is carried separately by design). The row rides
+  // a direct fetch (bypasses logService), so it carries its own gate-passing
+  // audit `message` (bug-log-schema-gate-rejects-app-own-combat-rows).
   it.each([
     [20, true, false],
     [1, false, true],
@@ -321,6 +323,7 @@ describe('npcCombatService - addNPCToInitiative', () => {
       mode: 'normal',
       isNatural20: isNat20,
       isNatural1: isNat1,
+      message: `Goblin rolls initiative: ${die} (+3)`,
       timestamp: expect.any(Number),
       id: 'test-guid',
     });
