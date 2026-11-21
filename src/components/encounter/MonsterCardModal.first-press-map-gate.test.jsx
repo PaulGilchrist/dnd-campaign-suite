@@ -216,6 +216,10 @@ describe('MonsterCardModal — first-press map-measure gate', () => {
     expect(chip.getAttribute('aria-disabled')).toBe('true');
     expect(chip.className).toContain('mc-dice-link-spell-spent');
     expect(chip.textContent).toContain('+4');
+    // Pending visual (2026-11-21 DDD backlog): the dice glyph is visibly
+    // replaced by the spinner face so the inert press explains itself.
+    expect(chip.querySelector('i.fa-dice-d20'), 'dice glyph replaced while pending').toBeNull();
+    expect(chip.querySelector('i.fa-spinner.fa-spin'), 'spinner face during the fetch window').toBeTruthy();
 
     fireEvent.click(chip);
     expect(rollAttack).not.toHaveBeenCalled();
@@ -242,6 +246,8 @@ describe('MonsterCardModal — first-press map-measure gate', () => {
     const chip = attackChip();
     expect(chip.hasAttribute('aria-busy')).toBe(false);
     expect(chip.className).toBe('mc-dice-link');
+    expect(chip.querySelector('i.fa-spinner'), 'spinner face retires on settle').toBeNull();
+    expect(chip.querySelector('i.fa-dice-d20'), 'normal dice glyph restores after settle').toBeTruthy();
 
     fireEvent.click(chip);
     await waitFor(() => expect(rollAttack).toHaveBeenCalled());

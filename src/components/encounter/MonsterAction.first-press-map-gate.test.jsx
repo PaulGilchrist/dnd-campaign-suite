@@ -2,7 +2,8 @@
 // Component unit lane for the 2026-11-20 CCC backlog improvement "Modal
 // first-press mapData race": while the modal's active-map fetch is pending
 // (spatialGatePending), the ATTACK-roll chip renders as an inert busy
-// affordance — spent styling + aria-busy/aria-disabled, NO onClick — and a
+// affordance — spent styling + aria-busy/aria-disabled, dice glyph swapped
+// for the fa-spinner fa-spin loading face, NO onClick — and a
 // press routes nothing to onAttack. Settled (false or default prop) the chip
 // is byte-identical to its pre-fix shape and routes the exact payload (the
 // ma0294 byte pins). Integration lanes (fetch tracking, settle-on-reject,
@@ -46,7 +47,7 @@ function chip(container) {
 }
 
 describe('first-press map-measure gate on the attack chip', () => {
-  it('pending face: inert busy affordance — spent styling + aria-busy/aria-disabled, click routes NOTHING', () => {
+  it('pending face: inert busy affordance — spent styling + aria-busy/aria-disabled, spinner glyph replaces the dice, click routes NOTHING', () => {
     const { container, onAttack } = renderChip({ spatialGatePending: true });
     const el = chip(container);
     expect(el.getAttribute('aria-busy')).toBe('true');
@@ -54,6 +55,11 @@ describe('first-press map-measure gate on the attack chip', () => {
     expect(el.className).toBe('mc-dice-link mc-dice-link-spell-spent');
     expect(el.getAttribute('onClick')).toBeNull();
     expect(el.textContent).toContain('+4');
+    // 2026-11-21 DDD backlog: the muted color alone surfaced the pending
+    // window nowhere visually — the dice glyph must swap to the app-wide
+    // spinner idiom while the map fetch is in flight.
+    expect(el.querySelector('i.fa-dice-d20'), 'dice glyph is replaced while pending').toBeNull();
+    expect(el.querySelector('i.fa-spinner.fa-spin'), 'spinner face explains the inert press').toBeTruthy();
     fireEvent.click(el);
     expect(onAttack).not.toHaveBeenCalled();
   });
@@ -63,6 +69,8 @@ describe('first-press map-measure gate on the attack chip', () => {
     const el = chip(container);
     expect(el.className).toBe('mc-dice-link');
     expect(el.hasAttribute('aria-busy')).toBe(false);
+    expect(el.querySelector('i.fa-spinner'), 'spinner face is gone once settled').toBeNull();
+    expect(el.querySelector('i.fa-dice-d20'), 'normal dice glyph restores').toBeTruthy();
     fireEvent.click(el);
     expect(onAttack).toHaveBeenCalledTimes(1);
     expect(onAttack).toHaveBeenCalledWith('Shortbow', 4, SHORTBOW);
@@ -73,6 +81,7 @@ describe('first-press map-measure gate on the attack chip', () => {
     const el = chip(container);
     expect(el.className).toBe('mc-dice-link');
     expect(el.hasAttribute('aria-busy')).toBe(false);
+    expect(el.querySelector('i.fa-dice-d20'), 'dice glyph on ungated hosts').toBeTruthy();
     fireEvent.click(el);
     expect(onAttack).toHaveBeenCalledTimes(1);
   });

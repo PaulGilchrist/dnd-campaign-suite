@@ -63,7 +63,6 @@ change-data `{}` + log `[]` (post-clear stable on re-read, disk ABSENT; single-p
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 DDD — first-press gate has no visible 'loading' affordance beyond the muted chip color:** during the frozen window the chip keeps its dice glyph and only loses color + gains aria attrs; a brief `…` or spinner in the chip (or title already exists — surfaced nowhere visually) would explain the inert press to a GM clicking fast. Low priority: window is ~1 s natural.
 - **2026-11-21 DDD — quick-spawn outdoor skip is console-only:** the picker still shows the checkbox on an ACTIVE outdoor map, the stamp silently no-ops (loud console only) and the user gets no toast explaining why their token didn't appear. Hide the checkbox when the active map is outdoor (mapsService already exposes type) or toast the skip.
 
 ## Blocked / Not Verified (fold-gate ledger)

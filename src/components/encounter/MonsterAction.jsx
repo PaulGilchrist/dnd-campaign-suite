@@ -35,16 +35,20 @@ function attackChipClass(rechargeOut) {
 // plain NORMAL past the normal band. While the fetch is PENDING the chip
 // renders as an inert busy affordance (no onClick — the spent-chip/unclickable
 // precedent every sibling chip-link uses — plus aria-busy/aria-disabled and
-// the muted spent class); it re-enables when the fetch settles, resolve or
-// reject. With NO active map there is no fetch to await and the chip is never
-// gated. Pending-OA chips are a different press surface (PendingOpportunity-
-// AttackRow) and stay trigger-lenient untouched. Hoisted to its own component
-// to hold the MonsterAction complexity ceiling (precedent: every *Link above).
+// the muted spent class) whose dice GLYPH swaps to the app-wide spinner idiom
+// (`fa-spinner fa-spin`, the QuestBoard/NPCs/EncounterBuilder loading face) so
+// a fast-clicking GM sees why the press is inert (2026-11-21 DDD backlog: the
+// muted color alone was surfaced nowhere visually); it re-enables when the
+// fetch settles, resolve or reject. With NO active map there is no fetch to
+// await and the chip is never gated. Pending-OA chips are a different press
+// surface (PendingOpportunity-AttackRow) and stay trigger-lenient untouched.
+// Hoisted to its own component to hold the MonsterAction complexity ceiling
+// (precedent: every *Link above).
 function AttackChip({ action, onAttack, rechargeOut, spatialGatePending }) {
   if (spatialGatePending) {
     return (
       <span className="mc-dice-link mc-dice-link-spell-spent" data-kind="attack" role="button" tabIndex={0} aria-busy="true" aria-disabled="true" title="Loading map positions for range and cover — the attack chip re-enables once the map is ready">
-        <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
+        <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> +{action.attack_bonus}
       </span>
     );
   }
