@@ -36,3 +36,24 @@ Give the shared footer a wrapping law: `.ct-container .ct-modal-footer { flex-wr
 
 ## Severity
 Minor UX issue → borderline broken feature at narrow widths: at desktop widths the buttons are ugly-but-usable; at ~800px the primary `Save` is clipped by the viewport edge and smaller windows make it unreachable, stranding edits (data-entry risk, not data corruption).
+
+## Resolution
+FIXED 2026-11-21 (e2e-fix subagent run).
+
+**What was actually wrong:** the original diagnosis of the nowrap space-between footer was correct, but the deeper root cause was a **dead CSS rule**: `Sessions.css` already intended a wider planner via `.sessions-modal { width: 720px }` — a single-class selector (0-1-0) that LOSES to the shared `.ct-container .ct-modal { width: 520px }` (0-2-0). The lane's 720px never applied (measured 522px live), and the shared `.ct-modal-footer` had no wrapping law, so ~668px of two-child nowrap flex content overflowed the 480px content box and the modal has no overflow clip — Cancel/Save escaped onto the backdrop.
+
+**Files changed:**
+- `src/App.css` — shared footer wrapping law: `.ct-container .ct-modal-footer` gains `flex-wrap: wrap; gap: 8px`; `.ct-container .ct-modal-actions` gains `flex-wrap: wrap` (shrinks below its widest single-line row); `.ct-container .ct-modal-buttons` gains `margin-left: auto` (keeps the right cluster right-aligned even when it wraps alone onto a second row — `space-between` can't). No-op for the ≤2-3-button consumers (notes/quests/npcs/factions/settlements): they still render a single row inside the 520px card.
+- `src/components/sessions/Sessions.css` — the planner width law now out-specifies the shared card: `.ct-container .ct-modal.sessions-modal { width: min(720px, 92vw); }` (viewport-capped, so it never exceeds small windows).
+- `src/App.css.test.jsx` — two new contract tests pinning the layout laws (jsdom does no layout, so the repo idiom is CSS-text pinning; the file already parses stylesheets into selector→property maps): (1) footer declares `flex-wrap: wrap` + `gap: 8px`, actions cluster declares `flex-wrap: wrap`, buttons cluster declares `margin-left: auto`; (2) Sessions.css must carry the compound `.ct-container .ct-modal.sessions-modal` width rule (not a bare-class override), wider than 520px and vw-capped.
+
+**Verification:**
+- Live repro (pre-fix): modal right 1125 vs Cancel/Save spanning 1126→1293, `saveOutsideModal: true`; at 800×700 Save 745→829 clipped by the viewport — byte-exact to the filed measurements.
+- Post-fix re-measure (`getBoundingClientRect` on `.ct-modal` + every footer button, `saveOutsideModal = saveRect.right > modalRect.right`):
+  - 1728×997: modal 503→1225 (722px, the lane's intended width now applies); all 7 footer buttons `inside: true` (actions cluster wraps its 5th button to a second row, Cancel 1038→1112 / Save 1120→1204 right-aligned inside the card); `saveOutsideModal: false`.
+  - 800×700: modal 39→761; Save 656→740 — inside card AND viewport; zero offenders.
+  - 640×700: modal 31→609; Save 504→588 — inside card AND viewport; zero offenders.
+- Adjacent consumer sanity: Quests editor modal re-opened post-fix — still 522px wide, footer stayed a SINGLE row (no stray wrapping), all 4 buttons inside the card, then closed via Cancel (zero writes; quests md5 untouched).
+- Tests: `npx vitest run src/App.css.test.jsx` 21/21 pass; `npx vitest run src/components/sessions` 10 files / 73 tests pass; other App.css-consuming suites (VictoryBanner modal-tier + no-capture, CreatureBadge, MonsterCardModal header-layout, generateModalParity) 33/33 pass. `npm run lint` clean (zero warnings).
+- Cleanup: throwaway `Fix QA Layout` session deleted via the planner's Delete (native confirm accepted); browser closed before the admin clears; POST `admin/clear-log` + `admin/clear-change-data` → GET-verified `change-data {}` + `log []`; `sessions` API back to `[]`; no change-data/log residue files on disk.
+

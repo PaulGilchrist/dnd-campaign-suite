@@ -1,7 +1,12 @@
 /* Session Planner — scoped to sessions components */
 
-.sessions-modal {
-  width: 720px;
+/* Specificity: `.sessions-modal` alone (0-1-0) LOSES to the shared
+   `.ct-container .ct-modal` width (0-2-0), so the planner silently stayed
+   520px and its 5-button footer overflowed the card (filed 2026-11-21).
+   The 0-3-0 selector applies the lane's intended width; min() keeps it
+   viewport-fitting at narrow widths. */
+.ct-container .ct-modal.sessions-modal {
+  width: min(720px, 92vw);
 }
 
 /* --- List rows --- */

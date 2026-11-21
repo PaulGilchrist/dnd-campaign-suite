@@ -429,22 +429,31 @@ button.hidden {
   gap: 14px;
 }
 
+/* Wrapping law: the two footer clusters must never push each other past
+   the card edge (sessions' planner stacks 5 action buttons). With wrap +
+   gap an over-wide left cluster drops to its own row instead of shoving
+   Cancel/Save onto the backdrop; margin-left:auto keeps the right cluster
+   right-aligned even when it wraps alone onto a second row. */
 .ct-container .ct-modal-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
 }
 
 .ct-container .ct-modal-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .ct-container .ct-modal-buttons {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 /* --- Form Fields --- */

@@ -107,6 +107,9 @@ function parseStylesheet(source) {
 
 const { topRules, mediaQueries } = parseStylesheet(css);
 
+/** Sessions lane ships a wider planner modal; its width law lives here. */
+const sessionsCss = parseRules(readCss(join(SRC_DIR, 'components/sessions/Sessions.css')));
+
 /**
  * Cascade-aware lookup: merges declarations from every top-level rule whose
  * (possibly comma-grouped) selector matches, later rules winning.
@@ -375,6 +378,43 @@ describe('App.css', () => {
 
       expectStyles('.ct-container .ct-modal-body', { 'overflow-y': 'auto' });
       expectStyles('.ct-container .ct-modal-close', { cursor: 'pointer' });
+    });
+
+    it('never lets footer clusters push Cancel/Save outside the card', () => {
+      // Repro (filed 2026-11-21): the sessions planner's 5-button left cluster
+      // (~502px) overflowed the 520px card's content box and, with a nowrap
+      // space-between footer, shoved Cancel/Save (~167px) fully onto the
+      // backdrop — clipped by the viewport edge at ~800px windows. The wrap
+      // law drops an over-wide cluster to its own row instead.
+      expectStyles('.ct-container .ct-modal-footer', {
+        'flex-wrap': 'wrap',
+        gap: '8px',
+      });
+      // The actions cluster must wrap internally so it can shrink below its
+      // widest single-line row.
+      expectStyles('.ct-container .ct-modal-actions', { 'flex-wrap': 'wrap' });
+      // margin-left:auto keeps the right cluster right-aligned even when it
+      // wraps alone onto a second row (space-between cannot do that).
+      expectStyles('.ct-container .ct-modal-buttons', { 'margin-left': 'auto' });
+    });
+
+    it('lets the sessions planner actually widen past the shared 520px card', () => {
+      // Specificity law: `.sessions-modal` alone (0-1-0) LOSES to the shared
+      // `.ct-container .ct-modal` width (0-2-0), so a bare-class override is
+      // dead code — the planner measured 520px live despite claiming 720px.
+      const sessionsWidth = styleFor('.ct-container .ct-modal.sessions-modal', sessionsCss);
+      expect(
+        sessionsWidth,
+        'Sessions.css must out-specify .ct-container .ct-modal (compound selector)'
+      ).not.toBeNull();
+      expect(sessionsWidth.width, 'planner width must be viewport-capped (vw) as well as px').toMatch(
+        /vw/
+      );
+      const px = parseFloat(sessionsWidth.width.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '');
+      const shared = styleFor('.ct-container .ct-modal');
+      expect(px, 'planner must be wider than the shared 520px card').toBeGreaterThan(
+        parseFloat(shared.width)
+      );
     });
   });
 
