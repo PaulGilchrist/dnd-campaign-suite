@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + sessions `[]`; disk `campaign-log.json`/`character
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (MMM 2026-11-21) `AiWorldConsole` quest-card advisory lands a beat AFTER the card (ledger `Promise.allSettled` fetch): between mount and arrival the referee sees a scrutiny-clean card that isn't scrutinized yet. Render a subtle "checking ledger names…" pending state while `ledgerNames === null` on a quest_draft card.
 - (MMM 2026-11-21) `proposalNameAudit` fragments epithets containing a lowercase particle: "Zorvath the Unminted" surfaces as two candidates `Zorvath, Unminted` (run-collector only fuses CONSECUTIVE capitals). Consider absorbing a single lowercase `the|of|son` between two capitalised tokens as one name candidate (keep the existing sentence-start verb fusion guard intact).
 - (MMM 2026-11-21) Audit-producer field asymmetry post-`0a23ce90d`: the world family (`ai_world`/`ai_world_applied`) stamps `characterName` only, while `ai_director`/`ai_director_applied` stamp BOTH `name:'AI director'` + `characterName:<creature>`. Pick one convention across the AI audit family (the renderer census shows GenericEntry ignores `name` anyway).
 

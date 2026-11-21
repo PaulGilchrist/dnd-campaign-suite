@@ -43,6 +43,21 @@
     background: rgba(210, 153, 34, 0.16);
     color: #d29922;
 }
+/* MMM 2026-11-21 — ledger-check pending pill: same pill geometry as the
+   .ai-world-advisory above, but muted grey (the .ai-confidence tone) — a
+   "working, not yet verdict" face, deliberately quieter than the amber one. */
+.ai-world-console .ai-world-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin-top: 0.5rem;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    background: rgba(139, 148, 158, 0.12);
+    color: #8b949e;
+}
 /* Backlog 2026-11-01 (AV) — applied-state receipt badge: reuses the .ai-badge
    pill + .ai-badge--on green from AiRefereeSection.css as-is; the only tweak
    is dropping its header-context left margin, since here it is the sole child

@@ -45,6 +45,10 @@ export default function AiWorldConsole({ campaignName }) {
     React.useEffect(() => {
         if (!proposal || proposal.kind !== 'quest_draft') return undefined
         let cancelled = false
+        // MMM 2026-11-21 — restart from "not scrutinized yet" for every fresh
+        // card: without this reset a second quest card would briefly wear the
+        // previous card's verdict while its own fetch is still in flight.
+        setLedgerNames(null)
         Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName), loadQuests(campaignName)]).then(([npcs, settlements, factions, quests]) => {
             if (cancelled) return
             setLedgerNames({
@@ -61,7 +65,7 @@ export default function AiWorldConsole({ campaignName }) {
     }, [proposal, campaignName])
 
     const ask = async () => {
-        setAsking(true); setResult(null); setProposal(null); setApplied(false)
+        setAsking(true); setResult(null); setProposal(null); setApplied(false); setLedgerNames(null)
         let res
         try {
             res = await askWorldKeeper({ campaignName, kind, focus: focus.trim() || null })
@@ -114,6 +118,11 @@ function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss })
         ? `${proposal.name} — ${proposal.description}${proposal.rewards ? ` (rewards: ${proposal.rewards})` : ''}`
         : `${proposal.kind === 'npc_dialogue' ? `${proposal.npcName}: ` : ''}${proposal.text}`
     const unknownNames = findUnknownLedgerNames(proposal, ledgerNames)
+    // MMM 2026-11-21 — pending face: while the ledger-name fetch is in flight
+    // (ledgerNames === null) the card is NOT scrutiny-clean, it is un-checked.
+    // Say so, quietly, so the advisory's late arrival is never misread as an
+    // all-clear. Purely informational — the action row stays live.
+    const ledgerPending = proposal.kind === 'quest_draft' && ledgerNames === null && !applied
     return (
         <div className="ai-world-card">
             <div className="ai-world-head">
@@ -121,6 +130,12 @@ function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss })
                 {typeof proposal.confidence === 'number' && <em className="ai-confidence">confidence {(proposal.confidence * 100).toFixed(0)}%</em>}
             </div>
             <p className="ai-world-body">{body}</p>
+            {ledgerPending && (
+                <div className="ai-world-pending" role="status">
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                    Checking ledger names…
+                </div>
+            )}
             {unknownNames.length > 0 && (
                 <div className="ai-world-advisory" role="status">
                     <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
