@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-20 AAA) The death-save prompt's mount-side stale-evict (DeathSavePromptModal.jsx ~146-153) is silent: a prompt POSTed (or replayed from an undrained key) over a living player vanishes with ZERO console/debug feedback — correct defense, but a GM watching a manually-armed prompt disappear gets no explanation. A one-line `console.debug` (or debug-build toast) naming the re-verdict would help harnesses and GMs distinguish "auto-evicted: target HP>0" from a mount failure.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

@@ -148,6 +148,10 @@ function DeathSavePromptModal({ campaignName, characters }) {
     const hpRaw = getRuntimeValue(current.targetName, 'currentHitPoints');
     const hp = Number(hpRaw);
     if (hpRaw == null || !Number.isFinite(hp) || hp <= 0) return;
+    // Diagnostic-only trace (backlog 2026-11-20 AAA): name the re-verdict so
+    // GMs/harnesses can distinguish "auto-evicted: target HP>0" from a mount
+    // failure. console.debug only — no UI, no game-state writes.
+    console.debug(`[DeathSavePromptModal] auto-evicting stale prompt for ${current.targetName} — target HP ${hp} > 0`);
     clearDeathSavePrompt(campaignName, current.targetName);
     advance();
   }, [advance, campaignName, current, leadHp, leadIsPlayerPrompt]);

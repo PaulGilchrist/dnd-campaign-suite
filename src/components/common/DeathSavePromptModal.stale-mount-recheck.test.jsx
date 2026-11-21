@@ -118,8 +118,19 @@ const okResponse = { ok: true, status: 200, json: () => Promise.resolve({}) };
 
 const overlayGone = () => expect(document.querySelector('.dsp-overlay')).toBeNull();
 
+// The re-verdict trace (backlog 2026-11-20 AAA): the evict branch names its
+// cause on console.debug so a vanishing prompt is distinguishable from a
+// mount failure. Filter on the cause phrase so unrelated debug rows (from
+// the runtime store, if any) never pollute the pins.
+let debugSpy;
+const evictDebugLines = () =>
+  debugSpy.mock.calls
+    .map(([msg]) => msg)
+    .filter((msg) => typeof msg === 'string' && msg.includes('auto-evicting stale prompt'));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
   setupEventSource();
   deathSaveRules.rollDeathSave.mockReturnValue({
     roll: 20,
@@ -140,6 +151,7 @@ afterEach(() => {
     clearRuntimeState(name);
   });
   globalThis.fetch.mockRestore();
+  debugSpy.mockRestore();
 });
 
 describe('DeathSavePromptModal mount-side stale re-verdict', () => {
@@ -170,6 +182,15 @@ describe('DeathSavePromptModal mount-side stale re-verdict', () => {
       // lanes so the key never replays the double-sweep 404.
       await vi.waitFor(() => expect(getAllStoreKeys()).not.toContain(promptKey(ALIVE)));
       expect(getStore('campaign').has(promptKey(ALIVE))).toBe(false);
+
+      // Diagnostic trace (backlog 2026-11-20 AAA): EXACTLY one console.debug
+      // naming the re-verdict — target name + cause phrase distinguishing
+      // "auto-evicted: target HP>0" from a mount failure.
+      const lines = evictDebugLines();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toBe(
+        '[DeathSavePromptModal] auto-evicting stale prompt for AliveAlly — target HP 18 > 0'
+      );
     });
 
     it('no prompt mirror ⇒ local self-heal with ZERO requests (mirror gate refuses the blind DELETE)', async () => {
@@ -197,6 +218,10 @@ describe('DeathSavePromptModal mount-side stale re-verdict', () => {
       await vi.waitFor(() => expect(fetchCalls('DELETE')).toHaveLength(1));
       expect(fetchCalls('DELETE')[0][0]).toBe(`/api/campaigns/${CAMPAIGN}/${promptKey(ALIVE)}`);
       expect(fetchCalls('POST')).toHaveLength(0);
+      // The late re-verdict names itself on console.debug just the same.
+      expect(evictDebugLines()).toEqual([
+        '[DeathSavePromptModal] auto-evicting stale prompt for AliveAlly — target HP 18 > 0',
+      ]);
     });
 
     it('a stale head self-heals without wedging the genuinely armed prompt behind it', async () => {
@@ -233,6 +258,8 @@ describe('DeathSavePromptModal mount-side stale re-verdict', () => {
 
       await screen.findByText(/must make a/i);
       expect(globalThis.fetch).not.toHaveBeenCalled();
+      // Genuine arm (HP 0): the re-verdict trace never fires.
+      expect(evictDebugLines()).toHaveLength(0);
 
       fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
       await screen.findByText('NATURAL 20 — STABILIZED!');
@@ -294,6 +321,8 @@ describe('DeathSavePromptModal mount-side stale re-verdict', () => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument());
       expect(screen.getByText('Restored to 1 HP')).toBeInTheDocument();
       expect(document.querySelector('.dsp-overlay')).not.toBeNull();
+      // HP=1 stamp on a result-stage head must not trigger the evict trace.
+      expect(evictDebugLines()).toHaveLength(0);
     });
   });
 });
