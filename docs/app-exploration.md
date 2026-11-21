@@ -66,7 +66,6 @@ change-data `{}` + log `[]` + sessions `[]` + disk `campaign-log.json`/`characte
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (KKK 2026-11-21) 200 map-save response does not echo the clamped `gridSize` (the 400/error bodies carry rich copy but the success body is generic) — returning the stored/clamped value (or a `clamped:true` flag) would spare clients a follow-up GET after the save-lane clamp (paired with the 751e89e44 honest-response doctrine on the PATCH lane).
 
 
 ## Blocked / Not Verified (fold-gate ledger)

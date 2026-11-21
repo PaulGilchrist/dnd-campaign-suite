@@ -606,6 +606,21 @@ router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   res.json(mapData);
 }));
 
+// Honest success echo for the whole-doc save (backlog KKK 2026-11-21, twin of
+// the PATCH-lane {applied, appliedFields, skipped} doctrine in
+// campaigns-changedata.js): the PUT clamps gridSize before writing, so the 200
+// body reports the STORED (post-clamp) document value — a client that PUTs 110
+// learns 100 without a follow-up GET, and the body never claims a value disk
+// does not hold. `clamped` merely flags that a REQUESTED number was replaced.
+// A body that omitted the key echoes no gridSize at all (JSON.stringify drops
+// undefined), mirroring the never-invent rule; an explicit null echoes null.
+const saveResponse = (requestedDoc, storedDoc) => ({
+  message: 'Map saved successfully',
+  gridSize: storedDoc?.gridSize,
+  clamped: typeof requestedDoc?.gridSize === 'number'
+    && storedDoc?.gridSize !== requestedDoc.gridSize,
+});
+
 // PUT /api/campaigns/:campaign/maps/:mapname - Save map data
 router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
@@ -681,7 +696,13 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   const eventMapName = fileName.replace(/\.json$/, '');
   publish(`map-data-${campaign}-${eventMapName}`, mapData, campaign);
 
-  res.json({ message: 'Map saved successfully' });
+  // Honest success echo (backlog KKK 2026-11-21, twin of the PATCH-lane
+  // {applied, appliedFields, skipped} doctrine in campaigns-changedata.js):
+  // the save lane clamps gridSize before writing, so the 200 body carries the
+  // STORED (post-clamp) value — a client that PUTs 110 learns 100 without a
+  // follow-up GET. A body that omitted the key echoes no gridSize at all
+  // (JSON drops undefined), mirroring the never-invent rule.
+  res.json(saveResponse(bodyDoc, mapData));
 }));
 
 // DELETE /api/campaigns/:campaign/maps/:mapname - Delete a map

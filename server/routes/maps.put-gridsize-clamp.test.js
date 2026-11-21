@@ -5,8 +5,10 @@
 // the fog-iteration blow-up the create clamp guards (0..gridSize-1 per render)
 // was reachable through PUT: two rules for one field. The PUT now runs the
 // same clampGridSize helper before the write. In-range values (boundaries 5
-// and 100) store verbatim; out-of-range clamp (110→100, 2→5); the GET and the
-// SSE echo both carry the stored (clamped) value; a body that OMITS the key
+// and 100) store verbatim; out-of-range clamp (110→100, 2→5); the GET, the
+// SSE echo AND the 200 response body (KKK 2026-11-21 honest echo: `gridSize`
+// carries the stored value, `clamped` flags a replaced request number) all
+// carry the stored (clamped) value; a body that OMITS the key
 // keeps it omitted (never-invent, mirroring the erasure-guard asymmetry).
 import express from 'express';
 import fs from 'fs';
@@ -109,7 +111,13 @@ describe('maps PUT — gridSize clamp parity with create (JII 2026-11-21)', () =
 
         expect(JSON.parse(MOCK_FS.get(FILE)).gridSize).toBe(expected);
 
-        // The GET reflects the STORED (clamped) value…
+        // The 200 body echoes the STORED (post-clamp) value — no follow-up GET
+        // needed to learn what happened to the request (KKK 2026-11-21). It
+        // never claims the REQUESTED value when a clamp replaced it.
+        expect(res.body.gridSize).toBe(expected);
+        expect(res.body.clamped).toBe(sent !== expected);
+
+        // The GET reflects the same stored value the body echoed…
         const fetched = await getIndoor();
         expect(fetched.status).toBe(200);
         expect(fetched.body.gridSize).toBe(expected);
@@ -135,6 +143,9 @@ describe('maps PUT — gridSize clamp parity with create (JII 2026-11-21)', () =
             });
         expect(res.status).toBe(200);
         expect(JSON.parse(MOCK_FS.get(FILE)).gridSize).toBe(100);
+        // The outdoor save lane echoes the stored value too.
+        expect(res.body.gridSize).toBe(100);
+        expect(res.body.clamped).toBe(true);
     });
 
     it('prunes revealed cells against the CLAMPED grid in the same pass', async () => {
@@ -151,6 +162,8 @@ describe('maps PUT — gridSize clamp parity with create (JII 2026-11-21)', () =
 
         const saved = JSON.parse(MOCK_FS.get(FILE));
         expect(saved.gridSize).toBe(100);
+        expect(res.body.gridSize).toBe(100);
+        expect(res.body.clamped).toBe(true);
         // 105,3 is out of bounds for the clamped 100-grid — pruned, not stored.
         expect(saved.revealed).toEqual(['50,50']);
     });
@@ -162,6 +175,9 @@ describe('maps PUT — gridSize clamp parity with create (JII 2026-11-21)', () =
         expect(res.status).toBe(200);
         expect(MOCK_FS.get(FILE)).not.toContain('gridSize');
         expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
+        // The honest echo never invents the key the body omitted (KKK 2026-11-21).
+        expect(res.body).not.toHaveProperty('gridSize');
+        expect(res.body.clamped).toBe(false);
     });
 
     it('an explicit null gridSize stays the sanctioned clear (clamp polices values, not presence)', async () => {
@@ -170,5 +186,19 @@ describe('maps PUT — gridSize clamp parity with create (JII 2026-11-21)', () =
         const res = await putIndoor({ gridSize: null });
         expect(res.status).toBe(200);
         expect(JSON.parse(MOCK_FS.get(FILE)).gridSize).toBeNull();
+        // Honest echo of the stored null; nothing was clamped.
+        expect(res.body.gridSize).toBeNull();
+        expect(res.body.clamped).toBe(false);
+    });
+
+    it('the 200 body reports the clamped value, never the requested one (honest-response doctrine)', async () => {
+        seedIndoor();
+
+        const res = await putIndoor({ gridSize: 110 });
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Map saved successfully');
+        expect(res.body.gridSize).toBe(100);
+        expect(res.body).not.toMatchObject({ gridSize: 110 });
+        expect(res.body.clamped).toBe(true);
     });
 });
