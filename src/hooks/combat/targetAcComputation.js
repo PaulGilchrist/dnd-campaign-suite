@@ -15,6 +15,22 @@ export function isBarkskinAcFloorActive(targetName, campaignName) {
     return Array.isArray(activeBuffs) && activeBuffs.some(b => b && b.effect === 'barkskin');
 }
 
+// RAW no-stacking law (PHB 2024 "Cover": "when a target has cover from more
+// than one source, only the greatest degree applies") across the COVER
+// CHANNEL INTERSECTION: the §8.3 enforcement-zones stamp (campaign
+// `_cover_shot`, +2 half cover) vs the furniture/prop cover riding the shot
+// context (contextBuilder-map → context.coverAcBonus, added later by
+// computeEffectiveAc in hitResolution.js). The stamp only folds when it BEATS
+// the context bonus; whenever the context bonus is ≥ the stamp it carries the
+// single applied cover instead, so the two lanes never sum (+4 on one shot)
+// and the stored targetAc stays RAW — keeping `targetAc + coverAcBonus` (the
+// audit message's arithmetic) equal to the AC the resolver adjudicated.
+function foldStampCover(targetAc, context, target, campaignName) {
+    const contextCoverAcBonus = Number(context?.coverAcBonus) || 0;
+    const stamp = readCoverShot(context, target.name, campaignName, getCurrentCombatRound(campaignName));
+    return stamp && stamp.ac > contextCoverAcBonus ? targetAc + stamp.ac : targetAc;
+}
+
 export function computeTargetAc(context, target, characters, campaignName) {
     if (context?.rollType !== 'attack' || !target) {
         return undefined;
@@ -34,14 +50,10 @@ export function computeTargetAc(context, target, characters, campaignName) {
         targetAc = Math.max(targetAc, 17);
     }
     // L5-003 §8.3 cover: half-cover stamp armed by the LoS/cover gate at
-    // this shot's click (sync cached read). Covers stack ON TOP of the
+    // this shot's click (sync cached read). The stamp stacks ON TOP of the
     // Barkskin floor (floor is a base-AC rule; +2 is a circumstance
     // bonus). Matched by attacker + target + round; clear shots write
     // null so a clean line never gains the bonus. Zones off ⇒ stamp never
     // written ⇒ byte-parity.
-    const cover = readCoverShot(context, target.name, campaignName, getCurrentCombatRound(campaignName));
-    if (cover) {
-        targetAc += cover.ac;
-    }
-    return targetAc;
+    return foldStampCover(targetAc, context, target, campaignName);
 }
