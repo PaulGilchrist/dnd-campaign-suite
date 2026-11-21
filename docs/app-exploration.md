@@ -66,7 +66,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-20 ZZ: `ALLOWED_LOG_TYPES` (server/routes/log.js) is a hand-maintained mirror of the producers/render registry (`Log.jsx` ENTRY_COMPONENTS + AUDIT_TYPES) — a new log type added without editing the Set silently 400s its own producer; derive it from a shared module or add a pin test asserting the Set covers every ENTRY_COMPONENTS key.
 - 2026-11-20 ZZ: silent-failure console labels are copy-pasted across damage producers — `handlePlainDamage.js`/`handleNpcSaveDamage.js` catch as `[useLoggedDiceRollDamage]` while `useLoggedDiceRollEventHandlers.js` uses `[useLoggedDiceRollEventHandlers]`/`[useLoggedDiceRoll]` — producer attribution during log-lane debugging is ambiguous; give each site its own tag.
 
 ## Blocked / Not Verified (fold-gate ledger)

@@ -9,6 +9,10 @@ import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 import logRouter, { logCache, ALLOWED_LOG_TYPES } from './log.js';
 import { stampAuditText } from '../../src/services/ui/logService.js';
+// Real client registries the allowlist must cover (jsdom vitest env resolves
+// these plain .js modules; their JSX component imports are side-effect-free).
+import { ENTRY_COMPONENTS } from '../../src/components/log/entryComponents.js';
+import { AUDIT_TYPES } from '../../src/components/campaign-admin/auditTypes.js';
 
 const mockFsState = { exists: new Set(), files: new Map() };
 
@@ -244,15 +248,33 @@ describe('POST /api/campaigns/:campaign/log — schema gate', () => {
         );
     });
 
-    // ── allowlist derivation sanity ──────────────────────────────────────────
+    // ── allowlist derivation pins (backlog 2026-11-20 ZZ) ────────────────────
+    // These derive from the REAL client registries (not hand-copied arrays):
+    // a new key in ENTRY_COMPONENTS or entry in AUDIT_TYPES without a matching
+    // ALLOWED_LOG_TYPES member turns one of these RED instead of silently
+    // 400-ing the new producer at this gate. deriveAuditText's structured
+    // types (roll/hp_change/death_save/encounter/condition) are all
+    // ENTRY_COMPONENTS keys, so the first pin covers the stamping lane too.
 
-    it('allowlist covers the render-dispatch types (Log.jsx ENTRY_COMPONENTS)', () => {
-        for (const type of ['roll', 'note', 'hp_change', 'ability_use', 'automation',
-            'save_result', 'spell', 'music', 'write_rejected', 'ai_designer']) {
-            expect(ALLOWED_LOG_TYPES.has(type)).toBe(true);
-        }
+    it('allowlist covers every render-dispatch type (entryComponents.js ENTRY_COMPONENTS)', () => {
+        const missing = Object.keys(ENTRY_COMPONENTS)
+            .filter((type) => !ALLOWED_LOG_TYPES.has(type));
+        expect(missing).toEqual([]);
     });
 
+    it('allowlist covers every audit-ledger type (auditTypes.js AUDIT_TYPES)', () => {
+        const missing = AUDIT_TYPES
+            .filter((type) => !ALLOWED_LOG_TYPES.has(type));
+        expect(missing).toEqual([]);
+    });
+
+    it('both registries are non-empty (a vacuous pin is drift too)', () => {
+        expect(Object.keys(ENTRY_COMPONENTS).length).toBeGreaterThan(0);
+        expect(AUDIT_TYPES.length).toBeGreaterThan(0);
+    });
+
+    // Server-lane producers have no client registry to derive from — these
+    // hand-listed types stay pinned so a Set edit can't drop them unnoticed.
     it('allowlist covers the server-lane audit types', () => {
         for (const type of ['write_rejected', 'inventory_transfer', 'ai_authoring',
             'ai_draft_approved', 'ai_draft_rejected', 'adventure_regenerated']) {

@@ -11,6 +11,9 @@
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { SESSION_PHASES, setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js'
+// Ledger filter list, extracted to a plain .js module so the server allowlist
+// pin test can derive it (see auditTypes.js).
+import { AUDIT_TYPES } from './auditTypes.js'
 import './SessionSection.css'
 
 const PHASE_LABELS = {
@@ -19,14 +22,6 @@ const PHASE_LABELS = {
     travel: { icon: 'fa-road', label: 'Travel' },
     roleplay: { icon: 'fa-comments', label: 'Roleplay' },
 }
-
-const AUDIT_TYPES = [
-    'enforcement_denied', 'enforcement_triggered', 'enforcement_clock_expired',
-    'enforcement_cover', 'ai_ruling', 'ai_director', 'ai_world', 'session_phase',
-    // Server-validator write refusals ride their own type since the GC
-    // improve 2026-11-10 split (they used to hide inside enforcement_denied).
-    'write_rejected',
-]
 
 // The campaign log lives at its own route (not change-data) — read on mount,
 // re-read on the Refresh click. No polling timers (AGENTS.md).

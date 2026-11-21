@@ -102,22 +102,26 @@ export function addEntry(campaign, entry) {
 //     ai_dress/ai_authoring/ai_world/ai_director/ai_ruling);
 //   - dynamic template types: ai_draft_approved/ai_draft_rejected
 //     (campaign/draftActions.js), plus adventure_regenerated
-//     (campaign/seededCampaign.js);
-//   - cross-checked against the render dispatch Log.jsx ENTRY_COMPONENTS and
-//     the SessionSection AUDIT_TYPES list.
+//     (campaign/seededCampaign.js).
+// Drift protection (backlog 2026-11-20 ZZ): server/routes/log.schema-gate.test.js
+// PINS this Set against the real client registries — every key of
+// src/components/log/entryComponents.js ENTRY_COMPONENTS and every entry of
+// src/components/campaign-admin/auditTypes.js AUDIT_TYPES must be a member.
+// Adding a log type to either registry without adding it here turns that pin RED
+// (instead of silently 400-ing the new producer at this gate).
 export const ALLOWED_LOG_TYPES = new Set([
   'ability_use', 'action_complete', 'adventure_regenerated',
   'ai_authoring', 'ai_designer', 'ai_director', 'ai_director_applied',
   'ai_draft_approved', 'ai_draft_rejected', 'ai_dress', 'ai_refine',
   'ai_ruling', 'ai_ruling_applied', 'ai_world', 'ai_world_applied',
   'automation', 'automation_info', 'buff', 'condition', 'concentration_lost',
-  'death_save', 'encounter', 'enforcement_cover', 'enforcement_denied',
-  'enforcement_triggered', 'healing', 'healing_pool', 'hp_change', 'info',
-  'inventory_transfer', 'long_rest', 'loot', 'map_regenerated',
-  'material_consumed', 'metamagic', 'metamagic_use', 'music', 'narrative',
-  'note', 'psionic_sorcery', 'roll', 'save_result', 'session-played',
-  'session_phase', 'short_rest', 'spell', 'spell_effect', 'summons',
-  'travel', 'ward_absorbed', 'write_rejected',
+  'death_save', 'encounter', 'enforcement_clock_expired', 'enforcement_cover',
+  'enforcement_denied', 'enforcement_triggered', 'healing', 'healing_pool',
+  'hp_change', 'info', 'inventory_transfer', 'long_rest', 'loot',
+  'map_regenerated', 'material_consumed', 'metamagic', 'metamagic_use',
+  'music', 'narrative', 'note', 'psionic_sorcery', 'roll', 'save_result',
+  'session-played', 'session_phase', 'short_rest', 'spell', 'spell_effect',
+  'summons', 'travel', 'ward_absorbed', 'write_rejected',
 ]);
 
 // Canonical verbatim-text fields (see gate comment above). One canonical
