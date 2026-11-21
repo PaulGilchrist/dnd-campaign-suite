@@ -505,7 +505,7 @@ function writeDamageResults({ campaignName, target, totalDamageDealt, newHp, old
         // Players at 0 HP are DYING, not dead (5e) — see logDamageApplication:
         // the audio lane voices 'player-down' vs 'monster-death' off this stamp.
         if (target.type === 'player') hpEntry.isPlayer = true;
-        addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
+        addEntry(campaignName, hpEntry).catch((e) => { console.error("[handleNpcSaveDamage] Error:", e); });
     }
 
     if (target.type === 'player') {
@@ -584,7 +584,7 @@ function buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets
 function storeSaveLastAttack({ context, campaignName, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, characterName }) {
     const { attackerName, statusEffects, affectedTargets, spellSchool } = context || {};
     if (!attackerName || !target?.name) {
-        console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName, targetName: target?.name, characterName });
+        console.error('[handleNpcSaveDamage] lastAttack missing required fields:', { attackerName, targetName: target?.name, characterName });
     }
     const entry = buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, spellSchool });
     setRuntimeValue('campaign', 'lastAttack', entry, campaignName);
