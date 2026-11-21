@@ -368,6 +368,48 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(result.coverLevel).toBeUndefined();
     });
 
+    // ── Furniture cover names its source (backlog 2026-11-21 EEE) ──
+    // computeCover stamps sourceLabel on the half/¾ furniture tiers
+    // (rules/combat/coverService.js pins the label law); finalizeCover rides
+    // it into coverReason so a barrel row is distinguishable from a grant row.
+
+    it('names the covering furniture item in coverReason for half cover', async () => {
+      setupCoverTest();
+      computeCover.mockReturnValue({ level: 'half', acBonus: 2, sourceLabel: 'Barrel' });
+      const result = await buildAttack();
+      expect(result.coverAcBonus).toBe(2);
+      expect(result.coverLevel).toBe('half');
+      expect(result.coverReason).toBe('Barrel');
+    });
+
+    it('names the covering furniture item in coverReason for three-quarter cover', async () => {
+      setupCoverTest();
+      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5, sourceLabel: 'Altar' });
+      const result = await buildAttack();
+      expect(result.coverAcBonus).toBe(5);
+      expect(result.coverLevel).toBe('threeQuarter');
+      expect(result.coverReason).toBe('Altar');
+    });
+
+    it('keeps the furniture source label when bait-and-switch raises the AC bonus', async () => {
+      setupCoverTest();
+      computeCover.mockReturnValue({ level: 'half', acBonus: 2, sourceLabel: 'Barrel' });
+      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
+      const result = await buildAttack();
+      expect(result.coverAcBonus).toBe(5);
+      expect(result.coverReason).toBe('Barrel');
+    });
+
+    it('keeps coverReason null for furniture-less bonus faces (bait-and-switch on none)', async () => {
+      setupCoverTest();
+      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
+      const result = await buildAttack();
+      expect(result.coverAcBonus).toBe(5);
+      expect(result.coverLevel).toBe('none');
+      expect(result.coverReason).toBeUndefined();
+    });
+
     // ── Defensive Duelist (2024): proficiency floor on AC bonus ──
 
     it('applies Defensive Duelist proficiency bonus when it exceeds computed cover', async () => {

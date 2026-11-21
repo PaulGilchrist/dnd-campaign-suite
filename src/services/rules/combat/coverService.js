@@ -32,6 +32,17 @@ function getOccupiedCells(item) {
   return cells
 }
 
+// Consumer-facing name for the furniture item that produced a cover tier —
+// a GM rename wins; otherwise the capitalized type key reads as the honest
+// label ('barrel' → 'Barrel'). Rides computeCover's `sourceLabel` so sheet-lane
+// rows can say WHY a target is behind cover (coverReason), not just the bonus.
+export function coverSourceLabel(item) {
+  const name = typeof item?.name === 'string' ? item.name.trim() : ''
+  if (name) return name
+  const type = item?.type
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : null
+}
+
 function buildCoverMap(placedItems) {
   const coverMap = new Map()
   for (const item of placedItems) {
@@ -45,11 +56,20 @@ function buildCoverMap(placedItems) {
     for (const cell of getOccupiedCells(item)) {
       const key = `${cell.x},${cell.y}`
       if (!coverMap.has(key)) {
-        coverMap.set(key, level)
+        coverMap.set(key, { level, item })
       }
     }
   }
   return coverMap
+}
+
+// First interior cell (ray order, so nearest the attacker) covered by `level`.
+function firstCoveredCell(cells, coverMap, level) {
+  for (const cell of cells) {
+    const entry = coverMap.get(`${cell.x},${cell.y}`)
+    if (entry && entry.level === level) return entry.item
+  }
+  return null
 }
 
 function buildClosedDoors(placedItems) {
@@ -80,11 +100,21 @@ export function computeCover(attackerPos, targetPos, walls, placedItems) {
   if (lineHits(cells, (key) => wallKeys.has(key) || closedDoors.has(key))) {
     return { level: COVER.FULL, acBonus: COVER_AC_BONUS[COVER.FULL] }
   }
-  if (lineHits(cells, (key) => coverMap.get(key) === COVER.THREE_QUARTER)) {
-    return { level: COVER.THREE_QUARTER, acBonus: COVER_AC_BONUS[COVER.THREE_QUARTER] }
+  const threeQuarterItem = firstCoveredCell(cells, coverMap, COVER.THREE_QUARTER)
+  if (threeQuarterItem) {
+    return {
+      level: COVER.THREE_QUARTER,
+      acBonus: COVER_AC_BONUS[COVER.THREE_QUARTER],
+      sourceLabel: coverSourceLabel(threeQuarterItem),
+    }
   }
-  if (lineHits(cells, (key) => coverMap.get(key) === COVER.HALF)) {
-    return { level: COVER.HALF, acBonus: COVER_AC_BONUS[COVER.HALF] }
+  const halfItem = firstCoveredCell(cells, coverMap, COVER.HALF)
+  if (halfItem) {
+    return {
+      level: COVER.HALF,
+      acBonus: COVER_AC_BONUS[COVER.HALF],
+      sourceLabel: coverSourceLabel(halfItem),
+    }
   }
 
   return { level: COVER.NONE, acBonus: 0 }

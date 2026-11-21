@@ -56,7 +56,6 @@ change-data `{}` + log `[]` (two-pass: re-select rehydrated the AasimarTest/__ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 EEE — furniture cover rows carry no `coverReason`:** the sheet-lane furniture faces write `coverLevel/coverAcBonus` but leave `coverReason` null (`finalizeCover` in `src/services/automation/contextBuilder-map.js` sets a reason only for grants/Sharpshooter/full), so a barrel row is indistinguishable from a Bulwark row for prose/search/AI consumers — consider naming the source item type (`'Barrel'`-style, or reuse the placedItem `name`).
 - **2026-11-21 EEE — enforcement-folded rows state the bumped AC bare:** a zones-covered row reads `vs AC 17` with zero annotation (the +2 lives only in the adjacent `enforcement_cover` row) while furniture rows now annotate inline — once the stacking bug lands, give both lanes the same chip-vocabulary annotation so one accessor tells the whole story.
 - **2026-11-21 EEE — AUTO-MISS message drops the full-cover reason:** the FULL tier row prints `… vs AC 15 — AUTO-MISS` while `coverReason:'Target has full cover'` rides structured-only; a `(Full Cover)` chip-vocab tail (same family as f78c06905) would complete the prose parity.
 - **2026-11-21 EEE — QMS type-fetch pending shows nothing:** while `useActiveMapType` awaits the list lane, the checkbox is indistinguishable from the outdoor/hidden face on a slow network — a brief disabled placeholder or delayed paint would tell "outdoor map" from "still loading".

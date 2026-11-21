@@ -259,6 +259,13 @@ function finalizeCover(base, coverResult) {
     } else if (coverResult.acBonus > 0) {
         base.coverAcBonus = coverResult.acBonus;
         base.coverLevel = coverResult.level;
+        // Furniture cover (computeCover's sourceLabel) names its covering
+        // item ('Barrel'-style) so a barrel row is distinguishable from a
+        // grant row by prose/search/AI consumers. Grants already stamped
+        // base.coverReason upstream — never clobber them.
+        if (coverResult.sourceLabel && !base.coverReason) {
+            base.coverReason = coverResult.sourceLabel;
+        }
     }
 }
 

@@ -92,6 +92,10 @@ describe('staging map identity', () => {
 });
 
 describe('generateCoverLayout', () => {
+    // Staging furniture never carries a `name`, so computeCover's sourceLabel
+    // is its capitalized type key (rules/combat/coverService.js coverSourceLabel).
+    const capType = (type) => type.charAt(0).toUpperCase() + type.slice(1);
+
     it('seeds all three cover tiers every reuse (AC3 producers present)', () => {
         for (const seed of [1, 2, 3, 4, 5]) {
             const items = generateCoverLayout({ gridSize: 30, rng: seededRandom(seed) });
@@ -111,11 +115,11 @@ describe('generateCoverLayout', () => {
 
         const half = tierItem((i) => HALF_COVER_ITEM_TYPES.includes(i.type));
         expect(computeCover({ gridX: half.gridX - 2, gridY: half.gridY }, { gridX: half.gridX + 2, gridY: half.gridY }, [], [half]))
-            .toEqual({ level: COVER.HALF, acBonus: 2 });
+            .toEqual({ level: COVER.HALF, acBonus: 2, sourceLabel: capType(half.type) });
 
         const three = tierItem((i) => TWO_CELL_TYPES.has(i.type));
         expect(computeCover({ gridX: three.gridX - 2, gridY: three.gridY }, { gridX: three.gridX + 2, gridY: three.gridY }, [], [three]))
-            .toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 });
+            .toEqual({ level: COVER.THREE_QUARTER, acBonus: 5, sourceLabel: capType(three.type) });
 
         const door = tierItem((i) => i.type === 'door');
         expect(computeCover({ gridX: door.gridX - 2, gridY: door.gridY }, { gridX: door.gridX + 2, gridY: door.gridY }, [], [door]))
