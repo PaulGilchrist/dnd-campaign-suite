@@ -642,9 +642,23 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
     return res.status(400).json({ error: normalizedPlayers.error });
   }
 
+  // One canonical gridSize rule for BOTH write lanes (backlog JII 2026-11-21):
+  // create clamps 5..100 via clampGridSize, but the whole-doc save stored any
+  // integer verbatim (110 lived), so the fog-iteration blow-up the create clamp
+  // exists to prevent was reachable through PUT. Same helper, one rule; runs
+  // BEFORE pruneRevealedToGrid so cells outside the clamped grid are pruned in
+  // the same pass and the SSE echo below carries the stored (clamped) value.
+  // Key-absent and explicit-null bodies keep the erasure guard's asymmetry
+  // (omission never invents a field; explicit null is the sanctioned clear) —
+  // the clamp polices VALUES, not the presence protocol.
+  const bodyDoc = normalizedPlayers.mapData;
+  const clampedDoc = bodyDoc?.gridSize == null
+    ? bodyDoc
+    : { ...bodyDoc, gridSize: clampGridSize(bodyDoc.gridSize) };
+
   const mapData = preserveAuthoredNames(
     storedData,
-    pruneRevealedToGrid(normalizedPlayers.mapData)
+    pruneRevealedToGrid(clampedDoc)
   );
 
   if (!fs.existsSync(mapsDir)) {
