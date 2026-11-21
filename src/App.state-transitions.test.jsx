@@ -26,7 +26,8 @@
  *    values), and toggle round-trips from the default dark that persist
  *    to localStorage and echo into the Admin readout. Theme is display
  *    formatting, so localStorage is the sanctioned store here.
- *  - document.title follows the active view/character.
+ *  - document.title: "<campaign> — <view>" while mounted, app name on the
+ *    campaign-select screen.
  *
  * Deliberately NOT re-tested here (covered by siblings):
  *  - Maps-click routing / back stack / manager behavior → App.map-navigation.test.jsx
@@ -494,25 +495,39 @@ describe('App - State Transitions', () => {
     });
   });
 
-  describe('document.title follows the active view', () => {
-    it('shows the active character name on the sheet and CharSheets elsewhere', async () => {
+  describe('document.title names the campaign and view', () => {
+    it('uses "<campaign> — <view>" while mounted (character names the sheet view)', async () => {
       await renderInCampaign('localhost', [
         { name: 'Aragorn', level: 1 },
         { name: 'Legolas', level: 2 },
       ]);
 
-      expect(document.title).toBe('Aragorn');
+      // Sheet mounted right after campaign select → campaign + character.
+      expect(document.title).toBe('test-campaign — Aragorn');
 
-      // Any non-sheet view reverts the title to the app name.
+      // Any other view swaps in its sidebar label, campaign still first.
       await openView('initiative-btn', 'initiative');
-      expect(document.title).toBe('CharSheets');
+      expect(document.title).toBe('test-campaign — Initiative');
 
-      // Selecting a character brings their name back.
+      await openView('log-btn', 'campaign-log-view');
+      expect(document.title).toBe('test-campaign — Log');
+
+      // Selecting a character re-names the sheet section.
       fireEvent.click(screen.getByTestId('char-btn-Legolas'));
       await waitFor(() => {
         expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
       });
-      expect(document.title).toBe('Legolas');
+      expect(document.title).toBe('test-campaign — Legolas');
+    });
+
+    it('falls back to the neutral app name on the campaign-select screen', async () => {
+      await renderInCampaign('localhost', [{ name: 'Aragorn', level: 1 }]);
+      await openView('initiative-btn', 'initiative');
+
+      // "Campaigns" keeps campaignName/activeView mounted in state — the
+      // title must drop them, never showing a stale campaign or character.
+      await backToCampaigns();
+      expect(document.title).toBe('CharSheets');
     });
   });
 });

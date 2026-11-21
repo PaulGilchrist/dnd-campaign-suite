@@ -55,6 +55,7 @@ import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
 import EmptyCampaignState from './components/campaign-empty-state/EmptyCampaignState.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
+import { getDocumentTitle } from './routes/config.js';
 import LevelUpCelebration from './components/level-up/LevelUpCelebration.jsx';
 
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
@@ -686,11 +687,16 @@ function App() {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Tab title always answers "which campaign is this?" (backlog KKK 2026-11-21):
+  // "<campaign> — <view>" while mounted, neutral app name on the select screen.
   useEffect(() => {
-    document.title = activeView === 'charSheet' && activeCharacter
-      ? activeCharacter.name
-      : 'CharSheets';
-  }, [activeView, activeCharacter]);
+    document.title = getDocumentTitle({
+      campaignName,
+      showCampaignSelection,
+      activeView,
+      characterName: activeCharacter?.name,
+    });
+  }, [campaignName, showCampaignSelection, activeView, activeCharacter]);
 
   useEffect(() => {
     setMapsView({ type: 'none' });

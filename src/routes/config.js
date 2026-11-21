@@ -193,3 +193,35 @@ export const SIDEBAR_BUTTONS = [
  * All sidebar views — mutually exclusive via single activeView variable.
  */
 export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'questBoard', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'gmScreen', 'music', 'campaignRepair'];
+
+/**
+ * Neutral app name — matches index.html's static <title> so the
+ * campaign-select screen and a fresh load agree.
+ */
+export const APP_TITLE = 'CharSheets';
+
+// View-name → sidebar label, derived from SIDEBAR_BUTTONS (single source of
+// truth for how each view is named in the UI).
+const VIEW_TITLE_LABELS = SIDEBAR_BUTTONS.reduce((labels, { view, label }) => {
+  labels[view] = label;
+  return labels;
+}, {});
+
+/**
+ * Browser tab title derivation (backlog KKK 2026-11-21): while a campaign is
+ * mounted the title is "<campaign> — <view>" so every tab answers "which
+ * campaign is this?" on multi-campaign QA setups and table TVs. The sheet
+ * view names the open character as its section ("<campaign> — Aragorn");
+ * any other view uses its sidebar label. The campaign-select screen (no
+ * campaign, or the selection overlay showing after "Campaigns" — where
+ * activeView may still hold a stale view) gets the neutral app name, never
+ * a stale campaign.
+ */
+export function getDocumentTitle({ campaignName, showCampaignSelection, activeView, characterName }) {
+  if (!campaignName || showCampaignSelection) return APP_TITLE;
+  if (activeView === VIEWS.CHAR_SHEET.name && characterName) {
+    return `${campaignName} — ${characterName}`;
+  }
+  const label = VIEW_TITLE_LABELS[activeView];
+  return label ? `${campaignName} — ${label}` : campaignName;
+}
