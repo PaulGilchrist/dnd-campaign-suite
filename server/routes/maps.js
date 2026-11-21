@@ -160,7 +160,8 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   res.json({ maps });
 }));
 
-const clampGridSize = (gridSize) => Math.max(5, Math.min(100, gridSize ?? 20));
+const DEFAULT_GRID_SIZE = 20;
+const clampGridSize = (gridSize) => Math.max(5, Math.min(100, gridSize ?? DEFAULT_GRID_SIZE));
 
 // revealed[] entries are "gx,gy" strings (see useFogOfWar / mergeNewlyRevealed).
 // Cells outside the current grid can never be rendered or matched by fog math
@@ -456,8 +457,16 @@ const centrePartyPosition = (gridSize) => ({
   r: Math.floor(gridSize / 2),
 });
 
+// Create-lane gridSize mirroring the PUT's sanctioned-null-clear asymmetry
+// (LLL backlog 2026-11-21): an explicit null stays null in the stored document
+// (the echo then honestly reports null), while an ABSENT key takes the
+// documented default through clampGridSize and numbers clamp to 5..100 — the
+// one shared helper for both write lanes.
+const createGridSize = (requested) =>
+  requested === null ? null : clampGridSize(requested);
+
 const buildOutdoorMapData = (name, body) => {
-  const gridSize = clampGridSize(body.gridSize);
+  const gridSize = createGridSize(body.gridSize);
   return {
     displayName: createDisplayName(name, body),
     name: toKebabCase(name.trim()),
@@ -476,7 +485,9 @@ const buildOutdoorMapData = (name, body) => {
     zoom: 1,
     panX: 0,
     panY: 0,
-    partyPosition: body.partyPosition ?? centrePartyPosition(gridSize),
+    // An explicit null gridSize (sanctioned clear) has no centre — stamp the
+    // documented default grid's centre so the pin is always a valid origin.
+    partyPosition: body.partyPosition ?? centrePartyPosition(gridSize ?? DEFAULT_GRID_SIZE),
   };
 };
 
@@ -484,7 +495,7 @@ const buildIndoorMapData = (name, body) => ({
   displayName: createDisplayName(name, body),
   name: toKebabCase(name.trim()),
   type: body.type ?? 'indoor',
-  gridSize: clampGridSize(body.gridSize),
+  gridSize: createGridSize(body.gridSize),
   walls: body.walls ?? [],
   placedItems: body.placedItems ?? [],
   paintCells: body.paintCells ?? [],
@@ -582,7 +593,15 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   const createdMap = { name: name.trim(), fileName, slug: slugFromFileName(fileName) };
   publish(`maps-list-${campaign}`, { action: 'created', map: createdMap }, campaign);
 
-  res.status(201).json({ message: 'Map created successfully', map: createdMap });
+  // Honest clamp echo on the create lane too (LLL backlog 2026-11-21, twin of
+  // the PUT saveResponse): the builders clamp gridSize before the write, so
+  // the body carries the STORED value + the replaced-number flag — a rig that
+  // posts 110 learns 100 without a follow-up GET. The existing {message, map}
+  // fields ride unchanged; gridSize/clamped are added.
+  res.status(201).json({
+    ...saveResponse(body, normalizedCreate.mapData, 'Map created successfully'),
+    map: createdMap,
+  });
 }));
 
 // GET /api/campaigns/:campaign/maps/:mapname - Get map data
@@ -614,8 +633,11 @@ router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
 // does not hold. `clamped` merely flags that a REQUESTED number was replaced.
 // A body that omitted the key echoes no gridSize at all (JSON.stringify drops
 // undefined), mirroring the never-invent rule; an explicit null echoes null.
-const saveResponse = (requestedDoc, storedDoc) => ({
-  message: 'Map saved successfully',
+// The create lane (LLL backlog 2026-11-21) reuses the same flag law with its
+// own message — a create builder always stores a gridSize (absent takes the
+// documented default), so its echo always carries the stored value.
+const saveResponse = (requestedDoc, storedDoc, message = 'Map saved successfully') => ({
+  message,
   gridSize: storedDoc?.gridSize,
   clamped: typeof requestedDoc?.gridSize === 'number'
     && storedDoc?.gridSize !== requestedDoc.gridSize,
