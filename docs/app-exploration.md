@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + disk `campaign-log.json`/`character-change-data.js
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 JII — scoped PATCH success body `applied:0` counter reads as a lie:** every record-merge commit (4/4 JII, plus carried RG/DM law) returns `applied:0` while the GET shows the value landed — the field is combatSummary-row-scoped semantics leaking into char-bucket responses; count applied fields or omit the counter outside the rows lane (`campaigns-changedata.js`).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

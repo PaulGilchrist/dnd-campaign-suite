@@ -423,10 +423,13 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
  *     (join/remove/clear) keep riding the full POST;
  *   • anything else ⇒ the patch field replaces the stored field.
  *
- * Response honesty (backlog 2026-11-04 CS): alongside the existing
- * `message`, the 200 body reports `applied` (count of named records that
- * merged) and `skipped` (names with no stored match) so clients can detect
- * silently-dropped arms instead of trusting a blanket success.
+ * Response honesty (backlog 2026-11-04 CS, amended 2026-11-21 JII): alongside
+ * the existing `message`, the 200 body reports `applied` (count of named
+ * records that merged — combatSummary-rows-lane semantics ONLY),
+ * `appliedFields` (count of top-level patch fields actually WRITTEN into the
+ * merged bucket — see mergePatchFields) and `skipped` (names with no stored
+ * match). A char-bucket field patch answers `applied: 0, appliedFields: n` —
+ * the record counter no longer reads as a lie where no records exist.
  */
 function isPlainRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -451,16 +454,28 @@ function mergeNamedRecords(stored, patchRecords, stats) {
     }
 }
 
+// Merges `patch`'s fields into `target` and RETURNS the number of fields
+// WRITTEN at this object's level (write counts, not diff counts: a field
+// written with an identical value still counts). Each key counts once at the
+// shallowest level it is written — a recursive object merge counts its key
+// ONCE (never per leaf), and only when something inside was actually written;
+// a named-records merge counts its key once if at least one record matched.
+// The root call's return value is the response's `appliedFields`.
 function mergePatchFields(target, patch, stats) {
+    let written = 0;
     for (const [key, value] of Object.entries(patch)) {
         if (isPlainRecord(target[key]) && isPlainRecord(value)) {
-            mergePatchFields(target[key], value, stats);
+            if (mergePatchFields(target[key], value, stats) > 0) written += 1;
         } else if (namedRecords(target[key]) && namedRecords(value)) {
+            const appliedBefore = stats.applied;
             mergeNamedRecords(target[key], value, stats);
+            if (stats.applied > appliedBefore) written += 1;
         } else {
             target[key] = value;
+            written += 1;
         }
     }
+    return written;
 }
 
 /**
@@ -534,20 +549,27 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
         });
     }
 
-    // Merge accounting (backlog 2026-11-04 CS): the old reply said "Data
-    // patched successfully" even when EVERY record was skipped — the truth
-    // lived only in the server console, so a silently-dropped arming arm was
-    // undetectable client-side. The response now reports how many named
-    // records actually merged (`applied`) and which had no stored match
-    // (`skipped`). Field-level patches with no named-record arrays report
-    // applied: 0 / skipped: [] — nothing was dropped, there were just no
-    // records to merge; clients detect drops via `skipped.length > 0`.
+    // Merge accounting (backlog 2026-11-04 CS, amended 2026-11-21 JII): the
+    // old reply said "Data patched successfully" even when EVERY record was
+    // skipped — the truth lived only in the server console, so a silently-
+    // dropped arming arm was undetectable client-side. The response reports
+    // how many named records actually merged (`applied` — a ROWS-lane count:
+    // it stays byte-identical for combatSummary and is honest record-merge
+    // truth = 0 for a char bucket with no record arrays) and which had no
+    // stored match (`skipped`). The JII fix adds `appliedFields`: how many
+    // TOP-LEVEL patch fields were actually WRITTEN into the merged bucket
+    // (write counts, not diff counts — a field written with an identical
+    // value counts; a recursive object merge and a named-records merge each
+    // count their top-level key ONCE, never per leaf/record). So a char-
+    // bucket PATCH like {value:{currentHitPoints:8}} answers
+    // {applied: 0, appliedFields: 1} — the field landed, nothing reads as a
+    // lie. Drop detection stays `skipped.length > 0`.
     // Stale arm writes lost to a controller swap/release (dropStaleArmWrites)
     // are named in `staleArmDropped` — same never-silent-success doctrine.
     const staleArmDropped = dropStaleArmWrites(campaign, key, patch, data[key]);
     const merged = lodash.cloneDeep(data[key]);
     const stats = { applied: 0, skipped: [] };
-    mergePatchFields(merged, patch, stats);
+    const appliedFields = mergePatchFields(merged, patch, stats);
     const { skipped } = stats;
     if (skipped.length) {
         console.error(
@@ -588,7 +610,13 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // exists (byte-identical to a full POST echo).
     publish(`change-${campaign}-${key}`, storedValue, campaign);
 
-    res.json({ message: 'Data patched successfully', applied: stats.applied, skipped, staleArmDropped });
+    res.json({
+        message: 'Data patched successfully',
+        applied: stats.applied,
+        appliedFields,
+        skipped,
+        staleArmDropped,
+    });
 }));
 
 // PUT /api/campaigns/:campaign/:key — reserved-key guard only.
