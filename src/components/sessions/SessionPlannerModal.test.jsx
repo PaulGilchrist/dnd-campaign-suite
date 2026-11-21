@@ -3,6 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
 
+// The footer's RecapButton probes GET /ai/status on mount (backlog 2026-11-21
+// FFF) and AiRefineButton owns refineEntity — stub the whole transport lane so
+// no test hits the network. Default face: AI configured (happy-path wiring).
+vi.mock('../../services/ai/aiClient.js', () => ({
+  getAiStatus: vi.fn(async () => ({ configured: true })),
+  refineEntity: vi.fn(),
+}));
+
 // Stub clipboard (jsdom does not provide navigator.clipboard by default)
 beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', {

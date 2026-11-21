@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AiRefineButton from '../common/AiRefineButton.jsx';
+import { getAiStatus } from '../../services/ai/aiClient.js';
 import {
   LINK_TYPES,
   CONTINGENCY_BRANCHES,
@@ -230,17 +231,42 @@ function ActiveSessionToggle({ editingSession, formData, activeSession, onSetAct
 // as ActiveSessionToggle: a visitor gets no button. Row-only (like
 // Delete/Mark-played): the recap mines the log rows stamped with this saved
 // session's name, so an unsaved-new draft has nothing to recap yet.
-function RecapButton({ editingSession, formData, recapBusy, onWriteRecap }) {
-  if (!onWriteRecap || !editingSession) return null;
-  const name = formData.name.trim() || editingSession.name;
+//
+// Backlog 2026-11-21 FFF: with AI off the server 403s POST /ai/recap, so the
+// old face burned a click before the honest banner arrived. The button now
+// pre-gates on the SAME truth that gate uses — GET /ai/status `configured`
+// (the server's own aiConfigLive derivation, consumed, never mirrored here).
+// While the probe is in flight (aiConfigured === null) or the status lane
+// failed, the button keeps its NEUTRAL pre-change face (enabled): a slow
+// probe must never flash a wrong disabled state, and a failed probe still
+// lands on the server's honest refusal. The effect keys off primitives only
+// so the parent's per-render handler identity never re-triggers the fetch.
+function RecapButton({ campaignName, editingSession, formData, recapBusy, onWriteRecap }) {
+  const visible = Boolean(onWriteRecap && editingSession);
+  const savedName = editingSession?.name || '';
+  const [aiConfigured, setAiConfigured] = useState(null);
+
+  useEffect(() => {
+    if (!visible || !campaignName || !savedName) return;
+    let cancelled = false;
+    getAiStatus(campaignName)
+      .then((s) => { if (!cancelled) setAiConfigured(Boolean(s.configured)) })
+      .catch((err) => console.error('Failed to check AI status for the recap button:', err));
+    return () => { cancelled = true };
+  }, [visible, campaignName, savedName]);
+
+  if (!visible) return null;
+  const name = formData.name.trim() || savedName;
+  const aiOff = aiConfigured === false;
+  let title = `Ask the AI to write ${name}'s story from its campaign log rows and post it to the log`;
+  if (recapBusy) title = 'The AI is writing this session\'s story…';
+  if (aiOff) title = 'Enable AI in Admin to write recaps';
   return (
     <button
       className="ct-btn sessions-recap-btn"
       onClick={onWriteRecap}
-      disabled={recapBusy || !name}
-      title={recapBusy
-        ? 'The AI is writing this session\'s story…'
-        : `Ask the AI to write ${name}'s story from its campaign log rows and post it to the log`}
+      disabled={recapBusy || !name || aiOff}
+      title={title}
     >
       <i className={`fa-solid ${recapBusy ? 'fa-spinner fa-spin' : 'fa-scroll'}`} /> {recapBusy ? 'Writing recap…' : 'Write recap'}
     </button>
@@ -302,6 +328,7 @@ function SessionModalFooter({
           onSetActiveSession={onSetActiveSession}
         />
         <RecapButton
+          campaignName={campaignName}
           editingSession={editingSession}
           formData={formData}
           recapBusy={recapBusy}

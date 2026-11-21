@@ -16,6 +16,9 @@ import { refineEntity } from '../../services/ai/aiClient.js';
 
 vi.mock('../../services/ai/aiClient.js', () => ({
   refineEntity: vi.fn(),
+  // RecapButton's status probe (backlog 2026-11-21 FFF) imports this too —
+  // Vitest throws on undefined exports of a mocked module.
+  getAiStatus: vi.fn(async () => ({ configured: true })),
 }));
 
 const DIRTY_ROW = {
