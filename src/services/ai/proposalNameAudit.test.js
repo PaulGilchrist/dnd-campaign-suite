@@ -119,10 +119,68 @@ describe('findUnknownLedgerNames — possessive/plural face (YB 2026-11-13)', ()
     it('genuine unknowns — typos and invented names — are still flagged', () => {
         expect(findUnknownLedgerNames(quest('Spies from The Iron Conshortium gather at the quay.'), LEDGERS))
             .toEqual(['The Iron Conshortium']);
-        // "the" breaks the capitalised run, so both halves of the invented
-        // name surface — proof the invented name is never swallowed.
+        // MMM 2026-11-21: the epithet particle fuses, so the invented name
+        // surfaces as ONE flagged phrase, never as fragments.
         expect(findUnknownLedgerNames(quest("The Iron Consortium's agent Marta Copperkettle meets Zarvok the Unlit."), LEDGERS))
-            .toEqual(['Zarvok', 'Unlit']);
+            .toEqual(['Zarvok the Unlit']);
+    });
+});
+
+describe('extractProperNameRuns — epithet-particle fusion (MMM 2026-11-21)', () => {
+    it('a single lowercase the/of/son between capitalised tokens joins one candidate', () => {
+        expect(extractProperNameRuns('Bring it to Zorvath the Unminted quietly.'))
+            .toEqual(['Zorvath the Unminted']);
+        expect(extractProperNameRuns('Pledge to the Legion of Doom first.'))
+            .toEqual(['Legion of Doom']);
+        expect(extractProperNameRuns('Bring it to Aldric son Bard.'))
+            .toEqual(['Aldric son Bard']);
+    });
+
+    it('two consecutive lowercase words never fuse', () => {
+        expect(extractProperNameRuns('kneel before Zorvath the great Unminted.'))
+            .toEqual(['Zorvath', 'Unminted']);
+    });
+
+    it('a particle at a run end (no following capitalised token) does not fuse', () => {
+        expect(extractProperNameRuns('Bring it to Zorvath the'))
+            .toEqual(['Zorvath']);
+    });
+
+    it('punctuation after the particle breaks the run (spaces only fuse)', () => {
+        expect(extractProperNameRuns('Bend the knee to Zorvath the. Unminted watches.'))
+            .toEqual(['Zorvath']);
+    });
+
+    it('the particle tail still obeys isNameToken (acronym after a particle does not fuse)', () => {
+        expect(extractProperNameRuns('Bring it to Zorvath the II.'))
+            .toEqual(['Zorvath']);
+    });
+
+    it('a sentence-initial fused phrase keeps its lead verb token in the phrase', () => {
+        // Same shape as the "Repay Marta Copperkettle" fusion: the phrase is
+        // kept whole; the grounding face drops the lead token (pinned below).
+        expect(extractProperNameRuns('Find Zorvath the Unminted.'))
+            .toEqual(['Find Zorvath the Unminted']);
+    });
+});
+
+describe('findUnknownLedgerNames — epithet grounding (MMM 2026-11-21)', () => {
+    const LEDGERS = {
+        npcNames: ['Marta Copperkettle', 'Zorvath the Unminted'],
+        settlementNames: ['Bravor'],
+    };
+
+    it('an epithet ledger name grounds stem-exact as a whole phrase', () => {
+        expect(findUnknownLedgerNames(quest('Bring it to Zorvath the Unminted in Bravor.'), LEDGERS)).toEqual([]);
+    });
+
+    it('an unknown epithet surfaces as ONE flagged name', () => {
+        expect(findUnknownLedgerNames(quest('Bring it to Vexley the Unforged.'), LEDGERS))
+            .toEqual(['Vexley the Unforged']);
+    });
+
+    it('a sentence-start fused epithet drops its lead verb token when grounding', () => {
+        expect(findUnknownLedgerNames(quest('Find Zorvath the Unminted at dusk.'), LEDGERS)).toEqual([]);
     });
 });
 

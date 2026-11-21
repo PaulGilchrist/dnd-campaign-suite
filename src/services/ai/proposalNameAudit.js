@@ -14,6 +14,12 @@
 // A capitalised token, hyphenated parts included ("Nowhere-on-Sea").
 const RUN_RE = /[A-Z][A-Za-z0-9'’]*(?:[-‑][A-Za-z0-9'’]+)*/g
 const NEXT_TOKEN_RE = /^ +[A-Z][A-Za-z0-9'’]*(?:[-‑][A-Za-z0-9'’]+)*/
+// Epithet particles (MMM 2026-11-21): ONE lowercase "the"/"of"/"son" riding
+// between two capitalised tokens joins the name ("Zorvath the Unminted"). The
+// tail reuses NEXT_TOKEN_RE's space-only shape, so intervening punctuation
+// ("the. Then Marta") still breaks the run, and a second consecutive
+// lowercase word ("the big Unminted") never matches.
+const PARTICLE_TOKEN_RE = /^ +(the|of|son)( +[A-Z][A-Za-z0-9'’]*(?:[-‑][A-Za-z0-9'’]+)*)/
 // Sentence boundaries — a lone capital after one is probably just a verb.
 const SENTENCE_END = /[.!?;:]['"]?$/
 // Roman numerals / acronyms riding the capitalised pattern (II, DC, GP).
@@ -47,17 +53,28 @@ function isPlausibleName(run, sentenceStart) {
 // Collect consecutive capitalised name tokens as one candidate phrase; returns
 // the phrase plus the exact end offset so the scan never re-reads absorbed
 // tokens. An all-caps/lone-letter neighbour is NOT absorbed (verbs followed
-// by Roman numerals must not fuse into a fake phrase).
+// by Roman numerals must not fuse into a fake phrase). A single lowercase
+// epithet particle ("the"/"of"/"son") immediately between the run's last
+// capitalised token and a following capitalised name token rides along, so
+// epithets join as one candidate ("Zorvath the Unminted", not two fragments).
 function collectRun(text, start, firstToken) {
     const run = [firstToken]
     let cursor = start + firstToken.length
     for (;;) {
         const next = NEXT_TOKEN_RE.exec(text.slice(cursor))
-        if (!next) break
-        const token = next[0].trim()
+        if (next) {
+            const token = next[0].trim()
+            if (!isNameToken(token)) break
+            run.push(token)
+            cursor += next[0].length
+            continue
+        }
+        const fused = PARTICLE_TOKEN_RE.exec(text.slice(cursor))
+        if (!fused) break
+        const token = fused[2].trim()
         if (!isNameToken(token)) break
-        run.push(token)
-        cursor += next[0].length
+        run.push(fused[1], token)
+        cursor += fused[0].length
     }
     return { run, end: cursor }
 }
