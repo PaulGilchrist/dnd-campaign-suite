@@ -29,13 +29,19 @@ const clip = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 // One prompt line per row. Recaps get the biggest clip (they carry whole
 // sessions); raw rows are beats, so a tighter one-liner keeps the budget for
 // more of the story. Returns null for rows with no readable text.
+// Recaps carry NO author token: `session_recap` is a SERVER-ONLY log type
+// (routes/log.js SERVER_ONLY_LOG_TYPES) whose author is always GM, so `GM:`
+// is pure noise there — raw rows keep theirs (a note may be player-authored).
 function storyLine(entry) {
-    const isRecap = entry.type === 'session_recap';
-    const text = clip(getEntryText(entry), isRecap ? 300 : 160);
+    if (entry.type === 'session_recap') {
+        const text = clip(getEntryText(entry), 300);
+        if (!text) return null;
+        return `- recap of “${clip(entry.recapSession, 60)}”: ${text}`;
+    }
+    const text = clip(getEntryText(entry), 160);
     if (!text) return null;
     const who = entry.characterName ? `${clip(entry.characterName, 40)}: ` : '';
-    const label = isRecap ? `recap of “${clip(entry.recapSession, 60)}”` : entry.type;
-    return `- ${label}: ${who}${text}`;
+    return `- ${entry.type}: ${who}${text}`;
 }
 
 /**

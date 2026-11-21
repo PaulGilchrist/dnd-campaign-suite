@@ -98,6 +98,34 @@ describe('buildStoryFromRows — hierarchical memory (recap-compressed past)', (
     });
 });
 
+describe('buildStoryFromRows — line format (JII: recaps drop the author token)', () => {
+    it('renders a recap line exactly as `- recap of “X”: <prose>` — no author token even when the row carries characterName', () => {
+        const story = buildStoryFromRows([
+            { type: 'session_recap', description: 'The party fled the cave.', recapSession: 'Session 1', characterName: 'GM' },
+        ], 'Session 2');
+        expect(story).toBe('- recap of “Session 1”: The party fled the cave.');
+        expect(story).not.toContain('GM:');
+    });
+
+    it('clips the recap session name at 60 chars (clamp preserved)', () => {
+        const long = 'S'.repeat(80);
+        const story = buildStoryFromRows([
+            { type: 'session_recap', description: 'Prose.', recapSession: long, characterName: 'GM' },
+        ], 'Session 2');
+        expect(story).toBe(`- recap of “${'S'.repeat(60)}”: Prose.`);
+    });
+
+    it('raw note/narrative rows keep their author label verbatim', () => {
+        const story = buildStoryFromRows([
+            { type: 'note', noteText: 'the keeper lies', characterName: 'GM' },
+            { type: 'narrative', description: 'Rakan strikes.', characterName: 'Rakan' },
+        ], null);
+        const lines = story.split('\n');
+        expect(lines[0]).toBe('- note: GM: the keeper lies');
+        expect(lines[1]).toBe('- narrative: Rakan: Rakan strikes.');
+    });
+});
+
 describe('buildStoryFromRows — budgets', () => {
     it('caps at STORY_MAX_ROWS keeping the freshest tail', () => {
         const rows = Array.from({ length: STORY_MAX_ROWS + 10 }, (_, i) => narrative(`beat ${i}.`));
