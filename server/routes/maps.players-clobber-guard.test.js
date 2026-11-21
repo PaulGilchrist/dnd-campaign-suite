@@ -6,6 +6,9 @@
 // strip players → PUT → reopen crashes the editor at Players.jsx). The route
 // now 400s the erase and stays byte-inert; every valid full-object lane
 // (fog-merge, token-move, travelState, create-via-PUT) must keep working.
+// MERGED (improve 2026-11-21): the array-shape test feeds the generalized
+// wholeMapErasureError, so one refusal names players ALONGSIDE every other
+// omitted field; the singular face keeps the general sentence pattern.
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 import maps, { erasesStoredPlayers } from './maps.js';
@@ -96,7 +99,8 @@ describe('maps - PUT players-clobber guard', () => {
 
         expect(res.status).toBe(400);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toMatch(/players array/i);
+        expect(res.body.error).toContain('"players"');
+        expect(res.body.error).toMatch(/^Map save rejected: a whole-map save must include the /);
         // Byte-inert: the stored document still carries its tokens…
         expect(readMockFile(file)).toEqual(original);
         // …and no SSE echo resurrected the clobber client-side.

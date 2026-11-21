@@ -8,9 +8,12 @@
 // (outdoor type/gridSize/terrain/pois, indoor type/gridSize/walls/
 // placedItems) 400 with the same plain-English register and stay byte-inert,
 // while an explicit null passes (omission is NOT clearing — same asymmetry),
-// the players-guard copy stays byte-identical, and every legitimate full-
-// document lane (hex settle envelope, encounter/staging/seed bodies,
-// create-via-PUT, legacy docs that never carried a key) keeps working.
+// and every legitimate full-document lane (hex settle envelope, encounter/
+// staging/seed bodies, create-via-PUT, legacy docs that never carried a key)
+// keeps working. MERGED (improve 2026-11-21): the players-clobber guard's
+// array-shape test rides the indoor set, so ONE refusal names EVERY missing
+// guarded field (players included) instead of the old one-per-round-trip
+// short-circuit; for players an explicit null stays refused (array required).
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 import maps, { wholeMapErasureError } from './maps.js';
@@ -205,22 +208,53 @@ describe('maps - generalized whole-map PUT erasure guard', () => {
         );
     });
 
-    it('players-guard copy stays byte-identical and wins over the general guard', async () => {
+    it('one 400 names BOTH "players" and "walls" when both are omitted (merged guard — no short-circuit)', async () => {
         const file = `${MAPS_DIR}/test-map.json`;
         const original = storedIndoor();
         MOCK_FS.set(file, original);
 
         const stripped = { ...original };
         delete stripped.players;
-        delete stripped.walls; // both guards would fire — players copy must win verbatim
+        delete stripped.walls; // both fields missing — one message lists both
 
         const res = await putMap('test-map', stripped);
 
         expect(res.status).toBe(400);
         expect(res.body.error).toBe(
-            'Map save rejected: a whole-map save must include the players array — '
+            'Map save rejected: a whole-map save must include the "players" and "walls" fields — '
+            + 'without them every player token would be erased from the map; '
+            + 'every wall would be erased from the map.'
+        );
+        expect(readMockFile(file)).toEqual(original); // zero write
+    });
+
+    it('omitting ONLY players keeps the singular face — same pattern, names just players', async () => {
+        const file = `${MAPS_DIR}/test-map.json`;
+        const original = storedIndoor();
+        MOCK_FS.set(file, original);
+
+        const stripped = { ...original };
+        delete stripped.players;
+
+        const res = await putMap('test-map', stripped);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(
+            'Map save rejected: a whole-map save must include the "players" field — '
             + 'without it every player token would be erased from the map.'
         );
+        expect(readMockFile(file)).toEqual(original);
+    });
+
+    it('a non-array players value (null) rides the same refusal (array-shape arm — null is NOT a sanctioned clear there)', async () => {
+        const file = `${MAPS_DIR}/test-map.json`;
+        const original = storedIndoor();
+        MOCK_FS.set(file, original);
+
+        const res = await putMap('test-map', { ...original, players: null });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('"players"');
         expect(readMockFile(file)).toEqual(original);
     });
 
@@ -234,6 +268,13 @@ describe('maps - generalized whole-map PUT erasure guard', () => {
         // Outdoor docs are policed against the OUTDOOR set only (placedItems is indoor-structural).
         expect(wholeMapErasureError({ placedItems: [] }, {}, true)).toBeNull();
         expect(wholeMapErasureError({ pois: [] }, {}, true)).toMatch(/"pois"/);
+        // players arm: array-shape semantics (omission OR non-array refuses;
+        // stored doc without a players array is never policed; outdoor stays free).
+        expect(wholeMapErasureError({ players: [] }, {}, false)).toMatch(/"players"/);
+        expect(wholeMapErasureError({ players: [] }, { players: null }, false)).toMatch(/"players"/);
+        expect(wholeMapErasureError({ players: [] }, { players: [] }, false)).toBeNull();
+        expect(wholeMapErasureError({ players: null }, {}, false)).toBeNull();
+        expect(wholeMapErasureError({ players: [] }, {}, true)).toBeNull();
     });
 });
 

@@ -243,6 +243,9 @@ function readStoredMapDocument(filePath) {
 // keeps the hex travelState lane byte-identical without a type check. Create-
 // via-PUT (no stored doc) and stored docs that never carry players (outdoor
 // hex maps) stay untouched — this rejects only an ERASE, never over-validates.
+// Since the 2026-11-21 merge it feeds the `players` arm of
+// wholeMapErasureError (one refusal listing every missing field) instead of
+// its own short-circuiting route branch.
 export function erasesStoredPlayers(storedData, incomingData) {
   return !!storedData
     && Array.isArray(storedData.players)
@@ -263,15 +266,18 @@ export function erasesStoredPlayers(storedData, incomingData) {
 // staging/seed bodies), while fields some builders legitimately omit (indoor
 // items/paintCells/fog, outdoor roads/marchingOrder/weather/travelState,
 // view-only zoom/pan) stay unguarded so the guard can never fire on an
-// honest app save. `players` keeps its own byte-pinned branch above.
+// honest app save. `players` rides the indoor set with its OWN array-shape
+// test (see the special arm in wholeMapErasureError) so one refusal names it
+// alongside every other omitted field instead of short-circuiting the list.
 const ERASURE_GUARD_FIELDS = {
   outdoor: ['type', 'gridSize', 'terrain', 'pois'],
-  indoor: ['type', 'gridSize', 'walls', 'placedItems'],
+  indoor: ['type', 'gridSize', 'players', 'walls', 'placedItems'],
 };
 
 // Plain-English consequence per guarded field (the "every player token would
 // be erased" register — name the field, name what its loss destroys).
 const ERASURE_HARM = {
+  players: 'every player token would be erased from the map',
   type: 'the map would be reclassified and reopen in the wrong editor',
   gridSize: 'its grid dimensions would be lost',
   walls: 'every wall would be erased from the map',
@@ -287,15 +293,22 @@ const quoteFields = (fields) => {
     : `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
 };
 
-// Returns the plain-English 400 message naming every required field the body
-// omits while the stored document has it, or null when the body is safe.
-// Explicit null passes (clear), explicit undefined… cannot arrive over JSON,
-// so key-presence is the whole test — same omission-vs-null asymmetry as the
-// players guard.
+// Returns the plain-English 400 message naming EVERY required field the body
+// omits while the stored document has it, or null when the body is safe —
+// the full list rides one refusal so a client fixing its body learns the
+// whole required-key set in a single round-trip. Explicit null passes
+// (clear), explicit undefined… cannot arrive over JSON, so key-presence is
+// the whole test — same omission-vs-null asymmetry throughout, EXCEPT the
+// `players` arm: it keeps the players-clobber guard's array-shape semantics
+// verbatim (a stored players array demands an ARRAY back — omission or a
+// non-array value like null both refuse, so an explicit null is NOT the
+// sanctioned clear for tokens).
 export function wholeMapErasureError(storedData, incomingData, isOutdoor) {
   if (!storedData) return null;
   const missing = (isOutdoor ? ERASURE_GUARD_FIELDS.outdoor : ERASURE_GUARD_FIELDS.indoor)
-    .filter((field) => storedData[field] !== undefined && incomingData?.[field] === undefined);
+    .filter((field) => (field === 'players'
+      ? erasesStoredPlayers(storedData, incomingData)
+      : storedData[field] !== undefined && incomingData?.[field] === undefined));
   if (missing.length === 0) return null;
   const harms = missing.map((field) => ERASURE_HARM[field]).join('; ');
   const single = missing.length === 1;
@@ -612,15 +625,12 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
     return refuseOutdoorEditorWriteUnlessGm(req, res);
   }
 
-  if (!isOutdoor && erasesStoredPlayers(storedData, req.body)) {
-    console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — body without a players array would erase stored player tokens`);
-    return res.status(400).json({ error: 'Map save rejected: a whole-map save must include the players array — without it every player token would be erased from the map.' });
-  }
-
-  // Generalized erasure guard (backlog 2026-11-12 WY) — same seam, same
-  // omission-vs-null asymmetry as the players guard above, per-type required
-  // sets. Runs AFTER the players branch so its byte-pinned copy wins whenever
-  // both would fire. Nothing on disk is touched on refusal.
+  // Erasure guard (backlog 2026-11-12 WY, generalized 2026-11-21): ONE refusal
+  // naming EVERY omitted required field — the players-clobber branch that used
+  // to short-circuit ahead of it is folded into the indoor set, so a body
+  // missing `players` AND `walls` learns both names in one 400 instead of
+  // one-per-round-trip. Same omission-vs-null asymmetry per field; nothing on
+  // disk is touched on refusal.
   const erasureError = wholeMapErasureError(storedData, req.body, isOutdoor);
   if (erasureError) {
     console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — body without required stored fields would flatten the map document`);

@@ -66,7 +66,6 @@ change-data `{}` + log `[]` + sessions `[]` + disk `campaign-log.json`/`characte
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (KKK 2026-11-21) Whole-doc map PUT erasure guard reports ONE missing field per 400 (`players` first, then `walls`, …) — a client (or harness) fixing its body learns the required-key set one round-trip at a time; listing ALL missing guarded fields in a single message would close the loop in one pass (`server/routes/maps.js` `wholeMapErasureError`).
 - (KKK 2026-11-21) 200 map-save response does not echo the clamped `gridSize` (the 400/error bodies carry rich copy but the success body is generic) — returning the stored/clamped value (or a `clamped:true` flag) would spare clients a follow-up GET after the save-lane clamp (paired with the 751e89e44 honest-response doctrine on the PATCH lane).
 
 
