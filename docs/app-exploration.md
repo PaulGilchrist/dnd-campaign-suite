@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab clears; dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-20 BBB) The forced-outcome chip rig would be cheaper for harnesses if the app carried a dev-only deterministic-roll seam (e.g. honouring a `?testRoll=` param or an exposed `__forceNextD20` hook in `diceRoller.js` behind an env gate) instead of every QA run re-wrapping `Math.random` page-side and risking bleed into `utils.guid()`/other consumers during the pin window. Not user-visible; harness ergonomics only.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.

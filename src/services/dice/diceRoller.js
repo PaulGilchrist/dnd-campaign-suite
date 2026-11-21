@@ -1,5 +1,46 @@
 
+// ── Dev-only forced-d20 seam (backlog 2026-11-20 BBB, harness ergonomics) ──
+// QA harnesses need forced natural 20/1 chip commits without re-wrapping
+// Math.random page-side (the pin window bleeds into unrelated consumers like
+// utils.guid()). The seam lives INSIDE rollD20 so no global RNG is patched:
+// arm once, the next rollD20() call returns the value verbatim and the seam
+// auto-disarms. Arming lanes (both gated import.meta.env.DEV, mirroring the
+// Map3D __map3d handle pattern):
+//   1. globalThis.__forceNextD20(n) — arm with an integer 1..20, or
+//      __forceNextD20(null) to disarm. Rejects out-of-range/non-integer.
+//   2. `?testRoll=<n>` URL param — arms the same one-shot seam at module
+//      load, so a fresh dev-server page ride needs zero page-side injection.
+// The override rides ONLY the rollD20() primitive (attack/save/initiative
+// d20s via computeD20Roll); damage dice (rollDie/rollDice) never consume it.
+let forcedD20 = null;
+
+function armForcedD20(value) {
+  if (value === null) {
+    forcedD20 = null;
+    return true;
+  }
+  if (!Number.isInteger(value) || value < 1 || value > 20) {
+    console.error('[diceRoller] forced-d20 seam rejected (need an integer 1..20, or null to disarm):', value);
+    return false;
+  }
+  forcedD20 = value;
+  return true;
+}
+
+if (import.meta.env.DEV) {
+  globalThis.__forceNextD20 = armForcedD20;
+  const testRollParam = new URLSearchParams(globalThis.location?.search || '').get('testRoll');
+  if (testRollParam !== null) {
+    armForcedD20(Number(testRollParam));
+  }
+}
+
 function rollD20() {
+  if (import.meta.env.DEV && forcedD20 !== null) {
+    const forced = forcedD20;
+    forcedD20 = null;
+    return forced;
+  }
   return Math.floor(Math.random() * 20) + 1;
 }
 
