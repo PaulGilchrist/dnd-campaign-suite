@@ -37,7 +37,7 @@ function renderModal(overrides = {}) {
     campaignName: 'test-campaign',
     saving: false,
     deleting: false,
-    error: null,
+    banner: null,
     onClose: vi.fn(),
     onSave: vi.fn(),
     onDelete: vi.fn(),

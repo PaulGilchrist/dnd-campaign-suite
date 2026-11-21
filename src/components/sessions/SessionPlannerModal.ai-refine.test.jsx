@@ -53,7 +53,7 @@ function renderEditor(formOverrides = {}, { editing = true } = {}) {
       campaignName="test-campaign"
       saving={false}
       deleting={false}
-      error={null}
+      banner={null}
       onClose={vi.fn()}
       onReloadList={vi.fn()}
       onSave={vi.fn()}

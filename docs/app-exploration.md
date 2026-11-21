@@ -66,8 +66,6 @@ change-data `{}` + log `[]` + disk `campaign-log.json`/`character-change-data.js
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 GGG: recap success feedback is asymmetric and easy to miss.** Failures print a persistent inline banner in the open planner modal (good), but success is only the transient toast `Recap of “…” posted to the campaign log` (`Sessions.jsx:498` showToast) — ~6 s after the press the toast had already faded while the modal stayed open, leaving zero in-modal witness that the recap landed (prose is visible only by switching to Log). Consider reusing the banner region on success (e.g. `Recap posted to the campaign log — open the Log to read it`), symmetrical with the refusal copy.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

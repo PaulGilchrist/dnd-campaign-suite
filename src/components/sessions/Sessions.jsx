@@ -89,10 +89,16 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   } = useCrudList(sessions, ['name', 'summary', 'notes']);
 
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState(null);
-  // True when the visible banner error is a 409 concurrent-edit conflict
-  // (server body { conflict: true }) — gates the "Reload list" action button.
-  const [errorIsConflict, setErrorIsConflict] = useState(false);
+  // The planner modal's ONE inline banner region as a single state concept:
+  // { message, kind, conflict } or null. `kind` carries the tone — 'error' is
+  // refusal/failure copy (red), 'success' is an action's persistent in-modal
+  // witness (green) — so both faces share the same region and the same
+  // lifecycle (reset per attempt, discarded on close). Backlog 2026-11-21 GGG:
+  // recap success rode only the transient toast, leaving the open modal with
+  // zero witness once it faded; it now rides this banner like its refusal twin.
+  // `conflict` marks a 409 concurrent-edit (server body { conflict: true }) —
+  // gates the "Reload list" action button.
+  const [banner, setBanner] = useState(null);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx
@@ -131,11 +137,15 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // runtime store (FriendlyFireConfirmModal idiom).
   const [pendingUnarmedNpc, setPendingUnarmedNpc] = useState(null);
 
-  // Single choke point for the banner: every message carries whether it was a
-  // conflict, so the "Reload list" action can never outlive its error copy.
+  // Single choke points for the banner: every message carries its kind (and
+  // whether it was a conflict), so the "Reload list" action can never outlive
+  // its error copy and success/refusal never fight over two parallel states.
   const showError = (message, conflict = false) => {
-    setError(message);
-    setErrorIsConflict(conflict);
+    setBanner(message ? { message, kind: 'error', conflict } : null);
+  };
+
+  const showSuccess = (message) => {
+    setBanner({ message, kind: 'success', conflict: false });
   };
 
   useEffect(() => {
@@ -483,19 +493,24 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // ── Session recap (roadmap Step 8) ──
   // GM-only, like the active-session toggle: the server gathers the rows
   // stamped to this session and posts the AI's story as a `session_recap`
-  // log row (SSE shows it in every tab). Failures land verbatim in the
-  // banner — plain-English server copy, never a silent spinner. The model
-  // call is bounded by the provider's own fetch timeout, so the busy flag
-  // can only outlive a hung request by that bound.
+  // log row (SSE shows it in every tab). Both outcomes land verbatim in the
+  // planner banner — plain-English server copy on refusal, a persistent
+  // success witness on landing (backlog 2026-11-21 GGG: the toast alone had
+  // faded while the modal stayed open, leaving nothing to prove the recap
+  // arrived). The model call is bounded by the provider's own fetch timeout,
+  // so the busy flag can only outlive a hung request by that bound.
   const [recapBusy, setRecapBusy] = useState(false);
 
   const handleWriteRecap = async () => {
     if (!editingSession || !formData || recapBusy) return;
     const name = formData.name.trim() || editingSession.name;
+    // A new attempt never keeps the previous banner glowing while it runs —
+    // same reset discipline every attempt pays.
+    showError(null);
     setRecapBusy(true);
     try {
       await requestSessionRecap(campaignName, name);
-      showToast(`Recap of “${name}” posted to the campaign log`);
+      showSuccess(`Recap of “${name}” posted to the campaign log — open the Log to read it`);
     } catch (err) {
       console.error('Failed to write the session recap:', err);
       showError(err.message || 'Failed to write the session recap');
@@ -623,8 +638,7 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
           campaignName={campaignName}
           saving={saving}
           deleting={deleting}
-          error={error}
-          errorConflict={errorIsConflict}
+          banner={banner}
           onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}

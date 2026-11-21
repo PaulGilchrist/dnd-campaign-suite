@@ -47,7 +47,7 @@ function renderModal(overrides = {}) {
     campaignName: 'test-campaign',
     saving: false,
     deleting: false,
-    error: null,
+    banner: null,
     onClose: vi.fn(),
     onSave: vi.fn(),
     onDelete: vi.fn(),
@@ -193,7 +193,7 @@ describe('SessionPlannerModal', () => {
   });
 
   it('shows the New Session title and error banner when creating with an error', () => {
-    renderModal({ editingSession: null, formData: { ...baseFormData, name: '' }, error: 'A session with this name already exists' });
+    renderModal({ editingSession: null, formData: { ...baseFormData, name: '' }, banner: { message: 'A session with this name already exists', kind: 'error', conflict: false } });
     expect(screen.getByRole('heading', { name: /new session/i })).toBeInTheDocument();
     expect(screen.getByText(/already exists/i)).toBeInTheDocument();
   });

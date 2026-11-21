@@ -75,12 +75,12 @@ vi.mock('./SessionListItem.jsx', () => ({
 // conflict "Reload list" action contract, and Save/Cancel wired to the real
 // handlers. (The real modal's own rendering lives in SessionPlannerModal.test.jsx.)
 vi.mock('./SessionPlannerModal.jsx', () => ({
-  default: ({ formData, setFormData, error, errorConflict, onReloadList, onClose, onSave }) => (
+  default: ({ formData, setFormData, banner, onReloadList, onClose, onSave }) => (
     <div data-testid="session-planner-modal">
-      {error ? (
-        <div className="sessions-form-error">
-          {error}
-          {errorConflict && onReloadList ? (
+      {banner ? (
+        <div className={banner.kind === 'success' ? 'sessions-form-success' : 'sessions-form-error'}>
+          {banner.message}
+          {banner.kind === 'error' && banner.conflict && onReloadList ? (
             <button onClick={onReloadList}>Reload list</button>
           ) : null}
         </div>

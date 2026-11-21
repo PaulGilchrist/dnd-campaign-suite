@@ -124,6 +124,18 @@
   font-size: 0.85rem;
 }
 
+/* Success face of the SAME planner banner region (backlog 2026-11-21 GGG):
+   Write-recap success used to be only the transient toast, gone before the
+   open modal could witness it. Same box shape as .sessions-form-error,
+   global success tokens (the app's sibling convention). */
+.sessions-form-success {
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
 /* Partial picker-batch failure notice (improve sessions-picker-failure-double-
    console) — one visible line for the whole batch instead of silent empty
    option lists. Mirrors .ea-immunity-notice / .notes-form-error global error

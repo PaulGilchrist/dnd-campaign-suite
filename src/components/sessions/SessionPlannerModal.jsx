@@ -349,6 +349,29 @@ function SessionModalFooter({
   );
 }
 
+// The planner's single inline banner region (Sessions.jsx owns the one
+// banner state): refusals print red, successes green, same box lifecycle.
+// Extracted so the modal body stays under the complexity ceiling.
+function BannerNotice({ banner, onReloadList }) {
+  if (!banner) return null;
+  return (
+    <div className={banner.kind === 'success' ? 'sessions-form-success' : 'sessions-form-error'}>
+      {banner.message}
+      {/* 409 conflicts only: one-click sanctioned recovery (close +
+          refetch) so the guided "reload the list" step needs no
+          trial-and-error. Mirrors NPCs.jsx's stale-close path. */}
+      {banner.kind === 'error' && banner.conflict && onReloadList && (
+        <button
+          className="ct-btn sessions-error-reload-btn"
+          onClick={onReloadList}
+        >
+          <i className="fa-solid fa-rotate" /> Reload list
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SessionPlannerModal({
   formData,
   setFormData,
@@ -360,8 +383,7 @@ function SessionPlannerModal({
   campaignName,
   saving,
   deleting,
-  error,
-  errorConflict,
+  banner,
   onClose,
   onReloadList,
   onSave,
@@ -404,22 +426,11 @@ function SessionPlannerModal({
         </div>
 
         <div className="ct-modal-body">
-          {error && (
-            <div className="sessions-form-error">
-              {error}
-              {/* 409 conflicts only: one-click sanctioned recovery (close +
-                  refetch) so the guided "reload the list" step needs no
-                  trial-and-error. Mirrors NPCs.jsx's stale-close path. */}
-              {errorConflict && onReloadList && (
-                <button
-                  className="ct-btn sessions-error-reload-btn"
-                  onClick={onReloadList}
-                >
-                  <i className="fa-solid fa-rotate" /> Reload list
-                </button>
-              )}
-            </div>
-          )}
+          {/* One banner region, two tones (backlog 2026-11-21 GGG): an action
+              that succeeded is as visible from the open modal as one that
+              refused — same spot, same lifecycle (reset by the next attempt,
+              discarded on close). */}
+          <BannerNotice banner={banner} onReloadList={onReloadList} />
 
           <div className="sessions-form-row">
             <div className="sessions-form-col">

@@ -75,12 +75,12 @@ vi.mock('./SessionListItem.jsx', () => ({
 // real SessionPlannerModal, so one Cancel button exercises the guard copy;
 // name/date inputs dirty the draft via onFormChange(field, value).
 vi.mock('./SessionPlannerModal.jsx', () => ({
-  default: ({ formData, onFormChange, error, errorConflict, onReloadList, onClose, onSave }) => (
+  default: ({ formData, onFormChange, banner, onReloadList, onClose, onSave }) => (
     <div data-testid="session-planner-modal">
-      {error ? (
-        <div className="sessions-form-error">
-          {error}
-          {errorConflict && onReloadList ? (
+      {banner ? (
+        <div className={banner.kind === 'success' ? 'sessions-form-success' : 'sessions-form-error'}>
+          {banner.message}
+          {banner.kind === 'error' && banner.conflict && onReloadList ? (
             <button onClick={onReloadList}>Reload list</button>
           ) : null}
         </div>
