@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import './DiceRollResult.css';
 import { useDiceRollState } from './DiceRollResult.computed.js';
 import { createDiceRollHandlers } from './DiceRollResult.handlers.js';
+import { DIRECT_DAMAGE_ROLL_NOTE } from '../../hooks/combat/useSimpleDamageRoll.js';
 
 function AutoDamageActionButton({ autoDamage, computedHit, onDone }) {
     if (autoDamage.damageTypeChoices?.length > 0) {
@@ -247,6 +248,23 @@ function AwayNotice({ props }) {
     return (
         <div className="dice-roll-away-note">
             <i className="fa-solid fa-person-walking-arrow-right"></i> {props.awayNote}
+        </div>
+    );
+}
+
+// HHH 2026-11-21 improve damage-chip-disclosure: the Actions-table DAMAGE-column
+// chip is the ungated direct roller (useSimpleDamageRoll) — it rolls freely even
+// while the paired HIT chip's shot is refused by the armed-target/line-of-sight
+// gates. The table reads as one attack row, so the direct face must self-disclose
+// that this roll is NOT the gated lane. Producer-signature gate: only the exact
+// DIRECT_DAMAGE_ROLL_NOTE payload shows this line — the staged HIT/MISS attack
+// face (handleAttackClick) and every other damage popup carry a different (or no)
+// note and stay byte-unchanged. Owner decision: disclosure, not gating.
+function DirectRollNotice({ props }) {
+    if (props.note !== DIRECT_DAMAGE_ROLL_NOTE) return null;
+    return (
+        <div className="dice-roll-save-info">
+            <i className="fa-solid fa-circle-info"></i> Direct damage roll — ignores your armed target and enforcement gates.
         </div>
     );
 }
@@ -1154,6 +1172,7 @@ function DiceRollResult(props) {
             <RollSummary props={props} state={state} />
 
             <AwayNotice props={props} />
+            <DirectRollNotice props={props} />
             <FloorNotices props={props} state={state} />
             <RollAdjustmentNotices props={props} state={state} />
 

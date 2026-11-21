@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + disk `campaign-log.json`/`character-change-data.js
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 HHH — damage-column chip ignores the armed target AND the geometry gates its row-mate enforces:** on the 2024 Actions table, pressing `1d8+2` while an armed target sits behind a closed door (LoS enforcement ON) rolls a free `Direct damage roll (no target)` while the `+8` chip next to it loudly refuses the same shot (`Goblin is behind a wall at (5,10)…`). Honest as a raw roller, but the table reads as one attack row and the silent lane is easy to mistake for the gated one (it fooled this run's probe). Options: route the damage chip through the same armed-target gate when a target is armed, or give the direct-roll popup a visible "ignores target & enforcement" clause. Likely `src/components/char-sheet/` action-row component + `lineOfSightGate` consumers; non-blocking UX/consistency.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).
