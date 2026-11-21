@@ -126,6 +126,7 @@ describe('dressMapProposal — indoor happy lane', () => {
         // had none, so the log list fell back to the title-case type label).
         expect(log).toHaveBeenCalledWith('unit', expect.objectContaining({
             type: 'ai_dress', map: 'sunken-temple', ops: 3, attempts: 1,
+            characterName: 'AI dress',
             description: 'AI dressed "sunken-temple" with 3 ops (preview)',
         }));
     });

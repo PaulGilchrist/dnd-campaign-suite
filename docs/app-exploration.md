@@ -67,8 +67,6 @@ change-data `{}` + log `[]` + sessions `[]`; disk `campaign-log.json`/`character
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (MMM 2026-11-21) Audit-producer field asymmetry post-`0a23ce90d`: the world family (`ai_world`/`ai_world_applied`) stamps `characterName` only, while `ai_director`/`ai_director_applied` stamp BOTH `name:'AI director'` + `characterName:<creature>`. Pick one convention across the AI audit family (the renderer census shows GenericEntry ignores `name` anyway).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

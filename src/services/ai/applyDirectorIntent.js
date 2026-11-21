@@ -21,7 +21,6 @@ import { addEntry } from '../ui/logService.js'
 function audit(campaignName, intent, outcome, detail) {
     return addEntry(campaignName, {
         type: 'ai_director_applied',
-        name: 'AI director',
         characterName: intent.creatureName,
         description: `AI director ${outcome}: ${intent.intent} — ${String(detail).slice(0, 220)}`,
     }).catch((e) => { console.error('[applyDirectorIntent:audit]', e) })

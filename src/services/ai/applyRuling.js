@@ -30,7 +30,7 @@ const D20_RE = /^1?d20([+-]\d+)?$/i
 function audit(campaignName, ruling, outcome, detail) {
     return addEntry(campaignName, {
         type: 'ai_ruling_applied',
-        name: 'AI referee',
+        characterName: 'AI referee',
         description: `AI ruling ${outcome}: ${ruling.type} — ${String(detail).slice(0, 220)}`,
         ruling,
     }).catch((e) => { console.error('[applyRuling:audit]', e) })

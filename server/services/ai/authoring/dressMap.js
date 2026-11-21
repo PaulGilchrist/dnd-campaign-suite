@@ -315,7 +315,7 @@ MAP DIGEST (the live document — ids and cells exactly as listed): ${json(diges
 // describer prose with its per-attempt detail.
 function audit(log, info) {
     if (typeof log !== 'function') return;
-    const row = { type: 'ai_dress', name: 'AI dress', map: info.map, instruction: String(info.instruction).slice(0, 200), ops: info.ops, attempts: info.attempts };
+    const row = { type: 'ai_dress', characterName: 'AI dress', map: info.map, instruction: String(info.instruction).slice(0, 200), ops: info.ops, attempts: info.attempts };
     if (info.description) row.description = info.description;
     log(info.campaign, row);
 }

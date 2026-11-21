@@ -133,7 +133,10 @@ describe('askNpcDirector funnel', () => {
         const r = await askNpcDirector({ campaign: 'test-campaign', creatureName: 'Goblin 1', aiConfig: CFG, state: STATE, log });
         expect(r.ok).toBe(true);
         expect(r.intent).toMatchObject({ intent: 'attack', actionName: 'Scimitar', targetName: 'Rakan', creatureName: 'Goblin 1' });
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director', attempts: 1 }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'ai_director', attempts: 1, characterName: 'Goblin 1', // sole author field (MMM 2026-11-21)
+        }));
+        expect(log.mock.calls.at(-1)[1]).not.toHaveProperty('name');
     });
 
     it('hallucinated action: retry ONCE then needs_human (never guessed)', async () => {

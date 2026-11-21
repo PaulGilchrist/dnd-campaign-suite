@@ -271,7 +271,6 @@ async function directorAudit(log, campaign, intent, attempts) {    if (typeof lo
     try {
         await log(campaign, {
             type: 'ai_director',
-            name: 'AI director',
             characterName: intent.creatureName,
             intent,
             attempts,
@@ -286,7 +285,6 @@ async function auditLog(log, campaign, characterName, ruling, attempts) {    if 
     try {
         await log(campaign, {
             type: 'ai_ruling',
-            name: 'AI referee',
             characterName: characterName || null,
             ruling,
             attempts,

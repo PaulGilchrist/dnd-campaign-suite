@@ -38,7 +38,13 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
     it('narrative applies as a logged outcome and audits', async () => {
         const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'narrative', text: 'The door opens.' } });
         expect(r.applied).toBe(true);
-        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_ruling_applied' }));
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+            type: 'ai_ruling_applied',
+            // MMM 2026-11-21: characterName is the sole author field — the row
+            // used to stamp `name` and render an empty .log-character.
+            characterName: 'AI referee',
+        }));
+        expect(addEntry.mock.calls[0][1]).not.toHaveProperty('name');
     });
 
     it('dice rolls client-side when serverDice is off (engine rolls, never the AI)', async () => {

@@ -187,7 +187,7 @@ describe('log-utils filter helpers', () => {
     const refineEntry = {
       id: 'aud1',
       type: 'ai_refine',
-      name: 'AI refine',
+      characterName: 'AI refine',
       timestamp: 1700000000000,
       kind: 'npc',
       instruction: 'Make him more menacing',
@@ -222,7 +222,7 @@ describe('log-utils filter helpers', () => {
       const designer = {
         id: 'aud3',
         type: 'ai_designer',
-        name: 'AI designer',
+        characterName: 'AI designer',
         timestamp: 1700000000000,
         stage: 'batch',
         error: 'validation failed',

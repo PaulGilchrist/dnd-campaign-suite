@@ -423,5 +423,5 @@ function generateSuccessDescription(payload) {
 
 function audit(log, campaign, payload, attempts) {
     if (typeof log !== 'function') return;
-    log(campaign, { type: 'ai_designer', name: 'AI designer', attempts, ...payload, description: auditDescription(payload) });
+    log(campaign, { type: 'ai_designer', characterName: 'AI designer', attempts, ...payload, description: auditDescription(payload) });
 }

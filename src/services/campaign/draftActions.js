@@ -113,7 +113,7 @@ async function auditDraftDecision(campaignName, action, kind, row) {
   try {
     await addEntry(campaignName, {
       type: `ai_draft_${isApprove ? 'approved' : 'rejected'}`,
-      name: 'AI draft review',
+      characterName: 'AI draft review',
       description: `${verb} AI draft: ${AUDIT_KIND_OF[kind] || kind} "${auditLabel(row)}"`,
     });
   } catch (err) {

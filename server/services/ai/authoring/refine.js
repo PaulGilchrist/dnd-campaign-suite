@@ -130,5 +130,5 @@ function checkOutwardRefs(campaign, kind, current, replacement) {
 // marker, every other row keeps the exact pre-existing (byte-identical) shape.
 function audit(log, info) {
     if (typeof log !== 'function') return;
-    log(info.campaign, { type: 'ai_refine', name: 'AI refine', kind: info.kind, instruction: String(info.instruction).slice(0, 200), attempts: info.attempts, ...(info.noOp ? { noOp: true } : {}) });
+    log(info.campaign, { type: 'ai_refine', characterName: 'AI refine', kind: info.kind, instruction: String(info.instruction).slice(0, 200), attempts: info.attempts, ...(info.noOp ? { noOp: true } : {}) });
 }

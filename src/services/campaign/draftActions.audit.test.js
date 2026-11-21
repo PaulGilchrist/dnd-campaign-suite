@@ -47,7 +47,7 @@ describe('draft approve/reject audit rows — thin, action-specific, one per dec
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('C', {
             type: 'ai_draft_approved',
-            name: 'AI draft review',
+            characterName: 'AI draft review',
             description: 'Approved AI draft: npc "Seren Vael"',
         });
     });
@@ -57,7 +57,7 @@ describe('draft approve/reject audit rows — thin, action-specific, one per dec
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('C', {
             type: 'ai_draft_rejected',
-            name: 'AI draft review',
+            characterName: 'AI draft review',
             description: 'Rejected AI draft: npc "Seren Vael"',
         });
     });

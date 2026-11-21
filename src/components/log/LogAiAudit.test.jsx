@@ -22,17 +22,17 @@ import Log from './Log.jsx';
 const TS = 1700000000000; // fixed epoch — deterministic timestamps
 
 const designer = (o = {}) => ({
-  id: 'd', type: 'ai_designer', name: 'AI designer', attempts: 1, timestamp: TS, ...o,
+  id: 'd', type: 'ai_designer', characterName: 'AI designer', attempts: 1, timestamp: TS, ...o,
 });
 const refine = (o = {}) => ({
-  id: 'rf', type: 'ai_refine', name: 'AI refine', kind: 'npc',
+  id: 'rf', type: 'ai_refine', characterName: 'AI refine', kind: 'npc',
   instruction: 'make Marta grumpier but keep her secrets', attempts: 1, timestamp: TS, ...o,
 });
 const authoring = (o = {}) => ({
-  id: 'au', type: 'ai_authoring', name: 'AI designer', timestamp: TS, ...o,
+  id: 'au', type: 'ai_authoring', characterName: 'AI designer', timestamp: TS, ...o,
 });
 const dress = (o = {}) => ({
-  id: 'dr', type: 'ai_dress', name: 'AI dress', map: 'battle-arena',
+  id: 'dr', type: 'ai_dress', characterName: 'AI dress', map: 'battle-arena',
   instruction: 'add a trapped chest guarding the entrance', ops: 4, attempts: 1, timestamp: TS, ...o,
 });
 
@@ -63,8 +63,8 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   it('ai_director + ai_director_applied keep their pre-existing generic labeled rows', () => {
     setup(Log, [
-      { id: 'g1', type: 'ai_director', name: 'AI director', description: 'AI director proposed attack: Bite → Frodo', timestamp: TS },
-      { id: 'g2', type: 'ai_director_applied', name: 'AI director', description: 'AI director confirmed: attack — target set', timestamp: TS },
+      { id: 'g1', type: 'ai_director', characterName: 'Goblin', description: 'AI director proposed attack: Bite → Frodo', timestamp: TS },
+      { id: 'g2', type: 'ai_director_applied', characterName: 'Goblin', description: 'AI director confirmed: attack — target set', timestamp: TS },
     ]);
     const rows = document.querySelectorAll('.log-entry.log-generic');
     expect(rows.length).toBe(2);
@@ -72,6 +72,24 @@ describe('AI audit rows render labeled one-line summaries', () => {
     // Newest-first: [0] is the applied row posted second.
     expect(rows[0].textContent).toContain('AI director confirmed: attack — target set');
     expect(rows[1].textContent).toContain('AI director proposed attack: Bite → Frodo');
+  });
+
+  // Backlog 2026-11-21 (MMM): the whole AI audit family stamps characterName
+  // as its sole author field — designer/refine/authoring/dress rows (whose
+  // headers used to render empty) now show their producer label in
+  // .log-character, exactly like the world family always did.
+  it('designer/refine/authoring/dress rows render their stamped author in .log-character', () => {
+    setup(Log, [
+      designer({ stage: 'plan', entityPlan: [{ kind: 'npc', count: 1 }] }),
+      refine(),
+      authoring({ scope: 'bespoke', created: { npcs: 1 }, summary: 'AI drafted 1 entity' }),
+      dress({ action: 'applied' }),
+    ]);
+    const rows = document.querySelectorAll('.log-ai-audit');
+    expect(rows.length).toBe(4);
+    // Newest-first render order: dress, authoring, refine, designer.
+    const authors = [...rows].map(row => row.querySelector('.log-character').textContent);
+    expect(authors).toEqual(['AI dress', 'AI designer', 'AI refine', 'AI designer']);
   });
 
   it('pre-existing row types are unaffected alongside ai rows', () => {

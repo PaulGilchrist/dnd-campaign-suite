@@ -119,7 +119,7 @@ describe('refineEntity — proposal only, validation-gated', () => {
             const res = await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'make it better', aiConfig: { ...AI, jsonSchema: true }, chatFn, log });
             expect(res.ok).toBe(true); // suppression stays the client's job
             expect(log).toHaveBeenCalledWith('c', {
-                type: 'ai_refine', name: 'AI refine', kind: 'npc',
+                type: 'ai_refine', characterName: 'AI refine', kind: 'npc',
                 instruction: 'make it better', attempts: 1, noOp: true,
             });
         });
@@ -130,7 +130,7 @@ describe('refineEntity — proposal only, validation-gated', () => {
             const res = await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'give him a secret', aiConfig: AI, chatFn, log });
             expect(res.ok).toBe(true);
             expect(log).toHaveBeenCalledWith('c', {
-                type: 'ai_refine', name: 'AI refine', kind: 'npc',
+                type: 'ai_refine', characterName: 'AI refine', kind: 'npc',
                 instruction: 'give him a secret', attempts: 1,
             });
         });

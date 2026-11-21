@@ -116,7 +116,7 @@ describe('applyBlueprint — draft application through the lane semantics', () =
         expect(createSnapshot).toHaveBeenCalledWith(C);
         expect(addEntry).toHaveBeenCalledWith(C, expect.objectContaining({
             type: 'ai_authoring',
-            name: 'AI designer',
+            characterName: 'AI designer',
             scope: 'session',
             snapshot: 'unit-2026.zip',
         }));

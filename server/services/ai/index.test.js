@@ -53,6 +53,7 @@ describe('askReferee', () => {
             attempts: 1, // success row carries the real attempt index
             description: expect.stringContaining('dice'),
         }));
+        expect(log.mock.calls[0][1]).not.toHaveProperty('name'); // sole author = characterName
     });
 
     it('invalid twice ⇒ needs_human fallback logged (never a guessed ruling)', async () => {

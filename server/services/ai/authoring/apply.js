@@ -112,7 +112,7 @@ function logSuccess(campaign, blueprint, created, snap, log) {
     const maps = created.maps || 0;
     log(campaign, {
         type: 'ai_authoring',
-        name: 'AI designer',
+        characterName: 'AI designer',
         scope: blueprint.scope?.scope || 'bespoke',
         created,
         snapshot: snap?.filename || null,
@@ -124,7 +124,7 @@ function failMidBatch(campaign, error, snap, log) {
     const message = String(error.message || error).slice(0, 300);
     log(campaign, {
         type: 'ai_authoring',
-        name: 'AI designer',
+        characterName: 'AI designer',
         error: message,
         snapshot: snap?.filename || null,
     });

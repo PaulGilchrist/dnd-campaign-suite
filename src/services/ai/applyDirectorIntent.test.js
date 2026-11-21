@@ -24,7 +24,11 @@ describe('applyDirectorIntent', () => {
         expect(onStampTarget).toHaveBeenCalledWith('Goblin 1', 'Rakan');
         expect(r.applied).toBe(true);
         expect(r.detail).toMatch(/engine rolls, not the AI/);
-        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_director_applied' }));
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+            type: 'ai_director_applied',
+            characterName: 'Goblin 1', // sole author field (MMM 2026-11-21)
+        }));
+        expect(addEntry.mock.calls[0][1]).not.toHaveProperty('name');
     });
 
     it('move is ADVISORY — the drag lane owns token movement (no silent writes)', async () => {
