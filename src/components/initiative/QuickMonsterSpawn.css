@@ -120,8 +120,10 @@
     gap: 12px;
 }
 
-/* Map-token opt-in row (2026-11-20 CCC backlog) — renders only while a map is
-   active; same type scale as the qty label, own line under the controls. */
+/* Map-token opt-in row (2026-11-20 CCC backlog) — renders only while an
+   ACTIVE INDOOR grid map is active (outdoor + no-map faces hide it: DDD
+   backlog 2026-11-21); same type scale as the qty label, own line under the
+   controls. */
 .qms-token-label {
     display: flex;
     align-items: center;

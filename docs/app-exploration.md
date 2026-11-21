@@ -63,8 +63,6 @@ change-data `{}` + log `[]` (post-clear stable on re-read, disk ABSENT; single-p
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 DDD — quick-spawn outdoor skip is console-only:** the picker still shows the checkbox on an ACTIVE outdoor map, the stamp silently no-ops (loud console only) and the user gets no toast explaining why their token didn't appear. Hide the checkbox when the active map is outdoor (mapsService already exposes type) or toast the skip.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.

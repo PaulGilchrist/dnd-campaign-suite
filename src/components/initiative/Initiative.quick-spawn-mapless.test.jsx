@@ -15,6 +15,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
 import * as combatData from '../../services/encounters/combatData.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import storage from '../../services/ui/storage.js';
 import { quickSpawnMonster } from '../../services/encounters/quickMonsterSpawn.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
@@ -103,6 +104,12 @@ vi.mock('../../services/encounters/quickMonsterSpawn.js', () => ({
     QUICK_SPAWN_ENCOUNTER_NAME: 'Quick spawn',
 }));
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({ useMonstersData: vi.fn() }));
+// The picker's active-map TYPE probe (DDD outdoor-hide): keep every other
+// mapsService export real, stub only the list lane the probe reads.
+vi.mock('../../services/maps/mapsService.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    loadMaps: vi.fn(),
+}));
 vi.mock('../../services/combat/conditions/conditionSaveService.js', () => ({
     rollConditionSave: vi.fn(), removeCondition: vi.fn(), addCondition: vi.fn(), buildConditionPopup: vi.fn(),
 }));
@@ -156,6 +163,9 @@ describe('Initiative — quick monster spawn (mapless law + token opt-in threadi
         errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         Element.prototype.scrollIntoView = vi.fn();
         useMonstersData.mockReturnValue({ monsters: [GOBLIN_ROW], loading: false });
+        mapsService.loadMaps.mockResolvedValue({
+            maps: [{ name: 'qa-sandbox', slug: 'qa-sandbox', type: 'indoor', isActive: true }],
+        });
         vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 1, creatures: [
             playerRow('Alice', '12'),
             playerRow('Bob', '9'),
@@ -214,7 +224,9 @@ describe('Initiative — quick monster spawn (mapless law + token opt-in threadi
         // Picker closed on success + honest disclosure toast.
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(screen.getByText('5× Goblin joined initiative')).toBeInTheDocument();
-        // Mapless contract: nothing anywhere asked for a map or errored.
+        // Mapless contract: nothing anywhere asked for a map (not even the
+        // picker's type probe) and nothing errored.
+        expect(mapsService.loadMaps).not.toHaveBeenCalled();
         expect(errorSpy).not.toHaveBeenCalled();
     });
 
@@ -256,7 +268,9 @@ describe('Initiative — quick monster spawn (mapless law + token opt-in threadi
 
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: '+ Monster' })); });
         await waitFor(() => screen.getByLabelText('Search monsters'));
-        const box = screen.getByLabelText('Place a token near the party on the map');
+        // The indoor type lands through the list probe (DDD: outdoor would
+        // stay absent — pinned by QuickMonsterSpawn.test.jsx).
+        const box = await waitFor(() => screen.getByLabelText('Place a token near the party on the map'));
         expect(box).not.toBeChecked();
         fireEvent.click(box);
         fireEvent.click(screen.getByText('Goblin'));

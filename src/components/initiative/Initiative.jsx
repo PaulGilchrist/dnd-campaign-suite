@@ -1054,7 +1054,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                       active map (targets arm through the card's Target select).
                       With an active map the picker additionally offers the
                       opt-in party-relative token stamp (2026-11-20 CCC backlog). */}
-                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} mapName={mapName} />
+                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} mapName={mapName} campaignName={campaignName} />
                   <PartyPresenceButton
                       creatures={combatSummary.creatures}
                       onConfirm={handlePartyPresenceChange}

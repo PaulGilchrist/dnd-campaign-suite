@@ -1,6 +1,7 @@
 import React from 'react'
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js'
 import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js'
+import * as mapsService from '../../services/maps/mapsService.js'
 // Reuse, never re-implement (roadmap Item 4): the tracker picker narrows the
 // bestiary through the SAME pure helpers the Encounter Builder uses —
 // name/type/subtype search, inclusive CR parsing and the bounded un-narrowed
@@ -21,13 +22,43 @@ import './QuickMonsterSpawn.css'
 // The open flag is per-client presentation (showModal category — local state
 // law), never the runtime store. Escape closes (EffectAdder convention).
 //
-// Map-token opt-in (2026-11-20 CCC backlog): when a map is ACTIVE (`mapName`,
-// the App activeMapName prop the Initiative host already threads), the picker
-// offers "Place a token near the party on the map" — default OFF (opt-in,
-// mirroring the qty field's conservative default). With no active map the
-// affordance never renders and the flow is byte-identical to before. The stamp
-// itself is owned by services/encounters/quickMonsterSpawn.js.
-function MonsterPickerModal({ onClose, onSpawn, mapName }) {
+// Map-token opt-in (2026-11-20 CCC backlog): when an INDOOR map is ACTIVE
+// (`mapName`, the App activeMapName prop the Initiative host already threads),
+// the picker offers "Place a token near the party on the map" — default OFF
+// (opt-in, mirroring the qty field's conservative default). With no active map
+// the affordance never renders and the flow is byte-identical to before. The
+// stamp itself is owned by services/encounters/quickMonsterSpawn.js.
+//
+// Outdoor gate (2026-11-21 DDD backlog): placedItems tokens only exist on
+// indoor grid maps, so with an ACTIVE OUTDOOR map the checkbox is ABSENT too
+// (same face as the no-map law) — the producer-side skip is loud but
+// console-only, and a checkbox that silently no-ops is a lie. The type comes
+// from the maps LIST lane (it carries `type` precisely so metadata renders
+// never fetch whole documents — server maps.js list comment); any unresolved
+// or failed type fetch fails CLOSED to absent (the producer's defensive
+// outdoor guard stays the backstop lane).
+function useActiveMapType(campaignName, mapName) {
+    const [mapType, setMapType] = React.useState(null)
+    React.useEffect(() => {
+        if (!mapName) {
+            setMapType(null)
+            return
+        }
+        let live = true
+        mapsService.loadMaps(campaignName).then(
+            (data) => {
+                if (!live) return
+                const entry = (data.maps || []).find(m => m.slug === mapName || m.name === mapName)
+                setMapType(entry?.type || null)
+            },
+            () => { if (live) setMapType(null) },
+        )
+        return () => { live = false }
+    }, [campaignName, mapName])
+    return mapType
+}
+
+function MonsterPickerModal({ onClose, onSpawn, mapName, campaignName }) {
     const { monsters, loading } = useMonstersData()
     const [searchQuery, setSearchQuery] = React.useState('')
     const [selected, setSelected] = React.useState(null)
@@ -35,6 +66,7 @@ function MonsterPickerModal({ onClose, onSpawn, mapName }) {
     const [placeToken, setPlaceToken] = React.useState(false)
     const [error, setError] = React.useState('')
     const [spawning, setSpawning] = React.useState(false)
+    const activeMapType = useActiveMapType(campaignName, mapName)
     // Entrance focus + stranded-close restore (shared overlay hook).
     const overlayRef = React.useRef(null)
     useOverlayEntranceFocus(overlayRef)
@@ -149,7 +181,7 @@ function MonsterPickerModal({ onClose, onSpawn, mapName }) {
                             </button>
                             <button type='button' className='qms-cancel-btn' onClick={onClose}>Cancel</button>
                         </div>
-                        {mapName && (
+                        {mapName && activeMapType === 'indoor' && (
                             <label className='qms-token-label' htmlFor='qms-place-token'>
                                 <input
                                     id='qms-place-token'
@@ -171,7 +203,7 @@ function MonsterPickerModal({ onClose, onSpawn, mapName }) {
     )
 }
 
-export default function QuickMonsterSpawn({ onSpawn, mapName }) {
+export default function QuickMonsterSpawn({ onSpawn, mapName, campaignName }) {
     const [open, setOpen] = React.useState(false)
     return (
         <>
@@ -179,7 +211,7 @@ export default function QuickMonsterSpawn({ onSpawn, mapName }) {
                 onClick={() => setOpen(true)}
                 title='Search the bestiary and spawn N instances with real stats and initiative rolled — works without a map; nothing is written to the NPCs list'
             >+ Monster</button>
-            {open && <MonsterPickerModal onClose={() => setOpen(false)} onSpawn={onSpawn} mapName={mapName} />}
+            {open && <MonsterPickerModal onClose={() => setOpen(false)} onSpawn={onSpawn} mapName={mapName} campaignName={campaignName} />}
         </>
     )
 }
