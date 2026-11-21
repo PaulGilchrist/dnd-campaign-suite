@@ -206,6 +206,19 @@ function RollModifierBadges({ entry }) {
   );
 }
 
+// Crit damage producers (handlePlainDamage/handleNpcSaveDamage/handleAutoMiss/
+// useLoggedDiceRollDamage) bake the rolled dice into the stored formula via
+// formatDamageFormula — the pinned crit wire shape is `1d6*2+2 (6)`. When the
+// formula already ends with the entry's own rolls annotation, the inline dice
+// span would print the identical `(6)` a second time (bug-log-crit-damage-row-
+// duplicate-dice), so only render it when the formula doesn't carry it yet.
+// Exact-match only: lanes whose displayRolls differ from the baked tail (e.g.
+// GWF-doubled lists) keep rendering both.
+function formulaAlreadyShowsRolls(entry) {
+  if (!entry.formula || !entry.rolls?.length) return false;
+  return entry.formula.endsWith(`(${entry.rolls.join(', ')})`);
+}
+
 function RollDiceValues({ entry }) {
   const isSave = entry.rollType === 'save';
   const damageRoll = isDamageRoll(entry);
@@ -215,7 +228,7 @@ function RollDiceValues({ entry }) {
       {damageRoll && entry.formula && (
         <span className="log-dice-formula">{entry.formula}</span>
       )}
-      {!isSave && damageRoll && entry.rolls?.length > 0 && (
+      {!isSave && damageRoll && entry.rolls?.length > 0 && !formulaAlreadyShowsRolls(entry) && (
         <span className="log-dice-values-inline">
           ({entry.rolls.join(', ')})
         </span>

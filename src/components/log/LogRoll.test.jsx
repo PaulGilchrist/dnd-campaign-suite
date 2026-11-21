@@ -242,6 +242,31 @@ describe('Log > RollEntry', () => {
     expect(q('.log-total').textContent).toBe('32');
   });
 
+  it('renders crit damage dice once when the stored formula already ends with the rolls annotation', () => {
+    // Crit wire shape (pinned producers): crit rows store formatDamageFormula output,
+    // e.g. `1d6*2+2 (6)` — rolls baked into the formula. The renderer must not print
+    // the same `(6)` a second time inline. Non-crit rows (bare formula) keep the
+    // inline dice; a displayRolls mismatch (GWF-doubled list ≠ baked tail) keeps both.
+    setup(Log, [
+      roll({ id: 'crit', rollType: 'damage', formula: '1d6*2+2 (6)', rolls: [6], total: 14, modifier: 2, damageType: 'slashing', isCrit: true }),
+      roll({ id: 'crit-save', rollType: 'save-damage', formula: '8d6*2 (4, 4, 6, 3, 5, 2, 6, 1)', rolls: [4, 4, 6, 3, 5, 2, 6, 1], total: 65, damageType: 'fire', isCrit: true }),
+      roll({ id: 'gwf-crit', rollType: 'damage', formula: '2d6*2+1 (5, 3)', rolls: [5, 3, 5, 3], total: 19, damageType: 'bludgeoning', isCrit: true }),
+    ]);
+    // newest-first render order: gwf-crit, crit-save, crit
+    expect(textsOf('.log-dice-formula')).toEqual([
+      '2d6*2+1 (5, 3)',
+      '8d6*2 (4, 4, 6, 3, 5, 2, 6, 1)',
+      '1d6*2+2 (6)',
+    ]);
+    // only the GWF row (inline list ≠ baked tail) still renders the inline dice span
+    expect(textsOf('.log-dice-values-inline')).toEqual(['(5, 3, 5, 3)']);
+    expect(textsOf('.log-dice-values')).toEqual([
+      '2d6*2+1 (5, 3)(5, 3, 5, 3)19',
+      '8d6*2 (4, 4, 6, 3, 5, 2, 6, 1)65',
+      '1d6*2+2 (6)14',
+    ]);
+  });
+
   it('renders condition save bytes with mode badges on roll entries', () => {
     setup(Log, [
       roll({ id: 'cs1', condition: 'charmed', dc: 15, success: true, mode: 'advantage', advantageSources: ['Bard', 'Paladin'] }),
