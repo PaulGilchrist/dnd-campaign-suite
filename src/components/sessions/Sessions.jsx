@@ -3,7 +3,7 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import Subscriber from '../common/Subscriber.jsx';
-import { loadSessions, saveSession, saveSessions, deleteSession } from '../../services/campaign/sessionsService.js';
+import { loadSessions, saveSession, saveSessions, deleteSession, requestSessionRecap } from '../../services/campaign/sessionsService.js';
 import {
   getDefaultSessionData,
   mergeChecklist,
@@ -480,6 +480,30 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
     }
   };
 
+  // ── Session recap (roadmap Step 8) ──
+  // GM-only, like the active-session toggle: the server gathers the rows
+  // stamped to this session and posts the AI's story as a `session_recap`
+  // log row (SSE shows it in every tab). Failures land verbatim in the
+  // banner — plain-English server copy, never a silent spinner. The model
+  // call is bounded by the provider's own fetch timeout, so the busy flag
+  // can only outlive a hung request by that bound.
+  const [recapBusy, setRecapBusy] = useState(false);
+
+  const handleWriteRecap = async () => {
+    if (!editingSession || !formData || recapBusy) return;
+    const name = formData.name.trim() || editingSession.name;
+    setRecapBusy(true);
+    try {
+      await requestSessionRecap(campaignName, name);
+      showToast(`Recap of “${name}” posted to the campaign log`);
+    } catch (err) {
+      console.error('Failed to write the session recap:', err);
+      showError(err.message || 'Failed to write the session recap');
+    } finally {
+      setRecapBusy(false);
+    }
+  };
+
   const handleMarkPlayed = async () => {
     if (!editingSession || !formData) return;
     const recap = prompt('Session recap (optional) — added to the campaign log:');
@@ -619,6 +643,8 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
           onMarkPlayed={handleMarkPlayed}
           activeSession={activeSession}
           onSetActiveSession={activeSessionHandlerFor(isLocalhost, handleSetActiveSession)}
+          recapBusy={recapBusy}
+          onWriteRecap={activeSessionHandlerFor(isLocalhost, handleWriteRecap)}
         />
       )}
 

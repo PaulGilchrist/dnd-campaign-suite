@@ -226,11 +226,34 @@ function ActiveSessionToggle({ editingSession, formData, activeSession, onSetAct
   );
 }
 
+// Session recap (roadmap Step 8) — GM-only by the same handler-injection gate
+// as ActiveSessionToggle: a visitor gets no button. Row-only (like
+// Delete/Mark-played): the recap mines the log rows stamped with this saved
+// session's name, so an unsaved-new draft has nothing to recap yet.
+function RecapButton({ editingSession, formData, recapBusy, onWriteRecap }) {
+  if (!onWriteRecap || !editingSession) return null;
+  const name = formData.name.trim() || editingSession.name;
+  return (
+    <button
+      className="ct-btn sessions-recap-btn"
+      onClick={onWriteRecap}
+      disabled={recapBusy || !name}
+      title={recapBusy
+        ? 'The AI is writing this session\'s story…'
+        : `Ask the AI to write ${name}'s story from its campaign log rows and post it to the log`}
+    >
+      <i className={`fa-solid ${recapBusy ? 'fa-spinner fa-spin' : 'fa-scroll'}`} /> {recapBusy ? 'Writing recap…' : 'Write recap'}
+    </button>
+  );
+}
+
 function SessionModalFooter({
   editingSession, formData, setFormData, campaignName, saving, deleting,
   onClose, onSave, onDelete, onMarkPlayed,
   activeSession = null,
   onSetActiveSession = null,
+  recapBusy = false,
+  onWriteRecap = null,
 }) {
   const canMarkPlayed = editingSession && editingSession.status !== 'played';
   return (
@@ -278,6 +301,12 @@ function SessionModalFooter({
           activeSession={activeSession}
           onSetActiveSession={onSetActiveSession}
         />
+        <RecapButton
+          editingSession={editingSession}
+          formData={formData}
+          recapBusy={recapBusy}
+          onWriteRecap={onWriteRecap}
+        />
       </div>
       <div className="ct-modal-buttons">
         <button className="ct-btn" onClick={onClose} disabled={saving}>Cancel</button>
@@ -324,6 +353,8 @@ function SessionPlannerModal({
   onMarkPlayed,
   activeSession,
   onSetActiveSession,
+  recapBusy,
+  onWriteRecap,
 }) {
   const [copied, setCopied] = useState('');
 
@@ -483,6 +514,8 @@ function SessionPlannerModal({
           onMarkPlayed={onMarkPlayed}
           activeSession={activeSession}
           onSetActiveSession={onSetActiveSession}
+          recapBusy={recapBusy}
+          onWriteRecap={onWriteRecap}
         />
       </div>
     </div>

@@ -11,9 +11,11 @@
  * leaks to the browser.
  */
 import { chat, probe, isLocalEndpoint } from './providers/localProvider.js';
-import { buildRefereeMessages, parseRulingAnswer, buildDirectorMessages, parseIntentAnswer, buildWorldMessages, parseWorldAnswer } from './promptBuilder.js';
+import { buildRefereeMessages, parseRulingAnswer, buildDirectorMessages, parseIntentAnswer, buildWorldMessages, parseWorldAnswer, buildRecapMessages, parseRecapAnswer } from './promptBuilder.js';
 import { needsHumanRuling } from './schemas.js';
 import { lookupMonsterActions } from './monsterActions.js';
+import { buildStorySoFar } from './storyMemory.js';
+import { buildRecapTranscript } from './recapContext.js';
 
 export const AI_MODES = new Set(['off', 'suggest', 'autopilot']);
 
@@ -44,7 +46,7 @@ export async function askReferee({ campaign, action, characterName, aiConfig, st
     if (!aiConfigLive(aiConfig)) {
         return { ok: false, code: 'AI_OFF', ruling: null };
     }
-    const messages = buildRefereeMessages({ action, characterName, state, actorStats });
+    const messages = buildRefereeMessages({ action, characterName, state, actorStats, story: buildStorySoFar(campaign) });
 
     let lastError = 'no attempt made';
     let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
@@ -107,7 +109,7 @@ function directorGate(creatureName, state) {
     return { self, economy, actionsSpent, targets: livingPlayers(cs), round: cs.round };
 }
 
-function directorPrompt(creatureName, monster, gate) {
+function directorPrompt(creatureName, monster, gate, story) {
     const allow = {
         actionNames: monster.actions.map(a => a.name),
         targetNames: gate.targets.map(t => t.name),
@@ -122,6 +124,7 @@ function directorPrompt(creatureName, monster, gate) {
         economy: { actionsUsed: gate.economy.actionsUsed ?? 0, bonusActionsUsed: gate.economy.bonusActionsUsed ?? 0, movementUsedFeet: gate.economy.movementUsedFeet ?? 0, actionsSpent: gate.actionsSpent },
         allowedIntents: allow.allowedIntents,
         round: gate.round ?? null,
+        story,
     });
     return { allow, messages };
 }
@@ -138,7 +141,7 @@ export async function askNpcDirector({ campaign, creatureName, aiConfig, state =
     if (gate.targets.length === 0 && !gate.actionsSpent) {
         return await directorFail(log, campaign, creatureName, 'no living targets in combat — the GM decides what this monster does', 0); // pre-loop refusal — zero model calls
     }
-    const { allow, messages } = directorPrompt(creatureName, monster, gate);
+    const { allow, messages } = directorPrompt(creatureName, monster, gate, buildStorySoFar(campaign));
 
     let lastError = 'no attempt made';
     let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
@@ -177,7 +180,7 @@ async function directorFail(log, campaign, creatureName, reason, attempts) {
  */
 export async function askWorldKeeper({ campaign, kind, focus, world, allow, aiConfig, log }) {
     if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
-    const messages = buildWorldMessages({ kind, focus, world, allow });
+    const messages = buildWorldMessages({ kind, focus, world, allow, story: buildStorySoFar(campaign) });
 
     let lastError = 'no attempt made';
     let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
@@ -200,6 +203,53 @@ export async function askWorldKeeper({ campaign, kind, focus, world, allow, aiCo
     const proposal = { kind: 'needs_human', text: `AI world keeper unavailable — the GM supplies this. (${String(lastError).slice(0, 160)})` };
     await worldAudit(log, campaign, proposal, attemptsMade);
     return { ok: false, code: 'AI_NEEDS_HUMAN', proposal };
+}
+
+/**
+ * Roadmap Step 8 — write the story of one played session. Same funnel shape
+ * as the other roles (retry once, fail closed) but the OUTPUT is a finished
+ * artifact, not a proposal: the CALLER posts it as a `session_recap` row.
+ * Refusals carry plain-English copy for the Sessions planner button.
+ * Returns { ok, text?, code?, error? }.
+ */
+export async function askSessionRecap({ campaign, session, aiConfig }) {
+    if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
+
+    const { totalRows, included, transcript } = buildRecapTranscript(campaign, session);
+    if (totalRows === 0) {
+        return {
+            ok: false,
+            code: 'RECAP_NO_ROWS',
+            error: `The campaign log holds no rows for session “${session}” — set it as the active session while you play, or check its name`,
+        };
+    }
+    if (included === 0) {
+        return {
+            ok: false,
+            code: 'RECAP_EMPTY_TRANSCRIPT',
+            error: `Session “${session}” has ${totalRows} log rows but none carry readable text to recap`,
+        };
+    }
+
+    const messages = buildRecapMessages({ session, transcript });
+    let lastError = 'no attempt made';
+    for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then honest refusal (§9.1)
+        let content;
+        try {
+            content = await chat({ ...chatOpts(aiConfig), messages });
+        } catch (e) {
+            lastError = `${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`;
+            continue;
+        }
+        const result = parseRecapAnswer(content);
+        if (result.ok) return { ok: true, text: result.text };
+        lastError = `invalid recap: ${result.errors.join('; ')}`;
+    }
+    return {
+        ok: false,
+        code: 'AI_NEEDS_HUMAN',
+        error: `The recap model never answered with a usable story (${lastError}) — nothing was posted`,
+    };
 }
 
 async function worldAudit(log, campaign, proposal, attempts) {

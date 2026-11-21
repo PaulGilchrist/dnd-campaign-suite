@@ -14,7 +14,10 @@ const logCache = new Map();
 
 export { logCache };
 
-function loadLog(campaign) {
+// Exported for the AI memory lane (services/ai/storyMemory.js): the server-side
+// log slice for "story so far" + recap context reads through this one loader
+// (cache-first), never a second disk reader or an HTTP loop.
+export function loadLog(campaign) {
   if (logCache.has(campaign)) return logCache.get(campaign);
   const file = campaignDataFile(campaign, 'campaign-log.json');
   try {
@@ -66,7 +69,9 @@ function saveLogFile() {
 // producer lane (client POSTs, AI sinks, roll/inventory routes) is stamped
 // without touching ~200 producers, and a client can never forge or omit it.
 // Rows written outside any tracked session carry `session: null`.
-function activeSessionName(campaign) {
+// Exported alongside loadLog so the AI memory lane distinguishes the session
+// the table is PLAYING (raw rows) from prior ones (recap-compressed memory).
+export function activeSessionName(campaign) {
   const state = characterChangeData.get(campaign)?.sessionState;
   return typeof state?.name === 'string' && state.name.trim() ? state.name : null;
 }
@@ -157,7 +162,8 @@ export const ALLOWED_LOG_TYPES = new Set([
   'hp_change', 'info', 'inventory_transfer', 'long_rest', 'loot',
   'map_regenerated', 'material_consumed', 'metamagic', 'metamagic_use',
   'music', 'narrative', 'note', 'psionic_sorcery', 'roll', 'save_result',
-  'session_active', 'session-played', 'session_phase', 'short_rest',
+  'session_active', 'session-played', 'session_phase', 'session_recap',
+  'short_rest',
   'spell', 'spell_effect',
   'summons', 'travel', 'ward_absorbed', 'write_rejected',
 ]);

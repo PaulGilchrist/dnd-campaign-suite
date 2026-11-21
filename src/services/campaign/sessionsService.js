@@ -89,3 +89,27 @@ export const deleteSession = async (campaignName, sessionName) => {
     throw error;
   }
 };
+
+/**
+ * Roadmap Step 8 — ask the server to write this session's AI recap (GM-only
+ * lane; the server posts the `session_recap` log row itself). Resolves with
+ * the posted row; rejects with the server's plain-English refusal copy so
+ * the planner banner shows an honest reason — never a silent spinner.
+ */
+export const requestSessionRecap = async (campaignName, sessionName) => {
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/recap`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: sessionName }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body.ok) {
+      throw new Error(body.error || `Recap request failed (HTTP ${response.status})`);
+    }
+    return body.entry;
+  } catch (error) {
+    console.error('Error writing session recap:', error);
+    throw error;
+  }
+};

@@ -51,3 +51,45 @@ describe('Log narrative entries', () => {
     expect(q('.log-narrative .log-entry-session').textContent).toBe('Session 3 — The Long Dark');
   });
 });
+
+// ── Session recap rows (roadmap Step 8) ──
+// Same markdown-sanitized body as narrative; title names the SUBJECT
+// (recapSession), the badge shows WHEN it was written (the server stamp).
+describe('Log session_recap entries', () => {
+  const recap = (o = {}) => narrative({
+    id: 'rc',
+    type: 'session_recap',
+    name: 'Session Recap',
+    recapSession: 'Session 1 — Smuggler’s Cave',
+    description: 'The party **fled** the cave.',
+    session: 'Session 2',
+    ...o,
+  });
+
+  it('routes session_recap rows to the recap renderer with title, author, and scroll icon', () => {
+    setup(Log, [recap({ timestamp: 1700000000000 })]);
+    expect(q('.log-entry.log-recap')).toBeInTheDocument();
+    expect(q('.log-recap .log-character').textContent).toBe('GM');
+    expect(q('.log-recap-title').textContent).toBe('Session Recap — Session 1 — Smuggler’s Cave');
+    expect(q('.log-recap i.fa-scroll')).toBeInTheDocument();
+  });
+
+  it('titles off recapSession (the SUBJECT) while the stamp badge shows WHEN', () => {
+    setup(Log, [recap()]);
+    expect(q('.log-recap-title').textContent).toContain('Session 1 — Smuggler’s Cave');
+    expect(q('.log-recap .log-entry-session').textContent).toBe('Session 2');
+  });
+
+  it('renders sanitized markdown prose (bold survives, scripts do not)', () => {
+    setup(Log, [recap({ description: 'The **gate** groans <script>window.__pwn = 1</script>.' })]);
+    const body = q('.log-narrative-text');
+    expect(body.querySelector('strong').textContent).toBe('gate');
+    expect(body.querySelector('script')).toBeNull();
+  });
+
+  it('omits the subject suffix and the stamp badge when neither field is set', () => {
+    setup(Log, [recap({ recapSession: undefined, session: null })]);
+    expect(q('.log-recap-title').textContent).toBe('Session Recap');
+    expect(q('.log-recap .log-entry-session')).toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 // L5 Phase 3 — prompt builder + answer parsing tests.
 import { describe, it, expect, vi } from 'vitest';
-import { buildRefereeMessages, compactContext, compactActorStats, parseRulingAnswer } from './promptBuilder.js';
+import { buildRefereeMessages, buildDirectorMessages, buildWorldMessages, buildRecapMessages, parseRecapAnswer, compactContext, compactActorStats, parseRulingAnswer } from './promptBuilder.js';
 
 // Drift pin: REFEREE_SYSTEM must enumerate the REAL registry keys. The
 // registry imports client runtime hooks — stub that boundary so the server
@@ -99,6 +99,50 @@ describe('buildRefereeMessages — ACTOR STATS projection', () => {
     });
 });
 
+// Roadmap Step 9 — the "STORY SO FAR" memory block. Every AI role receives
+// the storyMemory slice; campaigns with an empty log keep prompts byte-
+// identical (the section is absent, not blank).
+describe('STORY SO FAR memory block — all three roles', () => {
+    const STORY = '- narrative: The party fled the smugglers\' cave.\n- recap of “Session 1”: Mira struck a bargain.';
+    const MONSTER = { speedFeet: 30, actions: [{ name: 'Scimitar', attack_bonus: 4, description: 'Melee.' }] };
+    const ALLOW = { npcNames: [], settlementNames: [], factionNames: [], questNames: [] };
+
+    const refereeUser = (story) => buildRefereeMessages({ action: 'I follow the blood trail', characterName: 'Rakan', state: {}, story })[1].content;
+    const directorUser = (story) => buildDirectorMessages({ creatureName: 'Goblin', monster: MONSTER, targets: [], self: {}, economy: {}, allowedIntents: null, round: 1, story })[1].content;
+    const worldUser = (story) => buildWorldMessages({ kind: 'rumor', focus: 'the docks', world: {}, allow: ALLOW, story })[1].content;
+
+    it('referee prompt carries the story + the never-contradict law', () => {
+        const u = refereeUser(STORY);
+        expect(u).toContain('STORY SO FAR');
+        expect(u).toContain('fled the smugglers');
+        expect(u).toMatch(/never contradict it/i);
+    });
+
+    it('director prompt carries the story FIRST (continuity before tactics)', () => {
+        const u = directorUser(STORY);
+        expect(u.indexOf('STORY SO FAR')).toBe(0);
+        expect(u).toContain('Mira struck a bargain');
+    });
+
+    it('world-keeper prompt carries the story between focus and ledger', () => {
+        const u = worldUser(STORY);
+        expect(u).toContain('STORY SO FAR');
+        expect(u).toContain('fled the smugglers');
+        expect(u.indexOf('STORY SO FAR')).toBeLessThan(u.indexOf('CAMPAIGN LEDGER'));
+    });
+
+    it.each([
+        ['referee', refereeUser],
+        ['director', directorUser],
+        ['world-keeper', worldUser],
+    ])('%s stays byte-identical with no story — null/blank and absent never mention it', async (_role, build) => {
+        const absent = build(undefined);
+        expect(absent).not.toContain('STORY SO FAR');
+        expect(build(null)).toBe(absent);
+        expect(build('   ')).toBe(absent);
+    });
+});
+
 describe('parseRulingAnswer — hp_change provenance gate', () => {    it('bare-amount hp_change is rejected; amount + dice expression parses', () => {
         expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","amount":-6,"explanation":"claws"}').ok).toBe(false);
         expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","expression":"2d6","amount":-6,"explanation":"claws"}'))
@@ -124,6 +168,34 @@ describe('REFEREE_SYSTEM — target_effect key allowlist', () => {
         const s = system();
         const missing = TARGET_EFFECT_DEFINITIONS.filter(d => !s.includes(d.effect));
         expect(missing.map(d => d.effect)).toEqual([]); // 100% coverage = single source of truth
+    });
+});
+
+// Roadmap Step 8 — the recap chronicler prompt + answer contract.
+describe('buildRecapMessages / parseRecapAnswer — the chronicler lane', () => {
+    const TRANSCRIPT = 'STORY BEATS (narrative, encounters, milestones):\n[narrative] The cave mouth yawned.';
+
+    it('system carries the grounding law, the narrator-not-referee law, and the JSON contract', () => {
+        const [system, user] = buildRecapMessages({ session: 'Session 1: The Long Dark', transcript: TRANSCRIPT });
+        expect(system.content).toMatch(/ground EVERY event/i);
+        expect(system.content).toMatch(/never invent/i);
+        expect(system.content).toMatch(/narrate them/i);
+        expect(system.content).toMatch(/\{"text":"\.\.\."\}/);
+        expect(user.content).toContain('Session 1: The Long Dark');
+        expect(user.content).toContain('your ONLY source of truth');
+        expect(user.content).toContain('The cave mouth yawned.');
+    });
+
+    it('parses a clean {"text":...} answer (fences tolerated like every other lane)', () => {
+        expect(parseRecapAnswer('{"text":"The party delved deep."}')).toMatchObject({ ok: true, text: 'The party delved deep.' });
+        expect(parseRecapAnswer('```json\n{"text":"Done."}\n```')).toMatchObject({ ok: true, text: 'Done.' });
+    });
+
+    it('fails closed on prose, empty text, non-string text, and oversize answers', () => {
+        expect(parseRecapAnswer('Once upon a time…').ok).toBe(false);
+        expect(parseRecapAnswer('{"text":"   "}').ok).toBe(false);
+        expect(parseRecapAnswer('{"text":42}').ok).toBe(false);
+        expect(parseRecapAnswer(JSON.stringify({ text: 'x'.repeat(2001) })).ok).toBe(false);
     });
 });
 

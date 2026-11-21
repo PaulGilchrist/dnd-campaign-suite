@@ -28,8 +28,9 @@
  */
 import express from 'express';
 import { characterChangeData } from '../utils/changeData.js';
+import { isLocalhost } from '../utils/gmGuard.js';
 import { addEntry } from './log.js';
-import { askReferee, askNpcDirector, askWorldKeeper, aiConfigLive, probe } from '../services/ai/index.js';
+import { askReferee, askNpcDirector, askWorldKeeper, askSessionRecap, aiConfigLive, probe } from '../services/ai/index.js';
 import { loadWorldState } from '../services/ai/worldContext.js';
 
 const WORLD_KINDS = new Set(['recap', 'rumor', 'npc_dialogue', 'quest_draft', 'event']);
@@ -38,9 +39,9 @@ const router = express.Router();
 
 // §12 authority: AI surfaces are GM surfaces — localhost only (the assignable
 // referee role was removed 2026-10-13; the GM machine is always localhost).
-function isGM(req) {
-    return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-}
+// The predicate is the SHARED gmGuard (2026-11-21 unification): it also
+// counts the IPv6 loopback Host, so a `::1` tab is honestly GM everywhere.
+const isGM = isLocalhost;
 
 router.get('/api/campaigns/:campaign/ai/status', async (req, res) => {
     try {
@@ -149,6 +150,53 @@ router.post('/api/campaigns/:campaign/ai/world', async (req, res) => {
     } catch (e) {
         console.error('[campaigns-ai:world]', e);
         res.status(500).json({ error: 'ai world keeper request failed' });
+    }
+});
+
+// Roadmap Step 8 — the session recap generator. GM presses "Write recap";
+// the server gathers the session's stamped log rows, asks the model for an
+// enthralling story grounded ONLY in those rows, and posts the result as a
+// `session_recap` row authored GM — server-side addEntry, so the row gets the
+// standard audit fields and the one log-<c> SSE broadcast (no client POST).
+// STAMPING LAW (pinned in campaigns-ai-recap.test.js): addEntry's `session`
+// field is the server stamp of WHEN the row was written (whatever session the
+// table is playing); the row's `recapSession` field is the SUBJECT — the
+// session whose story it tells. Renderers and the story-so-far memory key off
+// recapSession, never the stamp, so a recap of Session 1 written during
+// Session 2 stays honestly attributed.
+router.post('/api/campaigns/:campaign/ai/recap', async (req, res) => {
+    try {
+        const { campaign } = req.params;
+        const cd = characterChangeData.get(campaign) || {};
+        const cfg = cd.aiConfig;
+        if (!aiConfigLive(cfg)) {
+            return res.status(403).json({ error: 'AI is not enabled for this campaign — configure it in the Admin console first' });
+        }
+        if (!isGM(req)) {
+            return res.status(403).json({ error: 'only localhost (the GM) may ask the AI to write a session recap' });
+        }
+        const session = typeof req.body?.session === 'string' ? req.body.session.trim().slice(0, 120) : '';
+        if (!session) {
+            return res.status(400).json({ error: 'session (the session to recap) is required' });
+        }
+
+        const result = await askSessionRecap({ campaign, session, aiConfig: cfg });
+        if (!result.ok) {
+            // Honest refusals carry plain-English copy the button shows verbatim.
+            const status = { RECAP_NO_ROWS: 400, RECAP_EMPTY_TRANSCRIPT: 400, AI_NEEDS_HUMAN: 502 }[result.code] || 502;
+            return res.status(status).json({ ok: false, code: result.code, error: result.error || 'recap failed' });
+        }
+        const entry = addEntry(campaign, {
+            type: 'session_recap',
+            name: 'Session Recap',
+            characterName: 'GM',
+            description: result.text,
+            recapSession: session,
+        });
+        res.status(200).json({ ok: true, entry });
+    } catch (e) {
+        console.error('[campaigns-ai:recap]', e);
+        res.status(500).json({ error: 'ai recap request failed' });
     }
 });
 

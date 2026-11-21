@@ -1029,4 +1029,23 @@ describe('POST /log — active-session stamp', () => {
         expect(res.body.session).toBe('Real Session');
         expect(logModule.logCache.get('test-campaign').at(-1).session).toBe('Real Session');
     });
+
+    // ── Recap stamping law (roadmap Step 8, ratified 2026-11-21) ──
+    // `session` = WHEN the recap was written (the table's live session, stamped
+    // like every row); `recapSession` = WHICH session the story describes.
+    // A recap of Session 1 written while Session 2 is active must carry BOTH,
+    // honestly — renderers and storyMemory key the subject off recapSession.
+    it('session_recap rows: the stamp records WHEN (live session), recapSession the SUBJECT', async () => {
+        const { characterChangeData } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        characterChangeData.set('test-campaign', { sessionState: { name: 'Session 2' } });
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .send({ type: 'session_recap', name: 'Session Recap', characterName: 'GM', description: 'In the beginning…', recapSession: 'Session 1' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.session).toBe('Session 2');
+        expect(res.body.recapSession).toBe('Session 1');
+    });
 });

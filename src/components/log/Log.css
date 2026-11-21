@@ -387,6 +387,19 @@
     border-left: 3px solid #9c6ade;
 }
 
+/* Session recap rows (roadmap Step 8) ride the narrative styles above; the
+   gold accent + title distinguish the AI's per-session story. */
+.log-recap {
+    border-left-color: #d4a017;
+}
+
+.log-recap-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #d4a017;
+    white-space: nowrap;
+}
+
 .log-narrative-speaker {
     font-size: 0.8rem;
     font-style: italic;

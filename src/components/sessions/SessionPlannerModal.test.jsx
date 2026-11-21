@@ -225,4 +225,36 @@ describe('SessionPlannerModal', () => {
     renderModal({ formData: legacyRow });
     expect(screen.getByLabelText('Notes')).toHaveValue('');
   });
+
+  // ── Write recap button (roadmap Step 8) — GM-only by handler injection,
+  // mirroring the ActiveSessionToggle census (Sessions.jsx passes the handler
+  // on localhost alone; a visitor gets no button at all).
+  describe('Write recap button', () => {
+    it('renders (and fires) only when the GM handler is passed', () => {
+      const { props, unmount } = renderModal();
+      expect(screen.queryByRole('button', { name: /write recap/i })).not.toBeInTheDocument();
+      unmount();
+
+      const onWriteRecap = vi.fn();
+      renderModal({ onWriteRecap });
+      fireEvent.click(screen.getByRole('button', { name: /write recap/i }));
+      expect(onWriteRecap).toHaveBeenCalledTimes(1);
+      expect(props.onSave).not.toHaveBeenCalled();
+    });
+
+    it('is row-only: an unsaved-new draft shows no recap button', () => {
+      renderModal({ editingSession: null, onWriteRecap: vi.fn() });
+      expect(screen.queryByRole('button', { name: /write recap/i })).not.toBeInTheDocument();
+    });
+
+    it('busy state disables the button and relabels it — no second concurrent request', () => {
+      const onWriteRecap = vi.fn();
+      renderModal({ onWriteRecap, recapBusy: true });
+      const btn = screen.getByRole('button', { name: /writing recap/i });
+      expect(btn).toBeDisabled();
+      expect(btn.querySelector('i.fa-spinner')).toBeInTheDocument();
+      fireEvent.click(btn);
+      expect(onWriteRecap).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -7,8 +7,13 @@ vi.mock('../utils/changeData.js', () => ({
     characterChangeData: new Map(),
     publish: vi.fn(),
 }));
+// loadLog/activeSessionName: storyMemory.js (pulled in by services/ai/index.js)
+// reads the story slice through them — the mock must supply every named export
+// the real module offers here, or the import boundary throws.
 vi.mock('./log.js', () => ({
     addEntry: vi.fn(() => ({})),
+    loadLog: vi.fn(() => []),
+    activeSessionName: vi.fn(() => null),
 }));
 
 import { characterChangeData } from '../utils/changeData.js';

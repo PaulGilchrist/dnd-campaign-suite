@@ -123,12 +123,25 @@ function actorStatsBlock(raw) {
 }
 
 /**
- * Build the chat messages for a referee ruling request.
- * @param {{ action: string, characterName: string, state: object, actorStats?: object|null }} args
+ * "Story so far" prompt block (roadmap Step 9 — the campaign log as AI
+ * memory). Built by services/ai/storyMemory.js; null (nothing recorded yet)
+ * keeps every prompt byte-identical to the pre-memory era. Every AI role
+ * (referee, director, world keeper) receives it so narration and rulings
+ * carry campaign continuity instead of answering amnesially.
  */
-export function buildRefereeMessages({ action, characterName, state, actorStats }) {
+export function storyBlock(story) {
+    if (typeof story !== 'string' || !story.trim()) return null;
+    return `STORY SO FAR — the campaign's own log memory; be consistent with it, never contradict it:\n${story.trim()}`;
+}
+
+/**
+ * Build the chat messages for a referee ruling request.
+ * @param {{ action: string, characterName: string, state: object, actorStats?: object|null, story?: string|null }} args
+ */
+export function buildRefereeMessages({ action, characterName, state, actorStats, story }) {
     const user = [
         `CAMPAIGN STATE (compact JSON):\n${JSON.stringify(compactContext(state))}`,
+        storyBlock(story),
         characterName ? `ACTING CHARACTER: ${characterName}` : null,
         actorStatsBlock(actorStats),
         `PLAYER'S ACTION (freeform): ${String(action || '').slice(0, 2000)}`,
@@ -158,10 +171,11 @@ Keep "explanation" short (one sentence). "confidence" is 0..1.`;
 
 /**
  * Build chat messages for an NPC-turn director request.
- * @param {{ creatureName: string, monster: object, targets: Array, self: object, economy: object, allowedIntents: Array|null, round: number|null }} args
+ * @param {{ creatureName: string, monster: object, targets: Array, self: object, economy: object, allowedIntents: Array|null, round: number|null, story?: string|null }} args
  */
-export function buildDirectorMessages({ creatureName, monster, targets, self, economy, allowedIntents, round }) {
+export function buildDirectorMessages({ creatureName, monster, targets, self, economy, allowedIntents, round, story }) {
     const user = [
+        storyBlock(story),
         `MONSTER (its turn): ${creatureName}`,
         `SPEED: ${monster.speedFeet ?? 'unknown'} ft.`,
         `ALLOWED ACTIONS (exact names — pick only from this list):\n${JSON.stringify(monster.actions.map(a => ({ name: a.name, attack_bonus: a.attack_bonus, description: a.description.slice(0, 140) })))}`,
@@ -261,13 +275,14 @@ Keep "text" ≤ 1200 characters.`;
 
 /**
  * Build chat messages for a world-keeper request.
- * @param {{ kind: string, focus: string|null, world: object, allow: object }} args
+ * @param {{ kind: string, focus: string|null, world: object, allow: object, story?: string|null }} args
  */
-export function buildWorldMessages({ kind, focus, world, allow }) {
+export function buildWorldMessages({ kind, focus, world, allow, story }) {
     const focusLine = focus ? `FOCUS (referee's steer): ${String(focus).slice(0, 400)}` : null;
     const user = [
         `REQUESTED KIND: ${kind}`,
         focusLine,
+        storyBlock(story),
         `CAMPAIGN LEDGER (ground every claim in this):\n${JSON.stringify(world)}`,
         `EXISTING NAMES you may reference: NPCs ${JSON.stringify(allow.npcNames)}; settlements ${JSON.stringify(allow.settlementNames)}; factions ${JSON.stringify(allow.factionNames)}; quests ${JSON.stringify(allow.questNames)}`,
         kind === 'quest_draft' ? 'The draft goes to the quest ledger unchanged — make it actionable.' : null,
@@ -284,4 +299,50 @@ export function parseWorldAnswer(content, allow) {
     if (!extracted.ok) return extracted;
     const result = validateWorldProposal(extracted.value, allow);
     return result.ok ? { ok: true, proposal: extracted.value } : { ok: false, errors: result.errors };
+}
+
+// ── Roadmap Step 8 — session recap generator ─────────────────────────────
+// The chronicler voice: the log transcript it is handed IS the truth of the
+// session; its job is to make that truth enthralling, never to extend it.
+// Same JSON-envelope discipline as the other roles (extract + validate, fail
+// closed to a retry then a refusal — never a silent spinner or a invented
+// session). Text cap mirrors the schemas MAX_TEXT narrative-prose law.
+const RECAP_MAX_TEXT = 2000;
+
+const RECAP_SYSTEM = `You are the chronicler of a D&D (5e/2024) campaign. You will receive the campaign log of ONE played session, already compacted. Write the session's story: enthralling, readable aloud at the table, faithful to the log.
+
+NON-NEGOTIABLE RULES:
+1. Ground EVERY event, name, place and outcome in the log rows provided. Never invent characters, encounters, or outcomes that are not in them. If a detail is missing, write around it — do not guess.
+2. The log rows already hold the mechanical truth (hits, misses, damage, deaths). You NEVER change or invent results; you narrate them.
+3. Past tense, vivid prose. Weave story beats and combat into ONE flowing narrative — not a bullet list. Markdown allowed.
+4. Keep "text" ≤ ${RECAP_MAX_TEXT} characters.
+5. Answer with ONE JSON object and nothing else: {"text":"..."}`;
+
+/**
+ * Build chat messages for a session-recap request.
+ * @param {{ session: string, transcript: string }} args
+ */
+export function buildRecapMessages({ session, transcript }) {
+    const user = [
+        `SESSION: ${String(session || '').slice(0, 120)}`,
+        `LOG ROWS OF THIS SESSION (your ONLY source of truth):\n${transcript}`,
+    ].join('\n\n');
+    return [
+        { role: 'system', content: RECAP_SYSTEM },
+        { role: 'user', content: user },
+    ];
+}
+
+/** Parse + validate a recap answer: one JSON object carrying non-empty prose. */
+export function parseRecapAnswer(content) {
+    const extracted = extractJsonObject(content);
+    if (!extracted.ok) return extracted;
+    const value = extracted.value;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return { ok: false, errors: ['recap must be an object'] };
+    }
+    const text = typeof value.text === 'string' ? value.text.trim() : '';
+    if (!text) return { ok: false, errors: ['recap.text must be a non-empty string'] };
+    if (text.length > RECAP_MAX_TEXT) return { ok: false, errors: [`recap.text must be ≤${RECAP_MAX_TEXT} chars`] };
+    return { ok: true, text };
 }
