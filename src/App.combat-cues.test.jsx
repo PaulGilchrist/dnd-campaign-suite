@@ -18,7 +18,7 @@ import App from './App.jsx';
 
 import { mockState } from './test/appTestState.js';
 import { subscribeToSSE } from './services/ui/sseClient.js';
-import { playCue } from './services/ui/audioCues.js';
+import { playCue, resetAudioCues } from './services/ui/audioCues.js';
 
 // --- Core mocks (harness parity with App.level-up-celebration.test.jsx) ---
 
@@ -210,6 +210,7 @@ const cuesPlayed = () => playCue.mock.calls.map(([cue]) => cue);
 describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAudioCues(); // cold audio module, incl. the cue lane's cued-row seen-set
 
     _appDataRef.value = {
       abilityScores: [{ full_name: 'Strength' }],
@@ -260,7 +261,7 @@ describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () 
     expect(subscribeToSSE).toHaveBeenCalledTimes(1);
     expect(subscribeToSSE).toHaveBeenCalledWith('test-campaign', expect.any(Function));
 
-    await emitLogAppend({ type: 'roll', rollType: 'save', saveResult: 'success', message: 'probe' });
+    await emitLogAppend({ id: 'app-1', type: 'roll', rollType: 'save', saveResult: 'success', message: 'probe' });
     expect(cuesPlayed()).toEqual(['save-success']);
   });
 
@@ -273,7 +274,7 @@ describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () 
     // The tracker mounted, yet the lane was NOT re-subscribed by it.
     expect(subscribeToSSE).toHaveBeenCalledTimes(1);
 
-    await emitLogAppend({ type: 'hp_change', threshold: 'dead', targetName: 'Goblin', message: 'probe' });
+    await emitLogAppend({ id: 'app-2', type: 'hp_change', threshold: 'dead', targetName: 'Goblin', message: 'probe' });
     expect(cuesPlayed()).toEqual(['monster-death']);
   });
 
@@ -283,13 +284,13 @@ describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () 
     await waitFor(() => {
       expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
     });
-    await emitLogAppend({ type: 'roll', rollType: 'attack', hit: true, isCrit: true, message: 'probe' });
+    await emitLogAppend({ id: 'app-3', type: 'roll', rollType: 'attack', hit: true, isCrit: true, message: 'probe' });
     expect(cuesPlayed()).toEqual(['crit']);
 
     // Silent faces stay silent through the App seam too.
     playCue.mockClear();
-    await emitLogAppend({ type: 'roll', rollType: 'save', name: 'Concentration Save', saveResult: 'success' });
-    await emitLogAppend({ type: 'note', noteText: 'quiet' });
+    await emitLogAppend({ id: 'app-4', type: 'roll', rollType: 'save', name: 'Concentration Save', saveResult: 'success' });
+    await emitLogAppend({ id: 'app-5', type: 'note', noteText: 'quiet' });
     await act(async () => {
       cueHandlers().forEach((handler) => handler({ key: 'log-test-campaign', data: null }));
       await flushEffects();

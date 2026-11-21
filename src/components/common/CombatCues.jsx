@@ -26,8 +26,15 @@
 
 import { useEffect } from 'react';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
-import { cueForLogEntry, playCue } from '../../services/ui/audioCues.js';
+import { cueForLogEntry, playCue, alreadyCued } from '../../services/ui/audioCues.js';
 
+// PER-ROW IDEMPOTENCE (improve 2026-11-21, CCC backlog): a duplicate delivery
+// of the same log row — an SSE resend after a brief drop, or a remount
+// replaying the newest append — never re-voices a moment. Every row that
+// decodes to a cue is claimed by its server-stamped GUID `id` via alreadyCued
+// (a module-level bounded-FIFO seen-set beside the decoder it guards, so the
+// memory survives this component's remounts; bound/eviction law lives in
+// audioCues.js). Rows with no cue never touch the set.
 export default function CombatCues({ campaignName }) {
     useEffect(() => {
         if (!campaignName) return undefined;
@@ -35,7 +42,9 @@ export default function CombatCues({ campaignName }) {
             // log-clear events carry data:null — nothing to cue on.
             if (!event || !event.key || !event.key.startsWith('log-')) return;
             const cue = cueForLogEntry(event.data);
-            if (cue) playCue(cue);
+            if (!cue) return;
+            if (alreadyCued(event.data.id)) return;
+            playCue(cue);
         });
     }, [campaignName]);
 

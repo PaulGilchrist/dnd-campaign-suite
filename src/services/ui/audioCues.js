@@ -27,8 +27,9 @@
 //
 // Machine-gun guard: ONE pooled HTMLAudioElement per cue key. Re-firing the
 // same cue restarts that single element (currentTime reset), so a burst of
-// identical events in one batch collapses into one audible hit — the only
-// dedupe mechanism, no wall-clock throttle anywhere.
+// identical events in one batch collapses into one audible hit — the
+// same-key floor, complemented per ROW by alreadyCued below (the SSE log lane's
+// duplicate-delivery guard). No wall-clock throttle anywhere.
 
 // cue key → served URL. public/ is served statically in dev (express + Vite)
 // and copied into dist/ by the build, so these paths resolve in both modes.
@@ -121,10 +122,12 @@ function refreshUnlock() {
 unlockOnFirstGesture();
 
 /** Test seam (resetSSEClient precedent): drop the pooled elements, the
- *  unlock listener and its flag so suites start from a cold audio module. */
+ *  unlock listener, its flag and the cued-row id set so suites start from a
+ *  cold audio module. */
 export function resetAudioCues() {
     for (const el of pool.values()) el.pause();
     pool.clear();
+    cuedRowIds.clear();
     if (unlockListener) document.removeEventListener('pointerdown', unlockListener);
     unlockListener = null;
     unlocked = false;
@@ -227,6 +230,31 @@ function cueForRollEntry(entry) {
         if (entry.saveResult === 'failure') return 'save-failure';
     }
     return null;
+}
+
+// ── Per-row idempotence for the SSE log cue lane (improve 2026-11-21) ──
+// A duplicate delivery of the same log row — an SSE resend after a brief
+// drop, or a CombatCues remount replaying the newest append — must never
+// re-voice a moment. Every row the lane cues is remembered by its server-
+// stamped GUID `id` (log.js addEntry stamps one on EVERY append) and later
+// deliveries of that id stay silent. The set lives at MODULE level, like the
+// element pool above, so the guard survives component remounts; only a page
+// reload empties it, and there the cue lane's no-initial-GET mount law means
+// history never retro-cues anyway. Bounded FIFO: Sets iterate insertion order,
+// so the oldest cued id evicts first; the cap comfortably outlives the shared
+// lane's traffic (the server log caps at 500 rows).
+const MAX_CUED_ROW_IDS = 200;
+const cuedRowIds = new Set();
+
+/** Record that log row `id` has been through the cue lane. Returns TRUE when
+ *  the id was already recorded — the caller must then stay silent. */
+export function alreadyCued(id) {
+    if (cuedRowIds.has(id)) return true;
+    cuedRowIds.add(id);
+    if (cuedRowIds.size > MAX_CUED_ROW_IDS) {
+        cuedRowIds.delete(cuedRowIds.values().next().value);
+    }
+    return false;
 }
 
 /**
