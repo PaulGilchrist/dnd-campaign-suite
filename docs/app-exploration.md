@@ -58,8 +58,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab clears; dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-20 CCC) **Quick-spawn never places a map token:** quick-spawned monsters join the Initiative board but get NO `placedItems` token on the active map — their range/cover lane silently degrades to leniency (CCC had to hand-PUT tokens to measure a Goblin at all), while campaign players auto-track via `players[]`. Suggest an opt-in "place at party-relative spot" stamp on quick-spawn when a map is active. Files: `src/services/encounters/quickMonsterSpawn.js`, `src/components/initiative/QuickMonsterSpawn.jsx`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.

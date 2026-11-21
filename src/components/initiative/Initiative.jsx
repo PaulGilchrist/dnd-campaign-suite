@@ -1051,8 +1051,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                       initiative-ready cards with real stats/art via the shared
                       encounter-join lane. The users-guide §20 "+ NPC auto-naming"
                       gotcha promoted to a first-class control; works with NO
-                      active map (targets arm through the card's Target select). */}
-                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} />
+                      active map (targets arm through the card's Target select).
+                      With an active map the picker additionally offers the
+                      opt-in party-relative token stamp (2026-11-20 CCC backlog). */}
+                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} mapName={mapName} />
                   <PartyPresenceButton
                       creatures={combatSummary.creatures}
                       onConfirm={handlePartyPresenceChange}

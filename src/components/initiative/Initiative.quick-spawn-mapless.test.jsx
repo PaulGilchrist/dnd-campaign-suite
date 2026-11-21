@@ -8,8 +8,9 @@
 // whole flow with zero errors and no map: the accepted cards re-render, the
 // freshly joined monster is armable through the card's Target select (the
 // mapless fallback-target lane — scoped combatSummary PATCH, no token, no
-// overlay, no navigation), and the picker closes on success.
-// Boundary mocks mirror initiative.test.jsx.
+// overlay, no navigation), and the picker closes on success. One threading
+// leg mounts WITH a mapName to pin the 2026-11-20 CCC token opt-in reaching
+// the service. Boundary mocks mirror initiative.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
@@ -145,7 +146,7 @@ const goblinRow = (n, initiative) => ({
 });
 const playerRow = (name, initiative) => ({ name, type: 'player', initiative, targetName: null, concentration: null });
 
-describe('Initiative — quick monster spawn with NO active map', () => {
+describe('Initiative — quick monster spawn (mapless law + token opt-in threading)', () => {
     let props;
     let errorSpy;
 
@@ -185,6 +186,9 @@ describe('Initiative — quick monster spawn with NO active map', () => {
         fireEvent.change(search, { target: { value: 'gob' } });
         fireEvent.click(screen.getByText('Goblin'));
         fireEvent.change(screen.getByLabelText('Qty'), { target: { value: '5' } });
+        // Mapless contract (2026-11-20 CCC opt-in): with mapName null the
+        // token affordance never renders while the picker is OPEN.
+        expect(screen.queryByLabelText('Place a token near the party on the map')).not.toBeInTheDocument();
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Spawn 5× Goblin' })); });
     }
 
@@ -199,8 +203,10 @@ describe('Initiative — quick monster spawn with NO active map', () => {
 
         // The lane ran through the shared spawn service with the full bestiary
         // row + the exact typed quantity + the roster for the party fan-out.
+        // No active map ⇒ no token affordance ever rendered ⇒ placeToken false.
         expect(quickSpawnMonster).toHaveBeenCalledWith(
-            expect.objectContaining({ index: 'goblin', name: 'Goblin' }), 5, props.characters, 'test-campaign');
+            expect.objectContaining({ index: 'goblin', name: 'Goblin' }), 5, props.characters, 'test-campaign', { placeToken: false });
+        expect(screen.queryByLabelText('Place a token near the party on the map')).not.toBeInTheDocument();
         // Accepted board mirrored: all five cards render beside the party.
         for (let n = 1; n <= 5; n++) {
             expect(screen.getByTestId(`creature-card-Goblin ${n}`)).toBeInTheDocument();
@@ -239,5 +245,24 @@ describe('Initiative — quick monster spawn with NO active map', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(/never reached the board/);
         expect(screen.queryByTestId('creature-card-Goblin 1')).not.toBeInTheDocument();
         expect(screen.getByText('Failed to spawn 5× Goblin')).toBeInTheDocument();
+    });
+
+    it('with an ACTIVE map the container threads mapName into the picker: the opt-in renders unchecked and a tick rides { placeToken: true }', async () => {
+        quickSpawnMonster.mockResolvedValue({ round: 1, creatures: [
+            goblinRow(1, 16), playerRow('Alice', '12'), playerRow('Bob', '9'),
+        ] });
+        await act(async () => { render(<Initiative {...props} mapName="qa-sandbox" />); });
+        await waitFor(() => expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument());
+
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: '+ Monster' })); });
+        await waitFor(() => screen.getByLabelText('Search monsters'));
+        const box = screen.getByLabelText('Place a token near the party on the map');
+        expect(box).not.toBeChecked();
+        fireEvent.click(box);
+        fireEvent.click(screen.getByText('Goblin'));
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Spawn 1× Goblin' })); });
+
+        expect(quickSpawnMonster).toHaveBeenCalledWith(
+            expect.objectContaining({ index: 'goblin', name: 'Goblin' }), 1, props.characters, 'test-campaign', { placeToken: true });
     });
 });

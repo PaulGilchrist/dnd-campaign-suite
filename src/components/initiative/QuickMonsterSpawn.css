@@ -120,6 +120,18 @@
     gap: 12px;
 }
 
+/* Map-token opt-in row (2026-11-20 CCC backlog) — renders only while a map is
+   active; same type scale as the qty label, own line under the controls. */
+.qms-token-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    color: var(--color-text);
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
 .qms-qty-label {
     color: var(--color-text);
     font-size: 0.9em;

@@ -21,9 +21,9 @@ const MONSTERS = [
   { index: 'rat', name: 'Giant Rat', type: 'beast', challenge_rating: 0.125, xp: 25 },
 ];
 
-function mount(onSpawn = vi.fn(async () => true)) {
+function mount(onSpawn = vi.fn(async () => true), mapName = undefined) {
   useMonstersData.mockReturnValue({ monsters: MONSTERS, loading: false });
-  render(<QuickMonsterSpawn onSpawn={onSpawn} />);
+  render(<QuickMonsterSpawn onSpawn={onSpawn} mapName={mapName} />);
   return onSpawn;
 }
 
@@ -97,7 +97,7 @@ describe('QuickMonsterSpawn selection + spawn', () => {
     expect(screen.getByRole('button', { name: 'Spawn 5× Goblin' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Spawn 5× Goblin' }));
-    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ index: 'goblin', name: 'Goblin' }), 5);
+    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ index: 'goblin', name: 'Goblin' }), 5, { placeToken: false });
   });
 
   it('closes only on an accepted spawn; a rejected spawn stays open with visible inline copy', async () => {
@@ -117,7 +117,7 @@ describe('QuickMonsterSpawn selection + spawn', () => {
     fireEvent.click(screen.getByText('Ogre'));
     fireEvent.click(screen.getByRole('button', { name: 'Spawn 1× Ogre' }));
 
-    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ index: 'ogre' }), 1);
+    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ index: 'ogre' }), 1, { placeToken: false });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -127,5 +127,36 @@ describe('QuickMonsterSpawn selection + spawn', () => {
     openPicker();
     expect(screen.getByText(/Loading bestiary/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Search monsters')).not.toBeInTheDocument();
+  });
+});
+
+describe('QuickMonsterSpawn map-token opt-in (2026-11-20 CCC backlog)', () => {
+  it('renders no token affordance with NO active map — the flow stays byte-identical to the mapless law', () => {
+    const onSpawn = mount(vi.fn(async () => true), null);
+    openPicker();
+    expect(screen.queryByLabelText('Place a token near the party on the map')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Goblin'));
+    fireEvent.click(screen.getByRole('button', { name: 'Spawn 1× Goblin' }));
+    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ name: 'Goblin' }), 1, { placeToken: false });
+  });
+
+  it('with an active map the opt-in renders UNCHECKED (default OFF), and ticking it stamps the spawn option', async () => {
+    const onSpawn = mount(vi.fn(async () => true), 'qa-sandbox');
+    openPicker();
+    const box = screen.getByLabelText('Place a token near the party on the map');
+    expect(box).not.toBeChecked();
+
+    fireEvent.click(screen.getByText('Goblin'));
+    fireEvent.click(screen.getByRole('button', { name: 'Spawn 1× Goblin' }));
+    expect(onSpawn).toHaveBeenCalledWith(expect.objectContaining({ name: 'Goblin' }), 1, { placeToken: false });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    openPicker();
+    fireEvent.click(screen.getByLabelText('Place a token near the party on the map'));
+    expect(screen.getByLabelText('Place a token near the party on the map')).toBeChecked();
+    fireEvent.click(screen.getByText('Goblin'));
+    fireEvent.click(screen.getByRole('button', { name: 'Spawn 1× Goblin' }));
+    expect(onSpawn).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Goblin' }), 1, { placeToken: true });
   });
 });

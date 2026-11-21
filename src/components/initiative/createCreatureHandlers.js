@@ -670,13 +670,13 @@ export function createCreatureHandlers({
     // (AGENTS invariant: pre-made monsters join from monsters.json, never as
     // NPC rows). Hosted behind the GM-only combat-controls row, matching the
     // +NPC lane's UI gating.
-    const handleQuickSpawnMonster = async function handleQuickSpawnMonster(monster, qty) {
+    const handleQuickSpawnMonster = async function handleQuickSpawnMonster(monster, qty, options = {}) {
         if (!combatSummary || !monster) return false
         const count = Math.max(1, parseInt(qty, 10) || 1)
         const namesBefore = new Set(combatSummary.creatures.map(c => c.name))
         let summary
         try {
-            summary = await quickSpawnMonster(monster, count, characters, campaignName)
+            summary = await quickSpawnMonster(monster, count, characters, campaignName, { placeToken: Boolean(options.placeToken) })
         } catch (e) {
             console.error('[handleQuickSpawnMonster] quick monster spawn failed:', e)
             showToast(`Failed to spawn ${count}× ${monster.name}`, true)

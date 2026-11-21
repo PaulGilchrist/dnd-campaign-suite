@@ -20,11 +20,19 @@ import './QuickMonsterSpawn.css'
 //
 // The open flag is per-client presentation (showModal category — local state
 // law), never the runtime store. Escape closes (EffectAdder convention).
-function MonsterPickerModal({ onClose, onSpawn }) {
+//
+// Map-token opt-in (2026-11-20 CCC backlog): when a map is ACTIVE (`mapName`,
+// the App activeMapName prop the Initiative host already threads), the picker
+// offers "Place a token near the party on the map" — default OFF (opt-in,
+// mirroring the qty field's conservative default). With no active map the
+// affordance never renders and the flow is byte-identical to before. The stamp
+// itself is owned by services/encounters/quickMonsterSpawn.js.
+function MonsterPickerModal({ onClose, onSpawn, mapName }) {
     const { monsters, loading } = useMonstersData()
     const [searchQuery, setSearchQuery] = React.useState('')
     const [selected, setSelected] = React.useState(null)
     const [qty, setQty] = React.useState('1')
+    const [placeToken, setPlaceToken] = React.useState(false)
     const [error, setError] = React.useState('')
     const [spawning, setSpawning] = React.useState(false)
     // Entrance focus + stranded-close restore (shared overlay hook).
@@ -60,7 +68,7 @@ function MonsterPickerModal({ onClose, onSpawn }) {
     const handleSpawn = async () => {
         if (!selected || spawning) return
         setSpawning(true)
-        const spawned = await onSpawn(selected, count)
+        const spawned = await onSpawn(selected, count, { placeToken })
         setSpawning(false)
         // Failure keeps the picker open for an honest retry; the parent handler
         // already named the failure in a toast + console.
@@ -141,6 +149,17 @@ function MonsterPickerModal({ onClose, onSpawn }) {
                             </button>
                             <button type='button' className='qms-cancel-btn' onClick={onClose}>Cancel</button>
                         </div>
+                        {mapName && (
+                            <label className='qms-token-label' htmlFor='qms-place-token'>
+                                <input
+                                    id='qms-place-token'
+                                    type='checkbox'
+                                    checked={placeToken}
+                                    onChange={(e) => setPlaceToken(e.target.checked)}
+                                />
+                                Place a token near the party on the map
+                            </label>
+                        )}
                         <p className='qms-hint'>
                             Real stat block and art from the bestiary — nothing is saved to the
                             NPCs list, and combat runs entirely in the tracker: no map required.
@@ -152,7 +171,7 @@ function MonsterPickerModal({ onClose, onSpawn }) {
     )
 }
 
-export default function QuickMonsterSpawn({ onSpawn }) {
+export default function QuickMonsterSpawn({ onSpawn, mapName }) {
     const [open, setOpen] = React.useState(false)
     return (
         <>
@@ -160,7 +179,7 @@ export default function QuickMonsterSpawn({ onSpawn }) {
                 onClick={() => setOpen(true)}
                 title='Search the bestiary and spawn N instances with real stats and initiative rolled — works without a map; nothing is written to the NPCs list'
             >+ Monster</button>
-            {open && <MonsterPickerModal onClose={() => setOpen(false)} onSpawn={onSpawn} />}
+            {open && <MonsterPickerModal onClose={() => setOpen(false)} onSpawn={onSpawn} mapName={mapName} />}
         </>
     )
 }

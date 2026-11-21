@@ -97,7 +97,7 @@ describe('handleQuickSpawnMonster', () => {
         const ok = await tab.handlers.handleQuickSpawnMonster(GOBLIN, 2);
 
         expect(ok).toBe(true);
-        expect(quickSpawnMonster).toHaveBeenCalledWith(GOBLIN, 2, [{ name: 'Alice' }], campaignName);
+        expect(quickSpawnMonster).toHaveBeenCalledWith(GOBLIN, 2, [{ name: 'Alice' }], campaignName, { placeToken: false });
         // Ack-then-publish: the RETURNED board is mirrored (cloned, not aliased).
         expect(tab.setCombatSummary).toHaveBeenCalledWith(spawned);
         expect(tab.setCombatSummary.mock.calls[0][0]).not.toBe(spawned);
@@ -133,13 +133,27 @@ describe('handleQuickSpawnMonster', () => {
         const tab = makeTab();
 
         await tab.handlers.handleQuickSpawnMonster(GOBLIN, '0');
-        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName);
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName, { placeToken: false });
 
         await tab.handlers.handleQuickSpawnMonster(GOBLIN, 'seven');
-        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName);
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName, { placeToken: false });
 
         await tab.handlers.handleQuickSpawnMonster(GOBLIN, 5);
-        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 5, [{ name: 'Alice' }], campaignName);
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 5, [{ name: 'Alice' }], campaignName, { placeToken: false });
+    });
+
+    it('forwards the picker\'s map-token opt-in to the service (normalized to a boolean)', async () => {
+        quickSpawnMonster.mockResolvedValue({ round: 1, creatures: [alice()] });
+        const tab = makeTab();
+
+        await tab.handlers.handleQuickSpawnMonster(GOBLIN, 1, { placeToken: true });
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName, { placeToken: true });
+
+        await tab.handlers.handleQuickSpawnMonster(GOBLIN, 1, { placeToken: 'truthy' });
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName, { placeToken: true });
+
+        await tab.handlers.handleQuickSpawnMonster(GOBLIN, 1, {});
+        expect(quickSpawnMonster).toHaveBeenLastCalledWith(GOBLIN, 1, [{ name: 'Alice' }], campaignName, { placeToken: false });
     });
 
     it('with no mounted board it never calls the lane (same guard family as +NPC)', async () => {
