@@ -15,7 +15,10 @@ const BASE_URL = '/api/campaigns';
 // runs this code and still 400s at the gate.
 //
 // LOG_TEXT_FIELDS mirrors the server gate's canonical list verbatim
-// (server/routes/log.js). Per-type phrasing mirrors the family voice of the
+// (server/routes/log.js). Canonical READS of the resulting text — the split
+// between stamped-`message` chip-commit rows and `description` join rows —
+// go through getEntryText in src/components/log/log-utils.js.
+// Per-type phrasing mirrors the family voice of the
 // matching Log renderers (LogRollEntry badges HIT/MISS/Critical Hit!,
 // LogHpHealingEntry 'Defeated/Bloodied', LogDeathSaveEntry 'Stabilized!/Has
 // Perished!', LogEncounterEntry/LogConditionEntry presentation maps).

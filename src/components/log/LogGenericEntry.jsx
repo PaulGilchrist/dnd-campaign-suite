@@ -1,4 +1,4 @@
-import { formatTimestamp, formatEntryTypeLabel } from './log-utils.js';
+import { formatTimestamp, formatEntryTypeLabel, getEntryText } from './log-utils.js';
 
 // Generic fallback for entry types missing from Log.jsx's ENTRY_COMPONENTS
 // registry (e.g. gameplay-lane 'enforcement_denied' / 'ai_director' /
@@ -6,9 +6,11 @@ import { formatTimestamp, formatEntryTypeLabel } from './log-utils.js';
 // Keeps the shared audit trail honest: nothing is stored-but-invisible.
 export function GenericEntry({ entry }) {
   const typeLabel = formatEntryTypeLabel(String(entry.type ?? 'unknown'));
-  // Prefer human-readable text fields; fall back to a JSON excerpt so even a
-  // bare payload renders its content.
-  const text = entry.message ?? entry.description ?? entry.noteText
+  // Prefer the canonical readable text (getEntryText resolves the stamped-
+  // `message` roll/hp_change rows and the join `description` rows through one
+  // documented precedence); fall back to a JSON excerpt so even a bare
+  // payload renders its content.
+  const text = getEntryText(entry)
     ?? JSON.stringify(Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'id')));
   return (
     <div className="log-entry log-generic">

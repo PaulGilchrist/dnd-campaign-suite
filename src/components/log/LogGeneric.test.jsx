@@ -47,6 +47,16 @@ describe('Log generic fallback entries', () => {
     expect(text).not.toContain('g3');
   });
 
+  it('resolves summary-only rows through the canonical getEntryText accessor', () => {
+    // The generic text line is the shared accessor (message → description →
+    // noteText → summary), so a summary-carrying row reads as prose, not a
+    // JSON dump (backlog 2026-11-20 AAA).
+    setup(Log, [
+      { id: 'g4', type: 'gm-note', summary: 'Restored 5 hp', timestamp: 1700000000000 },
+    ]);
+    expect(q('.log-generic-text').textContent).toBe('Restored 5 hp');
+  });
+
   it('labels a type-less entry as Unknown and keeps registered types unaffected', () => {
     setup(Log, [
       note({ id: 'n', noteText: 'Composer note' }),

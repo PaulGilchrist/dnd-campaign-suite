@@ -117,6 +117,21 @@ describe('enforcement & AI audit ledger', () => {
         expect(queryByText('entry-5')).toBeNull();        // …oldest five dropped
     });
 
+    it('resolves ledger text through the canonical accessor (message first, reason fallback)', async () => {
+        // Backlog 2026-11-20 AAA: the client POST funnel stamps a plain-English
+        // `message` on textless structured rows (e.g. reason-only enforcement
+        // denials), so the ledger reads them through the same precedence as the
+        // Log view's generic row — getEntryText first, lane `reason` fallback.
+        stubFetch([
+            { type: 'enforcement_denied', creature: 'FeyRanger', bucket: 'bonusAction', message: 'Enforcement Denied', reason: 'No bonus action left this turn.' },
+            { type: 'write_rejected', key: 'sessionState', description: 'Server rejected write to sessionState' },
+        ]);
+        const { findByText, queryByText } = render(<SessionSection campaignName={CN} />);
+        expect(await findByText('Enforcement Denied')).toBeInTheDocument();
+        expect(await findByText('Server rejected write to sessionState')).toBeInTheDocument();
+        expect(queryByText(/No bonus action left this turn\./)).toBeNull();
+    });
+
     it('stays honestly empty on a failed fetch, then fills on Refresh', async () => {
         let fail = true;
         let rows = [];

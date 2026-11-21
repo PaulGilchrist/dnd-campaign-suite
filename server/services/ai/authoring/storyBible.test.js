@@ -48,6 +48,30 @@ describe('buildStoryBible', () => {
         expect(bibleWith.designIntent.storySummary).toContain('ward-sacrifice');
         expect(bibleWith.designIntent.lastPlans).toHaveLength(1);
     });
+
+    it('reads recentLog through the canonical getEntryText accessor (both text fields)', () => {
+        // Backlog 2026-11-20 AAA: chip-commit rows carry the stamped `message`,
+        // join initiative/automation rows carry `description`, info rows ride
+        // the lane-local `text` field — a single-field grep misses families, so
+        // the forensic reader must surface all three shapes.
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bible-log-'));
+        try {
+            fs.mkdirSync(path.join(tmp, 'data'), { recursive: true });
+            fs.writeFileSync(path.join(tmp, 'data', 'campaign-log.json'), JSON.stringify([
+                { type: 'hp_change', delta: -5, message: 'ElderPaladin takes 5 damage (219/224 HP)' },
+                { type: 'roll', rollType: 'initiative', description: 'Goblin rolls initiative: 15 (+2)' },
+                { type: 'info', text: 'Composer info line' },
+            ]));
+            const bible = buildStoryBible('fixture', { root: tmp });
+            expect(bible.recentLog.map(l => l.text)).toEqual([
+                'ElderPaladin takes 5 damage (219/224 HP)',
+                'Goblin rolls initiative: 15 (+2)',
+                'Composer info line',
+            ]);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
 });
 
 describe('monsterMenu', () => {

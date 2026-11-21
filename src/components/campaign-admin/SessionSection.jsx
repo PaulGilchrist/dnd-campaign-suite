@@ -14,6 +14,7 @@ import { SESSION_PHASES, setSessionPhase, readSessionPhase } from '../../service
 // Ledger filter list, extracted to a plain .js module so the server allowlist
 // pin test can derive it (see auditTypes.js).
 import { AUDIT_TYPES } from './auditTypes.js'
+import { getEntryText } from '../log/log-utils.js'
 import './SessionSection.css'
 
 const PHASE_LABELS = {
@@ -121,7 +122,7 @@ export default function SessionSection({ campaignName }) {
                             {audit.map((e, i) => (
                                 <li key={e.id || i} className={`session-audit-row ${e.type}`}>
                                     <span className="session-audit-type">{e.type.replace(/_/g, ' ')}</span>
-                                    <span className="session-audit-text">{(e.description || e.reason || e.message || JSON.stringify(e)).slice(0, 180)}</span>
+                                    <span className="session-audit-text">{(getEntryText(e) || e.reason || JSON.stringify(e)).slice(0, 180)}</span>
                                 </li>
                             ))}
                         </ul>

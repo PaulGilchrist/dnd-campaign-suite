@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-20 AAA) The structured-log commit trio splits its human text across two fields — chip-commit `roll`/`hp_change` rows carry the stamped `message`, while the quick-spawn join trio's initiative (`roll`) and party-seed (`automation`) rows carry `description`; any forensic/export consumer that greps one field misses the other. Consider one canonical accessor or a note in `log.js`'s header documenting the split as intentional. Not user-visible; wire-level consistency only.
 - (2026-11-20 AAA) The death-save prompt's mount-side stale-evict (DeathSavePromptModal.jsx ~146-153) is silent: a prompt POSTed (or replayed from an undrained key) over a living player vanishes with ZERO console/debug feedback — correct defense, but a GM watching a manually-armed prompt disappear gets no explanation. A one-line `console.debug` (or debug-build toast) naming the re-verdict would help harnesses and GMs distinguish "auto-evicted: target HP>0" from a mount failure.
 
 ## Blocked / Not Verified (fold-gate ledger)

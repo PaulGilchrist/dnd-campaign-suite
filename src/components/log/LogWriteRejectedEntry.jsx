@@ -1,4 +1,4 @@
-import { formatTimestamp, formatEntryTypeLabel } from './log-utils.js';
+import { formatTimestamp, formatEntryTypeLabel, getEntryText } from './log-utils.js';
 
 // Server-validator write refusals (GC improve 2026-11-10, backlog audit
 // legibility). Rejected change-data writes log their own row type
@@ -9,8 +9,10 @@ import { formatTimestamp, formatEntryTypeLabel } from './log-utils.js';
 export function WriteRejectedEntry({ entry }) {
   const typeLabel = formatEntryTypeLabel(String(entry.type ?? 'write_rejected'));
   // Producers always stamp the full sentence; fall back honestly for rows
-  // missing it rather than dumping raw JSON.
-  const detail = entry.description ?? entry.reason ?? 'Server rejected the write.';
+  // missing it rather than dumping raw JSON. getEntryText is the canonical
+  // read (message → description → noteText → summary); write_rejected
+  // producers carry `description`, reason-only rows keep the lane fallback.
+  const detail = getEntryText(entry) ?? entry.reason ?? 'Server rejected the write.';
   return (
     <div className="log-entry log-write-rejected">
       <div className="log-entry-header">

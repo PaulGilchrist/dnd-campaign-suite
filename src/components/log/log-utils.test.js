@@ -9,6 +9,7 @@ import {
   formatAiAuditLine,
   formatEntryTypeLabel,
   getEntrySearchText,
+  getEntryText,
   getRollTypeOptions,
   LOG_WINDOW_SIZE
 } from './log-utils.js';
@@ -252,6 +253,42 @@ describe('log-utils filter helpers', () => {
       const withMessage = { ...refineEntry, id: 'aud4', message: 'Refined the npc' };
       expect(getEntrySearchText(withMessage)).toBe(expectedRawSearchText(withMessage));
       expect(getEntrySearchText(withMessage)).toContain('refined the npc');
+    });
+  });
+
+  describe('getEntryText (canonical entry-text accessor)', () => {
+    // Backlog 2026-11-20 AAA: the human text is split by producing lane —
+    // chip-commit roll/hp_change rows carry the stamped `message`, join
+    // initiative/automation rows carry `description`. The accessor is the
+    // ONE canonical read; these pins lock its documented precedence.
+    it('prefers the stamped message when present, even beside a description', () => {
+      expect(getEntryText({
+        type: 'roll',
+        message: 'Goblin attacks ElderPaladin with Scimitar: 6 +4 (+4 to hit) vs AC 19 — MISS',
+        description: 'join-row text',
+      })).toBe('Goblin attacks ElderPaladin with Scimitar: 6 +4 (+4 to hit) vs AC 19 — MISS');
+    });
+
+    it('falls back to description for the join trio rows, then noteText, then summary', () => {
+      expect(getEntryText({
+        type: 'roll', rollType: 'initiative', characterName: 'Goblin', total: 15,
+        description: 'Goblin rolls initiative: 15 (+2)',
+      })).toBe('Goblin rolls initiative: 15 (+2)');
+      expect(getEntryText({ type: 'note', noteText: 'Ambush at dawn' })).toBe('Ambush at dawn');
+      expect(getEntryText({ type: 'ai_authoring', summary: 'AI drafted 1 entity' })).toBe('AI drafted 1 entity');
+    });
+
+    it('walks the full message → description → noteText → summary precedence', () => {
+      expect(getEntryText({ description: 'd', noteText: 'n', summary: 's' })).toBe('d');
+      expect(getEntryText({ noteText: 'n', summary: 's' })).toBe('n');
+      expect(getEntryText({ summary: 's', text: 'lane-local' })).toBe('s');
+    });
+
+    it('returns null when no canonical field carries text (defined absent outcome)', () => {
+      expect(getEntryText({ type: 'hp_change', delta: -5, targetName: 'ElderPaladin' })).toBeNull();
+      expect(getEntryText({ message: undefined, description: null, noteText: {}, summary: [] })).toBeNull();
+      expect(getEntryText(null)).toBeNull();
+      expect(getEntryText(undefined)).toBeNull();
     });
   });
 

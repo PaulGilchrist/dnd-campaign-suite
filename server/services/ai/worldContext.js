@@ -10,6 +10,10 @@
  */
 import fs from 'fs';
 import { campaignDataFile } from '../../utils/campaignPaths.js';
+// Canonical log-row text read (shared with the Log view): resolves the
+// stamped-`message` chip-commit rows and the `description` join rows through
+// one documented precedence, so the AI context sees both families.
+import { getEntryText } from '../../../src/components/log/log-utils.js';
 
 // No slashes/dots — the file name is fixed by the caller, this guards the
 // campaign segment itself against traversal.
@@ -49,7 +53,7 @@ export function loadWorldState(campaign, changeData = {}) {
         .map(n => ({ title: n.name || clip(n.description, 40), body: clip(n.description, 120) }));
     const recentLog = (Array.isArray(changeData.log) ? changeData.log : log)
         .slice(-14)
-        .map(e => ({ type: e.type || '', text: clip(e.description || e.text, 120) }));
+        .map(e => ({ type: e.type || '', text: clip(getEntryText(e) || e.text, 120) }));
 
     return {
         context: {

@@ -18,6 +18,10 @@ import path from 'path';
 import { campaignDir } from '../../../utils/campaignPaths.js';
 import { readJson, BESTIARY_FILE } from './referential.js';
 import { readParty, partyLevelRange } from './party.js';
+// Canonical log-row text read (shared with the Log view): resolves the
+// stamped-`message` chip-commit rows and the `description` join rows through
+// one documented precedence, so the bible's recentLog sees both families.
+import { getEntryText } from '../../../../src/components/log/log-utils.js';
 
 const clip = (s, n = 160) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 
@@ -74,7 +78,7 @@ export function buildStoryBible(campaign, { root, notes = null } = {}) {
             .map(s => ({ name: s.name, date: s.date || null, status: s.status || 'planned', summary: clip(s.summary, 160) })),
         encounters: encounters.slice(-15).map(e => ({ name: e.name, monsters: (e.selectedMonsters || []).map(m => `${m.name}×${m.qty}`) })),
         maps,
-        recentLog: log.slice(-25).map(e => ({ type: e.type || '', text: clip(e.description || e.text, 140) })),
+        recentLog: log.slice(-25).map(e => ({ type: e.type || '', text: clip(getEntryText(e) || e.text, 140) })),
         designIntent: notes ? {
             storySummary: notes.storySummary || null,
             lastPlans: (notes.plans || []).slice(-3),

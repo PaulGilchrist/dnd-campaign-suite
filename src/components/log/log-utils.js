@@ -60,7 +60,7 @@ export function getEntrySearchText(entry) {
   // describer prose: rows with a direct message/summary already expose that
   // text via the raw harvest, and non-audit entries stay byte-identical
   // (their fallback line is a generic key: value summary, not prose).
-  const direct = directAuditText(entry);
+  const direct = getEntryText(entry);
   if (AI_AUDIT_DESCRIBERS[entry.type] && !(direct && direct.trim())) {
     parts.push(formatAiAuditLine(entry));
   }
@@ -287,17 +287,31 @@ function summarizeResidualPayload(entry) {
   return parts.length ? parts.join(' · ') : 'No detail recorded';
 }
 
-// Direct human/model-authored text a row carries verbatim (the generic rows
-// render it as-is). Shared guard: formatAiAuditLine prefers it over describer
-// prose, and getEntrySearchText skips the fold when it exists (raw harvest
-// already covers it).
-function directAuditText(entry) {
+// ── Canonical entry-text accessor (backlog 2026-11-20 AAA) ──
+// The human-readable text of a log row is INTENTIONALLY split across two
+// fields by producing lane: chip-commit `roll`/`hp_change` rows carry the
+// stamped `message` (src/services/ui/logService.js stampAuditText), while the
+// join trio's initiative (`roll`) and party-seed (`automation`) rows carry a
+// producer-written `description`. A consumer greping one field alone misses
+// the other family's rows, so EVERY generic display/audit/forensic/export
+// read of a row's text resolves through this one accessor with a single
+// documented precedence: message → description → noteText → summary (the
+// first field present, verbatim; null when none is). The info-lane `text`
+// field (src/hooks/combat/attackBlockers.js) stays a lane-local display
+// field, and per-type renderers that surface their own producer's field (the
+// sanitized description sinks, LogMusicEntry) render structured rows, not
+// generic text, so they intentionally stay off this accessor.
+export function getEntryText(entry) {
+  if (!entry || typeof entry !== 'object') return null;
   return asText(entry.message) ?? asText(entry.description)
     ?? asText(entry.noteText) ?? asText(entry.summary);
 }
 
+// Shared guard: formatAiAuditLine prefers verbatim text over describer prose,
+// and getEntrySearchText skips the fold when it exists (raw harvest already
+// covers it).
 export function formatAiAuditLine(entry) {
-  const direct = directAuditText(entry);
+  const direct = getEntryText(entry);
   if (direct && direct.trim()) return truncateLine(direct, 400);
   const describe = AI_AUDIT_DESCRIBERS[entry.type];
   if (describe) return truncateLine(describe(entry), 400);

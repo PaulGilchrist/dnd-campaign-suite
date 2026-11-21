@@ -70,6 +70,18 @@ export function addEntry(campaign, entry) {
 }
 
 // POST-lane schema gate (owner ruling 2026-11-20, backlog 2026-11-20 YY):
+//
+// INTENTIONAL TEXT-FIELD SPLIT (backlog 2026-11-20 AAA): a row's human-readable
+// text lives in ONE of two canonical fields depending on the producing lane —
+// chip-commit `roll`/`hp_change` rows carry the stamped `message`
+// (src/services/ui/logService.js stampAuditText), while the quick-spawn join
+// trio's initiative (`roll`) and party-seed (`automation`) rows carry a
+// producer-written `description`. This is NOT a legacy dual-write: each row
+// family writes exactly one field, by design. Consumers must never grep a
+// single field — canonical reads go through getEntryText
+// (src/components/log/log-utils.js), which resolves the split with one
+// documented precedence (message → description → noteText → summary).
+//
 // this lane stays visitor-writable shared-table authoring (same doctrine as
 // /spell-overlay) but is no longer schema-FREE. A forged row used to land
 // 200 for ANY JSON — it stamped id/timestamp, broadcast `log-<c>` to every
@@ -80,7 +92,8 @@ export function addEntry(campaign, entry) {
 //   2. `type` must be a string in ALLOWED_LOG_TYPES below;
 //   3. the entry must carry non-empty human-readable text in one of the
 //      canonical display fields the Log view reads — message/description/
-//      noteText/summary (directAuditText in src/components/log/log-utils.js)
+//      noteText/summary (canonical read: getEntryText in
+//      src/components/log/log-utils.js)
 //      plus the info-lane `text` field (src/hooks/combat/attackBlockers.js).
 // Extra unknown non-required fields pass through untouched so every existing
 // producer stays byte-compatible. Client-side companion: the shared POST lane
