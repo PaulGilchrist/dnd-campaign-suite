@@ -46,8 +46,8 @@ describe('AI audit rows render labeled one-line summaries', () => {
   it.each([
     ['ai_designer', designer({ stage: 'plan', scope: {}, entityPlan: [{ kind: 'npc', count: 1 }] })],
     ['ai_refine', refine()],
-    ['ai_world', { id: 'w', type: 'ai_world', name: 'AI world keeper', attempts: 1, timestamp: TS, description: 'AI world keeper proposed rumor: the wards flicker', proposal: { kind: 'rumor', text: 'the wards flicker' } }],
-    ['ai_world_applied', { id: 'wa', type: 'ai_world_applied', name: 'AI world keeper', timestamp: TS, description: 'AI world keeper applied: rumor — logged.' }],
+    ['ai_world', { id: 'w', type: 'ai_world', characterName: 'AI world keeper', attempts: 1, timestamp: TS, description: 'AI world keeper proposed rumor: the wards flicker', proposal: { kind: 'rumor', text: 'the wards flicker' } }],
+    ['ai_world_applied', { id: 'wa', type: 'ai_world_applied', characterName: 'AI world keeper', timestamp: TS, description: 'AI world keeper applied: rumor — logged.' }],
     ['ai_authoring', authoring({ scope: 'session', created: { encounters: 1 }, snapshot: 's.zip', summary: 'AI drafted 1 entity' })],
     ['ai_dress', dress({ action: 'applied', ops: 4 })],
   ])('%s routes to the ai-audit row (never the raw-JSON generic fallback)', (type, entry) => {
@@ -216,9 +216,26 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   // ── ai_world lanes ────────────────────────────────────────
 
+  // Backlog 2026-11-21 LLL: the world producers stamp the author on the ONE
+  // canonical author field (characterName) — the header span renders it, and
+  // a narrative row alongside still shows its own author.
+  it('world + world-applied rows render their stamped author in .log-character', () => {
+    setup(Log, [
+      { id: 'w', type: 'ai_world', characterName: 'AI world keeper', attempts: 1, timestamp: TS, description: 'AI world keeper proposed rumor: the wards flicker', proposal: { kind: 'rumor', text: 'the wards flicker' } },
+      { id: 'wa', type: 'ai_world_applied', characterName: 'AI world keeper', timestamp: TS, description: 'AI world keeper applied: rumor — logged.' },
+      { id: 'n', type: 'narrative', characterName: 'GM', description: 'The party rides north.', timestamp: TS },
+    ]);
+    const aiRows = document.querySelectorAll('.log-ai-audit');
+    expect(aiRows.length).toBe(2);
+    for (const row of aiRows) {
+      expect(within(row).getByText('AI world keeper')).toBeInTheDocument();
+    }
+    expect(document.querySelector('.log-entry.log-narrative .log-character').textContent).toBe('GM');
+  });
+
   it('world audit with description: description is the readable line verbatim', () => {
     setup(Log, [{
-      id: 'w', type: 'ai_world', name: 'AI world keeper', attempts: 1, timestamp: TS,
+      id: 'w', type: 'ai_world', characterName: 'AI world keeper', attempts: 1, timestamp: TS,
       description: 'AI world keeper proposed rumor: the wards flicker over Ironhaven',
       proposal: { kind: 'rumor', text: 'the wards flicker over Ironhaven' },
     }]);
@@ -227,7 +244,7 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   it('world audit WITHOUT description (needs_human): proposal kind + text, no JSON', () => {
     setup(Log, [{
-      id: 'w', type: 'ai_world', name: 'AI world keeper', attempts: 0, timestamp: TS,
+      id: 'w', type: 'ai_world', characterName: 'AI world keeper', attempts: 0, timestamp: TS,
       proposal: { kind: 'needs_human', text: 'AI world keeper unavailable — the GM supplies this.' },
     }]);
     const line = firstLine();
@@ -238,7 +255,7 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   it('world applied row shows its stamped description', () => {
     setup(Log, [{
-      id: 'wa', type: 'ai_world_applied', name: 'AI world keeper', timestamp: TS,
+      id: 'wa', type: 'ai_world_applied', characterName: 'AI world keeper', timestamp: TS,
       description: "AI world keeper applied: quest_draft — quest 'The Lost Relic' added directly to the ledger",
     }]);
     expect(firstLine()).toContain("quest 'The Lost Relic' added directly to the ledger");
@@ -353,7 +370,7 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   it('unknown ai audit shape degrades to a readable key line — no JSON dump, no [object Object]', () => {
     setup(Log, [{
-      id: 'x', type: 'ai_world_applied', name: 'AI world keeper', timestamp: TS,
+      id: 'x', type: 'ai_world_applied', characterName: 'AI world keeper', timestamp: TS,
       mystery: { deep: { deeper: 1 } }, tags: ['a', 'b', 'c'], note: 'ok',
     }]);
     const line = firstLine();

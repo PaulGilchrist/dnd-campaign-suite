@@ -257,7 +257,7 @@ async function worldAudit(log, campaign, proposal, attempts) {
     try {
         await log(campaign, {
             type: 'ai_world',
-            name: 'AI world keeper',
+            characterName: 'AI world keeper',
             proposal,
             attempts,
             description: `AI world keeper proposed ${proposal.kind}: ${String(proposal.text || proposal.name || '').slice(0, 220)}`,

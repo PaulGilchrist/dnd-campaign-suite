@@ -71,7 +71,9 @@ describe('askWorldKeeper funnel', () => {
         const r = await askWorldKeeper({ campaign: 'test-campaign', kind: 'recap', world: {}, allow: ALLOW, aiConfig: CFG, log });
         expect(r.ok).toBe(true);
         expect(r.proposal.kind).toBe('recap');
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 1 }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', characterName: 'AI world keeper', attempts: 1 }));
+        // Canonical author field only (backlog 2026-11-21 LLL): no dead `name`.
+        expect(log.mock.calls[0][1]).not.toHaveProperty('name');
     });
 
     it('fabricated NPC: retry once then needs_human (never guessed)', async () => {
@@ -82,7 +84,7 @@ describe('askWorldKeeper funnel', () => {
         expect(r.code).toBe('AI_NEEDS_HUMAN');
         expect(r.proposal.kind).toBe('needs_human');
         expect(fetchFn).toHaveBeenCalledTimes(2);
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 2 })); // honest audit: both attempts burned
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', characterName: 'AI world keeper', attempts: 2 })); // honest audit: both attempts burned
     });
 
     it('dead endpoint twice ⇒ needs_human with attempts: 2 (thrown calls still burn attempts)', async () => {
@@ -92,6 +94,6 @@ describe('askWorldKeeper funnel', () => {
         expect(r.ok).toBe(false);
         expect(r.code).toBe('AI_NEEDS_HUMAN');
         expect(fetchFn).toHaveBeenCalledTimes(2);
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 2 }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', characterName: 'AI world keeper', attempts: 2 }));
     });
 });

@@ -23,7 +23,11 @@ describe('applyWorldProposal', () => {
         const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'recap', text: 'Ash and ember…' } });
         expect(r.applied).toBe(true);
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'narrative', name: 'World keeper', description: expect.stringContaining('Ash and ember…') }));
-        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_world_applied', description: expect.stringContaining('applied: recap') }));
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_world_applied', characterName: 'AI world keeper', description: expect.stringContaining('applied: recap') }));
+        // Canonical author field only (backlog 2026-11-21 LLL): the audit row
+        // carries no dead `name`; the narrative row's `name` stays (speaker).
+        const auditRow = addEntry.mock.calls.find(([ , e]) => e.type === 'ai_world_applied')[1];
+        expect(auditRow).not.toHaveProperty('name');
     });
 
     it('npc_dialogue logs with the speaker; rumors too', async () => {
@@ -84,6 +88,7 @@ describe('applyWorldProposal', () => {
         expect(r.detail).not.toMatch(/draft/i);
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
             type: 'ai_world_applied',
+            characterName: 'AI world keeper',
             description: expect.stringContaining('added directly to the ledger'),
         }));
     });
@@ -108,6 +113,7 @@ describe('applyWorldProposal', () => {
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
             type: 'ai_world_applied',
+            characterName: 'AI world keeper',
             description: expect.stringContaining('refused: rewrite_history'),
         }));
         expect(saveQuests).not.toHaveBeenCalled();

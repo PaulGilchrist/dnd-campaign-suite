@@ -17,7 +17,7 @@ import utils from '../ui/utils.js'
 function audit(campaignName, proposal, outcome, detail) {
     return addEntry(campaignName, {
         type: 'ai_world_applied',
-        name: 'AI world keeper',
+        characterName: 'AI world keeper',
         description: `AI world keeper ${outcome}: ${proposal.kind} — ${String(detail).slice(0, 220)}`,
     }).catch((e) => { console.error('[applyWorldProposal:audit]', e) })
 }
