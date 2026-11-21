@@ -66,7 +66,6 @@ change-data `{}` + log `[]` + disk `campaign-log.json`/`character-change-data.js
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 GGG: `enforcement_denied` rows are opaque in the Log view.** The row carries rich `reason` (`Goblin is behind a wall at (5,10) — no line of sight.`) + creature/target, but renders as GenericEntry triple-printing the bare label `Enforcement Denied` (3 DOM leaves, zero attribution) — scrolling GMs can't tell WHICH attack/bucket was denied. `getEntryText`'s chain (message→description→noteText→summary) never consults `reason`. Likely fix: stamp `message` with `${reason}` (or `${creature} → ${target}: ${reason}`) in `denyBlockedShot`, mirroring how the cover lane self-annotates its row; alternatively a dedicated entry component showing target + bucket. Small, self-contained.
 - **2026-11-21 GGG: recap success feedback is asymmetric and easy to miss.** Failures print a persistent inline banner in the open planner modal (good), but success is only the transient toast `Recap of “…” posted to the campaign log` (`Sessions.jsx:498` showToast) — ~6 s after the press the toast had already faded while the modal stayed open, leaving zero in-modal witness that the recap landed (prose is visible only by switching to Log). Consider reusing the banner region on success (e.g. `Recap posted to the campaign log — open the Log to read it`), symmetrical with the refusal copy.
 
 ## Blocked / Not Verified (fold-gate ledger)

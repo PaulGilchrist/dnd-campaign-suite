@@ -5,8 +5,8 @@
 // mixes in API-validation noise. Row shape is copied from the producer:
 // {type:'write_rejected', origin:'server-validator', key, reason, description}.
 // Leaf bytes + registry routing + type-filter separation (LogAiAudit.test.jsx
-// style); the gameplay enforcement_denied generic row stays pinned by
-// LogGeneric.test.jsx.
+// style); the gameplay enforcement_denied row moved to its own attributed
+// renderer (LogEnforcementDenied.test.jsx owns those bytes, GGG improve 2026-11-21).
 
 import { screen, fireEvent } from '@testing-library/react';
 import { beforeEach } from 'vitest';
@@ -87,7 +87,7 @@ describe('write_rejected rows (server-validator refusals)', () => {
     fireEvent.change(typeSelect, { target: { value: 'enforcement_denied' } });
     rows = document.querySelectorAll('.log-entries .log-entry');
     expect(rows).toHaveLength(1);
-    expect(rows[0].className).toContain('log-generic');
+    expect(rows[0].className).toContain('log-enforcement-denied');
     expect(rows[0].textContent).toContain('No bonus action left this turn.');
     expect(rows[0].textContent).not.toContain('Server rejected write');
   });

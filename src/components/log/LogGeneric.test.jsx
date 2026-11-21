@@ -1,9 +1,11 @@
 // @maintained-by-ai
 // GENERIC fallback lane — leaf content for LogGenericEntry.jsx (bug-log-api-ghost-entries).
-// Unregistered entry types (server audit rows like enforcement_denied/ai_director,
+// Unregistered entry types (server audit rows like ai_director,
 // or raw API posts) must render an honest row: type label + readable text excerpt,
 // never a silently invisible ghost. Routing (type → this component) is pinned by
 // LogEntryRendering.test.jsx; this lane owns the leaf bytes (LogNotes.test.jsx style).
+// Gameplay-lane enforcement_denied rows moved to the dedicated attributed renderer
+// (LogEnforcementDenied.test.jsx owns those bytes, GGG improve 2026-11-21).
 
 import { within } from '@testing-library/react';
 import { beforeEach } from 'vitest';
@@ -25,17 +27,6 @@ describe('Log generic fallback entries', () => {
     expect(q('.log-generic-text').textContent).toBe('RUNQ SSE PROBE NOTE');
     expect(q('.log-generic .log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
     expect(q('.log-generic i.fa-circle-info')).toBeInTheDocument();
-  });
-
-  it('renders an enforcement audit row (no message field) from its description', () => {
-    // Gameplay-lane denials keep the generic row (creature/bucket/source, no
-    // origin). Server-validator refusals moved to the dedicated write_rejected
-    // renderer (LogWriteRejected.test.jsx owns those bytes, GC improve 2026-11-10).
-    setup(Log, [
-      { id: 'g2', type: 'enforcement_denied', creature: 'FeyRanger', bucket: 'bonusAction', source: 'useCharActionsAutomation', reason: 'No bonus action left this turn.', description: 'No bonus action left this turn.', timestamp: 1700000000000 },
-    ]);
-    expect(q('.log-generic-type').textContent).toBe('Enforcement Denied');
-    expect(q('.log-generic-text').textContent).toBe('No bonus action left this turn.');
   });
 
   it('falls back to a JSON excerpt (id excluded) for a bare payload with no text field', () => {

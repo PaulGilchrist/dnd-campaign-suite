@@ -26,6 +26,7 @@ import { BuffEntry } from './LogBuffEntry.jsx';
 import { MusicEntry } from './LogMusicEntry.jsx';
 import { AiAuditEntry } from './LogAiAuditEntry.jsx';
 import { WriteRejectedEntry } from './LogWriteRejectedEntry.jsx';
+import { EnforcementDeniedEntry } from './LogEnforcementDeniedEntry.jsx';
 
 export const ENTRY_COMPONENTS = {
   roll: RollEntry,
@@ -64,5 +65,8 @@ export const ENTRY_COMPONENTS = {
   ai_dress: AiAuditEntry,
   // Server-validator write refusals get their own row (GC improve 2026-11-10)
   // so they never share the enforcement_denied filter with gameplay denials.
-  write_rejected: WriteRejectedEntry
+  write_rejected: WriteRejectedEntry,
+  // Gameplay-lane enforcement refusals get attributed rendering (GGG improve
+  // 2026-11-21): creature → target + reason instead of the generic label row.
+  enforcement_denied: EnforcementDeniedEntry
 };
