@@ -54,13 +54,28 @@ const DAMAGE_ROLL_TYPES = ['damage', 'save-damage', 'aoe-damage', 'overchannel-d
 
 // Roll-type branches hoisted to small helpers (complexity budget, mirroring the
 // hoisted spread helpers in useLoggedDiceRollAttack.js).
+// Cover-flipped verdicts must not self-contradict in prose: a covered row that
+// logs `12 vs AC 12 — MISS` reads wrong to getEntryText/log-search/AI consumers
+// (the cover truth otherwise lives only in the structured fields the Log view
+// renders as a badge). When a cover bonus is in effect the AC named in the text
+// is the EFFECTIVE AC (raw + cover bonus) with a chip-vocabulary annotation
+// mirroring LogRollEntry/DiceRollResult ('1/2 Cover (+2 AC)' ternary). Rows
+// with no cover keep the exact legacy bytes.
+function attackAcClause(entry) {
+  if (entry.targetAc == null) return '';
+  const cover = Number(entry.coverAcBonus) || 0;
+  if (cover <= 0) return ` vs AC ${entry.targetAc}`;
+  const level = entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2';
+  return ` vs AC ${entry.targetAc + cover} (${level} Cover +${cover} AC)`;
+}
+
 function describeAttackRoll(entry) {
   const who = entry.characterName || 'The roll';
   let line = `${who} attacks${entry.targetName ? ` ${entry.targetName}` : ''}`
     + ` with ${entry.name || 'an attack'}: ${entry.total ?? '?'}`;
   if (entry.bonus != null) line += ` ${signed(entry.bonus)}`;
   if (entry.bonusDetail) line += ` ${entry.bonusDetail}`;
-  if (entry.targetAc != null) line += ` vs AC ${entry.targetAc}`;
+  line += attackAcClause(entry);
   const outcome = rollOutcome(entry);
   if (outcome) line += ` — ${outcome}`;
   return line;

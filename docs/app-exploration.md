@@ -63,7 +63,6 @@ change-data `{}` + log `[]` (post-clear stable on re-read, disk ABSENT; single-p
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 DDD — attack-row `message` names the RAW AC when cover flipped the verdict:** a Bulwark-covered row logs `…: 8 +4 (+4 to hit) vs AC 12 — MISS` while the very dice (12) WOULD hit raw 12 — the cover truth lives only in structured fields (`coverAcBonus/coverLevel/coverReason`) which `LogRollEntry` renders as a badge; but `getEntryText`/log-search/AI consumers see the self-contradicting sentence. Stamp the effective AC (or append `— 1/2 cover`) in the message producer (`useLoggedDiceRollAttack.js buildRollLogEntry`).
 - **2026-11-21 DDD — first-press gate has no visible 'loading' affordance beyond the muted chip color:** during the frozen window the chip keeps its dice glyph and only loses color + gains aria attrs; a brief `…` or spinner in the chip (or title already exists — surfaced nowhere visually) would explain the inert press to a GM clicking fast. Low priority: window is ~1 s natural.
 - **2026-11-21 DDD — quick-spawn outdoor skip is console-only:** the picker still shows the checkbox on an ACTIVE outdoor map, the stamp silently no-ops (loud console only) and the user gets no toast explaining why their token didn't appear. Hide the checkbox when the active map is outdoor (mapsService already exposes type) or toast the skip.
 
