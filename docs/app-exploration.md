@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + sessions `[]`; disk `campaign-log.json`/`character
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-21 LLL — Narrative composer copy drift: switching the GM As: select to Narrative keeps the textarea placeholder `Add a note to the log...` and the Post affordance note-voice; swap placeholder (e.g. `Add to the story…`) with the composeType so the two lanes read differently (`src/components/log/Log.jsx` LogComposer).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

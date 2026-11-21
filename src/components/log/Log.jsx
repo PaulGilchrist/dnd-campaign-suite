@@ -96,6 +96,12 @@ function LogFilterBar({ filters, typeOptions, rollTypeOptions, characterOptions,
 // all state lives in Log.
 function LogComposer({ isLocalhost, authorGroups, author, composeType, noteText, onSelectAuthor, onComposeType, onNoteText, onPost, onKeyDown }) {
   const canPost = authorGroups.length > 0;
+  // Lane-voice copy, derived from composeType (single source). Visitors never
+  // see the type select, so their composeType stays 'note' and they always
+  // get the note-voice face.
+  const copy = composeType === 'narrative'
+    ? { placeholder: 'Add to the story...', post: 'Post narrative' }
+    : { placeholder: 'Add a note to the log...', post: 'Post note' };
   return (
     <>
       <div className="log-add-note no-print">
@@ -137,13 +143,13 @@ function LogComposer({ isLocalhost, authorGroups, author, composeType, noteText,
           </>
         )}
         <textarea
-          placeholder="Add a note to the log..."
+          placeholder={copy.placeholder}
           value={noteText}
           onChange={(e) => onNoteText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={!canPost}
         />
-        <button className="log-add-btn" onClick={onPost} disabled={!canPost || !noteText.trim()} title="Post note" aria-label="Post note"><i className="fas fa-plus"></i></button>
+        <button className="log-add-btn" onClick={onPost} disabled={!canPost || !noteText.trim()} title={copy.post} aria-label={copy.post}><i className="fas fa-plus"></i></button>
       </div>
       {!canPost && (
         <div className="log-post-disabled-hint no-print">

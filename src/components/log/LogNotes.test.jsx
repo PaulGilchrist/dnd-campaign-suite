@@ -106,12 +106,53 @@ describe('Log notes', () => {
   it('GM narrative face dispatches exact payload with type narrative and description text', async () => {
     setup(Log, []);
     fireEvent.change(typeSelect(), { target: { value: 'narrative' } });
-    fireEvent.change(textarea(), { target: { value: ' The gate groans open. ' } });
+    fireEvent.change(screen.getByPlaceholderText('Add to the story...'), { target: { value: ' The gate groans open. ' } });
     fireEvent.click(q('.log-add-btn'));
     await vi.waitFor(() => {
       expect(mockAddEntry).toHaveBeenCalledTimes(1);
     });
     expect(mockAddEntry).toHaveBeenCalledWith({ type: 'narrative', characterName: 'GM', description: 'The gate groans open.' });
+  });
+
+  // ── COMPOSER LANE COPY (placeholder + Post button voice follow composeType) ──
+  it('composer copy switches to story-voice on Narrative and back to note-voice on Note', () => {
+    setup(Log, []);
+    const noteArea = textarea();
+    expect(noteArea).toHaveAttribute('placeholder', 'Add a note to the log...');
+    let btn = q('.log-add-btn');
+    expect(btn).toHaveAttribute('title', 'Post note');
+    expect(btn).toHaveAttribute('aria-label', 'Post note');
+
+    fireEvent.change(typeSelect(), { target: { value: 'narrative' } });
+    const storyArea = screen.getByPlaceholderText('Add to the story...');
+    expect(storyArea).toBeInTheDocument();
+    expect(noteArea).toBe(storyArea); // same element, placeholder attribute swapped
+    btn = q('.log-add-btn');
+    expect(btn).toHaveAttribute('title', 'Post narrative');
+    expect(btn).toHaveAttribute('aria-label', 'Post narrative');
+
+    fireEvent.change(typeSelect(), { target: { value: 'note' } });
+    expect(textarea()).toHaveAttribute('placeholder', 'Add a note to the log...');
+    btn = q('.log-add-btn');
+    expect(btn).toHaveAttribute('title', 'Post note');
+    expect(btn).toHaveAttribute('aria-label', 'Post note');
+  });
+
+  it('As: select tooltip is unchanged across lane faces', () => {
+    setup(Log, []);
+    const asTooltip = 'Notes are shared tabletop chatter; narrative is GM/storytelling prose';
+    expect(typeSelect()).toHaveAttribute('title', asTooltip);
+    fireEvent.change(typeSelect(), { target: { value: 'narrative' } });
+    expect(typeSelect()).toHaveAttribute('title', asTooltip);
+  });
+
+  it('visitor (no As: select) keeps note-voice copy verbatim', () => {
+    setup(Log, [], true, undefined, false);
+    expect(screen.queryByLabelText('As:')).not.toBeInTheDocument();
+    expect(textarea()).toHaveAttribute('placeholder', 'Add a note to the log...');
+    const btn = q('.log-add-btn');
+    expect(btn).toHaveAttribute('title', 'Post note');
+    expect(btn).toHaveAttribute('aria-label', 'Post note');
   });
 
   // ── SHORT-CIRCUITS ──
