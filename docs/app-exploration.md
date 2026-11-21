@@ -56,7 +56,6 @@ change-data `{}` + log `[]` (two-pass: re-select rehydrated the AasimarTest/__ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 EEE — AUTO-MISS message drops the full-cover reason:** the FULL tier row prints `… vs AC 15 — AUTO-MISS` while `coverReason:'Target has full cover'` rides structured-only; a `(Full Cover)` chip-vocab tail (same family as f78c06905) would complete the prose parity.
 - **2026-11-21 EEE — QMS type-fetch pending shows nothing:** while `useActiveMapType` awaits the list lane, the checkbox is indistinguishable from the outdoor/hidden face on a slow network — a brief disabled placeholder or delayed paint would tell "outdoor map" from "still loading".
 
 ## Blocked / Not Verified (fold-gate ledger)

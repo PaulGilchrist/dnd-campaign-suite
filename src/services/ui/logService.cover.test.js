@@ -8,7 +8,9 @@
 // sentence. Law: when coverAcBonus > 0 the AC named in the message is the EFFECTIVE
 // AC (targetAc + coverAcBonus) annotated with the LogRollEntry/DiceRollResult chip
 // vocabulary ('1/2 Cover' / '3/4' via the same threeQuarter ternary). No-cover rows
-// (coverAcBonus absent/0/null) keep byte-identical legacy text.
+// (coverAcBonus absent/0/null) keep byte-identical legacy text. The FULL tier
+// (EEE 2026-11-21 follow-up) rides coverAcBonus 0 + the full-cover reason and
+// gains a `(Full Cover)` prose tail — see the third describe below.
 import { describe, it, expect } from 'vitest';
 import { deriveAuditText, stampAuditText } from './logService.js';
 
@@ -78,5 +80,60 @@ describe('logService attack message — no cover (byte-identity regression pins)
             total: 15, bonus: 4, bonusDetail: '(+4 to hit)', targetName: 'ElderPaladin',
             targetAc: 19, hit: true, ...coverFields,
         })).toBe(NO_COVER);
+    });
+});
+
+// FULL-tier prose parity (2026-11-21 EEE backlog): a closed-door shot adjudicates
+// as isAutoMiss with coverAcBonus 0 (full cover never bumps the AC — it slays the
+// attack outright, nat-20 folded NON-crit) and the reason rides the structured
+// channel only (finalizeCover stamps coverReason 'Target has full cover'; no
+// coverLevel). Law: the FULL cover CHANNEL adds a chip-vocabulary `(Full Cover)`
+// tail to the AC clause — `vs AC 15 (Full Cover) — AUTO-MISS`. The marker keys
+// off coverLevel 'full' / the full-cover reason, NEVER off isAutoMiss alone:
+// an out-of-range AUTO-MISS keeps its bare legacy bytes.
+describe('logService attack message — full cover AUTO-MISS prose parity', () => {
+    // Real closed-door sheet-lane shape (EEE rig): raw AC 15 kept, bonus 0,
+    // pinning a nat-20 that folded NON-crit (full cover slays the crit honestly).
+    const FULL_COVER_ROW = {
+        ...COVERED_ATTACK_ROW,
+        total: 20, isNatural20: true,
+        targetAc: 15, effectiveAc: 15,
+        hit: false, isAutoMiss: true, isCrit: false,
+        coverLevel: null, coverAcBonus: 0, coverReason: 'Target has full cover',
+    };
+
+    it('names the full-cover reason in the prose before the AUTO-MISS tail', () => {
+        expect(deriveAuditText(FULL_COVER_ROW)).toBe(
+            'Goblin attacks FeyRanger with Longbow: 20 +4 (+4 to hit) vs AC 15 (Full Cover) — AUTO-MISS'
+        );
+    });
+
+    it('marks the row via the coverLevel full discriminator alone (no reason stamped)', () => {
+        expect(deriveAuditText({ ...FULL_COVER_ROW, coverLevel: 'full', coverReason: null }))
+            .toContain(' vs AC 15 (Full Cover) — AUTO-MISS');
+    });
+
+    it('stampAuditText adds only the message — structured full-cover fields ride untouched', () => {
+        const stamped = stampAuditText(FULL_COVER_ROW);
+        expect(stamped.message).toContain('(Full Cover)');
+        expect(stamped.targetAc).toBe(15);
+        expect(stamped.coverAcBonus).toBe(0);
+        expect(stamped.coverLevel).toBeNull();
+        expect(stamped.coverReason).toBe('Target has full cover');
+    });
+
+    it.each([
+        ['rangeReason set (real out-of-range AUTO-MISS shape)', { rangeReason: 'Target is out of range', coverLevel: null, coverAcBonus: 0, coverReason: null }],
+        ['no cover fields at all', { coverLevel: null, coverAcBonus: 0, coverReason: null }],
+        ['half-cover AUTO-MISS-shaped row keeps its annotated face', { coverLevel: 'half', coverAcBonus: 2, coverReason: 'Bulwark of Force' }],
+    ])('does NOT attach the marker to an AUTO-MISS whose cover channel is clear: %s', (_label, coverFields) => {
+        const text = deriveAuditText({
+            ...COVERED_ATTACK_ROW, total: 20, isNatural20: true, targetAc: 15,
+            effectiveAc: 15, hit: false, isAutoMiss: true, isCrit: false, ...coverFields,
+        });
+        expect(text).not.toContain('(Full Cover)');
+        if (!coverFields.coverAcBonus) {
+            expect(text).toBe('Goblin attacks FeyRanger with Longbow: 20 +4 (+4 to hit) vs AC 15 — AUTO-MISS');
+        }
     });
 });

@@ -61,12 +61,27 @@ const DAMAGE_ROLL_TYPES = ['damage', 'save-damage', 'aoe-damage', 'overchannel-d
 // is the EFFECTIVE AC (raw + cover bonus) with a chip-vocabulary annotation
 // mirroring LogRollEntry/DiceRollResult ('1/2 Cover (+2 AC)' ternary). Rows
 // with no cover keep the exact legacy bytes.
+// The FULL tier rides no AC bonus (full cover adjudicates as an AUTO-MISS, so
+// the '+N AC' form never applies) but its coverReason — the verbatim
+// finalizeCover('Target has full cover') string or a coverLevel 'full' stamp —
+// still names the reason in the chip vocabulary: `vs AC 15 (Full Cover)`. The
+// marker keys off the cover channel ONLY: an out-of-range AUTO-MISS (rangeReason
+// set, no cover) keeps its bare legacy bytes.
+const FULL_COVER_REASON = 'Target has full cover';
+
+function isFullCoverChannel(entry) {
+  return entry.coverLevel === 'full' || entry.coverReason === FULL_COVER_REASON;
+}
+
 function attackAcClause(entry) {
   if (entry.targetAc == null) return '';
   const cover = Number(entry.coverAcBonus) || 0;
-  if (cover <= 0) return ` vs AC ${entry.targetAc}`;
-  const level = entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2';
-  return ` vs AC ${entry.targetAc + cover} (${level} Cover +${cover} AC)`;
+  if (cover > 0) {
+    const level = entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2';
+    return ` vs AC ${entry.targetAc + cover} (${level} Cover +${cover} AC)`;
+  }
+  if (isFullCoverChannel(entry)) return ` vs AC ${entry.targetAc} (Full Cover)`;
+  return ` vs AC ${entry.targetAc}`;
 }
 
 function describeAttackRoll(entry) {
