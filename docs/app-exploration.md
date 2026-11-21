@@ -56,8 +56,6 @@ change-data `{}` + log `[]` (two-pass: re-select rehydrated the AasimarTest/__ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 EEE — QMS type-fetch pending shows nothing:** while `useActiveMapType` awaits the list lane, the checkbox is indistinguishable from the outdoor/hidden face on a slow network — a brief disabled placeholder or delayed paint would tell "outdoor map" from "still loading".
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (owner decision) / DSP resolved-id-guard RACE / `hpPending` PLACEHOLDER — unchanged carried, unit-pinned.

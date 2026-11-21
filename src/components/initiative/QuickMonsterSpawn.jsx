@@ -37,25 +37,58 @@ import './QuickMonsterSpawn.css'
 // never fetch whole documents — server maps.js list comment); any unresolved
 // or failed type fetch fails CLOSED to absent (the producer's defensive
 // outdoor guard stays the backstop lane).
+// Pending face (2026-11-21 EEE backlog): while the LIST lane is still in
+// flight the hook reports `pending`, and the picker paints a labelled spinner
+// placeholder (below) so "still loading" is distinguishable from the
+// outdoor/hidden face on a slow network. Resolve/reject ends the pending face
+// immediately: indoor swaps in the real checkbox; outdoor/untyped/failure
+// leave nothing (fail-CLOSED preserved — the placeholder never becomes a
+// permissive face, and `Error loading maps:` stays logged by mapsService).
 function useActiveMapType(campaignName, mapName) {
     const [mapType, setMapType] = React.useState(null)
+    const [pending, setPending] = React.useState(Boolean(mapName))
     React.useEffect(() => {
         if (!mapName) {
             setMapType(null)
+            setPending(false)
             return
         }
         let live = true
+        setPending(true)
         mapsService.loadMaps(campaignName).then(
             (data) => {
                 if (!live) return
                 const entry = (data.maps || []).find(m => m.slug === mapName || m.name === mapName)
                 setMapType(entry?.type || null)
+                setPending(false)
             },
-            () => { if (live) setMapType(null) },
+            () => { if (live) { setMapType(null); setPending(false) } },
         )
         return () => { live = false }
     }, [campaignName, mapName])
-    return mapType
+    return { mapType, pending }
+}
+
+// Delayed paint for the pending placeholder (2026-11-21 EEE backlog): the warm
+// local fetch resolves in a few ms and the fast-network face must stay exactly
+// as EEE lived it (checkbox present/absent immediately, no extra chrome), so
+// the placeholder only paints once the fetch has been in flight longer than
+// this window. Benign UI timer (no-timers policy, animation/display tier): it
+// delays a display-only placeholder and NEVER touches game state — the spawn
+// lane never reads it.
+const PENDING_PLACEHOLDER_PAINT_MS = 300
+
+function usePlaceholderPaintDelay(active) {
+    const [placeholderPainted, setPlaceholderPainted] = React.useState(false)
+    React.useEffect(() => {
+        if (!active) {
+            setPlaceholderPainted(false)
+            return
+        }
+        const placeholderTimer = setTimeout(() => setPlaceholderPainted(true), PENDING_PLACEHOLDER_PAINT_MS)
+        return () => clearTimeout(placeholderTimer)
+    }, [active])
+    return placeholderPainted
 }
 
 function MonsterPickerModal({ onClose, onSpawn, mapName, campaignName }) {
@@ -66,7 +99,8 @@ function MonsterPickerModal({ onClose, onSpawn, mapName, campaignName }) {
     const [placeToken, setPlaceToken] = React.useState(false)
     const [error, setError] = React.useState('')
     const [spawning, setSpawning] = React.useState(false)
-    const activeMapType = useActiveMapType(campaignName, mapName)
+    const { mapType: activeMapType, pending: mapTypePending } = useActiveMapType(campaignName, mapName)
+    const paintMapTypePending = usePlaceholderPaintDelay(Boolean(mapName) && mapTypePending)
     // Entrance focus + stranded-close restore (shared overlay hook).
     const overlayRef = React.useRef(null)
     useOverlayEntranceFocus(overlayRef)
@@ -191,6 +225,12 @@ function MonsterPickerModal({ onClose, onSpawn, mapName, campaignName }) {
                                 />
                                 Place a token near the party on the map
                             </label>
+                        )}
+                        {mapName && mapTypePending && paintMapTypePending && (
+                            <div className='qms-note' role='status' data-testid='qms-token-pending'>
+                                <i className='fa-solid fa-spinner fa-spin' aria-hidden='true'></i>
+                                {' '}Checking the active map for token placement...
+                            </div>
                         )}
                         <p className='qms-hint'>
                             Real stat block and art from the bestiary — nothing is saved to the

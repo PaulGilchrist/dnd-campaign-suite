@@ -33,6 +33,7 @@ const BENIGN = [
     { why: 'deferred popup render (adjudication already decided; display only)', re: /setPopupHtml/ },
     { why: 'dice tray result popup auto-hide, UI feedback only', re: /setDiceResult/ },
     { why: 'focus/blur UI nicety', re: /focus|blur/i },
+    { why: 'pending placeholder delayed paint (display-only spinner chrome, never game state)', re: /laceholderPainted|PLACEHOLDER_PAINT/i },
 ]
 
 function walk(dir, out = []) {
