@@ -87,14 +87,18 @@ describe('computeTargetAc', () => {
     });
 
     describe('L5-003 §8.3 half cover', () => {
-        it('stacks the stamped +2 on top of the Barkskin floor', () => {
+        it('rides the context cover channel ON TOP of the Barkskin floor (targetAc stays RAW)', () => {
             barkskin('DruidTarget');
-            store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'DruidTarget', ac: 2, round: 1 };
+            store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'DruidTarget', ac: 2, blocker: 'Goblin', round: 1 };
             const ctx = { ...ATTACK, attackerName: 'Hero' };
             const target = { name: 'DruidTarget', type: 'player' };
             const characters = [{ name: 'DruidTarget', computedStats: { armorClass: 9 } }];
-            // floor 17 is a base-AC rule; the +2 circumstance bonus rides on top.
-            expect(computeTargetAc(ctx, target, characters, CAMPAIGN)).toBe(19);
+            // floor 17 is a base-AC rule; the +2 circumstance bonus rides the
+            // cover channel (computeEffectiveAc adds it) so the row annotates.
+            expect(computeTargetAc(ctx, target, characters, CAMPAIGN)).toBe(17);
+            expect(ctx.coverAcBonus).toBe(2);
+            expect(ctx.coverLevel).toBe('half');
+            expect(ctx.coverReason).toBe('Goblin');
         });
     });
 });

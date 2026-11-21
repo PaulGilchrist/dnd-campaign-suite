@@ -5,7 +5,8 @@
 // in DiceRollResult.computed.js). A prior producer shipped HALF_COVER_AC = -2,
 // which made interposed targets EASIER to hit (live: AC 10 resolved as 8).
 // This file pins the sign end-to-end at both seams: the stamping producer
-// (coverService) and the additive reader (targetAcComputation.computeTargetAc).
+// (coverService) and the channel reader (targetAcComputation.computeTargetAc,
+// which folds a winning stamp into context.coverAcBonus for computeEffectiveAc).
 // Deeper channel/geometry contracts stay owned by coverService.test.js and
 // targetAcComputation.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -47,11 +48,16 @@ describe('§8.3 half-cover RAW sign (+2, never −2)', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('campaign', COVER_SHOT_KEY, stamp, CAMPAIGN);
     });
 
-    it('computeTargetAc RAISES the covered target AC by +2 (AC 10 ⇒ 12, not 8)', () => {
+    it('a covered shot RAISES the adjudicated AC by +2 via the cover channel (AC 10 + 2 = 12, never 8)', () => {
         store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'Guard', ac: HALF_COVER_AC, blocker: 'Goblin', cell: '3,0', round: 1 };
         const ctx = { rollType: 'attack', attackerName: 'Hero' };
         const target = { name: 'Guard', type: 'npc', ac: 10 };
-        expect(computeTargetAc(ctx, target, [], CAMPAIGN)).toBe(12);
+        // targetAc stays RAW; the +2 rides the context cover channel
+        // (computeEffectiveAc folds it) so the row reads 10 + 2 = 12.
+        expect(computeTargetAc(ctx, target, [], CAMPAIGN)).toBe(10);
+        expect(ctx.coverAcBonus).toBe(2);
+        expect(ctx.coverLevel).toBe('half');
+        expect(ctx.coverAcBonus).toBeGreaterThan(0);
     });
 
     it('adjudicateCoverShot logs the RAW-honest "(+2 AC)" description', () => {

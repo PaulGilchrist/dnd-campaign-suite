@@ -456,7 +456,11 @@ function resolveBiDieSize(rollType, target, campaignName, characters) {
 
 // Propagate context mutations back to original context object
 function propagateContextMutations(ctx, context) {
-    const contextKeys = ['notice', 'bardicInspirationDefense', 'bardicInspirationDefenseDieSize', 'bardicInspirationDefenseTargetName', 'bardicInspirationDefenseAttackRoll', 'bardicInspirationDefenseBonus', 'bardicInspirationDefenseEffectiveAc', 'forcedMode'];
+    // The §8.3 stamp fold (computeTargetAc → foldStampCover) lands on the
+    // roll-time ctx; the cover trio rides back so the log row and popup
+    // annotate the enforcement-folded shot in the furniture lane's
+    // vocabulary (raw targetAc + stated coverAcBonus).
+    const contextKeys = ['notice', 'bardicInspirationDefense', 'bardicInspirationDefenseDieSize', 'bardicInspirationDefenseTargetName', 'bardicInspirationDefenseAttackRoll', 'bardicInspirationDefenseBonus', 'bardicInspirationDefenseEffectiveAc', 'forcedMode', 'coverAcBonus', 'coverLevel', 'coverReason'];
     for (const key of contextKeys) {
         if (ctx[key] !== undefined) {
             context[key] = ctx[key];

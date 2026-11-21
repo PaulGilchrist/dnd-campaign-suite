@@ -22,13 +22,30 @@ export function isBarkskinAcFloorActive(targetName, campaignName) {
 // context (contextBuilder-map → context.coverAcBonus, added later by
 // computeEffectiveAc in hitResolution.js). The stamp only folds when it BEATS
 // the context bonus; whenever the context bonus is ≥ the stamp it carries the
-// single applied cover instead, so the two lanes never sum (+4 on one shot)
-// and the stored targetAc stays RAW — keeping `targetAc + coverAcBonus` (the
-// audit message's arithmetic) equal to the AC the resolver adjudicated.
-function foldStampCover(targetAc, context, target, campaignName) {
-    const contextCoverAcBonus = Number(context?.coverAcBonus) || 0;
+// single applied cover instead, so the two lanes never sum (+4 on one shot).
+// A winning stamp folds INTO THE CONTEXT COVER CHANNEL (coverAcBonus/
+// coverLevel/coverReason, mirrored on the furniture lane's shape) instead of
+// bumping targetAc: the stored row keeps targetAc RAW and carries the applied
+// bonus + tier + blocking-creature reason itself, so `targetAc + coverAcBonus`
+// (the audit message's arithmetic) equals the AC the resolver adjudicated AND
+// the enforcement-folded row annotates in the same chip vocabulary as the
+// furniture row (`vs AC 17 (1/2 Cover +2 AC)`) — one accessor tells the whole
+// story, no bare bumped `vs AC 17`.
+function foldStampCover(context, target, campaignName) {
+    // An auto-denied line (full-cover AUTO-MISS / out-of-range AUTO-MISS) is
+    // already decided — a half-cover bonus can never rescue it, so the stamp
+    // stays off the row and its face stays byte-identical.
+    if (context.isAutoMiss) return;
+    const contextCoverAcBonus = Number(context.coverAcBonus) || 0;
     const stamp = readCoverShot(context, target.name, campaignName, getCurrentCombatRound(campaignName));
-    return stamp && stamp.ac > contextCoverAcBonus ? targetAc + stamp.ac : targetAc;
+    if (!stamp || stamp.ac <= contextCoverAcBonus) return;
+    context.coverAcBonus = stamp.ac;
+    // The §8.3 gate only ever stamps half cover (+2, HALF_COVER_AC) — three-
+    // quarters needs 75% obscuration, never fabricated from a token grid.
+    context.coverLevel = 'half';
+    // Name the blocking creature ('FeyRanger'-style) so prose/search/AI see the
+    // source — mirrors finalizeCover's furniture law: set only when unset.
+    if (!context.coverReason) context.coverReason = stamp.blocker;
 }
 
 export function computeTargetAc(context, target, characters, campaignName) {
@@ -50,10 +67,12 @@ export function computeTargetAc(context, target, characters, campaignName) {
         targetAc = Math.max(targetAc, 17);
     }
     // L5-003 §8.3 cover: half-cover stamp armed by the LoS/cover gate at
-    // this shot's click (sync cached read). The stamp stacks ON TOP of the
-    // Barkskin floor (floor is a base-AC rule; +2 is a circumstance
-    // bonus). Matched by attacker + target + round; clear shots write
+    // this shot's click (sync cached read). A winning stamp rides the context
+    // cover channel (stacks ON TOP of the Barkskin floor — floor is a base-AC
+    // rule; +2 is a circumstance bonus added by computeEffectiveAc), never a
+    // bumped targetAc. Matched by attacker + target + round; clear shots write
     // null so a clean line never gains the bonus. Zones off ⇒ stamp never
     // written ⇒ byte-parity.
-    return foldStampCover(targetAc, context, target, campaignName);
+    foldStampCover(context, target, campaignName);
+    return targetAc;
 }
