@@ -2,9 +2,10 @@
 // Unit tests for the client-side log filter/window helpers in log-utils.js:
 // filterLogEntries (AND-semantics facets), getEntrySearchText (recursive
 // string harvest + AI audit one-liner fold, ids skipped), formatEntryTypeLabel,
-// LOG_WINDOW_SIZE.
+// buildAuthorOptions (grouped compose-lane census), LOG_WINDOW_SIZE.
 
 import {
+  buildAuthorOptions,
   filterLogEntries,
   formatAiAuditLine,
   formatEntryTypeLabel,
@@ -311,6 +312,62 @@ describe('log-utils filter helpers', () => {
       expect(formatEntryTypeLabel('roll')).toBe('Roll');
       expect(formatEntryTypeLabel('automation')).toBe('Automation');
       expect(formatEntryTypeLabel('unknown')).toBe('Unknown');
+    });
+  });
+
+  describe('buildAuthorOptions (grouped compose-lane census)', () => {
+    it('GM tab: three labeled groups — GM, Characters, Initiative — with exact membership', () => {
+      expect(buildAuthorOptions({
+        isLocalhost: true,
+        characterNames: ['Frodo', 'Aragorn'],
+        creatureNames: ['Goblin', 'Orc']
+      })).toEqual([
+        { label: 'GM', options: ['GM'] },
+        { label: 'Characters', options: ['Frodo', 'Aragorn'] },
+        { label: 'Initiative', options: ['Goblin', 'Orc'] }
+      ]);
+    });
+
+    it('GM tab dedup face: initiative names already in the roster never get a monster-tier voice', () => {
+      // The merged combatSummary boards carry player rows too, so 'Frodo'
+      // appears in BOTH censuses — he stays a Characters-only option.
+      const groups = buildAuthorOptions({
+        isLocalhost: true,
+        characterNames: ['Frodo'],
+        creatureNames: ['Goblin', 'Frodo', 'Goblin']
+      });
+      expect(groups.map(g => g.label)).toEqual(['GM', 'Characters', 'Initiative']);
+      expect(groups.find(g => g.label === 'Characters').options).toEqual(['Frodo']);
+      expect(groups.find(g => g.label === 'Initiative').options).toEqual(['Goblin']);
+    });
+
+    it('GM tab empty-Initiative face: no creatures omits the Initiative group entirely', () => {
+      expect(buildAuthorOptions({
+        isLocalhost: true,
+        characterNames: ['Frodo', 'Aragorn'],
+        creatureNames: []
+      })).toEqual([
+        { label: 'GM', options: ['GM'] },
+        { label: 'Characters', options: ['Frodo', 'Aragorn'] }
+      ]);
+    });
+
+    it('GM tab with no characters: only the GM group (Characters omitted, never an empty optgroup)', () => {
+      expect(buildAuthorOptions({ isLocalhost: true, characterNames: [], creatureNames: [] }))
+        .toEqual([{ label: 'GM', options: ['GM'] }]);
+    });
+
+    it('visitor flat face: one label:null group of roster characters — no GM, no creatures', () => {
+      expect(buildAuthorOptions({
+        isLocalhost: false,
+        characterNames: ['Frodo', 'Aragorn'],
+        creatureNames: ['Goblin']
+      })).toEqual([{ label: null, options: ['Frodo', 'Aragorn'] }]);
+    });
+
+    it('visitor with zero characters: empty census (composer disables)', () => {
+      expect(buildAuthorOptions({ isLocalhost: false, characterNames: [], creatureNames: [] }))
+        .toEqual([]);
     });
   });
 

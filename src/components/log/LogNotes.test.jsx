@@ -13,9 +13,9 @@
 // payload names a real author (GM default on localhost, first player on a
 // visitor tab). Narrative dispatch (GM type select) is owned here too.
 
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { beforeEach } from 'vitest';
-import { q, setup, note, beforeEachSetup, mockAddEntry } from './log-test-utils.jsx';
+import { q, setup, note, beforeEachSetup, mockAddEntry, mockState } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
 
@@ -78,6 +78,20 @@ describe('Log notes', () => {
     fireEvent.click(q('.log-add-btn'));
     await vi.waitFor(() => {
       expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Aragorn', noteText: 'by the fire' });
+    });
+  });
+
+  it('GM posting as an Initiative-group creature dispatches under that monster name', async () => {
+    mockState.combatSummary = { creatures: [{ name: 'Goblin' }] };
+    setup(Log, []);
+    await vi.waitFor(() => {
+      expect(within(authorSelect()).getByRole('option', { name: 'Goblin' })).toBeInTheDocument();
+    });
+    fireEvent.change(authorSelect(), { target: { value: 'Goblin' } });
+    fireEvent.change(textarea(), { target: { value: 'Goblin talks' } });
+    fireEvent.click(q('.log-add-btn'));
+    await vi.waitFor(() => {
+      expect(mockAddEntry).toHaveBeenCalledWith({ type: 'note', characterName: 'Goblin', noteText: 'Goblin talks' });
     });
   });
 

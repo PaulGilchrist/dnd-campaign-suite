@@ -66,7 +66,6 @@ change-data `{}` + log `[]` (closed-tab single pass sufficed — browser closed 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-21 FFF) The author `<select>` mixes roster characters and initiative creatures with no grouping/label once monsters join (a spawned `Goblin` sits indistinguishable among PCs). `<optgroup>` (GM / Characters / Initiative) would make the trust level visible; cosmetic.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

@@ -10,6 +10,12 @@
 // to 'GM'; visitor census = players only (no GM select, no Note|Narrative
 // type select); a visitor in a character-less campaign gets a disabled
 // composer + hint instead of an anonymous voice.
+// 2026-11-21 grouping improvement (owner ruling): on the GM tab the census
+// renders THREE labeled optgroups — GM / Characters / Initiative — with empty
+// groups omitted and Initiative deduped against the roster; a monster spawned
+// into initiative appears ONLY under Initiative. A visitor tab stays FLAT:
+// zero optgroups, roster options only (TargetSelect.jsx conditional-group
+// idiom).
 
 import { screen, within } from '@testing-library/react';
 import { beforeEach } from 'vitest';
@@ -19,30 +25,41 @@ import Log from './Log.jsx';
 
 const authorSelect = () => screen.getByLabelText('Post as:');
 const typeSelect = () => screen.getByLabelText('As:');
+const groupCensus = () =>
+  [...authorSelect().querySelectorAll('optgroup')].map(g => [g.label, [...g.querySelectorAll('option')].map(o => o.textContent)]);
+const flatOptions = () => within(authorSelect()).getAllByRole('option').map(o => o.textContent);
 
 describe('Log toolbar', () => {
   beforeEach(() => {
     beforeEachSetup();
   });
 
-  it('GM tab: renders heading, note-add controls, and exact ordered author census defaulting to GM', () => {
+  it('GM tab: renders heading, note-add controls, and grouped census defaulting to GM', () => {
     setup(Log, []);
     expect(q('.log-toolbar')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Campaign Log' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Add a note to the log...')).toBeInTheDocument();
     expect(q('.log-add-btn')).toBeInTheDocument();
     expect(authorSelect()).toHaveValue('GM');
-    expect(within(authorSelect()).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['GM', 'Frodo', 'Aragorn']);
+    expect(flatOptions()).toEqual(['GM', 'Frodo', 'Aragorn']);
+    expect(groupCensus()).toEqual([
+      ['GM', ['GM']],
+      ['Characters', ['Frodo', 'Aragorn']]
+    ]);
   });
 
-  it('GM tab: initiative-tracker creatures join the census after the roster, deduped', async () => {
+  it('GM tab: initiative creatures join under an Initiative group, deduped against the roster', async () => {
     mockState.combatSummary = { creatures: [{ name: 'Goblin' }, { name: 'Orc' }, { name: 'Frodo' }] };
     setup(Log, []);
     await vi.waitFor(() => {
-      expect(within(authorSelect()).getAllByRole('option').map(o => o.textContent))
-        .toEqual(['GM', 'Frodo', 'Aragorn', 'Goblin', 'Orc']);
+      expect(groupCensus()).toEqual([
+        ['GM', ['GM']],
+        ['Characters', ['Frodo', 'Aragorn']],
+        ['Initiative', ['Goblin', 'Orc']]
+      ]);
     });
+    // The roster Frodo is NOT duplicated as a monster-tier option.
+    expect(flatOptions()).toEqual(['GM', 'Frodo', 'Aragorn', 'Goblin', 'Orc']);
   });
 
   it('GM tab: the Note|Narrative type select exists and defaults to Note', () => {
@@ -52,25 +69,25 @@ describe('Log toolbar', () => {
       .toEqual(['Note', 'Narrative']);
   });
 
-  it('visitor: census is players only — no GM and no type select', () => {
+  it('visitor: flat census — zero optgroups, players only, no GM and no type select', () => {
     setup(Log, [], true, undefined, false);
     expect(authorSelect()).toHaveValue('Frodo');
-    expect(within(authorSelect()).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['Frodo', 'Aragorn']);
+    expect(flatOptions()).toEqual(['Frodo', 'Aragorn']);
+    expect(authorSelect().querySelectorAll('optgroup')).toHaveLength(0);
     expect(screen.queryByLabelText('As:')).toBeNull();
   });
 
   it('visitor with characters but none in initiative: creature lane never runs', () => {
     mockState.combatSummary = { creatures: [{ name: 'Goblin' }] };
     setup(Log, [], true, undefined, false);
-    expect(within(authorSelect()).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['Frodo', 'Aragorn']);
+    expect(flatOptions()).toEqual(['Frodo', 'Aragorn']);
+    expect(authorSelect().querySelectorAll('optgroup')).toHaveLength(0);
   });
 
-  it('GM tab with no characters still has the GM voice', () => {
+  it('GM tab with no characters: only the GM group (no empty Characters optgroup)', () => {
     setup(Log, [], true, []);
-    expect(within(authorSelect()).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['GM']);
+    expect(flatOptions()).toEqual(['GM']);
+    expect(groupCensus()).toEqual([['GM', ['GM']]]);
   });
 
   it('visitor with zero characters: no selects, composer disabled with a plain-English hint', () => {

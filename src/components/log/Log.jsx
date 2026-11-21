@@ -94,8 +94,8 @@ function LogFilterBar({ filters, typeOptions, rollTypeOptions, characterOptions,
 // and the disabled-with-hint face for a visitor in a character-less campaign
 // (the server mirrors this refusal on note/narrative POSTs). Presentational:
 // all state lives in Log.
-function LogComposer({ isLocalhost, authorOptions, author, composeType, noteText, onSelectAuthor, onComposeType, onNoteText, onPost, onKeyDown }) {
-  const canPost = authorOptions.length > 0;
+function LogComposer({ isLocalhost, authorGroups, author, composeType, noteText, onSelectAuthor, onComposeType, onNoteText, onPost, onKeyDown }) {
+  const canPost = authorGroups.length > 0;
   return (
     <>
       <div className="log-add-note no-print">
@@ -107,8 +107,17 @@ function LogComposer({ isLocalhost, authorOptions, author, composeType, noteText
               value={author}
               onChange={(e) => onSelectAuthor(e.target.value)}
             >
-              {authorOptions.map(name => (
-                <option key={name} value={name}>{name}</option>
+              {authorGroups.map(group => group.label === null ? (
+                // Flat visitor face: plain options, no optgroup chrome.
+                group.options.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))
+              ) : (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             {isLocalhost && (
@@ -156,14 +165,15 @@ export default function Log({ campaignName, characters, isLocalhost }) {
   const [creatureNames, setCreatureNames] = useState([]);
 
   const characterNames = useMemo(() => characters.map(ch => ch.name), [characters]);
-  const authorOptions = useMemo(
+  const authorGroups = useMemo(
     () => buildAuthorOptions({ isLocalhost, characterNames, creatureNames }),
     [isLocalhost, characterNames, creatureNames]
   );
-  // An unselected composer falls to the first option: 'GM' on the GM tab, the
-  // first character for a visitor. Empty authorOptions (a visitor in a
-  // character-less campaign) means there is nothing to post as at all.
-  const author = selectedAuthor || authorOptions[0] || '';
+  // An unselected composer falls to the FIRST option across the groups in
+  // render order: 'GM' on the GM tab, the first character for a visitor.
+  // No groups (a visitor in a character-less campaign) means there is
+  // nothing to post as at all.
+  const author = selectedAuthor || authorGroups[0]?.options[0] || '';
 
   // Initiative-tracker creature census (GM tab only — visitors never author
   // creatures). Mount read plus SSE mirror of the combatSummary change-data
@@ -238,7 +248,7 @@ export default function Log({ campaignName, characters, isLocalhost }) {
 
         <LogComposer
           isLocalhost={isLocalhost}
-          authorOptions={authorOptions}
+          authorGroups={authorGroups}
           author={author}
           composeType={composeType}
           noteText={noteText}

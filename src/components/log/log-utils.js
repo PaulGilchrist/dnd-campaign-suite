@@ -98,13 +98,33 @@ export function getRollTypeOptions(entries) {
 // combatSummary boards also carry player rows, so names dedupe against the
 // roster); a network visitor may author as player characters ONLY. Anonymous
 // exists nowhere in the compose lane.
+// Returns the canonical GROUPED shape [{ label, options }]: the GM tab gets
+// labeled optgroups 'GM' / 'Characters' / 'Initiative' so the author's trust
+// tier is visible once monsters join; a group with zero options is omitted
+// entirely. A visitor tab gets ONE flat group (`label: null` → the composer
+// renders plain <option>s with no optgroup chrome), mirroring the
+// TargetSelect.jsx idiom where the second-tier group appears only when it
+// has content.
 export function buildAuthorOptions({ isLocalhost, characterNames, creatureNames }) {
-  if (!isLocalhost) return [...characterNames];
-  const names = ['GM', ...characterNames];
+  if (!isLocalhost) {
+    return characterNames.length ? [{ label: null, options: [...characterNames] }] : [];
+  }
+  // Initiative creatures dedupe against the roster (and against each other)
+  // exactly as the old flat census did — a spawned 'Frodo' clone never gains
+  // a second, monster-tier voice.
+  const seen = new Set(characterNames);
+  const initiative = [];
   creatureNames.forEach(name => {
-    if (!names.includes(name)) names.push(name);
+    if (!seen.has(name)) {
+      seen.add(name);
+      initiative.push(name);
+    }
   });
-  return names;
+  return [
+    { label: 'GM', options: ['GM'] },
+    { label: 'Characters', options: [...characterNames] },
+    { label: 'Initiative', options: initiative },
+  ].filter(group => group.options.length > 0);
 }
 
 // Whole-word initialisms corrected by formatEntryTypeLabel.
