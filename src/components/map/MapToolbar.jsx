@@ -65,6 +65,23 @@ const LastKnownModeToggle = ({ isLocalhost, active, onToggle }) =>
         </button>
     ) : null;
 
+// Coordinate legend toggle (backlog 2026-11-21): binary button in the
+// Spell/Ruler idiom (aria-pressed mirrors the .active class). Hoisted like
+// MapDeactivatedHint for the toolbar's complexity cap. NOT localhost-gated:
+// the legend is per-client view state (Map.jsx local useState, zero server
+// traffic), so every origin toggles its own.
+const CoordsModeToggle = ({ active, onToggle }) => (
+    <button
+        className={active ? 'active' : ''}
+        aria-label="Coords"
+        aria-pressed={!!active}
+        title="Show grid coordinate labels (the 0-based column,row numbers map messages cite)"
+        onClick={onToggle}
+    >
+        <i className="fa-solid fa-border-all"></i> Coords
+    </button>
+);
+
 const MapToolbar = ({
     mapName,
     displayName,
@@ -88,6 +105,12 @@ const MapToolbar = ({
     backMapTarget,
     rulerMode,
     setRulerMode,
+    // Coordinate legend toggle (backlog 2026-11-21): PER-CLIENT view state
+    // (Map.jsx local useState — never server-synced, never a GM lane), so
+    // this button is deliberately NOT localhost-gated: a visitor tab toggles
+    // its own legend exactly like the ruler is its own per-tab tool.
+    coordsMode,
+    onToggleCoords,
     onEnter3D,
     spellOverlayState,
     dressButton,
@@ -206,6 +229,10 @@ const MapToolbar = ({
                     >
                         <i className="fa-solid fa-ruler"></i> Ruler
                     </button>
+                    {/* Coordinate legend toggle — pure display chrome: no
+                        tool/ruler interlock, no server write. See
+                        CoordsModeToggle above. */}
+                    <CoordsModeToggle active={coordsMode} onToggle={onToggleCoords} />
                     {onEnter3D && (
                         <button onClick={onEnter3D} title="View map in 3D" aria-label="View map in 3D">
                             <i className="fa-solid fa-cube"></i> 3D

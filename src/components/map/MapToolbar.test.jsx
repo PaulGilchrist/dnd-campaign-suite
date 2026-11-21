@@ -61,7 +61,7 @@ describe('MapToolbar', () => {
             const { container } = renderMapToolbar({ onEnter3D: vi.fn() });
             const buttons = [...container.querySelectorAll('.toolbar button')];
             expect(buttons.map(b => b.textContent.trim())).toEqual([
-                'Paint', 'Erase', 'Select', 'Spell', 'Ruler', '3D', 'Items', '', '', 'Reset Fog',
+                'Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Coords', '3D', 'Items', '', '', 'Reset Fog',
             ]);
             expect(buttons.map(b => b.querySelector('i')?.className)).toEqual([
                 'fa-solid fa-paint-brush',
@@ -69,6 +69,7 @@ describe('MapToolbar', () => {
                 'fa-solid fa-arrow-pointer',
                 'fa-solid fa-wand-magic-sparkles',
                 'fa-solid fa-ruler',
+                'fa-solid fa-border-all',
                 'fa-solid fa-cube',
                 'fa-solid fa-box',
                 'fa-solid fa-magnifying-glass-plus',
@@ -86,12 +87,16 @@ describe('MapToolbar', () => {
             const { container } = renderMapToolbar({ isLocalhost: false, resetView, resetFog });
             const buttons = [...container.querySelectorAll('.toolbar button')];
             expect(buttons.map(b => b.textContent.trim())).toEqual([
-                'Spell', 'Ruler', '', '', 'Reset View',
+                'Spell', 'Ruler', 'Coords', '', '', 'Reset View',
             ]);
             expect(screen.queryByText('Paint')).not.toBeInTheDocument();
             expect(screen.queryByText('Erase')).not.toBeInTheDocument();
             expect(screen.queryByText('Select')).not.toBeInTheDocument();
             expect(screen.queryByText('Items')).not.toBeInTheDocument();
+            // Coords is NOT a GM lane: the legend is per-client view state
+            // (local useState in Map.jsx, zero server traffic), so visitors
+            // get their own toggle — pinned to stay ungated.
+            expect(screen.getByRole('button', { name: 'Coords' })).toBeInTheDocument();
             expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
             expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();
             fireEvent.click(screen.getByTitle('Reset view'));
@@ -154,13 +159,34 @@ describe('MapToolbar', () => {
             expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
         });
 
+        // Coordinate legend toggle (backlog 2026-11-21): binary button in the
+        // Ruler idiom — aria-pressed mirrors the .active class; the press just
+        // flips the host's per-client flag (no tool/ruler interlock, the
+        // legend is pure display chrome).
+        it('Coords toggle: inactive by default, press flips once, active byte both ways', () => {
+            const onToggleCoords = vi.fn();
+            renderMapToolbar({ coordsMode: false, onToggleCoords });
+            const btn = screen.getByRole('button', { name: 'Coords' });
+            expect(btn).not.toHaveClass('active');
+            expect(btn).toHaveAttribute('aria-pressed', 'false');
+            fireEvent.click(btn);
+            expect(onToggleCoords).toHaveBeenCalledTimes(1);
+        });
+
+        it('Coords toggle renders the active byte when the legend is on', () => {
+            renderMapToolbar({ coordsMode: true, onToggleCoords: vi.fn() });
+            const btn = screen.getByRole('button', { name: 'Coords' });
+            expect(btn).toHaveClass('active');
+            expect(btn).toHaveAttribute('aria-pressed', 'true');
+        });
+
         it('gives every toolbar button an aria-label (GM census)', () => {
             const { container } = renderMapToolbar({ onEnter3D: vi.fn() });
             // Acceptance query: zero unlabelled buttons in the toolbar.
             expect(container.querySelectorAll('.toolbar button:not([aria-label])')).toHaveLength(0);
             expect(container.querySelector('.toolbar-back-btn')).toHaveAttribute('aria-label', 'Back to maps');
             // Texted buttons mirror their visible label; icon-only/3D carry functional ones.
-            for (const label of ['Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Items', 'Reset Fog']) {
+            for (const label of ['Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Coords', 'Items', 'Reset Fog']) {
                 expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-label', label);
             }
             expect(screen.getByRole('button', { name: 'View map in 3D' })).toHaveAttribute('aria-label', 'View map in 3D');
@@ -498,7 +524,7 @@ describe('MapToolbar', () => {
             const { container } = renderMapToolbar({ onToggleLastKnown, lastKnownMode: false, onEnter3D: vi.fn() });
             const buttons = [...container.querySelectorAll('.toolbar button')];
             expect(buttons.map(b => b.textContent.trim())).toEqual([
-                'Paint', 'Erase', 'Select', 'Spell', 'Ruler', '3D', 'Items', 'Last Seen', '', '', 'Reset Fog',
+                'Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Coords', '3D', 'Items', 'Last Seen', '', '', 'Reset Fog',
             ]);
             const toggle = screen.getByRole('button', { name: 'Last Seen Ghosts' });
             expect(toggle.querySelector('i')).toHaveClass('fa-solid', 'fa-ghost');

@@ -57,6 +57,7 @@ import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import RulerOverlay from './RulerOverlay.jsx';
+import CoordinateLegend from './CoordinateLegend.jsx';
 import MapSnapToast from './MapSnapToast.jsx';
 import MapNoticeToast from './MapNoticeToast.jsx';
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
@@ -179,6 +180,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     const [selectedShape, setSelectedShape] = useState(OverlayShape.SPHERE);
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
     const [viewMode, setViewMode] = useState('2d');
+    // Coordinate legend (backlog 2026-11-21): pure per-client view state, the
+    // exact idiom of rulerMode/3D — local useState, default OFF on every
+    // mount, never POSTed, never game state, never a GM-only lane.
+    const [coordsMode, setCoordsMode] = useState(false);
 
     // Shared map-notice channel (display-only ephemeral UI — never game
     // state; rendered by MapNoticeToast.jsx on the .map-toast slot). Fed by
@@ -492,11 +497,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     };
 
     // Mirror latest state into the refs the select-move lane reads mid-gesture.
-    // The two DOCUMENT mirrors are consolidated into ONE effect (idempotent
-    // .current writes — no ordering need) to hold Map at its max-statements cap.
-    useEffect(() => { placedItemsRef.current = placedItems; mapDataRef.current = mapData; }, [placedItems, mapData, placedItemsRef, mapDataRef]);
-    useEffect(() => { selectedWallsRef.current = selectedWalls; }, [selectedWalls, selectedWallsRef]);
-    useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems, selectedItemsRef]);
+    // The DOCUMENT/selection mirrors are consolidated into ONE effect
+    // (idempotent .current writes — no ordering need) to hold Map at its
+    // max-statements cap (one statement reclaimed for the coords-legend flag).
+    useEffect(() => {
+        placedItemsRef.current = placedItems;
+        mapDataRef.current = mapData;
+        selectedWallsRef.current = selectedWalls;
+        selectedItemsRef.current = selectedItems;
+    }, [placedItems, mapData, selectedWalls, selectedItems, placedItemsRef, mapDataRef, selectedWallsRef, selectedItemsRef]);
 
     const handleToolPanStart = useCallback((e) => {
         if (spellDragActiveRef.current) return;
@@ -650,6 +659,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 backMapTarget={backMapTarget}
                 rulerMode={rulerMode}
                 setRulerMode={handleSetRulerMode}
+                coordsMode={coordsMode}
+                onToggleCoords={() => setCoordsMode(prev => !prev)}
                 onEnter3D={() => setViewMode('3d')}
                 // Last-known-position mode (roadmap Item 7): the flag lives ON
                 // THE MAP DOCUMENT (default absent = OFF), so every client
@@ -901,6 +912,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     every proposed cell reads; null-wiped by the hook on
                     close/Apply (zero residue, criterion 5). */}
                 {dress.overlay}
+
+                {/* Coordinate legend (backlog 2026-11-21): drawn LAST so the
+                    edge digits read above fog/tokens/overlays; it lives in
+                    grid units, so the viewBox carries it through zoom/pan, and
+                    .coord-legend is pointer-events:none — every drag/pan/
+                    ruler/spell gesture is untouched. Renders null while OFF
+                    (the default): zero legend DOM, zero layout shift. */}
+                <CoordinateLegend gridSize={gridSize} enabled={coordsMode} />
             </svg>
             {/* Enforcement snap-back toast (display-only visibility for the
                 movement-budget clamp — see MapSnapToast.jsx) */}

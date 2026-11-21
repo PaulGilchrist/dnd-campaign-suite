@@ -961,6 +961,29 @@
     fill: #333;
 }
 
+/* Coordinate legend (backlog 2026-11-21): chess-board style 0-based axis
+   labels — columns along the TOP edge, rows along the LEFT edge — matching
+   the cell numbers the LoS/cover/dress copy cites ("(5,10)"). Rendered in
+   viewBox units (see CoordinateLegend.jsx) so labels track the grid's
+   zoom/pan transform, and pointer-events:none keeps every token/pan/ruler
+   gesture untouched. Same amber ruler tokens for app-wide consistency. */
+.map .coord-legend {
+    pointer-events: none;
+}
+
+.map .coord-label {
+    fill: #ffcc00;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    /* Readable on dark and light floors, mirroring .npc-name's halo. */
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+}
+
+[data-theme="light"] .map .coord-label {
+    fill: #996600;
+}
+
 .ruler-hint {
     display: flex;
     align-items: center;
