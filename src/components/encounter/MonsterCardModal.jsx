@@ -975,8 +975,17 @@ function psychicStrikePreconditionFailed(name, target, allTargetEffects) {
 // marked-mover target and are unaffected; armed presses are byte-identical.
 // Ordered AFTER the Psychic Strike legacy-alert lane so that row's pinned
 // alert survives (interaction.test.jsx).
-function attackPressPreconditionRefused({ actionName, target, monsterName, allTargetEffects, setPopupHtml }) {
+// First-press map-race backstop (2026-11-20 CCC backlog): while the modal's
+// active-map fetch is still in flight, this press would measure range/cover
+// from the gridless snapshot — refused here SILENTLY (zero roll, zero log,
+// zero write) so no plain-NORMAL reading escapes the window even via the
+// indirect lanes (spell-attack cast, gated reaction). The attack chip itself
+// renders inert while pending, so normal presses never reach this branch.
+// Pending-OA presses carry trigger-time spatial truth (OA_TRIGGER_SPATIAL_
+// STATE — the marker IS the adjacency proof) and stay trigger-lenient.
+function attackPressPreconditionRefused({ actionName, target, monsterName, allTargetEffects, setPopupHtml, mapMeasurePending, isOaPress }) {
   if (psychicStrikePreconditionFailed(actionName, target, allTargetEffects)) return true;
+  if (mapMeasurePending && !isOaPress) return true;
   if (!target?.name) {
     setPopupHtml(buildNoTargetRefusalPopup({ monsterName, actionName, rollNoun: 'attack' }));
     return true;
@@ -2417,11 +2426,52 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
   );
 }
 
+// First-press map-race gate (2026-11-20 CCC backlog): the active-map doc
+// fetches async on mount, and handleAttack measures range/cover from that
+// snapshot — a chip pressed inside the fetch window measured gridless and
+// rolled plain NORMAL past the normal-band. `mapPending` is true from the
+// FIRST render whenever mapName is set (lazy init — no pre-effect window) and
+// settles on resolve OR reject, so a rejected fetch never leaves the modal
+// permanently dead. No active map ⇒ nothing to await ⇒ never pending. The
+// attack chip renders inert while pending (MonsterAction AttackChip) and
+// handleAttack refuses the same press at precondition time (backstop for the
+// indirect lanes). Hoisted to a hook: MonsterCardModal sits at the
+// max-statements ceiling (playbook §EffectAdder complexity precedent).
+function useActiveMapFetch(campaignName, mapName) {
+  const [mapData, setMapData] = useState(null);
+  const [mapPending, setMapPending] = useState(() => Boolean(mapName));
+  useEffect(() => {
+    if (!mapName) {
+      setMapData(null);
+      setMapPending(false);
+      return;
+    }
+    setMapPending(true);
+    // Stale-settle guard: a mid-session mapName swap must never let the older
+    // fetch clear the newer fetch's pending flag.
+    let live = true;
+    mapsService.loadMapData(campaignName, mapName).then(
+      (data) => {
+        if (!live) return;
+        setMapData(data);
+        setMapPending(false);
+      },
+      () => {
+        if (!live) return;
+        setMapData(null);
+        setMapPending(false);
+      },
+    );
+    return () => { live = false; };
+  }, [campaignName, mapName]);
+  return [mapData, mapPending];
+}
+
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const creatureTempHp = getRuntimeValue(monsterName, 'tempHp', campaignName) || 0;
   const fallbackCsRef = useRef(null);
-  const [mapData, setMapData] = useState(null);
+  const [mapData, mapPending] = useActiveMapFetch(campaignName, mapName);
   const [evasionSelection, setEvasionSelection] = useState(null);
   const [showAllyModal, setShowAllyModal] = useState(false);
   const [allyModalCreatures, setAllyModalCreatures] = useState([]);
@@ -2434,18 +2484,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (cs) fallbackCsRef.current = cs;
     });
   }, [creatures, campaignName]);
-
-  useEffect(() => {
-    if (!mapName) {
-      setMapData(null);
-      return;
-    }
-    mapsService.loadMapData(campaignName, mapName).then(data => {
-      setMapData(data);
-    }).catch(() => {
-      setMapData(null);
-    });
-  }, [campaignName, mapName]);
 
   const storedTargetEffects = useRuntimeValue('campaign', 'targetEffects');
   const allTargetEffects = useMemo(() => storedTargetEffects ?? [], [storedTargetEffects]);
@@ -2637,7 +2675,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // that provoked the reaction IS the attack's occasion). Normal chip
     // presses (oaContext === null) keep resolution-time arming untouched.
     const target = resolvePressTarget(oaContext, getTarget);
-    if (attackPressPreconditionRefused({ actionName: name, target, monsterName, allTargetEffects, setPopupHtml })) return;
+    if (attackPressPreconditionRefused({ actionName: name, target, monsterName, allTargetEffects, setPopupHtml, mapMeasurePending: mapPending, isOaPress: !!oaContext })) return;
 
     // CLA-036 lane (a): Bestial Fury double-strike economy — the Fury-stamped
     // Beast's Strike chip consumes one of the command's 2 strikes per press;
@@ -3131,6 +3169,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         handleSkillCheck={handleSkillCheck}
         attackerCannotAct={attackerCannotAct}
         attackerActionBlocked={attackerActionBlocked}
+        spatialGatePending={mapPending}
         handleAttack={handleAttack}
         handleDamage={handleDamage}
         handleSaveRoll={handleSaveRoll}

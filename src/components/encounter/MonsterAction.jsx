@@ -28,6 +28,33 @@ function attackChipClass(rechargeOut) {
   return `mc-dice-link${rechargeOut ? ' mc-dice-link-spell-spent' : ''}`;
 }
 
+// First-press map-race gate (2026-11-20 CCC backlog): the modal fetches the
+// active-map doc async on mount and the attack chip's commit path (handleAttack
+// → resolvePressSpatialState → computeMapRangeState) measures range/cover from
+// that snapshot — a press inside the fetch window measured gridless and rolled
+// plain NORMAL past the normal band. While the fetch is PENDING the chip
+// renders as an inert busy affordance (no onClick — the spent-chip/unclickable
+// precedent every sibling chip-link uses — plus aria-busy/aria-disabled and
+// the muted spent class); it re-enables when the fetch settles, resolve or
+// reject. With NO active map there is no fetch to await and the chip is never
+// gated. Pending-OA chips are a different press surface (PendingOpportunity-
+// AttackRow) and stay trigger-lenient untouched. Hoisted to its own component
+// to hold the MonsterAction complexity ceiling (precedent: every *Link above).
+function AttackChip({ action, onAttack, rechargeOut, spatialGatePending }) {
+  if (spatialGatePending) {
+    return (
+      <span className="mc-dice-link mc-dice-link-spell-spent" data-kind="attack" role="button" tabIndex={0} aria-busy="true" aria-disabled="true" title="Loading map positions for range and cover — the attack chip re-enables once the map is ready">
+        <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
+      </span>
+    );
+  }
+  return (
+    <span className={attackChipClass(rechargeOut)} data-kind="attack" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
+      <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
+    </span>
+  );
+}
+
 // MA-0031: recharge label — a spent row reads "(Recharge 6 — unavailable)".
 // MA-0049: structured usage {recharge on roll, min_value 5} reads
 // "(Recharge 5+)" — the rechargeDisplayText helper covers both shapes.
@@ -449,7 +476,7 @@ function gatedSpellNamesFor(action, legendaryGate, spellNameIndex) {
   return { utilityNames: utilitySpellNamesFor(action, spellNameIndex), spellListNames: spellListNamesForSaveRow(action) };
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, onAdvisoryRow, spellNameIndex = null }) {
+export function MonsterAction({ action, index, attackerCannotAct, spatialGatePending = false, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, onAdvisoryRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
   // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
@@ -479,9 +506,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <AdvisoryLink action={action} attackerCannotAct={attackerCannotAct} onAdvisoryRow={onAdvisoryRow} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
-        <span className={attackChipClass(rechargeOut)} data-kind="attack" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
-          <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
-        </span>
+        <AttackChip action={action} onAttack={onAttack} rechargeOut={rechargeOut} spatialGatePending={spatialGatePending} />
       )}
       <ActionDamageLinks action={action} actionDamageFormula={actionDamageFormula} actionDamageTypeLabel={actionDamageTypeLabel} onDamage={onDamage} />
       <SpellOrSaveLinks action={action} isSpellcastingRow={isSpellcastingRow} utilityNames={utilityNames} spellListNames={spellListNames} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
