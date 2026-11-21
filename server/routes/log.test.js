@@ -1035,17 +1035,125 @@ describe('POST /log — active-session stamp', () => {
     // like every row); `recapSession` = WHICH session the story describes.
     // A recap of Session 1 written while Session 2 is active must carry BOTH,
     // honestly — renderers and storyMemory key the subject off recapSession.
-    it('session_recap rows: the stamp records WHEN (live session), recapSession the SUBJECT', async () => {
+    // The only recap producer is the /ai/recap endpoint's in-process addEntry
+    // call (client HTTP POSTs of the type are refused — see the server-only
+    // gate below), so the law rides addEntry directly, exactly as the
+    // endpoint invokes it.
+    it('session_recap rows via the server lane: the stamp records WHEN (live session), recapSession the SUBJECT', async () => {
         const { characterChangeData } = await import('../utils/changeData.js');
         ensureCampaign('test-campaign');
         characterChangeData.set('test-campaign', { sessionState: { name: 'Session 2' } });
+
+        const entry = logModule.addEntry('test-campaign', {
+            type: 'session_recap', name: 'Session Recap', characterName: 'GM',
+            description: 'In the beginning…', recapSession: 'Session 1',
+        });
+
+        expect(entry.session).toBe('Session 2');
+        expect(entry.recapSession).toBe('Session 1');
+        expect(logModule.logCache.get('test-campaign').at(-1).id).toBe(entry.id);
+    });
+});
+
+// ─── Server-only log types (forged session_recap gate, bug 2026-11-21) ───────
+// `session_recap` has no client producer: the recap endpoint posts the row
+// through the in-process addEntry() export, never HTTP. Any client POST of
+// the type — GM or visitor origin alike — is a forgery that would render with
+// privileged recap chrome and (via the storyMemory hierarchy law) suppress the
+// real session's raw rows from every AI prompt. Blanket 403 before addEntry:
+// no row, no broadcast.
+
+const RECAP_FORGERY_COPY = 'Session recap rows are posted by the AI recap endpoint (Sessions → Write recap) and cannot be added to the log directly';
+const RECAP_FORGERY_BODY = {
+    type: 'session_recap', characterName: 'GM',
+    description: 'FORGED: the party betrayed the town', recapSession: 'Session 1',
+};
+
+describe('POST /log — server-only types (session_recap forgery gate)', () => {
+    it('403s a visitor-origin session_recap POST with plain-English copy, zero side effects', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
         const app = createTestApp();
 
         const res = await request(app).post('/api/campaigns/test-campaign/log')
-            .send({ type: 'session_recap', name: 'Session Recap', characterName: 'GM', description: 'In the beginning…', recapSession: 'Session 1' });
+            .set('Host', VISITOR_HOST)
+            .send(RECAP_FORGERY_BODY);
 
-        expect(res.status).toBe(200);
-        expect(res.body.session).toBe('Session 2');
-        expect(res.body.recapSession).toBe('Session 1');
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual({ error: RECAP_FORGERY_COPY });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('403s a localhost-origin session_recap POST too (the recap lane is in-process, never HTTP)', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send(RECAP_FORGERY_BODY);
+
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual({ error: RECAP_FORGERY_COPY });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('the refusal is origin-neutral and author-independent (roster author + Anonymous bodies both 403)', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const asRoster = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ ...RECAP_FORGERY_BODY, characterName: 'Frodo' });
+        const anonymous = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', 'localhost:80')
+            .send({ ...RECAP_FORGERY_BODY, characterName: 'Anonymous' });
+
+        expect(asRoster.status).toBe(403);
+        expect(anonymous.status).toBe(403);
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+    });
+
+    it('the server lane still lands recap rows (addEntry is the endpoint path, untouched)', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+
+        const entry = logModule.addEntry('test-campaign', {
+            type: 'session_recap', name: 'Session Recap', characterName: 'GM',
+            description: 'A real recap.', recapSession: 'Session 1',
+        });
+
+        expect(logModule.logCache.get('test-campaign')).toHaveLength(1);
+        expect(logModule.logCache.get('test-campaign')[0].description).toBe('A real recap.');
+        expect(publish).toHaveBeenCalledWith(
+            'log-test-campaign',
+            expect.objectContaining({ type: 'session_recap', characterName: 'GM' }),
+            'test-campaign'
+        );
+        expect(entry.id).toBeTruthy();
+    });
+
+    it('compose-lane faces are unchanged: visitor note as a roster character 200s, as GM 403s', async () => {
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const asPlayer = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'note', characterName: 'Frodo', noteText: 'a real player voice' });
+        const asGM = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'note', characterName: 'GM', noteText: 'impersonation' });
+
+        expect(asPlayer.status).toBe(200);
+        expect(asGM.status).toBe(403);
+    });
+
+    it('session_recap stays allowlisted (GET-rendered real recaps + the drift pin)', () => {
+        expect(logModule.ALLOWED_LOG_TYPES.has('session_recap')).toBe(true);
     });
 });

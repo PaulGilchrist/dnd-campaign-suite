@@ -34,3 +34,17 @@ Add a server-only refusal in the POST lane, e.g.:
 
 ## Severity
 Data integrity risk — a visitor can rewrite what the campaign's own AI referee believes happened (and erase a session's real beats from its memory) without touching any GM surface. Rendered-XSS is NOT the risk (markdown is sanitized); authority + memory integrity is.
+
+## Resolution
+FIXED 2026-11-21 — the black-box diagnosis held exactly: the POST /log lane gated shape + manual authors but never saw `session_recap`, so any origin could forge a GM-authored recap row.
+
+**Fix** (`server/routes/log.js`): added `SERVER_ONLY_LOG_TYPES = new Set(['session_recap'])` + `validateClientPostableType(body)` (mirrors `validateManualAuthor`'s `{status, error}` shape), wired into `POST /api/campaigns/:campaign/log` between the shape gate and the author gate. Every client HTTP POST of `session_recap` — GM or visitor origin — 403s with the plain-English copy `Session recap rows are posted by the AI recap endpoint (Sessions → Write recap) and cannot be added to the log directly`, strictly BEFORE `addEntry()` (no row, no `log-<c>` broadcast). The type stays in `ALLOWED_LOG_TYPES` (GET-rendered real recaps + the drift pin unchanged); the `/ai/recap` endpoint is untouched because it posts via the in-process `addEntry()` export and never rides HTTP. The ALLOWED_LOG_TYPES census comment now names the recap endpoint as a server-side `addEntry` caller. No dual-ruleset sibling (log lane is ruleset-neutral).
+
+**Regression tests** (`server/routes/log.test.js`): new `POST /log — server-only types (session_recap forgery gate)` block — visitor POST → 403 verbatim copy + zero side effects (logCache empty, no publish); localhost POST → 403 same copy; origin-neutral/author-independent (roster-author + Anonymous bodies 403); server-lane `addEntry()` still lands + broadcasts the recap row; compose-lane faces unchanged (visitor note as roster char 200s, as GM 403s); type stays allowlisted. The pre-existing recap-stamping-law test rode the forged HTTP lane (it pinned 200 for a client POST — the very bug face) and now rides `addEntry()` directly, same WHEN/SUBJECT assertions.
+
+**Verification:**
+- Live repro (pre-fix): session-stamped note + visitor-origin forged recap (`Host: 192.168.0.44:5173` via Vite proxy) → **200**, row rendered as full RecapEntry in the Log view ("Session Recap — Session 1", author GM); pure `buildStoryFromRows(rows,'Session 2')` showed the forged recap alone — both real Session-1 beats suppressed (matches original witness).
+- Live re-verify (post-fix, dev pair restarted for the API): visitor forge → 403 verbatim; localhost forge → 403 verbatim; GET log carries ONLY the note row; SSE-mounted Log tab shows `Showing 1 of 1`, zero `.log-recap`, no FORGED text (refusal fires no broadcast); visitor note as roster char → 200 (live beat SSE-adopted), visitor note as GM → 403 roster copy.
+- Real recap lane proven end-to-end with the live omlx rig (`aiConfig` mode suggest, model Qwen3.8-Flash-Next-oQ4e-mtp): `POST /ai/recap` (localhost) → real `session_recap` row landed via `addEntry()` and rendered as RecapEntry ("Session Recap — Session 1", GM, "Showing 2 of 2") — the gate does not touch the endpoint lane.
+- Tests: `log.test.js` 68/68; `log.schema-gate` + `campaigns-ai-recap` + `campaigns-ai` + `storyMemory` 64/64; full `server/routes` folder 119 files / 1854 tests passed. `npm run lint` clean (zero warnings).
+- Closeout: Admin clear-log + clear-change-data from localhost, GET-verified `[]`/`{}`, `campaign-log.json` absent on disk; browser closed before clears.

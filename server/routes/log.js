@@ -141,7 +141,9 @@ export function addEntry(campaign, entry) {
 //     routes/campaigns-changedata.js (write_rejected), routes/inventory.js
 //     (inventory_transfer), routes/campaigns-ai.js + routes/ai-designer.js
 //     which inject addEntry as the AI `log` sink (ai_designer/ai_refine/
-//     ai_dress/ai_authoring/ai_world/ai_director/ai_ruling);
+//     ai_dress/ai_authoring/ai_world/ai_director/ai_ruling), plus the recap
+//     endpoint in campaigns-ai.js (session_recap — in-process only, see the
+//     SERVER_ONLY_LOG_TYPES gate below);
 //   - dynamic template types: ai_draft_approved/ai_draft_rejected
 //     (campaign/draftActions.js), plus adventure_regenerated
 //     (campaign/seededCampaign.js).
@@ -235,6 +237,31 @@ function validateManualAuthor(campaign, req, body) {
   return null;
 }
 
+// ── Server-only types (forged-recap gate, bug 2026-11-21) ──
+// `session_recap` rows exist ONLY when the GM presses "Write recap": the recap
+// endpoint (campaigns-ai.js POST /ai/recap) posts the row through the
+// in-process addEntry() export and never rides this HTTP lane, so any client
+// POST of the type — from ANY origin — is a forgery. A forged recap is worse
+// than GM impersonation: the storyMemory hierarchy law (a recap of session X
+// suppresses every raw X row from the AI "Story so far" block) lets one forged
+// row erase a real session's beats from the campaign's AI memory. Blanket
+// origin-neutral 403, same refusal posture as the author gate: validation
+// runs strictly before addEntry(), so refusals append NO row and fire NO
+// broadcast. The type STAYS in ALLOWED_LOG_TYPES — GET-rendered real recaps
+// must keep passing the shape gate and the drift pin.
+const SERVER_ONLY_LOG_TYPES = new Set(['session_recap']);
+
+// Returns { status, error } on refusal, or null when the type may be posted.
+function validateClientPostableType(body) {
+  if (SERVER_ONLY_LOG_TYPES.has(body.type)) {
+    return {
+      status: 403,
+      error: 'Session recap rows are posted by the AI recap endpoint (Sessions → Write recap) and cannot be added to the log directly',
+    };
+  }
+  return null;
+}
+
 // GET /api/campaigns/:campaign/log - returns full log (last 500 entries)
 router.get('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
   const log = loadLog(req.params.campaign);
@@ -242,12 +269,18 @@ router.get('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
 }));
 
 // POST /api/campaigns/:campaign/log - add a new log entry (shape-gated +
-// manual-author-gated, see ALLOWED_LOG_TYPES and validateManualAuthor above;
-// automated lanes stay visitor-writable, compose-lane notes/narrative do not)
+// server-only-type-gated + manual-author-gated, see ALLOWED_LOG_TYPES,
+// validateClientPostableType and validateManualAuthor above; automated lanes
+// stay visitor-writable, compose-lane notes/narrative do not, recap rows are
+// never client-posted at all)
 router.post('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
   const rejection = validateLogEntryBody(req.body);
   if (rejection) {
     return res.status(400).json({ error: rejection });
+  }
+  const serverOnlyRejection = validateClientPostableType(req.body);
+  if (serverOnlyRejection) {
+    return res.status(serverOnlyRejection.status).json({ error: serverOnlyRejection.error });
   }
   const authorRejection = validateManualAuthor(req.params.campaign, req, req.body);
   if (authorRejection) {
