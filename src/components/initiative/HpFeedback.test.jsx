@@ -28,7 +28,7 @@ describe('floater skin', () => {
         expect(cues()).toEqual([]);
     });
 
-    it('damage glyph + class, big-number law (≥10 or ≥25% of max)', () => {
+    it('damage glyph + class, big-number law (EITHER ≥10 absolute OR ≥25% of max)', () => {
         const { container } = render(
             <HpFeedback creatureName='Goblin' hpEvent={{ delta: -4, id: 1, max: 40 }} />,
         );
@@ -39,6 +39,38 @@ describe('floater skin', () => {
             <HpFeedback creatureName='Goblin' hpEvent={{ delta: -12, id: 2, max: 40 }} />,
         ).container;
         expect(big.querySelector('.hp-floater-big')).not.toBeNull();
+    });
+
+    // JII: the min() threshold lets EITHER leg alone flag a hit big — the old
+    // max() form demanded both, so a −30 on a 224-HP giant read as non-big.
+    it('big-number law: absolute leg fires regardless of max', () => {
+        const { container } = render(
+            <HpFeedback creatureName='Giant' hpEvent={{ delta: -30, id: 1, max: 224 }} />,
+        );
+        expect(container.querySelector('.hp-floater-big')).not.toBeNull();
+    });
+
+    it('big-number law: relative-only leg fires below the 10 floor on low-max creatures', () => {
+        // floor(12 * 0.25) = 3 < 10, so the 25% bar is the effective threshold.
+        const { container } = render(
+            <HpFeedback creatureName='Sprite' hpEvent={{ delta: -4, id: 1, max: 12 }} />,
+        );
+        expect(container.querySelector('.hp-floater-big')).not.toBeNull();
+    });
+
+    it('big-number law: sub-threshold control stays non-big', () => {
+        // max 89 → min(10, floor(22.25)) = 10; −5 clears neither leg.
+        const { container } = render(
+            <HpFeedback creatureName='Ogre' hpEvent={{ delta: -5, id: 1, max: 89 }} />,
+        );
+        expect(container.querySelector('.hp-floater')).not.toHaveClass('hp-floater-big');
+    });
+
+    it('big-number law: −10 on max 89 is big (absolute leg, old formula said non-big)', () => {
+        const { container } = render(
+            <HpFeedback creatureName='Ogre' hpEvent={{ delta: -10, id: 1, max: 89 }} />,
+        );
+        expect(container.querySelector('.hp-floater-big')).not.toBeNull();
     });
 
     it('heal glyph + class', () => {

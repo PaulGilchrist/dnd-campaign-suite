@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + disk `campaign-log.json`/`character-change-data.js
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-21 JII — HpFeedback big-hit comment↔formula drift:** the code comment says big = “≥10 or ≥25% of max” but `isBig = |Δ| >= Math.max(10, floor(max*0.25))` requires BOTH — a −30 on a 224-HP creature is honestly not-big (JII lived −10 non-big on max-89). Owner call: pick absolute-or-relative (one reads `Math.min`-style) and fix the comment or the expression.
 - **2026-11-21 JII — gridSize validation asymmetry:** create clamps 5..100 (`maps.js:163 clampGridSize`) but the whole-doc PUT stores any integer verbatim (110 lived) — two rules for one field; the fog-iteration cost the clamp's own comment warns about is reachable via the save lane. Clamp on save, or raise/document the authored ceiling consistently.
 - **2026-11-21 JII — scoped PATCH success body `applied:0` counter reads as a lie:** every record-merge commit (4/4 JII, plus carried RG/DM law) returns `applied:0` while the GET shows the value landed — the field is combatSummary-row-scoped semantics leaking into char-bucket responses; count applied fields or omit the counter outside the rows lane (`campaigns-changedata.js`).
 

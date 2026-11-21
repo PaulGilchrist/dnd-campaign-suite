@@ -25,9 +25,10 @@ export default function HpFeedback({ creatureName, hpEvent, onDone }) {
     }, [eventId, delta])
     if (!delta) return null
     const isDamage = delta < 0
-    // Big-number class for hits that meaningfully hurt: ≥10 or ≥25% of max.
+    // Big-number class for hits that meaningfully hurt: EITHER ≥10 absolute
+    // OR ≥25% of max (the min() lets the relative leg win on low-HP creatures).
     const max = hpEvent?.max || 1
-    const isBig = Math.abs(delta) >= Math.max(10, Math.floor(max * 0.25))
+    const isBig = Math.abs(delta) >= Math.min(10, Math.floor(max * 0.25))
     return (
         <span className="hp-feedback" aria-hidden="true">
             <span
