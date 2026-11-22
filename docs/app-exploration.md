@@ -50,7 +50,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT; ALL 10 data md5s byte-match the
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-22 LV24) The char-aggregate exit proof `fb536d55…` has no reproducible recipe in any run doc (a `cat root/*.json | md5` probe reads a different value); prior runs kept citing it as a pin. Exit docs should standardize on `git status --porcelain public/` EMPTY + per-file md5s and DROP the mystery aggregate from future pins.
 
 ## Blocked / Not Verified (fold-gate ledger)
 
