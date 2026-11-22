@@ -147,6 +147,11 @@ export function addEntry(campaign, entry) {
 //   - dynamic template types: ai_draft_approved/ai_draft_rejected
 //     (campaign/draftActions.js), plus adventure_regenerated
 //     (campaign/seededCampaign.js).
+// Membership here means GET-renderable + POSTABLE BY THE RIGHT LANE, not
+// freely client-postable: the twelve ai_* types additionally pass a GM-origin
+// gate before addEntry() (see AI_GM_ONLY_TYPES below), session_recap is
+// server-only (SERVER_ONLY_LOG_TYPES), and note/narrative run the manual-author
+// gate.
 // Drift protection (backlog 2026-11-20 ZZ): server/routes/log.schema-gate.test.js
 // PINS this Set against the real client registries — every key of
 // src/components/log/entryComponents.js ENTRY_COMPONENTS and every entry of
@@ -218,8 +223,10 @@ function validateLogEntryBody(body) {
 //     'GM'` for exactly this reason.
 // Automated/chip rows (roll, hp_change, delegated monster attacks, music,
 // write_rejected, AI audit rows…) are NOT manual-author rows and keep their
-// existing shapes byte-compatible. Refusals append NO row and fire NO
-// broadcast — validation runs strictly before addEntry(), like the shape gate.
+// existing shapes byte-compatible (client POSTs of the ai_* audit family are
+// separately GM-origin-gated — see AI_GM_ONLY_TYPES below). Refusals append
+// NO row and fire NO broadcast — validation runs strictly before addEntry(),
+// like the shape gate.
 const MANUAL_AUTHOR_TYPES = new Set(['note', 'narrative']);
 
 // Returns { status, error } on refusal, or null when the author is valid.
@@ -263,13 +270,38 @@ function validateManualAuthor(campaign, req, body) {
 // must keep passing the shape gate and the drift pin.
 const SERVER_ONLY_LOG_TYPES = new Set(['session_recap']);
 
+// ── ai_* GM-origin gate (owner-approved 2026-11-22, backlog OOO) ──
+// The twelve ai_* audit types are produced either server-side in-process
+// (campaigns-ai.js / ai-designer.js inject addEntry as the AI `log` sink —
+// those never ride this HTTP lane) or by client apply-lane audit POSTs from
+// GM-only UI lanes (Drafts approve/reject, the director/referee/world
+// consoles, the map Dress button). Before this gate any network client could
+// POST an ai_* row naming an arbitrary `characterName` and forge "the AI
+// ruled/directed/… as <author>" audit rows. Owner ruling: gate the whole
+// family on GM ORIGIN — a non-localhost POST of any ai_* type 403s with the
+// established `Access denied: GM-only feature` refusal; a localhost (GM) POST
+// keeps landing 200 (the sanctioned Log-witness lane the ai-audit renderer
+// recipe rides). The blanket server-only variant was REJECTED — only
+// `session_recap` above is origin-neutral 403. The types STAY in
+// ALLOWED_LOG_TYPES: GET-rendered real rows must keep passing the shape gate
+// and the drift pin. Refusals append NO row and fire NO broadcast —
+// validation runs strictly before addEntry(), like the sibling gates.
+const AI_GM_ONLY_TYPES = new Set([
+  'ai_authoring', 'ai_designer', 'ai_director', 'ai_director_applied',
+  'ai_draft_approved', 'ai_draft_rejected', 'ai_dress', 'ai_refine',
+  'ai_ruling', 'ai_ruling_applied', 'ai_world', 'ai_world_applied',
+]);
+
 // Returns { status, error } on refusal, or null when the type may be posted.
-function validateClientPostableType(body) {
+function validateClientPostableType(req, body) {
   if (SERVER_ONLY_LOG_TYPES.has(body.type)) {
     return {
       status: 403,
       error: 'Session recap rows are posted by the AI recap endpoint (Sessions → Write recap) and cannot be added to the log directly',
     };
+  }
+  if (AI_GM_ONLY_TYPES.has(body.type) && !isLocalhost(req)) {
+    return { status: 403, error: 'Access denied: GM-only feature' };
   }
   return null;
 }
@@ -281,16 +313,17 @@ router.get('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
 }));
 
 // POST /api/campaigns/:campaign/log - add a new log entry (shape-gated +
-// server-only-type-gated + manual-author-gated, see ALLOWED_LOG_TYPES,
-// validateClientPostableType and validateManualAuthor above; automated lanes
-// stay visitor-writable, compose-lane notes/narrative do not, recap rows are
-// never client-posted at all)
+// server-only-type-gated + ai_*-GM-origin-gated + manual-author-gated, see
+// ALLOWED_LOG_TYPES, validateClientPostableType and validateManualAuthor
+// above; automated non-ai lanes stay visitor-writable, ai_* rows are GM-origin
+// POSTs only, compose-lane notes/narrative do not, recap rows are never
+// client-posted at all)
 router.post('/api/campaigns/:campaign/log', asyncHandler((req, res) => {
   const rejection = validateLogEntryBody(req.body);
   if (rejection) {
     return res.status(400).json({ error: rejection });
   }
-  const serverOnlyRejection = validateClientPostableType(req.body);
+  const serverOnlyRejection = validateClientPostableType(req, req.body);
   if (serverOnlyRejection) {
     return res.status(serverOnlyRejection.status).json({ error: serverOnlyRejection.error });
   }

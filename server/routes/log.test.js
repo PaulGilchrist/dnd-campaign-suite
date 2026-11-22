@@ -1235,3 +1235,115 @@ describe('POST /log — server-only types (session_recap forgery gate)', () => {
         expect(logModule.ALLOWED_LOG_TYPES.has('session_recap')).toBe(true);
     });
 });
+
+// ─── ai_* GM-origin gate (owner-approved 2026-11-22, backlog OOO) ────────────
+// The twelve ai_* audit types ride this HTTP lane ONLY from GM-origin UI lanes
+// (Drafts approve/reject, director/referee/world consoles, map Dress); the
+// server-side AI sinks inject addEntry in-process and never POST here. A
+// network-origin POST of any ai_* type — whatever characterName it names — is
+// a forgeable audit row and 403s with the established GM-only refusal, strictly
+// before addEntry(): no row, no broadcast. The localhost witness lane stays
+// intact (200, row lands), and the types STAY in ALLOWED_LOG_TYPES (GET-render
+// + the schema-gate drift pin). session_recap above stays the only
+// origin-neutral 403.
+
+const AI_FORGERY_REFUSAL = 'Access denied: GM-only feature';
+const AI_GM_ONLY_LOG_TYPES = [
+    'ai_authoring', 'ai_designer', 'ai_director', 'ai_director_applied',
+    'ai_draft_approved', 'ai_draft_rejected', 'ai_dress', 'ai_refine',
+    'ai_ruling', 'ai_ruling_applied', 'ai_world', 'ai_world_applied',
+];
+
+// Producer-shaped body (the AiAuditEntry chrome contract): type + author +
+// description. The visitor face forges the GM's AI author voice.
+const aiBody = (type) => ({
+    type,
+    characterName: 'GM',
+    description: `FORGED ${type} audit row from a network client`,
+});
+
+describe('POST /log — ai_* GM-origin gate', () => {
+    it.each(AI_GM_ONLY_LOG_TYPES)(
+        '403s a visitor-origin %s POST with the GM-only refusal, zero side effects',
+        async (type) => {
+            const { publish } = await import('../utils/changeData.js');
+            ensureCampaign('test-campaign');
+            setRoster('test-campaign', ['Frodo']);
+            const app = createTestApp();
+
+            const res = await request(app).post('/api/campaigns/test-campaign/log')
+                .set('Host', VISITOR_HOST)
+                .send(aiBody(type));
+
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({ error: AI_FORGERY_REFUSAL });
+            expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+            expect(publish).not.toHaveBeenCalled();
+        }
+    );
+
+    it.each(AI_GM_ONLY_LOG_TYPES)(
+        'localhost-origin %s POST keeps landing 200 with the row witnessed (Log-witness lane)',
+        async (type) => {
+            ensureCampaign('test-campaign');
+            const app = createTestApp();
+
+            const res = await request(app).post('/api/campaigns/test-campaign/log')
+                .set('Host', 'localhost:80')
+                .send({ type, characterName: 'AI director', description: `witnessed ${type} row` });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ type, characterName: 'AI director' });
+            const log = logModule.logCache.get('test-campaign');
+            expect(log).toHaveLength(1);
+            expect(log[0].description).toBe(`witnessed ${type} row`);
+        }
+    );
+
+    it('the gate is type-based, not author-based (a rostered author cannot unlock ai_* for a visitor)', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        ensureCampaign('test-campaign');
+        setRoster('test-campaign', ['Frodo']);
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'ai_director', characterName: 'Frodo', description: 'roster author forging an AI row' });
+
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual({ error: AI_FORGERY_REFUSAL });
+        expect(logModule.logCache.get('test-campaign') || []).toHaveLength(0);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('the shape gate still runs first (textless visitor ai_* body 400s, not 403)', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'ai_director', characterName: 'GM' });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({
+            error: 'Log entry requires non-empty human-readable text (a "message" or "description" field)',
+        });
+    });
+
+    it('all twelve ai_* types stay in ALLOWED_LOG_TYPES (GET-renderable + GM-postable, no blanket server-only)', () => {
+        for (const type of AI_GM_ONLY_LOG_TYPES) {
+            expect(logModule.ALLOWED_LOG_TYPES.has(type)).toBe(true);
+        }
+    });
+
+    it('non-ai automated lanes stay visitor-writable (roll contrast row lands 200)', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+
+        const res = await request(app).post('/api/campaigns/test-campaign/log')
+            .set('Host', VISITOR_HOST)
+            .send({ type: 'roll', characterName: 'Goblin', message: 'Goblin attacks: 15 +4 vs AC 15 — HIT' });
+
+        expect(res.status).toBe(200);
+    });
+});
