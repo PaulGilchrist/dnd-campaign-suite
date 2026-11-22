@@ -180,6 +180,22 @@ function renameLockFlags(campaignLocked, lockNames, campaignName) {
     };
 }
 
+// Delete-lane lock disclosure (owner ruling 2026-11-22): the Delete Campaign
+// button is deliberately NOT gated by the lock — campaignLock phase 1 allows
+// DELETE of the lock's own member and no delete-specific guard exists, so the
+// typed-name confirm is the intentional escape hatch. This mirrors the rename
+// note's admin-lock-note style to disclose the asymmetry instead of letting it
+// read as an oversight. Extracted outside the component to keep CampaignAdmin
+// under the complexity cap (same rationale as renameLockFlags).
+function DeleteLockNote({ campaignLocked }) {
+    if (!campaignLocked) return null;
+    return (
+        <p className="admin-lock-note">
+            Deletable while locked — typing the campaign&apos;s full name is the intentional escape hatch
+        </p>
+    );
+}
+
 function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit, error, isBusy }) {
     const trimmed = newName.trim();
     const isUnchanged = trimmed !== '' && trimmed.toLowerCase() === campaignName.toLowerCase();
@@ -946,6 +962,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                         <button className="ct-btn ct-btn-danger" onClick={openDeleteModal}>
                             <i className="fas fa-exclamation-triangle"></i> Delete Campaign
                         </button>
+                        <DeleteLockNote campaignLocked={campaignLocked} />
                     </div>
                 </div>
             </div>
