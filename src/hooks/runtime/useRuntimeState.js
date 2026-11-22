@@ -325,6 +325,37 @@ export function clearRuntimeState(characterKey) {
 }
 
 /**
+ * Campaign-entry character-scope rescope (bug-character-store-ghost-keys-
+ * survive-campaign-switch, sibling of the 'campaign'-store fix d25431cab).
+ * `stores` keys character buckets by BARE characterKey, so a no-reload campaign
+ * switch left campaign A's per-character buckets readable under campaign B's
+ * same-named creatures: a fresh qa-arena `NPC 1` (no `NPC 1` key on B's server)
+ * opened its allies editor PRE-CHECKING A's allies and raised a friendly-fire
+ * confirm with no basis in B (getAllyList/hasExplicitAllyList in
+ * useAllySelection.js read the ghost bytes), and the next whole-mirror
+ * setRuntimeValue POST would have written A's roster into B's change-data.
+ * The App.jsx enter seam calls this on a real campaign CHANGE: every bucket
+ * present at that moment belongs to the PREVIOUS scope (the new campaign's
+ * SSE connection only opens with the new campaignName, and its connect
+ * snapshot replay arrives asynchronously). The shared 'campaign' bucket is
+ * excluded — hydrateCampaignRuntimeData re-scopes that one from the entered
+ * campaign's snapshot. Memory-only: never POSTs (skipSync law — the server
+ * owns this data); the new campaign's own buckets rehydrate through the lanes
+ * a reload already proves (SSE connect replay + the character seed effect).
+ * Same-campaign re-select must NOT call this: the char seed effect is gated
+ * on the campaign changing (seededCampaignRef), so locally-derived seeds
+ * (feature keys, tracked resources) would not reseed after a re-select wipe.
+ * notify wakes any consumer still mounted so its declared default wins.
+ */
+export function evictCharacterStores() {
+    for (const key of Array.from(stores.keys())) {
+        if (key === 'campaign') continue;
+        stores.delete(key);
+        notify(key);
+    }
+}
+
+/**
  * Check if a property exists in the runtime store (as opposed to returning null).
  * This is needed because getRuntimeValue returns null for both "key doesn't exist"
  * and "key exists with null value". Use this to distinguish the two cases.

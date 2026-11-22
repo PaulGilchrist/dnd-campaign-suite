@@ -30,7 +30,7 @@ import Subscriber from './components/common/Subscriber.jsx';
 import CombatCues from './components/common/CombatCues.jsx';
 import CampaignReloadNotice from './components/common/CampaignReloadNotice/CampaignReloadNotice.jsx';
 import MapContextSync from './components/common/MapContextSync.jsx';
-import { replaceRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
+import { replaceRuntimeObject, seedTrackedResources, getStore, notify, evictCharacterStores } from './hooks/runtime/useRuntimeState.js';
 import { applyServerOverride, trackedResourcesToStoreEntries } from './services/rules/trackedResources.js';
 import { usePostRestoreNotice } from './hooks/ui/usePostRestoreNotice.js';
 import { useBattleMasterSelectionVersion, battleMasterSelectionSerial } from './hooks/combat/battleMaster.js';
@@ -340,6 +340,48 @@ function hydrateCampaignRuntimeData(serverData) {
   replaceRuntimeObject('campaign', adopted);
 }
 
+// Enter-seam store rescope (module scope: App sits at the eslint statement
+// ceiling, EmptyCampaignStage/isActiveEconomyRowGmDriven precedent). ONE
+// fetch of the entered campaign's change-data drives BOTH scope lanes:
+// adopt-and-evict the shared 'campaign' bucket (every entry, including
+// re-selects) AND evict the character-keyed buckets on a real campaign
+// change. Law details in the effect body below.
+function useCampaignScopeRescope(campaignName, showCampaignSelection) {
+  // Tracks the campaign whose scope the character-keyed stores currently
+  // hold (enter-seam evict gate).
+  const charScopedCampaignRef = useRef('');
+  useEffect(() => {
+    if (!campaignName || showCampaignSelection) return;
+    // Character-scope rescope (bug-character-store-ghost-keys-survive-
+    // campaign-switch): the character-keyed buckets in useRuntimeState's
+    // `stores` Map are keyed by BARE character name, so the campaign-store
+    // adopt-and-evict below leaves a no-reload switch leaking campaign A's
+    // per-character runtime keys into a SAME-NAMED creature under campaign B
+    // (fresh qa-arena NPC 1 pre-trusting A's allies, spurious friendly-fire
+    // confirm, allegiance-override lanes reading ghost bytes). Fires ONLY
+    // when the campaign name actually CHANGES — never on same-campaign
+    // re-select: the character seed effect in App reseeds locally-derived
+    // keys only on a campaign change (seededCampaignRef gate), so a
+    // re-select wipe would strand them until a reload. Synchronous, before
+    // the snapshot fetch: every bucket still present at this moment belongs
+    // to the previous scope (the new campaign's SSE EventSource only opens
+    // on this render and its connect replay is asynchronous). Memory-only —
+    // the entered campaign's own buckets arrive via that replay + the seed
+    // effect (the exact lanes a reload hydrates through, which is why the
+    // reload-cure face was honest).
+    if (charScopedCampaignRef.current !== campaignName) {
+      charScopedCampaignRef.current = campaignName;
+      evictCharacterStores();
+    }
+    let cancelled = false;
+    (async () => {
+      const serverData = await fetchCampaignChangeData(campaignName);
+      if (!cancelled) hydrateCampaignRuntimeData(serverData);
+    })();
+    return () => { cancelled = true; };
+  }, [campaignName, showCampaignSelection]);
+}
+
 function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, activeCharacter, onBackFromMap, backMapTarget, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
@@ -595,29 +637,16 @@ function App() {
 
    // Seed runtime store with computed tracked resources, then apply server overrides
     const seededCampaignRef = useRef('');
-    // Campaign-store rescope on every entry (bug-campaign-store-ghost-keys-
-    // survive-campaign-switch): the shared 'campaign' bucket is ONE global Map
-    // keyed by characterKey only, so switching campaigns without a page reload
-    // under the old seed-if-absent hydration left campaign A's keys (e.g. an
-    // aiConfig with a LIVE referee console) readable under campaign B, whose
-    // server honestly answered {value:null}. This effect ADOPTS-AND-EVICTS the
-    // entered campaign's change-data snapshot (null-parked entries stay
-    // unadopted). Its gate is the ENTER seam (campaign armed + picker left),
-    // NOT the character-seed effect below: a zero-character campaign (a fresh
-    // throwaway - the campaign where the ghost face was witnessed) never
-    // reaches that character gate, and re-selecting the SAME campaign from the
-    // picker re-runs it, so an Admin clear + re-select re-reads server truth
-    // in ONE pass instead of resurrecting cleared keys (the select-rehydrated
-    // two-pass law retires with this).
-    useEffect(() => {
-      if (!campaignName || showCampaignSelection) return;
-      let cancelled = false;
-      (async () => {
-        const serverData = await fetchCampaignChangeData(campaignName);
-        if (!cancelled) hydrateCampaignRuntimeData(serverData);
-      })();
-      return () => { cancelled = true; };
-    }, [campaignName, showCampaignSelection]);
+    // Campaign-store rescope on every entry + character-store eviction on a
+    // campaign CHANGE (bug-campaign-store-ghost-keys-survive-campaign-switch
+    // and its character-scope follow-up). The full law lives with the
+    // module-scope hook (App's statement ceiling — EmptyCampaignStage
+    // precedent): its gate is the ENTER seam (campaign armed + picker left),
+    // NOT the character-seed effect below, so a zero-character throwaway
+    // re-scopes too, and re-selecting the SAME campaign re-reads server truth
+    // for the 'campaign' bucket in ONE pass (the two-pass law retired with
+    // d25431cab) without wiping live character state.
+    useCampaignScopeRescope(campaignName, showCampaignSelection);
     // Level-up celebration arming (roadmap Item 8): stays FALSE until the
     // change-data seed above has landed, so the seed itself (character JSON
     // `xp` → runtime `xp` jump on cold boot) can never read as an XP award.
