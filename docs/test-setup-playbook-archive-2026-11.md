@@ -2596,3 +2596,35 @@ Charter pass (target ~550 lines): the per-run sagas below were lifted out of the
 
 ### Avatar era detail (folded out of §2)
 - The visitor-avatar trapped-stacking-context bug (`bug-visitor-avatar-zoom-trapped-in-card-stacking-context`) pre-fix face: card-anchored overlay whose `.avatar-modal-close` was covered by a sibling card, Escape-only exit — fixed by the `createPortal` + `useModalDismiss` lane now in §2.
+
+## Condense pass 2026-11-22 (from playbook)
+
+Structural note for this pass: the playbook's ~120-line overage was retired by JOINING
+same-lane bullets into compound bullets (§2, §4–§7, §11, §12) — text preserved verbatim in
+place, so there is no moved prose for those joins; only the four narrative chunks below were
+actually removed from the playbook. Per-run initials (MA/NB/OG/OOO etc.) were also folded down
+to single date attributions inside retained bullets.
+
+### §2
+- New-combat latch-eviction law — MA/NB re-verify chronicles removed from the retained law:
+  "live 4/4 post-Clear GETs all-null, new-combat round-1 HIT re-arms both Charge chooser AND
+  Shield Bash prompt. INDEPENDENT RE-VERIFY (live NB 2026-11-18): exact MA setup re-ridden —
+  trio all-null stable at 0/4/8 s, audit row count==landed nulls, both riders re-arm in the
+  new generation, same-round 2nd HIT stays suppressed, AND the comparison gate survived the
+  single-write change (scoped `PATCH combatSummary.round` 1→2 re-arms BOTH
+  `_Charge_Attack_skippedRound{1}` and `_Shield_Bash_usedRound{1}` riders)."
+- Rider latch + reload laws — interleave-saga duplicate removed from face (a) (the canonical
+  telling stays in the new-combat latch-eviction law): "the old per-key nulls were separate
+  whole-bucket POSTs that could interleave and RESURRECT the freshest stamp while the row
+  counted intent — collapsed to ONE `setRuntimeBatch` per creature"; and face (b)'s
+  attribution trimmed from "both legs RE-LIVED live MA 2026-11-18" to "live re-verified MA
+  2026-11-18".
+- Kill hygiene + exit cleanup — duplicate pkill/vitest re-chronicle removed (the law itself
+  survives once at the bullet's head): "SHARPENED (2026-11-08 e2e-improve exit): the `vite`
+  substring also matches a RUNNING `vitest` — an orchestrator `pkill -f vite` mid-suite
+  SIGKILLs it (vitest exits 137 with no summary lines); never run the kill-trio while a
+  full-suite run is in flight, or re-run the suite after killing."
+- AI-audit renderer witness lane — OOO census wording compressed (chrome law + `e504cc2cd`
+  retained in place): "OOO 2026-11-22 LIVE-PROVED the unified chrome (`e504cc2cd`): a 15-row
+  census across director/ruling/draft/refine/dress/designer/world(+applied) renders EVERY
+  `ai_*` type through `.log-ai-audit` … zero generic leftovers".
