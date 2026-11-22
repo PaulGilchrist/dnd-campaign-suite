@@ -13,7 +13,8 @@ import Map from './components/map/Map.jsx';
 import MapUnavailable from './components/map/MapUnavailable.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
-import { beginCampaignChangeDataEntry, readCampaignChangeData } from './services/campaign/changeDataSnapshot.js';
+import { beginCampaignChangeDataEntry, readCampaignChangeData, abandonCampaignChangeDataEntry } from './services/campaign/changeDataSnapshot.js';
+import CampaignEnterFailed from './components/campaign-enter-failed/CampaignEnterFailed.jsx';
 import storage from './services/ui/storage.js';
 import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
 import { isWizardOffered, markWizardOffered } from './services/ui/wizardOfferedStore.js';
@@ -285,6 +286,137 @@ async function fetchCampaignChangeData(campaignName) {
   return null;
 }
 
+// Campaign-enter gate escape (backlog TT 2026-11-22): the enter-seam
+// change-data GET gates ALL campaign rendering, so a stalled socket used to
+// pin the tab on the `Loading campaign...` face forever (prod analogue: a
+// captive proxy / half-open keep-alive). Past this bounded wait — or on a
+// fast GET failure (500 / network error) — the gate flips to the
+// CampaignEnterFailed face with a Retry affordance instead.
+export const CAMPAIGN_ENTER_TIMEOUT_MS = 10000;
+
+/**
+ * Bounded enter-seam combatSummary preload. The load JOINS the ONE entry GET
+ * (single-GET law, caa1d0b0c) via the STRICT lane, so a genuine GET failure
+ * rejects fast; the timer is a benign-UI escape only (no-timers policy
+ * allowlist: 'network fetch timeout' — no game state advances on this clock,
+ * it decides which face the enter gate shows). On timeout the seam is
+ * ABANDONED first, releasing the hung socket + slot so the Retry seam issues
+ * a FRESH GET instead of re-joining the dead one. A late original response
+ * cannot clobber a retry result: its attempt token is stale (checked by
+ * useCampaignEnterGate) and the abandoned read already rejected its joiners.
+ */
+function loadCampaignEnterData(campaignName) {
+  const load = loadCombatSummary(campaignName, { strict: true });
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      // fetch timeout (benign UI): release the stalled enter seam, decide nothing else.
+      abandonCampaignChangeDataEntry(campaignName);
+      const err = new Error(`change-data enter timed out (${CAMPAIGN_ENTER_TIMEOUT_MS} ms) for ${campaignName}`);
+      err.enterLoadTimedOut = true;
+      reject(err);
+    }, CAMPAIGN_ENTER_TIMEOUT_MS);
+    load.then(
+      (cs) => { clearTimeout(timer); resolve(cs); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
+/**
+ * Campaign-enter gate (module scope: App sits at the eslint statement
+ * ceiling — useCampaignScopeRescope/EmptyCampaignStage precedent). Backlog
+ * TT 2026-11-22: the enter-seam change-data GET gates ALL campaign
+ * rendering, so a stalled socket used to pin the tab on `Loading campaign...`
+ * forever (prod analogue: captive proxy / half-open keep-alive). Every seam
+ * attempt carries an attempt token; a superseded (or timed-out-then-aborted)
+ * attempt can never apply its bytes. Stalls past CAMPAIGN_ENTER_TIMEOUT_MS
+ * and fast GET failures (500 / network error, surfaced through the STRICT
+ * enter load) land on ONE unified failure face with a Retry affordance that
+ * re-runs the seam for the SAME campaign in the SAME tab — the successful
+ * fast path renders byte-identically to before (the face state is only ever
+ * set on a settled-failed attempt).
+ */
+function useCampaignEnterGate({ charMgmtRef, wizardRef, campaignRef, consumeRestore, setActiveView, setCombatSummaryLoaded }) {
+  const [enterError, setEnterError] = useState(null);
+  const attemptRef = useRef(0);
+  const lastEnterRef = useRef(null);
+
+  const runEnter = useCallback(async (name, loaded) => {
+    const attempt = ++attemptRef.current;
+    lastEnterRef.current = { name, loaded };
+    setEnterError(null);
+    charMgmtRef.current.setCharacters(loaded);
+    // Open the enter-seam snapshot BEFORE the combat preload: this fetch is
+    // the ONE change-data GET the whole mount seam hydrates from (rescope
+    // hydrate + character seed adopt it; the preload below joins its live
+    // slot — backlog 2026-11-22 SV chatty-enter fix).
+    beginCampaignChangeDataEntry(name);
+    let cs = null;
+    try {
+      cs = await loadCampaignEnterData(name);
+    } catch (err) {
+      // Stale attempt (Retry/re-select superseded us) or abandoned stall:
+      // never apply, never clobber. The fast-fail lane (getCombatContext)
+      // owns the console warn; only the pure stall (no bytes ever arrived)
+      // logs here.
+      if (attempt !== attemptRef.current) return;
+      if (err.enterLoadTimedOut) console.error(`Campaign enter stalled: ${err.message}`);
+      setEnterError(err);
+      return;
+    }
+    if (attempt !== attemptRef.current) return;
+    if (cs) {
+      setCombatSummaryCache(cs, name);
+    } else if (loaded.length > 0) {
+      // No combat data on server yet — initialize from player characters
+      const creatures = loaded.map(c => ({
+        name: c.name,
+        type: 'player',
+        currentHp: c.computedStats?.hp?.current || c.hp?.current || 1,
+        maxHp: c.computedStats?.hp?.max || c.hp?.max || 1,
+      }));
+      const initial = { round: 1, creatures };
+      setCombatSummaryCache(initial, name);
+      storage.set('combatSummary', initial, name);
+    }
+    setCombatSummaryLoaded(true);
+    if (loaded.length > 0) {
+      charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
+      setActiveView('charSheet');
+    } else if (campaignRef.current.isLocalhost && !isWizardOffered(name)) {
+      // Offer the creation wizard ONCE per campaign per client (localStorage
+      // display pref, backlog KA 2026-11-18): re-selecting a zero-character
+      // campaign after cancelling must not re-arm the modal that swallows
+      // every next click. The shell stays navigable — the sidebar "Add
+      // Character" button and starter checklist still open the wizard.
+      // GM-origin gate (LAN-visitor bug 2026-11-20): character creation is
+      // localhost-only (Sidebar CharacterList door, EmptyCampaignState add
+      // button, server POST refuseUnlessGm), so a visitor never gets the
+      // dead-end auto-open. isLocalhost first ⇒ no offer made means no key
+      // burned, so a later GM session on this browser still gets its offer.
+      markWizardOffered(name);
+      wizardRef.current.handleAddCharacter();
+    }
+    // Post-rollback auto-selection: land the GM back on the Admin view
+    // instead of the character sheet after the full page reload.
+    if (consumeRestore(name)) {
+      setActiveView('campaignRepair');
+    }
+  }, [charMgmtRef, wizardRef, campaignRef, consumeRestore, setActiveView, setCombatSummaryLoaded]);
+
+  const retryEnter = useCallback(() => {
+    const last = lastEnterRef.current;
+    if (last) runEnter(last.name, last.loaded);
+  }, [runEnter]);
+
+  useEffect(() => {
+    campaignRef.current.setCampaignSelectCallback(runEnter);
+    campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
+  }, [runEnter, campaignRef, charMgmtRef]);
+
+  return { enterError, retryEnter };
+}
+
 function seedCharServerKeys(storeName, charServerData) {
   if (!charServerData || typeof charServerData !== 'object') return;
   const store = getStore(storeName);
@@ -547,56 +679,14 @@ function App() {
     wizardRef.current.setCharacterCallbacks({ setCharacters: charMgmtRef.current.setCharacters, setActiveCharacter: charMgmtRef.current.setActiveCharacter });
   }, []);
 
-  useEffect(() => {
-    campaignRef.current.setCampaignSelectCallback(async (name, loaded) => {
-      charMgmtRef.current.setCharacters(loaded);
-      // Open the enter-seam snapshot BEFORE the combat preload: this fetch is
-      // the ONE change-data GET the whole mount seam hydrates from (rescope
-      // hydrate + character seed adopt it; the preload below joins its live
-      // slot — backlog 2026-11-22 SV chatty-enter fix).
-      beginCampaignChangeDataEntry(name);
-      // Pre-load combatSummary for the selected campaign so attack rider maneuvers work immediately
-      const cs = await loadCombatSummary(name);
-      if (cs) {
-        setCombatSummaryCache(cs, name);
-      } else if (loaded.length > 0) {
-        // No combat data on server yet — initialize from player characters
-        const creatures = loaded.map(c => ({
-          name: c.name,
-          type: 'player',
-          currentHp: c.computedStats?.hp?.current || c.hp?.current || 1,
-          maxHp: c.computedStats?.hp?.max || c.hp?.max || 1,
-        }));
-        const initial = { round: 1, creatures };
-        setCombatSummaryCache(initial, name);
-        storage.set('combatSummary', initial, name);
-      }
-      setCombatSummaryLoaded(true);
-      if (loaded.length > 0) {
-        charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
-        setActiveView('charSheet');
-      } else if (campaignRef.current.isLocalhost && !isWizardOffered(name)) {
-        // Offer the creation wizard ONCE per campaign per client (localStorage
-        // display pref, backlog KA 2026-11-18): re-selecting a zero-character
-        // campaign after cancelling must not re-arm the modal that swallows
-        // every next click. The shell stays navigable — the sidebar "Add
-        // Character" button and starter checklist still open the wizard.
-        // GM-origin gate (LAN-visitor bug 2026-11-20): character creation is
-        // localhost-only (Sidebar CharacterList door, EmptyCampaignState add
-        // button, server POST refuseUnlessGm), so a visitor never gets the
-        // dead-end auto-open. isLocalhost first ⇒ no offer made means no key
-        // burned, so a later GM session on this browser still gets its offer.
-        markWizardOffered(name);
-        wizardRef.current.handleAddCharacter();
-      }
-      // Post-rollback auto-selection: land the GM back on the Admin view
-      // instead of the character sheet after the full page reload.
-      if (consumeRestore(name)) {
-        setActiveView('campaignRepair');
-      }
-    });
-    campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
-  }, [consumeRestore]);
+  const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
+
+  // Enter-seam gate: the shared change-data GET gates ALL rendering; bounded
+  // stall + unified failure/Retry face live in the module-scope hook (which
+  // also registers the select/delete callbacks it owns the seam for).
+  const { enterError, retryEnter } = useCampaignEnterGate({
+    charMgmtRef, wizardRef, campaignRef, consumeRestore, setActiveView, setCombatSummaryLoaded,
+  });
 
   const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
   const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, deleteErrorName, dismissDeleteError, inputRef } = charMgmt;
@@ -715,8 +805,6 @@ function App() {
       loadActiveMapAndOpen();
     }
   };
-
-  const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
 
   // Reset the loaded flag when switching campaigns so stale characters from the
   // previous campaign can't render (or bleed into the new campaign's initiative
@@ -1003,7 +1091,12 @@ function App() {
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} autoSelectCampaign={autoSelectCampaign} isLocalhost={isLocalhost} />;
   if (appData.isLoading) return <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading rules data...</div></div>;
-  if (!combatSummaryLoaded) return <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading campaign...</div></div>;
+  // Enter gate (backlog TT 2026-11-22): a stalled/fast-failed enter-seam GET
+  // no longer parks on the busy face — the bounded wait in useCampaignEnterGate
+  // flips it to the honest failure face with a Retry affordance.
+  if (!combatSummaryLoaded) return enterError
+    ? <CampaignEnterFailed campaignName={campaignName} onRetry={retryEnter} />
+    : <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading campaign...</div></div>;
 
   return (
     <div className="app">

@@ -1,0 +1,25 @@
+/* Campaign-enter failure face (backlog TT 2026-11-22), scoped to
+   .campaign-enter-failed. The full-viewport backdrop + centering re-use the
+   App.css `.loading-overlay` family tokens (same fixed tier, z-index 1100
+   above the 1000 modals, under the 1400 TV escape hatch) so the failure card
+   replaces the blocked-loading surface in place — but WITHOUT the spinner or
+   the progress cursor: the wait is over, the face is an alert. Card chrome
+   comes from the global .ct-container/.ct-empty-state tiers. */
+
+.campaign-enter-failed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--background-color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.campaign-enter-failed .campaign-enter-failed-retry-btn {
+  font-style: normal;
+  margin-top: 8px;
+}

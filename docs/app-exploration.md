@@ -55,8 +55,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT after the closed-tab SINGLE-pass
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[TT 2026-11-22]** The enter-seam change-data GET gates ALL campaign rendering with no escape affordance: a stalled socket pins the tab on `Loading campaign...` indefinitely (TT forced this with a hung route; the prod analogue is a captive proxy / half-open keep-alive). A bounded wait + `Retry` face (or surfacing the GET failure the way the 500-face already does) would break the deadlock — `src/App.jsx` enter lane / `src/services/campaign/changeDataSnapshot.js`; benign-UI timer category per the no-timers policy if a timeout is used.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

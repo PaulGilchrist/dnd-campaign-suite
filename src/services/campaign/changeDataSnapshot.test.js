@@ -21,6 +21,7 @@ import {
   fetchCampaignChangeData,
   beginCampaignChangeDataEntry,
   readCampaignChangeData,
+  abandonCampaignChangeDataEntry,
 } from './changeDataSnapshot.js';
 
 // damageUtils (pulled in by combatData) transitively loads these — stub them
@@ -160,5 +161,72 @@ describe('strict EB-join lane survives dedupe', () => {
     expect(lenient.status).toBe('fulfilled');
     expect(lenient.value).toBeNull(); // lenient bytes unchanged
     expect(errorSpy).toHaveBeenCalled(); // failure stays loudly logged
+  });
+});
+
+describe('enter-seam stall escape (backlog TT 2026-11-22)', () => {
+  /** Fetch that hangs until its abort signal fires (a captive proxy). */
+  function stubHangingFetch() {
+    const fetchMock = vi.fn((url, opts = {}) => new Promise((resolve, reject) => {
+      const settled = { resolve, reject };
+      fetchMock.settles.push({ url, opts, settled });
+      opts.signal?.addEventListener('abort', () => reject(opts.signal.reason));
+    }));
+    fetchMock.settles = [];
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('the enter read carries an abort signal; plain reads keep the un-signalled call', async () => {
+    const seamFetch = stubHangingFetch();
+    const entry = beginCampaignChangeDataEntry('signal-campaign');
+    expect(seamFetch).toHaveBeenCalledWith(
+      '/api/campaigns/signal-campaign/change-data',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    fetchCampaignChangeData('plain-campaign');
+    expect(seamFetch).toHaveBeenLastCalledWith('/api/campaigns/plain-campaign/change-data');
+    // Release the harness' hung sockets.
+    abandonCampaignChangeDataEntry('signal-campaign');
+    seamFetch.settles[1].settled.resolve(okResponse(snapshot(1)));
+    await expect(entry).rejects.toThrow();
+  });
+
+  it('abandoning a stalled enter read rejects every joiner and frees the slot for a FRESH GET', async () => {
+    const hungFetch = stubHangingFetch();
+    const entry = beginCampaignChangeDataEntry('stalled-campaign');
+    const joiner = combatData.loadCombatSummary('stalled-campaign', { strict: true });
+    const adopter = readCampaignChangeData('stalled-campaign').catch(() => null);
+
+    const results = Promise.allSettled([entry, joiner]);
+    abandonCampaignChangeDataEntry('stalled-campaign');
+    const settled = await results;
+
+    // Stall escape reaches EVERY waiter on the one shared read…
+    expect(settled.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+    expect(hungFetch).toHaveBeenCalledTimes(1); // …from ONE physical GET, not a fan-out
+    // …and the seam adopter keeps its historical null-on-failure contract.
+    expect(await adopter).toBeNull();
+
+    // Retry law: the slot cleared on the aborted settle, so the NEXT begin
+    // physically re-fetches instead of re-joining the dead socket.
+    const retryFetch = stubOk(snapshot(4));
+    await expect(beginCampaignChangeDataEntry('stalled-campaign')).resolves.toEqual(snapshot(4));
+    expect(retryFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('abandon is a no-op after the read settled — a live plain read stays un-aborted', async () => {
+    const fetchMock = stubOk(snapshot(2));
+    await beginCampaignChangeDataEntry('settled-campaign');
+    expect(() => abandonCampaignChangeDataEntry('settled-campaign')).not.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // A plain in-flight read has no enter abort: abandon cannot kill it.
+    const liveFetch = stubHangingFetch();
+    const live = fetchCampaignChangeData('plain-live-campaign');
+    expect(() => abandonCampaignChangeDataEntry('plain-live-campaign')).not.toThrow();
+    expect(liveFetch.settles).toHaveLength(1); // still in flight, un-aborted
+    liveFetch.settles[0].settled.resolve(okResponse(snapshot(1)));
+    await expect(live).resolves.toEqual(snapshot(1));
   });
 });

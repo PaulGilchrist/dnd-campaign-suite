@@ -37,6 +37,7 @@ export default [
         fetch: 'readonly',
         Response: 'readonly',
         AbortSignal: 'readonly',
+        AbortController: 'readonly',
         CustomEvent: 'readonly',
         console: 'readonly',
         localStorage: 'readonly',
