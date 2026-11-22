@@ -44,10 +44,20 @@ const httpResponse = ({ ok = true, body = {} } = {}) => ({
   json: () => Promise.resolve(body),
 });
 
+// Backlog 2026-11-22 QQ: the picker now mirrors CampaignAdmin's mount-time
+// GET /api/server-config (pre-commit lock disclosure), so every fetch spy
+// ignores that lane — these tests pin the CREATE lanes only.
+function isConfigFetch(url) {
+  return String(url).includes('/api/server-config');
+}
+
 function stubFetch(...responses) {
   const fetchMock = vi.fn();
   responses.forEach((response) => fetchMock.mockResolvedValue(response));
-  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('fetch', (url, ...rest) =>
+    (isConfigFetch(url)
+      ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ campaignLocked: false }) })
+      : fetchMock(url, ...rest)));
   return fetchMock;
 }
 

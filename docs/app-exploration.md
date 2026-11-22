@@ -55,8 +55,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (QQ) Quick-create default names fight CAMPAIGN_LOCK allowlists:** `New Arena Battle`/`New Starter Adventure` prefill `Arena-YYYYMMDD`/`Starter-YYYYMMDD` which honest-403 under a SET lock unless an operator retypes the allowlisted throwaway name; consider surfacing the allowed names in the modal when `campaignLocked` (the Admin rename note already enumerates `lockNames` — same data is client-readable from `/api/server-config`). (`src/components/campaign-selection/CampaignSelection.jsx`)
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

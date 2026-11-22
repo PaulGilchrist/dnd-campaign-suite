@@ -171,6 +171,18 @@
   text-align: left;
 }
 
+/* Pre-commit lock disclosure in the quick-create modals (backlog 2026-11-22
+   QQ): same visual language as the Admin lock notes (CampaignAdmin.css), but
+   that rule is scoped to `.campaign-admin`, so the shared .admin-lock-note
+   class gets a scoped mirror here for the .modal-content tier. */
+.campaign-selection .modal-content .admin-lock-note {
+  margin: 0.4rem 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.83em;
+  font-style: italic;
+  text-align: left;
+}
+
 .campaign-selection .modal-buttons {
   display: flex;
   gap: 1rem;

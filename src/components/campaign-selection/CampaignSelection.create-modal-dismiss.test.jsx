@@ -45,10 +45,11 @@ const overlay = () => document.querySelector('.modal-overlay');
 const nameInput = () => screen.getByPlaceholderText('Enter campaign name');
 
 // Every dismiss face must be fully inert server-side: no seeded orchestrator,
-// no raw POST /api/campaigns, and no native confirm prompt.
-function expectZeroCreateTraffic(confirmSpy) {
+// no raw POST /api/campaigns, and no native confirm prompt. The spy passed in
+// records only non-config fetches (see stubConfigAwareFetch).
+function expectZeroCreateTraffic(confirmSpy, fetchSpy) {
   expect(createSeededCampaign).not.toHaveBeenCalled();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetchSpy).not.toHaveBeenCalled();
   expect(confirmSpy).not.toHaveBeenCalled();
 }
 
@@ -61,11 +62,27 @@ async function renderSelection() {
   return view;
 }
 
+// Backlog 2026-11-22 QQ: the picker mirrors CampaignAdmin's mount-time
+// GET /api/server-config (pre-commit lock disclosure). The zero-create-traffic
+// law is about the CONFIGURED (unlocked) config lane plus POST /api/campaigns,
+// so the stub answers /api/server-config inline-unlocked — the spy below then
+// honestly records only create traffic.
+function stubConfigAwareFetch() {
+  const spy = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ campaignLocked: false }) });
+  vi.stubGlobal('fetch', (url, ...rest) =>
+    (String(url).includes('/api/server-config')
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ campaignLocked: false }) })
+      : spy(url, ...rest)));
+  return spy;
+}
+
 // Every dismiss face must close with zero create traffic and re-enable
 // every quick-create button.
+let fetchSpy;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('fetch', vi.fn());
+  fetchSpy = stubConfigAwareFetch();
 });
 
 afterEach(() => {
@@ -91,7 +108,7 @@ describe('Escape dismisses every Create-family modal with zero create traffic', 
     fireEvent.keyDown(nameInput(), { key: 'Escape' });
 
     expect(overlays()).toHaveLength(0);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
     expect(newCampaignBtn()).toBeEnabled();
     expect(arenaBtn()).toBeEnabled();
     expect(starterBtn()).toBeEnabled();
@@ -130,7 +147,7 @@ describe('a pure backdrop click dismisses like Escape', () => {
     fireEvent.click(overlay());
 
     expect(overlays()).toHaveLength(0);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
     expect(starterBtn()).toBeEnabled();
   });
 
@@ -142,7 +159,7 @@ describe('a pure backdrop click dismisses like Escape', () => {
     fireEvent.click(overlay());
 
     expect(overlays()).toHaveLength(0);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
   });
 });
 
@@ -160,13 +177,13 @@ describe('the drag guard and panel clicks never dismiss', () => {
     fireEvent.mouseDown(panel.querySelector('h2'));
     fireEvent.click(overlay());
     expect(overlays()).toHaveLength(1);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
 
     // The guard resets: the next pure backdrop click still dismisses.
     fireEvent.mouseDown(overlay());
     fireEvent.click(overlay());
     expect(overlays()).toHaveLength(0);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
   });
 
   it('clicks bubbling from inside the panel keep the modal mounted', async () => {
@@ -177,7 +194,7 @@ describe('the drag guard and panel clicks never dismiss', () => {
     fireEvent.click(panel.querySelector('h2'));
     fireEvent.click(panel);
     expect(overlays()).toHaveLength(1);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
   });
 });
 
@@ -213,7 +230,7 @@ describe('dismiss stays inert mid-create; Cancel and Create are unaffected', () 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(overlays()).toHaveLength(0);
-    expectZeroCreateTraffic(confirmSpy);
+    expectZeroCreateTraffic(confirmSpy, fetchSpy);
   });
 
   it('the standard New Campaign Create path still POSTs the typed name', async () => {

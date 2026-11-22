@@ -1,4 +1,5 @@
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
+import { seededDefaultName } from '../../services/campaign/seededCampaign.js';
 
 /**
  * Name-entry modal for the seeded quick-create campaigns (Arena/Starter).
@@ -31,7 +32,35 @@ export function ModalError({ message }) {
   return <div className="modal-error" role="alert">{message}</div>;
 }
 
-function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, onCancel, error }) {
+/**
+ * Pre-commit lock disclosure (backlog 2026-11-22 QQ): under CAMPAIGN_LOCK the
+ * create guard (server/utils/campaignLock.js createCampaignCreateGuard) allows
+ * ONLY the lock's own member names, so a create whose name is not an allowlist
+ * member (the seeded prefills' dated default `Arena-YYYYMMDD` /
+ * `Starter-YYYYMMDD`, and the standard modal's empty/typed name) honest-403s.
+ * This note names the allowed campaigns inside the modal BEFORE the operator
+ * commits, so the denial is no longer blind. Disclosure only — the prefills
+ * are unchanged and nothing renders when no lock is active (fail-open fetch).
+ * The seeded copy names the preset's own dated default via `prefix` so it can
+ * never claim a stale pattern; an empty allowlist (malformed config) renders
+ * nothing honest. Same admin-lock-note class as the Admin rename/delete notes
+ * (styled by a `.campaign-selection` .modal-content mirror rule in
+ * CampaignSelection.css, since Admin's rule is scoped to `.campaign-admin`).
+ */
+export function SeedLockNote({ campaignLocked, lockNames, prefix }) {
+  if (!campaignLocked || lockNames.length === 0) return null;
+  const defaultClause = prefix
+    ? `the prefilled default (${seededDefaultName(prefix)}) `
+    : 'a name outside the allowlist ';
+  return (
+    <p className="admin-lock-note">
+      Campaign is locked — {defaultClause}will be refused. Only these campaign
+      names are allowed: {lockNames.join(', ')}.
+    </p>
+  );
+}
+
+function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, onCancel, error, lockHint }) {
   const titleId = `seeded-campaign-title-${preset.prefix.toLowerCase()}`;
   const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
     useModalDismiss(onCancel, { disabled: seeding });
@@ -56,6 +85,7 @@ function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, on
           autoFocus
         />
         <ModalError message={error} />
+        <SeedLockNote campaignLocked={lockHint.campaignLocked} lockNames={lockHint.lockNames} prefix={preset.prefix} />
         <div className="modal-buttons">
           <button className="modal-btn-primary" onClick={onCreate} disabled={seeding}>
             {seeding ? 'Creating…' : 'Create'}

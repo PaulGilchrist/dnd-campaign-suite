@@ -36,7 +36,13 @@ const httpResponse = ({ ok = true, body = {} } = {}) => ({
 function stubFetch(...responses) {
   const fetchMock = vi.fn();
   responses.forEach((response) => fetchMock.mockResolvedValue(response));
-  vi.stubGlobal('fetch', fetchMock);
+  // Backlog 2026-11-22 QQ: the picker mirrors CampaignAdmin's mount-time
+  // GET /api/server-config; these pins are about the create POST only, so the
+  // config lane answers inert-unlocked and never reaches the ordered spy.
+  vi.stubGlobal('fetch', (url, ...rest) =>
+    (String(url).includes('/api/server-config')
+      ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ campaignLocked: false }) })
+      : fetchMock(url, ...rest)));
   return fetchMock;
 }
 
@@ -50,7 +56,11 @@ function stubPendingFetch() {
         resolveFetch = resolve;
       })
   );
-  vi.stubGlobal('fetch', fetchMock);
+  // See stubFetch — the config lane never occupies the pending slot.
+  vi.stubGlobal('fetch', (url, ...rest) =>
+    (String(url).includes('/api/server-config')
+      ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ campaignLocked: false }) })
+      : fetchMock(url, ...rest)));
   return { fetchMock, resolve: (response) => resolveFetch(response) };
 }
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
-import { createSeededCampaign, localDateStamp } from '../../services/campaign/seededCampaign.js';
+import { createSeededCampaign, seededDefaultName } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
-import SeededCampaignModal, { ModalError } from './SeededCampaignModal.jsx';
+import SeededCampaignModal, { ModalError, SeedLockNote } from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
 // Quick-create presets (arena-starter plan §2.3/§3.4): localhost-only buttons
@@ -26,10 +26,6 @@ const SEEDED_PRESETS = {
     note: 'Creates a short guided adventure: a generated village, wilds hex map with portal, dungeon, quests, and Dungeon Wave 1-3 encounters — every roll is fresh.',
   },
 };
-
-function seededDefaultName(prefix) {
-  return `${prefix}-${localDateStamp()}`;
-}
 
 /**
  * The list region has three mutually exclusive faces (hoisted out of
@@ -115,6 +111,35 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // never routes through `error`, whose full-page screen stays reserved for
   // genuine load/select failures (campaign data that cannot be read at all).
   const [createError, setCreateError] = useState(null);
+
+  // Campaign-lock state from GET /api/server-config (backlog 2026-11-22 QQ):
+  // mirrors the fetch in CampaignAdmin.jsx — same endpoint, same
+  // campaignLocked/lockedCampaign parse, same fail-open default (a failed GET
+  // renders no note, never blocks the unlocked flow). Drives the SeedLockNote
+  // disclosure in the quick-create modals: under a lock the dated prefilled
+  // default (Arena-/Starter-YYYYMMDD) is refused by the server's create guard,
+  // so the open modal names the allowed campaign names BEFORE the operator
+  // commits instead of 403-blind.
+  const [campaignLocked, setCampaignLocked] = useState(false);
+  const [lockNames, setLockNames] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/server-config');
+        const data = await res.json();
+        if (!cancelled && res.ok) {
+          setCampaignLocked(data.campaignLocked === true);
+          setLockNames(typeof data.lockedCampaign === 'string'
+            ? data.lockedCampaign.split(',').map((n) => n.trim()).filter(Boolean)
+            : []);
+        }
+      } catch (err) {
+        console.error('Failed to load server config:', err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Post-delete carry-over (backlog CP 2026-11-04): CampaignAdmin's typed-name
   // delete stores a one-shot sessionStorage notice before its full page
@@ -417,6 +442,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
                autoFocus
                />
                <ModalError message={createError} />
+               <SeedLockNote campaignLocked={campaignLocked} lockNames={lockNames} />
                <div className="modal-buttons">
                  <button className="modal-btn-primary" onClick={handleCreateCampaign} disabled={loading}>
                 Create
@@ -438,6 +464,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
              onCreate={handleCreateSeededCampaign}
              onCancel={closeSeedModal}
              error={createError}
+             lockHint={{ campaignLocked, lockNames }}
            />
          )}
        </div>

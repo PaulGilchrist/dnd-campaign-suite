@@ -234,8 +234,18 @@ export function localDateStamp(date = new Date()) {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
 }
 
+/**
+ * The quick-create dated default name (`Arena-YYYYMMDD` / `Starter-YYYYMMDD`).
+ * Shared by the prefill (CampaignSelection.openSeedModal) and the pre-commit
+ * lock note (SeededCampaignModal.SeedLockNote) so the hint can never quote a
+ * different date than the input shows (backlog 2026-11-22 QQ).
+ */
+export function seededDefaultName(prefix) {
+  return `${prefix}-${localDateStamp()}`;
+}
+
 const ARENA_PRESET = {
-  defaultName: () => `Arena-${localDateStamp()}`,
+  defaultName: () => seededDefaultName('Arena'),
   metaType: 'arena',
   async seed(campaignName, seed) {
     const rng = mulberry32(seed);
@@ -278,7 +288,7 @@ const ARENA_PRESET = {
 };
 
 const STARTER_PRESET = {
-  defaultName: () => `Starter-${localDateStamp()}`,
+  defaultName: () => seededDefaultName('Starter'),
   metaType: 'starter',
   async seed(campaignName, seed) {
     const rng = mulberry32(seed);
