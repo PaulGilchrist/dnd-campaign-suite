@@ -16,6 +16,15 @@ import { loadFactions } from '../../services/campaign/factionsService.js'
 import { loadQuests } from '../../services/campaign/questsService.js'
 import './AiWorldConsole.css'
 
+// 2026-11-22 — Lane labels for the partial-failure face. Order is index-bound
+// to the Promise.allSettled array below and to the ledgerNameList keys.
+const LEDGER_LANES = [
+    { key: 'npcs', label: 'NPC roster' },
+    { key: 'settlements', label: 'settlements' },
+    { key: 'factions', label: 'factions' },
+    { key: 'quests', label: 'quests' },
+]
+
 const KINDS = [
     { value: 'recap', label: 'Session recap' },
     { value: 'rumor', label: 'Rumor' },
@@ -49,16 +58,24 @@ export default function AiWorldConsole({ campaignName }) {
         // card: without this reset a second quest card would briefly wear the
         // previous card's verdict while its own fetch is still in flight.
         setLedgerNames(null)
-        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName), loadQuests(campaignName)]).then(([npcs, settlements, factions, quests]) => {
+        // Backlog 2026-11-22 (ledger partial-failure) — the ledger is either
+        // KNOWN or UNREADABLE per lane, never silently-empty: a REJECTED lane's
+        // [] would ground names against a partial ledger (a false all-clear, or
+        // an unknown-name advisory with no hint the roster never loaded). Name
+        // the failed lanes in `unreadable` so the card wears the incomplete
+        // face instead of a verdict.
+        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName), loadQuests(campaignName)]).then((settled) => {
             if (cancelled) return
+            const laneNames = (i) => settled[i].status === 'fulfilled' ? ledgerNameList(settled[i].value, LEDGER_LANES[i].key) : []
             setLedgerNames({
-                npcNames: npcs.status === 'fulfilled' ? ledgerNameList(npcs.value, 'npcs') : [],
-                settlementNames: settlements.status === 'fulfilled' ? ledgerNameList(settlements.value, 'settlements') : [],
-                factionNames: factions.status === 'fulfilled' ? ledgerNameList(factions.value, 'factions') : [],
+                npcNames: laneNames(0),
+                settlementNames: laneNames(1),
+                factionNames: laneNames(2),
                 // 2026-11-13 AD — quest titles ground cross-references the same
                 // way factions do (loadQuests unwraps to a bare array, which
                 // ledgerNameList already tolerates).
-                questNames: quests.status === 'fulfilled' ? ledgerNameList(quests.value, 'quests') : [],
+                questNames: laneNames(3),
+                unreadable: LEDGER_LANES.filter((_, i) => settled[i].status !== 'fulfilled').map(lane => lane.label),
             })
         })
         return () => { cancelled = true }
@@ -113,16 +130,30 @@ function appliedLabel(proposal) {
     return proposal.kind === 'quest_draft' ? `quest '${proposal.name}'` : proposal.kind.replace('_', ' ')
 }
 
+// MMM 2026-11-21 + Backlog 2026-11-22 — the quest card's ledger-scrutiny face:
+// exactly one of pending / incomplete / verdict can legitimately show. While
+// the fetch is in flight (ledgerNames === null) the card is NOT scrutiny-clean,
+// it is un-checked — say so quietly so the advisory's late arrival is never
+// misread as an all-clear. If any lane came back UNREADABLE, no verdict is
+// honest against a partial ledger: the incomplete face replaces advisory AND
+// all-clear silence alike. The settled verdicts (advisory or incomplete reason)
+// keep riding the applied receipt (name-scrutiny law); only the in-flight
+// "Checking…" pill retires once the card is terminal. Purely informational —
+// the action row never gates.
+function ledgerFace(proposal, ledgerNames, applied) {
+    if (proposal.kind !== 'quest_draft') return 'none'
+    if (ledgerNames === null) return applied ? 'none' : 'pending'
+    if (ledgerNames.unreadable.length > 0) return 'incomplete'
+    return 'verdict'
+}
+
 function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss }) {
     const body = proposal.kind === 'quest_draft'
         ? `${proposal.name} — ${proposal.description}${proposal.rewards ? ` (rewards: ${proposal.rewards})` : ''}`
         : `${proposal.kind === 'npc_dialogue' ? `${proposal.npcName}: ` : ''}${proposal.text}`
     const unknownNames = findUnknownLedgerNames(proposal, ledgerNames)
-    // MMM 2026-11-21 — pending face: while the ledger-name fetch is in flight
-    // (ledgerNames === null) the card is NOT scrutiny-clean, it is un-checked.
-    // Say so, quietly, so the advisory's late arrival is never misread as an
-    // all-clear. Purely informational — the action row stays live.
-    const ledgerPending = proposal.kind === 'quest_draft' && ledgerNames === null && !applied
+    const face = ledgerFace(proposal, ledgerNames, applied)
+    const unreadableLanes = (ledgerNames && ledgerNames.unreadable) || []
     return (
         <div className="ai-world-card">
             <div className="ai-world-head">
@@ -130,13 +161,19 @@ function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss })
                 {typeof proposal.confidence === 'number' && <em className="ai-confidence">confidence {(proposal.confidence * 100).toFixed(0)}%</em>}
             </div>
             <p className="ai-world-body">{body}</p>
-            {ledgerPending && (
+            {face === 'pending' && (
                 <div className="ai-world-pending" role="status">
                     <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     Checking ledger names…
                 </div>
             )}
-            {unknownNames.length > 0 && (
+            {face === 'incomplete' && (
+                <div className="ai-world-pending ai-world-pending--incomplete" role="status">
+                    <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                    {`Ledger check incomplete — ${unreadableLanes.join(', ')} unreadable`}
+                </div>
+            )}
+            {face === 'verdict' && unknownNames.length > 0 && (
                 <div className="ai-world-advisory" role="status">
                     <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
                     names not in the ledger — check spelling: {unknownNames.join(', ')}

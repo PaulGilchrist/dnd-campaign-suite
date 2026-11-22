@@ -45,7 +45,11 @@
 }
 /* MMM 2026-11-21 — ledger-check pending pill: same pill geometry as the
    .ai-world-advisory above, but muted grey (the .ai-confidence tone) — a
-   "working, not yet verdict" face, deliberately quieter than the amber one. */
+   "working, not yet verdict" face, deliberately quieter than the amber one.
+   Backlog 2026-11-22 — the partial-failure face (.ai-world-pending--incomplete,
+   a warning icon + "Ledger check incomplete — <lanes> unreadable") reuses this
+   rule's chrome verbatim; the modifier is a semantic hook only, so the muted
+   "no verdict yet" tone covers both. */
 .ai-world-console .ai-world-pending {
     display: inline-flex;
     align-items: center;
