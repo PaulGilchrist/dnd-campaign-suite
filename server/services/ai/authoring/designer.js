@@ -120,12 +120,20 @@ export async function proposePlan({ campaign, aiConfig, log, chatFn = chat }) {
  */
 export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn = chat }) {
     if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
-    if (!scope?.scope) return { ok: false, code: 'BAD_SCOPE' };
     // The rehydrated pending plan carries designNotes' server-owned stamps
     // (savePendingPlan adds savedAt; recordPlan adds proposedAt) straight back
     // into the POST — strip them before the scope schema (additionalProperties:
     // false) owns the blueprint, or every reload-then-regenerate self-rejects.
     scope = stripServerStamps(scope);
+    // The scope is CLIENT-supplied (mirroring refine.js's preflight: every-
+    // thing-refusible-before-a-model-call), so the SAME schema the plan lane
+    // enforces on model output owns it here too. A malformed-but-object plan
+    // (e.g. entityPlan as an object instead of the canonical array) used to
+    // sail past, burn the batch call, write the fallback audit row and crash
+    // the resume with a generic 500; BAD_SCOPE now refuses with the full
+    // error list and ZERO side effects.
+    const shape = validateAgainstSchema(scope, ENTITY_SCHEMAS.scope, { schemas: ENTITY_SCHEMAS });
+    if (!shape.ok) return { ok: false, code: 'BAD_SCOPE', errors: shape.errors };
 
     const notes = loadNotes(campaign);
     // Provenance (backlog ZC 2026-11-13): the plan audit row keeps the raw

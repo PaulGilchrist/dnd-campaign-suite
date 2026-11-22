@@ -119,6 +119,15 @@ router.post('/api/campaigns/:campaign/ai/designer/generate', async (req, res) =>
             return res.status(400).json({ error: 'scope (the confirmed build plan) is required' });
         }
         const result = await generateBlueprint({ campaign: req.params.campaign, scope, aiConfig: cfg, log: addEntry });
+        if (result.code === 'BAD_SCOPE') {
+            // Malformed plan (schema-checked before any model call or audit):
+            // one plain-English 400 naming EVERY offender (the map-erasure-
+            // guard law) and ZERO side effects — no setDesignerError, no
+            // savePendingPlan, so the GM's stored plan and lastError stay
+            // exactly as they were.
+            const offenders = result.errors?.length ? result.errors : ['scope is not a valid build plan'];
+            return res.status(400).json({ error: `Build plan rejected: ${offenders.join('; ')}` });
+        }
         if (result.ok) {
             savePendingPlan(req.params.campaign, null); // plan consumed by the generate
             setDesignerError(req.params.campaign, 'generate', null);
