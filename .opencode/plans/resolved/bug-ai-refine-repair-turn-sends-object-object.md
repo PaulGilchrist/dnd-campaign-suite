@@ -23,3 +23,24 @@ One-liner: `content: JSON.stringify(repairOf).slice(0, 20000)` at `refine.js:85`
 
 ## Severity
 Minor UX issue / degraded feature: nothing is mis-written (the lane fails closed honestly), but the shipped repair round-trip is objectively corrupted, causing avoidable refine refusals against real models.
+
+## Resolution
+FIXED 2026-11-22 (subagent fix run). Diagnosis confirmed verbatim: pre-fix capture-mock JSONL witness on `test-campaign` (dev pair lock `test-campaign`, mock on :8001, Marta row stripped of image keys, instruction `TRIGGER-INVALID output please`) showed the repair retry's assistant turn content is exactly `'[object Object]'` — `String(repairOf)` where `repairOf` is the parsed object.
+
+**What changed** (`server/services/ai/authoring/refine.js`): adopted the `designer.js` `lastContent` pattern — the repair-turn variable is now a TEXT variable `lastContent` (null initially), so the message line `String(lastContent).slice(0, 20000)` needed no change; the SEEDS carry the fix:
+- schema-rejected and ref-collision legs now seed `lastContent = JSON.stringify(replacement)` (was the raw object);
+- the extracted-not-JSON leg now seeds `lastContent = String(content)` (the model's raw rejected text) — previously it left the turn blind;
+- a transport-failure first attempt keeps the designer/dress twin face (`String(null)` → `'null'` placeholder — no output existed to echo); the suggested skip-the-turn branch was NOT added, staying consistent with both sibling lanes.
+
+Files changed:
+- `server/services/ai/authoring/refine.js` — the repair-turn seeds (see above).
+- `server/services/ai/authoring/refine.repair-turn.test.js` — NEW regression pin, 4 legs: schema-rejected turn is parseable JSON byte-equal to the rejected object (never `'[object Object]'`); ref-collision turn carries the rejected name; non-JSON answer echoes its raw text and attempt 2 recovers; transport-fail turn is the documented `'null'` twin placeholder. No sibling test pinned the repair-turn content before (that's how this hid).
+
+**Verification:**
+1. Repro-first: wire witness showed `messages` assistant content `'[object Object]'` verbatim (run before any code change).
+2. Post-fix capture-mock re-ride: repair request's assistant turn is the parseable JSON `{"name":"Marta Copperkettle",…,"bogusField":1}`; with the mock upgraded to comply ONLY on a `That output failed validation…` request, the lane now returns `ok:true` with the corrected replacement and the audit row honestly stamps `attempts:2` (pre-fix that recovery was impossible — the retry was blind).
+3. Refusal face unchanged: with an always-rejecting mock the response is the same `{"ok":false,"errors":[…]}` + `attempts:0` row (byte-identical errors).
+4. Tests: `npx vitest run` on the new file (4/4), the authoring folder (23 files/188 tests), full suite `npm run test:run` (3484 files / 37,165 tests, all pass). `npm run lint` zero warnings.
+5. Cleanup: admin clear-change-data + clear-log on test-campaign (exit GET `{}` / `[]`, both files ABSENT, npcs.json md5 `db6666c12` byte-exact); capture-mock rig + JSONL deleted; :80/:5173/:8001 dark.
+
+Note: `dressMap.js` (`String(json(repairOf))`) and `designer.js` (string `lastContent`) were already correct — refine was indeed the only broken twin; no dual-ruleset (5e/2024) sibling exists for this server-side AI lane.

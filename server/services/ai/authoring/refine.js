@@ -76,13 +76,16 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
     };
 
     let lastErrors = ['no attempt made'];
-    let repairOf = null;
+    // The rejected model output as TEXT for the repair retry's assistant turn
+    // (designer.js's lastContent pattern — the parsed OBJECT would serialize
+    // to the literal '[object Object]' and the model never sees its own output).
+    let lastContent = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
         let content;
         try {
             const call = attempt === 1 ? messages : [
                 ...messages,
-                { role: 'assistant', content: String(repairOf).slice(0, 20000) },
+                { role: 'assistant', content: String(lastContent).slice(0, 20000) },
                 { role: 'user', content: `That output failed validation:\n- ${lastErrors.join('\n- ')}\nFix every error; output ONLY the corrected ${kind} JSON object.` },
             ];
             content = await chatFn({
@@ -96,13 +99,13 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
             continue;
         }
         const parsed = extractJsonObject(content);
-        if (!parsed.ok) { lastErrors = ['model answer was not valid JSON']; continue; }
+        if (!parsed.ok) { lastErrors = ['model answer was not valid JSON']; lastContent = String(content); continue; }
         const replacement = parsed.value;
         const shape = validateEntity(kind, replacement);
-        if (!shape.ok) { lastErrors = shape.errors; repairOf = replacement; continue; }
+        if (!shape.ok) { lastErrors = shape.errors; lastContent = JSON.stringify(replacement); continue; }
 
         const refs = checkOutwardRefs(campaign, kind, entity, replacement);
-        if (refs.length) { lastErrors = refs; repairOf = replacement; continue; }
+        if (refs.length) { lastErrors = refs; lastContent = JSON.stringify(replacement); continue; }
 
         // Backlog echo-no-op-audit: run the client's echo predicate HERE too,
         // so a verbatim echo audits an honest no-op row instead of overstating
