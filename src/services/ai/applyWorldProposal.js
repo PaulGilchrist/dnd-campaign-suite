@@ -13,6 +13,7 @@
 import { addEntry } from '../ui/logService.js'
 import { loadQuests, saveQuests } from '../campaign/questsService.js'
 import utils from '../ui/utils.js'
+import { applyFailureDetail } from './applyFailureCopy.js'
 
 function audit(campaignName, proposal, outcome, detail) {
     return addEntry(campaignName, {
@@ -72,7 +73,7 @@ export async function applyWorldProposal({ campaignName, proposal }) {
             result = await apply(campaignName, proposal)
         } catch (e) {
             console.error('[applyWorldProposal]', e)
-            result = { applied: false, detail: `apply failed: ${String(e.message || e).slice(0, 160)}` }
+            result = { applied: false, detail: applyFailureDetail(e) }
         }
     }
     if (result.applied && proposal.kind !== 'quest_draft') {

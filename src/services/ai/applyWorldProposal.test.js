@@ -93,11 +93,29 @@ describe('applyWorldProposal', () => {
         }));
     });
 
-    it('quest CRUD failure is caught + refused, never thrown at the console', async () => {
+    // Backlog 2026-11-22 (UI) — refusal copy law: the notice opens with the
+    // plain-English sentence, the raw error rides only the bounded tail
+    // (applyFailureCopy.js) — never the old `apply failed: <raw echo>`.
+    it('quest CRUD failure is caught + refused with plain copy, never thrown at the console', async () => {
         saveQuests.mockRejectedValueOnce(new Error('ledger locked'));
         const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'quest_draft', name: 'X', description: 'y' } });
         expect(r.applied).toBe(false);
-        expect(r.detail).toMatch(/apply failed/);
+        expect(r.detail).toContain('the save request failed — nothing was changed.');
+        expect(r.detail).toContain('ledger locked'); // short raw stays verbatim
+    });
+
+    it('a proxy-HTML 500 never floods the refusal — detail is shaped + bounded', async () => {
+        const html = `<h1>502 Bad Gateway</h1>${'<p>proxy upstream returned an invalid response</p>'.repeat(12)}`;
+        loadQuests.mockRejectedValueOnce(new Error(html));
+        const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'quest_draft', name: 'X', description: 'y' } });
+        expect(r.applied).toBe(false);
+        expect(r.detail).not.toContain(html); // raw page not echoed whole
+        expect(r.detail).toMatch(/\[truncated/);
+        // The refused audit row carries the same shaped copy, not the page.
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+            type: 'ai_world_applied',
+            description: expect.stringContaining('truncated'),
+        }));
     });
 
     it('needs_human / garbage never write', async () => {

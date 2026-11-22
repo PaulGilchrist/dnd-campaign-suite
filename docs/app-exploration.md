@@ -58,8 +58,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT (closed-tab single-pass headless
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (UI): world-apply refusal copy echoes the RAW transport error** — `Not applied: apply failed: pt2-race-probe` quotes whatever the lane body/error text was; a proxy HTML 500 page would flood the notice. Consider a plain-English sentence + the raw detail truncated/gated. (`src/services/ai/applyWorldProposal.js` catch, `AiWorldConsole.jsx` notice render`)
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

@@ -125,7 +125,8 @@ describe('applyRuling — never-auto ops', () => {
         getRuntimeValue.mockImplementation(() => { throw new Error('store down'); });
         const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', expression: '1d6', amount: -1 } });
         expect(r.applied).toBe(false);
-        expect(r.detail).toMatch(/apply failed/);
+        expect(r.detail).toContain('the save request failed — nothing was changed.');
+        expect(r.detail).toContain('store down');
     });
 });
 

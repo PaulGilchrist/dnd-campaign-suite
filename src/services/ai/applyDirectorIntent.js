@@ -17,6 +17,7 @@
  * Nothing here runs unconfirmed in suggest mode; every outcome is logged.
  */
 import { addEntry } from '../ui/logService.js'
+import { applyFailureDetail } from './applyFailureCopy.js'
 
 function audit(campaignName, intent, outcome, detail) {
     return addEntry(campaignName, {
@@ -67,7 +68,7 @@ export async function applyDirectorIntent({ campaignName, intent, onStampTarget 
             result = apply(intent.creatureName || 'the NPC', intent, onStampTarget)
         } catch (e) {
             console.error('[applyDirectorIntent]', e)
-            result = { applied: false, detail: `apply failed: ${String(e.message || e).slice(0, 160)}` }
+            result = { applied: false, detail: applyFailureDetail(e) }
         }
     }
     await audit(campaignName, intent, result.applied ? 'confirmed' : (result.advisory ? 'advisory' : 'refused'), result.detail)

@@ -66,7 +66,8 @@ describe('applyDirectorIntent', () => {
             onStampTarget: () => { throw new Error('modal busy'); },
         });
         expect(broken.applied).toBe(false);
-        expect(broken.detail).toMatch(/apply failed/);
+        expect(broken.detail).toContain('the save request failed — nothing was changed.');
+        expect(broken.detail).toContain('modal busy');
     });
 
     it('no target lane ⇒ refused with guidance', async () => {

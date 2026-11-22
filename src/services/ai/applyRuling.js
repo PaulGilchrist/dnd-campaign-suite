@@ -24,6 +24,7 @@ import { addEntry } from '../ui/logService.js'
 import { rollExpression, rollAdvantage, rollDisadvantage } from '../dice/diceRoller.js'
 import { getEffectDefinition } from '../combat/conditions/targetEffectDefinitions.js'
 import { serverRoll } from './aiClient.js'
+import { applyFailureDetail } from './applyFailureCopy.js'
 
 const D20_RE = /^1?d20([+-]\d+)?$/i
 
@@ -108,7 +109,7 @@ export async function applyRuling({ campaignName, ruling, enforcement }) {
         result = await apply({ campaignName, ruling, enforcement })
     } catch (e) {
         console.error('[applyRuling]', e)
-        result = { applied: false, detail: `apply failed: ${String(e.message || e).slice(0, 160)}` }
+        result = { applied: false, detail: applyFailureDetail(e) }
     }
     await audit(campaignName, ruling, result.applied ? 'applied' : 'refused', result.detail)
     return result
