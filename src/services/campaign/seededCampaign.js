@@ -244,6 +244,54 @@ export function seededDefaultName(prefix) {
   return `${prefix}-${localDateStamp()}`;
 }
 
+/**
+ * The quick-create prefill, made ACTIONABLE under a campaign lock (backlog
+ * 2026-11-22): the dated default commits nowhere when CAMPAIGN_LOCK is on and
+ * it is not an allowlist member, so opening the modal under that lock starts
+ * on the FIRST FREE ALLOWLISTED NAME — the first name in the server-reported
+ * `lockNames` order whose campaign folder does not already exist. Faces:
+ *   - unlocked, or the dated default itself is allowlisted → dated default
+ *     (unchanged behavior);
+ *   - locked, dated default refused, a free member exists → that free member;
+ *   - locked with NO free member (every allowlisted folder exists) → the dated
+ *     default stays, and SeedLockNote honestly warns it will be refused
+ *     (no silent invalid state — the note keeps naming it).
+ * Shares `seededDefaultName` with the note so prefill and disclosure can never
+ * drift apart on the date stamp.
+ */
+export function seedPrefillName(prefix, campaignLocked, lockNames, existingCampaigns) {
+  const dated = seededDefaultName(prefix);
+  if (!campaignLocked || lockNames.includes(dated)) return dated;
+  return lockNames.find((name) => !existingCampaigns.includes(name)) || dated;
+}
+
+/**
+ * Exact copy for the quick-create modals' pre-commit lock note (rendered by
+ * SeededCampaignModal.SeedLockNote). The copy must NEVER be false about the
+ * CURRENT input `value`: under a lock that refuses it, the refusal clause
+ * quotes the field's actual value — labelled the prefilled default only while
+ * it still IS one (shares seededDefaultName so the date stamp can never drift
+ * from the input). A commit-able input keeps the honest allowlist disclosure
+ * with no refusal claim; the standard modal (no `prefix`, empty prefill) keeps
+ * the generic conditional clause. Returns null when nothing honest renders
+ * (no lock, or empty allowlist from a malformed config).
+ */
+export function seedLockNoteText({ campaignLocked, lockNames, prefix, value }) {
+  if (!campaignLocked || lockNames.length === 0) return null;
+  const allowed = `Only these campaign names are allowed: ${lockNames.join(', ')}.`;
+  if (!prefix) {
+    return `Campaign is locked — a name outside the allowlist will be refused. ${allowed}`;
+  }
+  const name = (value || '').trim();
+  if (name && !lockNames.includes(name)) {
+    const label = name === seededDefaultName(prefix)
+      ? `the prefilled default (${name})`
+      : `the name "${name}"`;
+    return `Campaign is locked — ${label} will be refused. ${allowed}`;
+  }
+  return `Campaign is locked. ${allowed}`;
+}
+
 const ARENA_PRESET = {
   defaultName: () => seededDefaultName('Arena'),
   metaType: 'arena',

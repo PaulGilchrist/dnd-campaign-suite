@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
-import { createSeededCampaign, seededDefaultName } from '../../services/campaign/seededCampaign.js';
+import { createSeededCampaign, seedPrefillName } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
@@ -115,11 +115,11 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // Campaign-lock state from GET /api/server-config (backlog 2026-11-22 QQ):
   // mirrors the fetch in CampaignAdmin.jsx — same endpoint, same
   // campaignLocked/lockedCampaign parse, same fail-open default (a failed GET
-  // renders no note, never blocks the unlocked flow). Drives the SeedLockNote
-  // disclosure in the quick-create modals: under a lock the dated prefilled
-  // default (Arena-/Starter-YYYYMMDD) is refused by the server's create guard,
-  // so the open modal names the allowed campaign names BEFORE the operator
-  // commits instead of 403-blind.
+  // renders no note, never blocks the unlocked flow). Drives both the
+  // SeedLockNote disclosure and the quick-create prefill itself
+  // (backlog 2026-11-22 improve seed-prefill-lock-aware): under a lock that
+  // refuses the dated default, openSeedModal starts the input on the first
+  // free allowlisted name so the modal's default face always commits.
   const [campaignLocked, setCampaignLocked] = useState(false);
   const [lockNames, setLockNames] = useState([]);
   useEffect(() => {
@@ -323,7 +323,15 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   const openSeedModal = (presetKey) => {
     if (modalOpen) return; // see openNewCampaignModal — no stacked overlays
     setSeedPreset(presetKey);
-    setNewCampaignName(seededDefaultName(SEEDED_PRESETS[presetKey].prefix));
+    // Lock-aware prefill: under a lock that refuses the dated default, start
+    // on the first free allowlisted name (seedPrefillName) so a zero-edit
+    // Create always commits; the dated default stays on every other face.
+    setNewCampaignName(seedPrefillName(
+      SEEDED_PRESETS[presetKey].prefix,
+      campaignLocked,
+      lockNames,
+      campaigns,
+    ));
     setCreateError(null);
   };
 

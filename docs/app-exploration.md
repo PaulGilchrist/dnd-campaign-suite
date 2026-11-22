@@ -59,8 +59,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **Dated quick-create prefill is un-creatable under a lock (RR 2026-11-22):** the modal now HONESTLY warns `Arena-YYYYMMDD will be refused`, but the input still starts on a name that can never commit; when `campaignLocked && !lockNames.includes(prefill)`, prefill the first allowlisted free name (or mark the input invalid up-front) so the default face is always actionable. `src/components/campaign-selection/CampaignSelection.jsx openSeedModal`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Character-store ghost WRITE-pollution leg (ghost mirror POSTing A's keys into B's change-data) — mechanism code-read (`setRuntimeValue` whole-mirror law) + store-level ghost live-proven, but no B-side full-mirror write lane was fired this run; next-run recipe in PT#2.
