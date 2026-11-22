@@ -54,15 +54,23 @@ export const ENTRY_COMPONENTS = {
   spell_effect: SpellEffectEntry,
   buff: BuffEntry,
   music: MusicEntry,
-  // AI audit lanes (backlog ai-audit-log-rows-raw-json). ai_director /
-  // ai_director_applied / ai_ruling* keep their described GenericEntry rows
-  // (producers already stamp a readable description).
+  // AI audit lanes (backlog ai-audit-log-rows-raw-json), whole family unified
+  // (backlog 2026-11-22): every ai_* row renders through AiAuditEntry's
+  // attributed .log-ai-audit chrome + category label. Producers already stamp
+  // a readable description, which formatAiAuditLine renders verbatim — the
+  // director/ruling/draft rows only swap chrome, never copy.
   ai_designer: AiAuditEntry,
   ai_refine: AiAuditEntry,
   ai_world: AiAuditEntry,
   ai_world_applied: AiAuditEntry,
   ai_authoring: AiAuditEntry,
   ai_dress: AiAuditEntry,
+  ai_director: AiAuditEntry,
+  ai_director_applied: AiAuditEntry,
+  ai_ruling: AiAuditEntry,
+  ai_ruling_applied: AiAuditEntry,
+  ai_draft_approved: AiAuditEntry,
+  ai_draft_rejected: AiAuditEntry,
   // Server-validator write refusals get their own row (GC improve 2026-11-10)
   // so they never share the enforcement_denied filter with gameplay denials.
   write_rejected: WriteRejectedEntry,

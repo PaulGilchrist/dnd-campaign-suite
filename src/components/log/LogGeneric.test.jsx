@@ -1,11 +1,13 @@
 // @maintained-by-ai
 // GENERIC fallback lane — leaf content for LogGenericEntry.jsx (bug-log-api-ghost-entries).
-// Unregistered entry types (server audit rows like ai_director,
-// or raw API posts) must render an honest row: type label + readable text excerpt,
-// never a silently invisible ghost. Routing (type → this component) is pinned by
-// LogEntryRendering.test.jsx; this lane owns the leaf bytes (LogNotes.test.jsx style).
-// Gameplay-lane enforcement_denied rows moved to the dedicated attributed renderer
-// (LogEnforcementDenied.test.jsx owns those bytes, GGG improve 2026-11-21).
+// Unregistered entry types (or raw API posts) must render an honest row: type
+// label + readable text excerpt, never a silently invisible ghost. Routing
+// (type → this component) is pinned by LogEntryRendering.test.jsx; this lane
+// owns the leaf bytes (LogNotes.test.jsx style). Gameplay-lane
+// enforcement_denied rows moved to the dedicated attributed renderer
+// (LogEnforcementDenied.test.jsx owns those bytes, GGG improve 2026-11-21),
+// and the whole ai_* audit family routes to AiAuditEntry (LogAiAudit.test.jsx,
+// family unification 2026-11-22).
 
 import { within } from '@testing-library/react';
 import { beforeEach } from 'vitest';

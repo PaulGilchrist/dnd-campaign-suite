@@ -68,7 +68,6 @@ change-data `{}` + log `[]` + sessions `[]`; disk `campaign-log.json`/`character
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **AI audit family renders in two chrome styles (2026-11-22 NNN):** the field convention (5db45b017) unified the DATA (`characterName` sole author), but `entryComponents.js` still routes only `ai_world`/`ai_world_applied` through `AiAuditEntry` (`.log-ai-audit`, category label) while `ai_director`/`ai_director_applied`/`ai_ruling`/`ai_ruling_applied`/`ai_draft_*` land in `log-generic`. Extending the AiAuditEntry registration across the family would give one attributed voice/category treatment for every AI audit row (authors already render on both arms — pure consistency, zero wire change).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

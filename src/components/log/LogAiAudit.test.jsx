@@ -1,17 +1,23 @@
 // @maintained-by-ai
 // AI AUDIT ROWS lane (backlog 2026-10-31 ai-audit-log-raw-json) — leaf content +
-// registry routing for the ai_designer/ai_refine/ai_world(+_applied) and
-// ai_authoring/ai_dress (bug-log-ai-authoring-raw-json) audit sinks.
+// registry routing for the WHOLE ai_* audit family (family unification
+// 2026-11-22: director/ruling/draft-review joined the designer/refine/world/
+// authoring/dress rows — one attributed .log-ai-audit chrome everywhere).
 // Payload shapes are copied from the real producers:
-//   ai_designer     → server/services/ai/authoring/designer.js audit() spread
-//   ai_refine       → server/services/ai/authoring/refine.js audit()
-//   ai_world        → server/services/ai/index.js worldAudit()
-//   ai_world_applied→ src/services/ai/applyWorldProposal.js audit()
-//   ai_authoring    → server/services/ai/authoring/apply.js logSuccess()/failMidBatch()
-//   ai_dress        → server/services/ai/authoring/dressMap.js audit() +
-//                     src/components/maps-manager/AiDressButton.jsx apply()
-// Regression guard included: ai_director(_applied) keep their pre-existing
-// GenericEntry labeled rows (LogGeneric.test.jsx owns their bytes).
+//   ai_designer         → server/services/ai/authoring/designer.js audit() spread
+//   ai_refine           → server/services/ai/authoring/refine.js audit()
+//   ai_world            → server/services/ai/index.js worldAudit()
+//   ai_world_applied    → src/services/ai/applyWorldProposal.js audit()
+//   ai_authoring        → server/services/ai/authoring/apply.js logSuccess()/failMidBatch()
+//   ai_dress            → server/services/ai/authoring/dressMap.js audit() +
+//                         src/components/maps-manager/AiDressButton.jsx apply()
+//   ai_director         → server/services/ai/index.js directorAudit()
+//   ai_director_applied → src/services/ai/applyDirectorIntent.js audit()
+//   ai_ruling           → server/services/ai/index.js auditLog()
+//   ai_ruling_applied   → src/services/ai/applyRuling.js audit()
+//   ai_draft_approved/rejected → src/services/campaign/draftActions.js auditDraftDecision()
+// Regression guard included: unknown types keep their GenericEntry fallback
+// (LogGeneric.test.jsx owns those bytes).
 
 import { screen, fireEvent, within } from '@testing-library/react';
 import { beforeEach, describe, it, expect } from 'vitest';
@@ -50,6 +56,12 @@ describe('AI audit rows render labeled one-line summaries', () => {
     ['ai_world_applied', { id: 'wa', type: 'ai_world_applied', characterName: 'AI world keeper', timestamp: TS, description: 'AI world keeper applied: rumor — logged.' }],
     ['ai_authoring', authoring({ scope: 'session', created: { encounters: 1 }, snapshot: 's.zip', summary: 'AI drafted 1 entity' })],
     ['ai_dress', dress({ action: 'applied', ops: 4 })],
+    ['ai_director', { id: 'dir', type: 'ai_director', characterName: 'Goblin', attempts: 1, timestamp: TS, intent: { intent: 'attack', actionName: 'Bite', targetName: 'Frodo' }, description: 'AI director proposed attack: Bite → Frodo' }],
+    ['ai_director_applied', { id: 'dira', type: 'ai_director_applied', characterName: 'Goblin', timestamp: TS, description: 'AI director confirmed: attack — Bite → Frodo: target set.' }],
+    ['ai_ruling', { id: 'rul', type: 'ai_ruling', characterName: 'AasimarTest', attempts: 1, timestamp: TS, ruling: { type: 'dice', expression: '1d20+5' }, description: 'AI referee proposed dice: 1d20+5' }],
+    ['ai_ruling_applied', { id: 'rula', type: 'ai_ruling_applied', characterName: 'AI referee', timestamp: TS, ruling: { type: 'dice', expression: '1d20+5' }, description: 'AI ruling applied: dice — 1d20+5 rolled [17] → 22' }],
+    ['ai_draft_approved', { id: 'drf-a', type: 'ai_draft_approved', characterName: 'AI draft review', timestamp: TS, description: 'Approved AI draft: npc "Zorvath"' }],
+    ['ai_draft_rejected', { id: 'drf-r', type: 'ai_draft_rejected', characterName: 'AI draft review', timestamp: TS, description: 'Rejected AI draft: npc "Zorvath"' }],
   ])('%s routes to the ai-audit row (never the raw-JSON generic fallback)', (type, entry) => {
     setup(Log, [entry]);
     expect(q(`.log-entry.log-ai-audit`)).toBeInTheDocument();
@@ -61,17 +73,51 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(q('.log-ai-audit .log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
   });
 
-  it('ai_director + ai_director_applied keep their pre-existing generic labeled rows', () => {
+  // Backlog 2026-11-22 (two-chrome-styles): the director/ruling/draft-review
+  // rows moved from log-generic to the shared ai-audit chrome. Producers stamp
+  // a readable description, so formatAiAuditLine renders it VERBATIM — the
+  // copy is unchanged, only the chrome unified — with the author still in
+  // .log-character and the category label derived from the type key.
+  it('director/ruling/draft rows render author + category + verbatim description', () => {
     setup(Log, [
       { id: 'g1', type: 'ai_director', characterName: 'Goblin', description: 'AI director proposed attack: Bite → Frodo', timestamp: TS },
       { id: 'g2', type: 'ai_director_applied', characterName: 'Goblin', description: 'AI director confirmed: attack — target set', timestamp: TS },
+      { id: 'g3', type: 'ai_ruling', characterName: 'AasimarTest', description: 'AI referee proposed dice: 1d20+5', timestamp: TS },
+      { id: 'g4', type: 'ai_ruling_applied', characterName: 'AI referee', description: 'AI ruling applied: dice — rolled 22', timestamp: TS },
+      { id: 'g5', type: 'ai_draft_approved', characterName: 'AI draft review', description: 'Approved AI draft: npc "Zorvath"', timestamp: TS },
+      { id: 'g6', type: 'ai_draft_rejected', characterName: 'AI draft review', description: 'Rejected AI draft: npc "Zorvath"', timestamp: TS },
     ]);
-    const rows = document.querySelectorAll('.log-entry.log-generic');
-    expect(rows.length).toBe(2);
+    const rows = document.querySelectorAll('.log-entry.log-ai-audit');
+    expect(rows.length).toBe(6);
+    expect(document.querySelector('.log-entry.log-generic')).toBeNull();
+    // Newest-first render order matches the posted array reversed.
+    const expected = [
+      ['g6', 'AI draft review', 'AI Draft Rejected', 'Rejected AI draft: npc "Zorvath"'],
+      ['g5', 'AI draft review', 'AI Draft Approved', 'Approved AI draft: npc "Zorvath"'],
+      ['g4', 'AI referee', 'AI Ruling Applied', 'AI ruling applied: dice — rolled 22'],
+      ['g3', 'AasimarTest', 'AI Ruling', 'AI referee proposed dice: 1d20+5'],
+      ['g2', 'Goblin', 'AI Director Applied', 'AI director confirmed: attack — target set'],
+      ['g1', 'Goblin', 'AI Director', 'AI director proposed attack: Bite → Frodo'],
+    ];
+    expected.forEach(([, author, category, text], i) => {
+      const row = rows[i];
+      expect(within(row).getByText(author)).toBeInTheDocument();
+      expect(row.querySelector('.log-ai-audit-type').textContent).toBe(category);
+      expect(row.querySelector('.log-ai-audit-text').textContent).toBe(text);
+    });
+  });
+
+  // Criterion 6 counterpart: non-family types keep their previous components.
+  it('unregistered and non-ai types are unaffected by the family routing', () => {
+    setup(Log, [
+      { id: 'h1', type: 'gm-note', message: 'GM note still generic', timestamp: TS },
+      note({ id: 'n', noteText: 'Composer note' }),
+      { id: 'h2', type: 'hp_change', targetName: 'Frodo', delta: -5, currentHp: 25, maxHp: 30, sourceName: 'Goblin', timestamp: TS },
+    ]);
+    expect(q('.log-entry.log-generic')).toBeInTheDocument();
+    expect(q('.log-entry.log-note')).toBeInTheDocument();
+    expect(q('.log-entry.log-hp-change')).toBeInTheDocument();
     expect(document.querySelector('.log-ai-audit')).toBeNull();
-    // Newest-first: [0] is the applied row posted second.
-    expect(rows[0].textContent).toContain('AI director confirmed: attack — target set');
-    expect(rows[1].textContent).toContain('AI director proposed attack: Bite → Frodo');
   });
 
   // Backlog 2026-11-21 (MMM): the whole AI audit family stamps characterName

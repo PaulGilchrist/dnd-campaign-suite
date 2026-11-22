@@ -1,11 +1,14 @@
 import { formatTimestamp, formatEntryTypeLabel, formatAiAuditLine } from './log-utils.js';
 
-// AI audit rows (ai_designer / ai_refine / ai_world + applied variants,
-// backlog ai-audit-log-rows-raw-json). Producers stamp structured payload
-// fields rather than message/description, so these would otherwise fall
-// through to the generic row's raw-JSON excerpt. Renders one human-readable
-// line (kind + instruction/request + outcome) via formatAiAuditLine. Plain
-// JSX text like GenericEntry — React escaping keeps user/model text inert.
+// AI audit rows — the whole ai_* family (designer/refine/world/authoring/
+// dress/director/ruling/draft-review + applied variants, backlog
+// ai-audit-log-rows-raw-json; family unification 2026-11-22). Producers stamp
+// structured payload fields or an authored description, so these would
+// otherwise fall through to the generic row's raw-JSON excerpt. Renders one
+// human-readable line via formatAiAuditLine (verbatim description when
+// present, else kind + instruction/request + outcome from the describers).
+// Plain JSX text like GenericEntry — React escaping keeps user/model text
+// inert.
 export function AiAuditEntry({ entry }) {
   const typeLabel = formatEntryTypeLabel(String(entry.type ?? 'unknown'));
   return (

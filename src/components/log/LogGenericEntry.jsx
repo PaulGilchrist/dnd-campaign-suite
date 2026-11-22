@@ -1,9 +1,10 @@
 import { formatTimestamp, formatEntryTypeLabel, getEntryText } from './log-utils.js';
 
 // Generic fallback for entry types missing from Log.jsx's ENTRY_COMPONENTS
-// registry (e.g. 'ai_director' /
-// 'ai_ruling' audit rows, or entries POSTed straight to the log API).
-// Keeps the shared audit trail honest: nothing is stored-but-invisible.
+// registry (e.g. entries POSTed straight to the log API, or future types
+// before they get a dedicated row). Keeps the shared audit trail honest:
+// nothing is stored-but-invisible. The ai_* audit family renders through
+// AiAuditEntry instead (family unification 2026-11-22).
 export function GenericEntry({ entry }) {
   const typeLabel = formatEntryTypeLabel(String(entry.type ?? 'unknown'));
   // Prefer the canonical readable text (getEntryText resolves the stamped-
