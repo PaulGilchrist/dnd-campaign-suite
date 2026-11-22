@@ -128,11 +128,36 @@ describe('ai-designer route authority', () => {
         const ok = await request(app).post(url).set('Host', 'localhost').send({ scope: { scope: 'arc', entityPlan: [] } });
         expect(ok.status).toBe(200);
         expect(ok.body).toMatchObject({ ok: true, pending: true });
-        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', { scope: 'arc', entityPlan: [] });
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', { scope: 'arc', entityPlan: [] }, { baseSavedAt: null });
 
         const clear = await request(app).post(url).set('Host', 'localhost').send({ scope: null });
-        expect(clear.body).toEqual({ ok: true, pending: false });
-        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null);
+        expect(clear.body).toEqual({ ok: true, pending: false, savedAt: null });
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null, { baseSavedAt: null });
+    });
+
+    it('pending-plan forwards the echoed savedAt and refuses a stale save with a plain-English 409', async () => {
+        const url = '/api/campaigns/test-campaign/ai/designer/pending-plan';
+        savePendingPlan.mockClear();
+
+        // Fresh stamp echo rides through to the service as baseSavedAt, and a
+        // successful save echoes the new server stamp back to the client.
+        const ok = await request(app).post(url).set('Host', 'localhost')
+            .send({ scope: { scope: 'arc' }, savedAt: 42 });
+        expect(ok.status).toBe(200);
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', { scope: 'arc' }, { baseSavedAt: 42 });
+        expect(ok.body).toMatchObject({ ok: true, pending: true, savedAt: 1 });
+
+        // Stale echo (service reports conflict): plain-English 409, conflict
+        // flag set (NPC-lane shape), and the response carries no fake success.
+        savePendingPlan.mockImplementationOnce(() => ({ conflict: true, notes: { pendingPlan: { scope: 'arc', savedAt: 99 } } }));
+        const stale = await request(app).post(url).set('Host', 'localhost')
+            .send({ scope: { scope: 'arc' }, savedAt: 42 });
+        expect(stale.status).toBe(409);
+        expect(stale.body).toMatchObject({ conflict: true });
+        expect(stale.body.ok).toBeUndefined();
+        expect(stale.body.error).toMatch(/build plan was modified in another tab or session since you loaded it/i);
+        expect(stale.body.error).toMatch(/reload the plan to get the newer version/i);
+        expect(stale.body.error).toMatch(/NOT saved/i);
     });
 
     // --- authoring-residue-reset (backlog 2026-11-07 DJ) --------------------

@@ -137,6 +137,31 @@ function AiDesignerSection({ campaignName, onGenerated }) {
   const threadEnd = useRef(null);
   const saveTimerRef = useRef(null); // debounce handle (network only — the server holds the truth)
   const stagedPlanRef = useRef(null); // latest plan edit not yet POSTed to design-notes
+  // Freshness contract (backlog 2026-11-22, mirrors the NPC lane's updatedAt
+  // tripwire): the savedAt stamp the server last showed this tab. Every
+  // pending-plan POST echoes it; the 409s when the stored plan moved on.
+  const baseSavedAtRef = useRef(null);
+  const [planConflict, setPlanConflict] = useState(null); // refused-save inline notice (plain-English)
+
+  // One outcome handler for every pending-plan POST: success adopts the
+  // server's new stamp (next echo stays fresh) and clears a stale notice;
+  // a 409 freshness conflict becomes the inline notice — the editor stays
+  // open with its staged bytes (never silently discarded or applied), and
+  // conflicts warn rather than error (benign rejected edit, NPC-lane law).
+  const applySaveResult = (res) => {
+    if (res?.conflict) {
+      console.warn('[ai-designer] pending plan conflict', res.error);
+      setPlanConflict(res.error || 'The build plan was modified in another tab or session — reload the plan to get the newer version.');
+      return false;
+    }
+    if (res?.ok) {
+      setPlanConflict(null);
+      baseSavedAtRef.current = typeof res.savedAt === 'number' ? res.savedAt : null;
+      return true;
+    }
+    console.error('[ai-designer] pending plan save failed', res?.error);
+    return false;
+  };
 
   const stopPlanDebounce = () => {
     if (saveTimerRef.current) {
@@ -155,16 +180,36 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     saveTimerRef.current = setTimeout(() => { // network/save debounce tick — flush latest plan POST
       saveTimerRef.current = null;
       stagedPlanRef.current = null;
-      saveDesignerPendingPlan({ campaignName, scope: next })
+      saveDesignerPendingPlan({ campaignName, scope: next, savedAt: baseSavedAtRef.current })
+        .then(applySaveResult)
         .catch(err => console.error('[ai-designer] pending plan save failed', err));
     }, PLAN_SAVE_DEBOUNCE_MS);
   };
 
   const clearPendingPlan = () => {
     stopPlanDebounce();
-    setPlan(null);
-    saveDesignerPendingPlan({ campaignName, scope: null })
+    saveDesignerPendingPlan({ campaignName, scope: null, savedAt: baseSavedAtRef.current })
+      .then(res => {
+        // The editor closes only once the server agrees the clear is fresh —
+        // a refused (stale) clear keeps it open behind the conflict notice.
+        if (applySaveResult(res)) setPlan(null);
+      })
       .catch(err => console.error('[ai-designer] pending plan clear failed', err));
+  };
+
+  // Reload-recovery affordance (mirrors the NPC lane's "Reload list"): fetch
+  // the server's newest bytes into the editor and re-arm the echo stamp.
+  const reloadPendingPlan = async () => {
+    stopPlanDebounce();
+    setPlanConflict(null);
+    try {
+      const notes = await loadDesignerConversation({ campaignName });
+      setPlan(notes.pendingPlan || null);
+      baseSavedAtRef.current = notes.pendingPlan?.savedAt ?? null;
+    } catch (err) {
+      console.error('[ai-designer] pending plan reload failed', err);
+      setPlanConflict('The plan could not be reloaded — try again.');
+    }
   };
 
   // Backlog 2026-11-07 DJ: authoring residue (conversation + plans + pending
@@ -181,6 +226,8 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       setError(null);
       setResult(null);
       setDraft('');
+      setPlanConflict(null);
+      baseSavedAtRef.current = null; // the ledger is blank — nothing to be stale against
     } else {
       setError(res.error || 'designer conversation clear failed');
     }
@@ -193,6 +240,8 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     setPlan(null);
     setError(null);
     setResult(null);
+    setPlanConflict(null);
+    baseSavedAtRef.current = null;
     (async () => {
       try {
         const status = await getAiStatus(campaignName);
@@ -203,6 +252,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
           if (cancelled) return;
           setMessages(notes.messages || []);
           if (notes.pendingPlan) setPlan(notes.pendingPlan);
+          baseSavedAtRef.current = notes.pendingPlan?.savedAt ?? null;
           if (notes.lastError?.error) setError(notes.lastError.error);
         }
       } catch {
@@ -211,12 +261,18 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     })();
     return () => {
       cancelled = true;
-      // Flushing on unmount is what makes "navigate away" lossless.
+      // Flushing on unmount is what makes "navigate away" lossless — and the
+      // echoed stamp makes it lossless WITHOUT clobbering a newer save from
+      // another tab: a stale flush is refused 409 (server keeps its bytes),
+      // and with the view gone a rejection only warns.
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
         if (stagedPlanRef.current) {
-          saveDesignerPendingPlan({ campaignName, scope: stagedPlanRef.current })
+          saveDesignerPendingPlan({ campaignName, scope: stagedPlanRef.current, savedAt: baseSavedAtRef.current })
+            .then(res => {
+              if (res && !res.ok) console.warn('[ai-designer] pending plan flush rejected', res.error);
+            })
             .catch(err => console.error('[ai-designer] pending plan flush failed', err));
         }
       }
@@ -246,8 +302,13 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     setBusy(true);
     setError(null);
     const res = await designerPlan({ campaignName });
-    if (res.ok) setPlan(res.scope); // route already persisted it as the pending plan
-    else setError(res.error || res.code || 'plan request failed');
+    if (res.ok) {
+      setPlan(res.scope); // route already persisted it as the pending plan
+      baseSavedAtRef.current = typeof res.savedAt === 'number' ? res.savedAt : null;
+      setPlanConflict(null);
+    } else {
+      setError(res.error || res.code || 'plan request failed');
+    }
     setBusy(false);
   };
 
@@ -258,7 +319,8 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     setError(null);
     // Make sure the exact scope we are generating from is what the server holds.
     if (hadUnsaved) {
-      await saveDesignerPendingPlan({ campaignName, scope: confirmedScope })
+      await saveDesignerPendingPlan({ campaignName, scope: confirmedScope, savedAt: baseSavedAtRef.current })
+        .then(applySaveResult)
         .catch(err => console.error('[ai-designer] pending plan flush failed', err));
     }
     const res = await designerGenerate({ campaignName, scope: confirmedScope });
@@ -266,6 +328,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     if (res.ok) {
       setResult(res);
       setPlan(null); // route cleared the server-side pending — plan consumed
+      setPlanConflict(null);
       onGenerated?.();
     } else {
       setError((res.errors || [res.error || res.code || 'generation failed']).join('\n'));
@@ -298,6 +361,14 @@ function AiDesignerSection({ campaignName, onGenerated }) {
         </button>
       </h3>
       {error && <div className="ai-designer-error" role="alert">{error}</div>}
+      {planConflict && (
+        <div className="ai-designer-conflict" role="alert">
+          <span>{planConflict}</span>
+          <button type="button" className="ct-btn ai-designer-conflict-reload" onClick={reloadPendingPlan}>
+            <i className="fa-solid fa-rotate" /> Reload plan
+          </button>
+        </div>
+      )}
       {result && <ResultNotice result={result} />}
 
       {plan ? (

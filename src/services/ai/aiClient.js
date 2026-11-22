@@ -110,15 +110,19 @@ export async function clearDesignerConversation({ campaignName }) {
 /**
  * Persist (or clear, with scope:null) the GM's pending build plan + count
  * edits so view navigation/reload rehydrates the PlanEditor from design-notes.
+ * `savedAt` echoes the server stamp this tab loaded (freshness contract,
+ * backlog 2026-11-22): the route 409s when it no longer matches the stored
+ * plan, and the caller keys its inline conflict notice off `conflict === true`
+ * (mirrors the NPC lane's stale-form 409 handling).
  */
-export async function saveDesignerPendingPlan({ campaignName, scope }) {
+export async function saveDesignerPendingPlan({ campaignName, scope, savedAt = null }) {
     const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/pending-plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope }),
+        body: JSON.stringify({ scope, savedAt }),
     })
     const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
-    if (!res.ok) return { ok: false, error: data.error }
+    if (!res.ok) return { ok: false, error: data.error, conflict: data.conflict === true }
     return data
 }
 

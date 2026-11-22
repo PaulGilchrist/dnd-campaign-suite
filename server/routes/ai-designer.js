@@ -4,7 +4,7 @@
  *   POST /api/campaigns/:campaign/ai/designer/chat     { message }      → { reply }
  *   POST /api/campaigns/:campaign/ai/designer/plan     {}               → { scope }   (GM edits/confirms this)
  *   POST /api/campaigns/:campaign/ai/designer/generate { scope }        → applyBlueprint result (drafts)
- *   POST /api/campaigns/:campaign/ai/designer/pending-plan { scope|null } → persist/clear the GM's un-revised plan
+ *   POST /api/campaigns/:campaign/ai/designer/pending-plan { scope|null, savedAt? } → persist/clear the GM's un-revised plan (stale savedAt echo → 409)
  *   POST /api/campaigns/:campaign/ai/designer/clear-conversation           → blank design-notes.json (GM residue reset)
  *   GET  /api/campaigns/:campaign/ai/designer/conversation              → design-notes.json
  *
@@ -97,11 +97,14 @@ router.post('/api/campaigns/:campaign/ai/designer/plan', async (req, res) => {
         if (!cfg) return;
         const result = await proposePlan({ campaign: req.params.campaign, aiConfig: cfg, log: addEntry });
         if (result.ok) {
-            savePendingPlan(req.params.campaign, result.scope);
+            const notes = savePendingPlan(req.params.campaign, result.scope);
             setDesignerError(req.params.campaign, 'plan', null);
-        } else {
-            setDesignerError(req.params.campaign, 'plan', result.error || result.code);
+            // Echo the server stamp so the client's first edit-save echoes a
+            // fresh baseSavedAt instead of a stale one (freshness contract).
+            res.json({ ...result, savedAt: notes.pendingPlan?.savedAt ?? null });
+            return;
         }
+        setDesignerError(req.params.campaign, 'plan', result.error || result.code);
         res.json(result);
     } catch (e) {
         console.error('[ai-designer:plan]', e);
@@ -153,6 +156,15 @@ router.post('/api/campaigns/:campaign/ai/designer/generate', async (req, res) =>
  * scope, story spine — so navigating away never discards them. GM-only like
  * the conversation read lane (deliberately not aiConfigLive-gated: a stored
  * plan must stay clearable/editable even after the config is removed).
+ *
+ * Freshness contract (backlog 2026-11-22, mirrors the NPC PUT lane's
+ * updatedAt tripwire): the client echoes the `savedAt` stamp it loaded in
+ * `body.savedAt`. A stored plan carrying a different stamp proves this tab
+ * never saw the current bytes — refuse with a plain-English 409 and write
+ * NOTHING (the newer save in the other tab survives, including a late
+ * unmount-flush from a leaving tab). No echoed stamp (fresh editor, or the
+ * server-side plan/generate lanes calling savePendingPlan directly) writes
+ * freely. Success echoes the NEW server stamp so the next save stays fresh.
  */
 router.post('/api/campaigns/:campaign/ai/designer/pending-plan', (req, res) => {
     try {
@@ -164,8 +176,15 @@ router.post('/api/campaigns/:campaign/ai/designer/pending-plan', (req, res) => {
         if (scope != null && JSON.stringify(scope).length > 64000) {
             return res.status(400).json({ error: 'pending plan is too large' });
         }
-        const notes = savePendingPlan(req.params.campaign, scope);
-        res.json({ ok: true, pending: !!notes.pendingPlan });
+        const savedAt = typeof req.body?.savedAt === 'number' ? req.body.savedAt : null;
+        const result = savePendingPlan(req.params.campaign, scope, { baseSavedAt: savedAt });
+        if (result.conflict) {
+            return res.status(409).json({
+                error: 'The build plan was modified in another tab or session since you loaded it — reload the plan to get the newer version — your edit was NOT saved.',
+                conflict: true,
+            });
+        }
+        res.json({ ok: true, pending: !!result.pendingPlan, savedAt: result.pendingPlan?.savedAt ?? null });
     } catch (e) {
         console.error('[ai-designer:pending-plan]', e);
         res.status(500).json({ error: 'pending plan save failed' });

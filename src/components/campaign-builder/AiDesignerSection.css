@@ -50,6 +50,30 @@
   margin-bottom: 0.5rem;
 }
 
+/* Backlog 2026-11-22 designer-pending-plan-freshness: the 409 refuse face —
+   the plan edit was NOT saved because another tab changed it. Amber refused
+   tone mirroring the referee console's .ai-notice--refused, with the
+   Reload-plan recovery affordance on the row's end. */
+.ai-designer-conflict {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: rgba(210, 153, 34, 0.16);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  border-radius: 6px;
+  color: #d29922;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.ai-designer-conflict-reload {
+  margin-left: auto;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 /* Partial resume outcome: rows survived, but the run stopped short — keep it
    visually distinct from a clean full draft (error-toned frame). */
 .ai-designer-result-partial {

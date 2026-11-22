@@ -198,6 +198,6 @@ describe('AiDesignerSection', () => {
         await screen.findByText('Review the build plan');
         fireEvent.click(screen.getByRole('button', { name: /back to chat/i }));
         expect(await screen.findByPlaceholderText('What are we building?')).toBeTruthy();
-        expect(api.saveDesignerPendingPlan).toHaveBeenCalledWith({ campaignName: 'c', scope: null });
+        expect(api.saveDesignerPendingPlan).toHaveBeenCalledWith({ campaignName: 'c', scope: null, savedAt: null });
     });
 });

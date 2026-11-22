@@ -71,6 +71,38 @@ describe('savePendingPlan', () => {
         expect(notes.plans).toHaveLength(1);
         expect(notes.storySummary).toBe('spine');
     });
+
+    // Freshness contract (backlog 2026-11-22, mirrors the NPC updatedAt
+    // tripwire): an echoed savedAt must match the stored stamp or the write
+    // is refused with a conflict and NOTHING hits disk.
+    it('refuses with conflict and writes NOTHING when the echoed stamp differs from the stored stamp', () => {
+        const first = savePendingPlan('c', { scope: 'arc', entityPlan: [{ kind: 'npc', count: 2 }] });
+        const result = savePendingPlan(
+            'c', { scope: 'arc', entityPlan: [{ kind: 'npc', count: 9 }] },
+            { baseSavedAt: first.pendingPlan.savedAt - 1 });
+        expect(result.conflict).toBe(true);
+        expect(state.writes).toBe(1); // only the first save ever touched disk
+        expect(loadNotes('c').pendingPlan.entityPlan[0].count).toBe(2); // newer bytes intact
+    });
+
+    it('accepts an echo matching the stored stamp and re-stamps the save', () => {
+        const first = savePendingPlan('c', { scope: 'arc' });
+        const second = savePendingPlan('c', { scope: 'session' }, { baseSavedAt: first.pendingPlan.savedAt });
+        expect(second.conflict).toBeUndefined();
+        expect(second.pendingPlan.scope).toBe('session');
+        expect(state.writes).toBe(2);
+    });
+
+    it('no stored plan, or no echoed stamp, always succeeds (fresh editor + server-side lanes)', () => {
+        // nothing stored yet — there is no newer save to be stale against
+        const fresh = savePendingPlan('c', { scope: 'one_shot' }, { baseSavedAt: 123 });
+        expect(fresh.conflict).toBeUndefined();
+        // no echo at all: fresh never-loaded editor, or the /plan + generate
+        // server lanes writing unconditionally
+        const noEcho = savePendingPlan('c', { scope: 'arc' });
+        expect(noEcho.conflict).toBeUndefined();
+        expect(noEcho.pendingPlan.scope).toBe('arc');
+    });
 });
 
 describe('setDesignerError', () => {
