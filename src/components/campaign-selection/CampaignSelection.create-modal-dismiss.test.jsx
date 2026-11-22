@@ -222,6 +222,39 @@ describe('dismiss stays inert mid-create; Cancel and Create are unaffected', () 
     });
   });
 
+  // Backlog SS 2026-11-22 (live-refocus improve): the browser face mid-create
+  // is focus stranded at BODY, so the Escape that must stay inert arrives
+  // TARGETED AT BODY — the rescue lane, not the subtree lane. It was fully
+  // inert for the seed lane (its disabledRef gate), but the standard modal's
+  // PERSISTENT rescue lane answered ANY mounted .modal-content and ran its
+  // closeModal, silently wiping the shared typed name while the seed modal
+  // stayed open. OWNED: a body-targeted Escape mid-create wipes nothing.
+  it('a body-targeted Escape mid-create stays fully inert (typed name preserved)', async () => {
+    let settleSeed;
+    createSeededCampaign.mockReturnValue(new Promise((resolve) => { settleSeed = resolve; }));
+    await renderSelection();
+    fireEvent.click(arenaBtn());
+    fireEvent.change(nameInput(), { target: { value: 'Typed Name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    });
+
+    // jsdom keeps no focus after click; place it where the browser strands it.
+    nameInput().blur();
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(overlays()).toHaveLength(1);
+    expect(nameInput().value).toBe('Typed Name');
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    settleSeed({ name: 'Arena-flight' });
+    await waitFor(() => {
+      expect(overlays()).toHaveLength(0);
+    });
+  });
+
   it('the Cancel button still closes with zero create traffic (law unchanged)', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     await renderSelection();

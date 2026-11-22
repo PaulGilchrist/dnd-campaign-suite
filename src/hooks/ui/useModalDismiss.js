@@ -52,8 +52,13 @@ export function useModalDismiss(onCancel, { disabled = false, panelSelector = '.
     // per-dialog scoped), and any other target stays with elements' own
     // handlers — notably AvatarModal's shipped one-shot document-level Escape
     // lane, which this listener must never double-fire. It also acts only while
-    // a dialog with this panel class is mounted (persistent-host consumers like
-    // CampaignSelection call the hook while their modal is closed too).
+    // a dialog with this panel class is mounted, and a persistent-host
+    // consumer (CampaignSelection calls the hook while its modal is closed
+    // too) must additionally pass `disabled` while ITS modal is unmounted:
+    // the panel-class query cannot tell two same-class dialogs apart, so an
+    // ungated persistent lane would answer Escapes aimed at a sibling modal
+    // (live: a body-targeted Escape mid-seeded-create ran the STANDARD
+    // modal's closeModal and wiped the shared typed name — SS 2026-11-22).
     useEffect(() => {
         const handleWindowKeyDown = (e) => {
             if (e.key !== 'Escape' || disabledRef.current) return;

@@ -55,7 +55,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT after clears (a 2-byte `{}` `cha
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(SS 2026-11-22) Seeded quick-create: focus never restored after a create attempt ends** — the Escape fix made the modal answerable again, but after the `seeding` pass finishes the buttons re-enable while `activeElement` stays BODY: a keyboard user must Tab from the document root to reach the name field (or Cancel) again. Cheap: in `SeededCampaignModal.jsx`, refocus the name input when `seeding` flips false with the modal still open (the refusal face keeps the typed name, so it is exactly the field to return to). Files: `src/components/campaign-selection/SeededCampaignModal.jsx`, `src/hooks/ui/useModalDismiss.js` (if centralized).
 - **(SS 2026-11-22) `GET /api/campaigns` types map lags folder materialization** — a just-created arena/starter appears under `folders` while `types` still says `standard` for a few seconds (debounced `campaign-meta.json` write), so the selection list can render the new campaign WITHOUT its preset badge briefly. Consider writing `campaign-meta.json` synchronously at seed time (create paths already writeFileSync maps immediately — same idiom). Files: `server/routes/campaigns*` create/seed path, `src/components/campaign-selection/CampaignSelection.jsx` badge render.
 
 ## Blocked / Not Verified (fold-gate ledger)

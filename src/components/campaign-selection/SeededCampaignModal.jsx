@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import { seedLockNoteText } from '../../services/campaign/seededCampaign.js';
 
@@ -57,6 +58,25 @@ function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, on
   const titleId = `seeded-campaign-title-${preset.prefix.toLowerCase()}`;
   const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
     useModalDismiss(onCancel, { disabled: seeding });
+
+  // Focus restoration after a create attempt (backlog SS 2026-11-22): BOTH
+  // footer buttons flip `disabled={seeding}`, so the clicked Create sheds
+  // activeElement to BODY mid-create (the same stranded-focus face the
+  // useModalDismiss window-rescue lane answers for Escape). When the pass
+  // ends with the modal still open — the refusal face keeps the typed name
+  // in the input, so that is exactly the field to return to — refocus it on
+  // the seeding true→false transition. Only that edge fires: initial mount
+  // starts at false (autoFocus owns that face), and a SUCCESS unmounts the
+  // modal before the effect re-runs, so focus is never stolen on close or
+  // mid-create.
+  const nameInputRef = useRef(null);
+  const wasSeedingRef = useRef(false);
+  useEffect(() => {
+    if (wasSeedingRef.current && !seeding && nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+    wasSeedingRef.current = seeding;
+  }, [seeding]);
   return (
     <div
       className="modal-overlay"
@@ -69,6 +89,7 @@ function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, on
         <h2 id={titleId}>{preset.button}</h2>
         <p className="seeded-campaign-note">{preset.note}</p>
         <input
+          ref={nameInputRef}
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}

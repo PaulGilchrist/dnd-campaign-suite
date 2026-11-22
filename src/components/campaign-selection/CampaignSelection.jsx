@@ -318,7 +318,16 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // Cancel lane (closeModal clears only local form state — nothing to discard,
   // so no confirm arms). Mid-create the Create button is disabled and the
   // screen swaps to the full-page "Creating…" face, so dismiss needs no gate.
-  const newCampaignDismiss = useModalDismiss(closeModal);
+  // `disabled` gates this lane to when ITS OWN modal is mounted (backlog SS
+  // 2026-11-22, live-focus-restoration improve): the hook is called from the
+  // persistent page component, so its window Escape-rescue — which answers
+  // ANY mounted `.modal-content` — used to fire while the SEEDED modal owned
+  // the screen. A body-targeted Escape mid-seeded-create was inert for the
+  // seed lane (its own disabledRef gate) but silently ran THIS closeModal,
+  // wiping the shared `newCampaignName` the refusal face must preserve. The
+  // seed modal unmounts this lane's overlay along with its own component, so
+  // the rescue must sleep exactly as long as the overlay does.
+  const newCampaignDismiss = useModalDismiss(closeModal, { disabled: !showNewCampaignModal });
 
   const openSeedModal = (presetKey) => {
     if (modalOpen) return; // see openNewCampaignModal — no stacked overlays
