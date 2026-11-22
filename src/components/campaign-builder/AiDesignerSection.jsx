@@ -79,14 +79,31 @@ function parseWholeMessageJson(content) {
   }
 }
 
-// One thread row's body: a whole-JSON designer reply becomes an indented,
-// readable block; everything else renders exactly as before.
+// One thread row's body: a whole-JSON designer reply is handled by
+// JsonMessageBody; everything else renders exactly as before.
 function MessageBody({ role, content }) {
   const json = role === 'ai' ? parseWholeMessageJson(content) : null;
-  if (json) {
-    return <pre className="ai-designer-msg-text ai-designer-msg-json">{JSON.stringify(json, null, 2)}</pre>;
+  if (!json) return <span className="ai-designer-msg-text">{content}</span>;
+  return <JsonMessageBody json={json} />;
+}
+
+// Backlog 2026-11-22 PPP: models answering the chat lane in JSON often wrap
+// their prose in a `text` field — show that prose as a normal message instead
+// of painting the blob. A whole-JSON OBJECT with a non-empty string `text`
+// renders the prose; anything without a usable `text` (bare object, array)
+// collapses behind a <details> disclosure so the thread stays readable while
+// the old AZ2 indented pretty-print block survives behind it.
+function JsonMessageBody({ json }) {
+  const prose = typeof json.text === 'string' && json.text.trim() !== '' ? json.text : null;
+  if (prose !== null) {
+    return <span className="ai-designer-msg-text">{prose}</span>;
   }
-  return <span className="ai-designer-msg-text">{content}</span>;
+  return (
+    <details className="ai-designer-msg-json-details">
+      <summary>Raw JSON reply</summary>
+      <pre className="ai-designer-msg-text ai-designer-msg-json">{JSON.stringify(json, null, 2)}</pre>
+    </details>
+  );
 }
 
 // Post-generate status banner. Full success keeps the classic copy; a

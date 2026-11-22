@@ -102,6 +102,24 @@
    indented block instead of a raw one-line blob. Mirrors the shared code
    treatment (Notes.css / PreviewToggle.css pre idiom: --code-bg, radius 4px,
    overflow-x). pre-wrap + overflow-wrap come from .ai-designer-msg-text. */
+/* Backlog 2026-11-22 PPP: a whole-JSON reply with no usable `text` field
+   collapses behind a disclosure so the raw blob never shouts into the
+   thread; expanding reveals the indented block below. */
+.ai-designer-msg-json-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-designer-msg-json-details summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.ai-designer-msg-json-details pre {
+  margin-top: 6px;
+}
+
 .ai-designer-msg-json {
   flex: 1;
   min-width: 0;

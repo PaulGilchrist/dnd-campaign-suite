@@ -54,8 +54,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (PPP) — Designer chat renders model replies verbatim even when the answer is a JSON blob:** the chat lane accepted my structured `{"type":"narrative",…}` answer and painted the raw pretty-printed JSON into the conversation thread. Real models occasionally do this too; a cheap guard could detect a JSON-object answer and show its `text`-like field (or collapse it in a `<details>` block). `src/components/campaign-builder/AiDesignerSection.jsx`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).
