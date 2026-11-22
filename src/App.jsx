@@ -1093,7 +1093,7 @@ function App() {
              onSaveClick={handleSaveClick}
            />
         )}
-        {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} onOpenEncounters={() => setActiveView('encounter')} />}
+        {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} onOpenEncounters={() => setActiveView('encounter')} onAddCharacter={handleAddCharacter} />}
         {/* GM Screen: pure-read lookup over computedCharacters + the runtime
             store (no writes, no mutation affordances). Sidebar entry is
             localhostOnly — same gate as the other GM views. */}

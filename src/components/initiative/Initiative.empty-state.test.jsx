@@ -193,4 +193,49 @@ describe('Initiative zero-subject empty state', () => {
         await act(async () => { fireEvent.click(button); });
         expect(onOpenEncounters).toHaveBeenCalledTimes(1);
     });
+
+    // [TT 2026-11-22 backlog] The copy's first verb ("add characters") must
+    // have a matching button riding the sidebar lane (handleAddCharacter →
+    // creation wizard) under the exact sidebar gate (isLocalhost only).
+    const findAddCharacter = (container) => [...container.querySelectorAll('button')]
+        .find((b) => /Add Character/i.test(b.textContent));
+
+    it('offers the Add Character button beside the deep-link on a zero-character GM tab', async () => {
+        const { container } = await mount(mountProps({ isLocalhost: true, onAddCharacter: vi.fn() }));
+        const add = findAddCharacter(container);
+        expect(add).toBeDefined();
+        expect(add.className).toMatch(/(^|\s)ct-btn(\s|$)/);
+        // The EB deep-link stays alongside it.
+        expect([...container.querySelectorAll('button')]
+            .some((b) => /Encounter Builder/i.test(b.textContent))).toBe(true);
+    });
+
+    it('does NOT render the Add Character button on a non-GM (player) tab', async () => {
+        const { container } = await mount(mountProps({ isLocalhost: false }));
+        expect(container.querySelector('.ct-empty-state')).not.toBeNull();
+        expect(findAddCharacter(container)).toBeUndefined();
+    });
+
+    it('does NOT render the Add Character button when the roster is non-empty', async () => {
+        // characters.length > 0 opens boardHasSubjects once the mount settles
+        // its summary — the normal board face renders and the empty state (with
+        // its add door) never shows.
+        const { container } = await mount(mountProps({
+            isLocalhost: true,
+            characters: [{ name: 'Alice' }],
+        }));
+        // Subjects present → normal board face, no empty state at all.
+        expect(container.querySelector('.ct-empty-state')).toBeNull();
+        expect(findAddCharacter(container)).toBeUndefined();
+    });
+
+    it('invokes onAddCharacter when the GM presses the Add Character button', async () => {
+        const onAddCharacter = vi.fn();
+        const { container } = await mount(mountProps({ isLocalhost: true, onAddCharacter }));
+        const button = findAddCharacter(container);
+        expect(button).toBeDefined();
+
+        await act(async () => { fireEvent.click(button); });
+        expect(onAddCharacter).toHaveBeenCalledTimes(1);
+    });
 });

@@ -241,14 +241,25 @@ function boardHasSubjects(combatSummary, characters) {
 // of guidance. Re-uses the global .ct-container/.ct-empty-state/.ct-btn tiers
 // (no new CSS). The deep-link into the Encounter Builder is GM-only — the
 // Encounters view is not in the visitor sidebar — while the copy itself shows
-// for everyone. Rendered as a module-scope component so Initiative's own
-// complexity stays at its eslint ceiling.
-function InitiativeEmptyState({ isLocalhost, onOpenEncounters }) {
+// for everyone. The Add Character button (backlog TT 2026-11-22) gives the
+// sentence's first verb its matching control on a ZERO-character campaign: it
+// rides the exact sidebar lane (App.jsx handleAddCharacter → creation wizard)
+// with the exact sidebar gate (isLocalhost, mirroring Sidebar.jsx
+// CharacterList). The characters.length guard covers the absent-combatSummary
+// branch, where the empty state can render before the roster settles.
+// Rendered as a module-scope component so Initiative's own complexity stays
+// at its eslint ceiling.
+function InitiativeEmptyState({ characters, isLocalhost, onOpenEncounters, onAddCharacter }) {
     return (
         <div className='ct-container'>
             <div className='ct-empty-state'>
                 <i className='fa-solid fa-dice-d20' aria-hidden='true'></i>
                 <p>No one is on the initiative board yet — add characters, or join monsters via the Encounter Builder to start combat.</p>
+                {isLocalhost && characters.length === 0 && onAddCharacter && (
+                    <button className='ct-btn' onClick={onAddCharacter}>
+                        Add Character
+                    </button>
+                )}
                 {isLocalhost && onOpenEncounters && (
                     <button className='ct-btn ct-btn-primary' onClick={onOpenEncounters}>
                         Open Encounter Builder
@@ -332,7 +343,7 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
     )
 }
 
-function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter, onOpenEncounters }) {
+function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter, onOpenEncounters, onAddCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
     const [activeCreatureName, setActiveCreatureName] = React.useState(null)
@@ -1139,7 +1150,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 />
             )}
             </>
-            ) : <InitiativeEmptyState isLocalhost={isLocalhost} onOpenEncounters={onOpenEncounters} />}
+            ) : <InitiativeEmptyState characters={characters} isLocalhost={isLocalhost} onOpenEncounters={onOpenEncounters} onAddCharacter={onAddCharacter} />}
         </div>
     )
 }
