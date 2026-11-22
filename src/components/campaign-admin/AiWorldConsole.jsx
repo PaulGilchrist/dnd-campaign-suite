@@ -10,6 +10,7 @@ import React from 'react'
 import { askWorldKeeper } from '../../services/ai/aiClient.js'
 import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js'
 import { findUnknownLedgerNames, ledgerNameList } from '../../services/ai/proposalNameAudit.js'
+import { incompleteLedgerCopy } from '../../services/ai/incompleteLedgerCopy.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { loadSettlements } from '../../services/campaign/settlementsService.js'
 import { loadFactions } from '../../services/campaign/factionsService.js'
@@ -18,8 +19,10 @@ import './AiWorldConsole.css'
 
 // 2026-11-22 — Lane labels for the partial-failure face. Order is index-bound
 // to the Promise.allSettled array below and to the ledgerNameList keys.
+// 2026-11-22 (OOO) — ONE all-lowercase label style: the pill embeds these
+// mid-sentence, so a Title-case lane read as a casing mix.
 const LEDGER_LANES = [
-    { key: 'npcs', label: 'NPC roster' },
+    { key: 'npcs', label: 'npcs' },
     { key: 'settlements', label: 'settlements' },
     { key: 'factions', label: 'factions' },
     { key: 'quests', label: 'quests' },
@@ -75,6 +78,8 @@ export default function AiWorldConsole({ campaignName }) {
                 // way factions do (loadQuests unwraps to a bare array, which
                 // ledgerNameList already tolerates).
                 questNames: laneNames(3),
+                // label === key (all-lowercase style): the raw lane names ride
+                // the state and the pure fn builds the pill copy from them.
                 unreadable: LEDGER_LANES.filter((_, i) => settled[i].status !== 'fulfilled').map(lane => lane.label),
             })
         })
@@ -170,7 +175,7 @@ function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss })
             {face === 'incomplete' && (
                 <div className="ai-world-pending ai-world-pending--incomplete" role="status">
                     <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                    {`Ledger check incomplete — ${unreadableLanes.join(', ')} unreadable`}
+                    {incompleteLedgerCopy(unreadableLanes)}
                 </div>
             )}
             {face === 'verdict' && unknownNames.length > 0 && (

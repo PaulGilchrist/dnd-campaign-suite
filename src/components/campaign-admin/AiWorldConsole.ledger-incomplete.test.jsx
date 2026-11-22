@@ -85,7 +85,7 @@ describe('AiWorldConsole — quest_draft ledger-check incomplete face', () => {
         rejectLanes('npcs');
         await askFor(fabricatedQuest); // unknown names WOULD advise on a full ledger
         await waitFor(() => expect(incomplete()).not.toBeNull());
-        expect(incomplete().textContent).toContain('NPC roster');
+        expect(incomplete().textContent).toBe('Ledger check incomplete — npcs unreadable');
         expect(advisory()).toBeNull(); // verdict suppressed — the ledger was partial
         expect(pending()).toBeNull();  // pending retired into the incomplete face
     });
@@ -94,7 +94,7 @@ describe('AiWorldConsole — quest_draft ledger-check incomplete face', () => {
         rejectLanes('factions');
         await askFor(groundedQuest); // on full ledgers this card settles silent
         await waitFor(() => expect(incomplete()).not.toBeNull());
-        expect(incomplete().textContent).toContain('factions');
+        expect(incomplete().textContent).toBe('Ledger check incomplete — factions unreadable');
         expect(advisory()).toBeNull();
     });
 
@@ -102,10 +102,9 @@ describe('AiWorldConsole — quest_draft ledger-check incomplete face', () => {
         rejectLanes('npcs', 'settlements', 'factions', 'quests');
         await askFor(fabricatedQuest);
         await waitFor(() => expect(incomplete()).not.toBeNull());
-        // Pins lane-name mapping coverage: all four lanes carry a label that
-        // reaches the pill copy.
-        const copy = incomplete().textContent;
-        ['NPC roster', 'settlements', 'factions', 'quests'].forEach(label => expect(copy).toContain(label));
+        // Pins lane-name mapping coverage: all four lanes carry a lowercase
+        // label that reaches the pill copy, enumerated in lane order.
+        expect(incomplete().textContent).toBe('Ledger check incomplete — npcs, settlements, factions, quests unreadable');
         expect(advisory()).toBeNull();
     });
 
