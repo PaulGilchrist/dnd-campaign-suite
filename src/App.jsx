@@ -274,7 +274,10 @@ async function fetchCampaignChangeData(campaignName) {
       return await response.json();
     }
   } catch { /* no server — use computed defaults */ }
-  return {};
+  // NULL marks "no snapshot" (unlike an EMPTY object, which honestly means
+  // "campaign has no change-data"): hydrateCampaignRuntimeData must never
+  // evict the whole shared store on a fetch failure, only on real server truth.
+  return null;
 }
 
 function seedCharServerKeys(storeName, charServerData) {
@@ -314,15 +317,27 @@ function seedCharacterRuntimeData(char, serverData) {
   seedCharFeatureKeys(stats.name, char);
 }
 
-function seedCampaignRuntimeData(serverData) {
-  // Campaign keys are at the top level of serverData, seeded into the 'campaign' store
+function hydrateCampaignRuntimeData(serverData) {
+  // Campaign keys are at the top level of serverData, adopted into the shared
+  // 'campaign' store. That store is ONE global bucket keyed by characterKey
+  // only (useRuntimeState.js `stores`), so selecting a campaign must RE-SCOPE
+  // it to that campaign's own snapshot: adopt-and-evict via
+  // replaceRuntimeObject, the same full-replace law the character-bucket SSE
+  // echoes follow (applyStoreUpdate). The old seed-if-absent never evicted, so
+  // a no-reload campaign switch left campaign A's keys readable under campaign
+  // B — the Admin AI panel rendered A's aiConfig (endpoint, model, a live
+  // referee console) for a B whose server answers {value:null}
+  // (bug-campaign-store-ghost-keys-survive-campaign-switch). Memory-only: the
+  // server owns this data, an adopted snapshot is never re-POSTed (skipSync law).
+  // Null-valued snapshot entries stay UNADOPTED (never a stored null — the
+  // null-echo REMOVE doctrine from applyStoreUpdate, hex-arrival-null-echo
+  // crash precedent); the POST-null lanes park nulls server-side, and absent
+  // from the adopted set a ghost null key evicts just like a missing one.
   if (!serverData || typeof serverData !== 'object') return;
-  const campaignStore = getStore('campaign');
-  for (const [key, value] of Object.entries(serverData)) {
-    if (!campaignStore.has(key) && value != null) {
-      campaignStore.set(key, value);
-    }
-  }
+  const adopted = Object.fromEntries(
+    Object.entries(serverData).filter(([, value]) => value != null)
+  );
+  replaceRuntimeObject('campaign', adopted);
 }
 
 function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, activeCharacter, onBackFromMap, backMapTarget, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
@@ -580,6 +595,29 @@ function App() {
 
    // Seed runtime store with computed tracked resources, then apply server overrides
     const seededCampaignRef = useRef('');
+    // Campaign-store rescope on every entry (bug-campaign-store-ghost-keys-
+    // survive-campaign-switch): the shared 'campaign' bucket is ONE global Map
+    // keyed by characterKey only, so switching campaigns without a page reload
+    // under the old seed-if-absent hydration left campaign A's keys (e.g. an
+    // aiConfig with a LIVE referee console) readable under campaign B, whose
+    // server honestly answered {value:null}. This effect ADOPTS-AND-EVICTS the
+    // entered campaign's change-data snapshot (null-parked entries stay
+    // unadopted). Its gate is the ENTER seam (campaign armed + picker left),
+    // NOT the character-seed effect below: a zero-character campaign (a fresh
+    // throwaway - the campaign where the ghost face was witnessed) never
+    // reaches that character gate, and re-selecting the SAME campaign from the
+    // picker re-runs it, so an Admin clear + re-select re-reads server truth
+    // in ONE pass instead of resurrecting cleared keys (the select-rehydrated
+    // two-pass law retires with this).
+    useEffect(() => {
+      if (!campaignName || showCampaignSelection) return;
+      let cancelled = false;
+      (async () => {
+        const serverData = await fetchCampaignChangeData(campaignName);
+        if (!cancelled) hydrateCampaignRuntimeData(serverData);
+      })();
+      return () => { cancelled = true; };
+    }, [campaignName, showCampaignSelection]);
     // Level-up celebration arming (roadmap Item 8): stays FALSE until the
     // change-data seed above has landed, so the seed itself (character JSON
     // `xp` → runtime `xp` jump on cold boot) can never read as an XP award.
@@ -598,8 +636,6 @@ function App() {
         for (const char of computedCharacters) {
           seedCharacterRuntimeData(char, serverData);
         }
-        // Seed campaign-level runtime data (targetEffects, etc.)
-        seedCampaignRuntimeData(serverData);
         setRuntimeSeeded(true);
       })();
     }, [computedCharacters, campaignName]);

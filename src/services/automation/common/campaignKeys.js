@@ -65,7 +65,7 @@ export const CAMPAIGN_KEYS = new Set([
     // isCampaignKey in applyStoreUpdate and was dispatched to a ghost
     // CHARACTER store named "lastCombatResult" — every already-mounted client
     // silently never showed the banner (only a reload hydrated it, since
-    // seedCampaignRuntimeData copies all top-level keys unfiltered).
+    // hydrateCampaignRuntimeData adopts all top-level keys unfiltered).
     // bug-victory-stamp-not-sse-adopted-missing-campaign-key.
     'lastCombatResult',
     // Starry Chalice post-cast ally-heal handoff (sibling-key audit 2026-11-02,

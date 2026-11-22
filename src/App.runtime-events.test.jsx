@@ -506,6 +506,11 @@ describe('App - Runtime Events & State Management', () => {
   describe('SSE runtime events', () => {
     beforeEach(async () => {
       await renderInCampaign();
+      // The select seam's campaign-store rescope (hydrateCampaignRuntimeData →
+      // replaceRuntimeObject('campaign', snapshot), bug-campaign-store-ghost-keys)
+      // lands during renderInCampaign's settle. These pins judge ONLY the
+      // dispatched echoes below — start them from a clean spy slate.
+      replaceRuntimeObject.mockClear();
     });
 
     it('character-update replaces a roster entry (swapping the active sheet only for the active character); character-create appends exactly one entry, deduped on re-echo', async () => {

@@ -9,8 +9,8 @@
  * destination tier purely from isCampaignKey(storeKey). Unregistered, the
  * stamp's OBJECT echo fell through to setRuntimeObject('lastCombatResult', …)
  * — a ghost CHARACTER store — so every already-mounted client silently never
- * showed the banner while a reload hydrated it fine (seedCampaignRuntimeData
- * copies all top-level keys unfiltered).
+ * showed the banner while a reload hydrated it fine (hydrateCampaignRuntimeData
+ * adopts all top-level keys unfiltered).
  *
  * This file pins the registration the dispatcher depends on. The end-to-end
  * routing outcome is pinned in App.runtime-events.test.jsx.

@@ -88,7 +88,7 @@ function deathSavePromptKey(targetName) {
 // Mirror-existence probe for the target-wide death-save prompt key. The key
 // reaches this client's synced runtime store on exactly two lanes: the
 // campaign-select seed (every top-level change-data key copies into the
-// 'campaign' store, App.jsx seedCampaignRuntimeData) and the live
+// 'campaign' store, App.jsx hydrateCampaignRuntimeData) and the live
 // `change-<campaign>-deathSavePrompt-<Name>` value echo (not registered as a
 // campaign key, App.jsx applyStoreUpdate dispatches it to a character-style
 // bucket store named after the full key). Present on either lane ⇒ the server
