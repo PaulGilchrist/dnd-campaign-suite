@@ -59,7 +59,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **Per-creature aria-label on the allies button (re-raised, RR 2026-11-22):** `.allies-edit-btn` exists on EVERY card and first() lands on the first PLAYER card — probes must scope `.creature-card.npc …`. A `aria-label="Edit allies of <name>"` (mirroring the `"<Name> target"` select idiom) would make GM automation and a11y both honest. `src/components/initiative/CreatureCard.jsx`.
 - **Dated quick-create prefill is un-creatable under a lock (RR 2026-11-22):** the modal now HONESTLY warns `Arena-YYYYMMDD will be refused`, but the input still starts on a name that can never commit; when `campaignLocked && !lockNames.includes(prefill)`, prefill the first allowlisted free name (or mark the input invalid up-front) so the default face is always actionable. `src/components/campaign-selection/CampaignSelection.jsx openSeedModal`.
 
 ## Blocked / Not Verified (fold-gate ledger)
