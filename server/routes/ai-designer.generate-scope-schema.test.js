@@ -72,8 +72,9 @@ describe('generate refuses malformed client scopes with an honest 400 — zero s
     it('object-shaped entityPlan → 400 naming the offender, no model call, no audit row, no design-notes write', async () => {
         const res = await post({ scope: 'bespoke', entityPlan: { npc: 1 }, levelRange: { min: 1, max: 2 } });
         expect(res.status).toBe(400);
-        expect(res.body.error).toContain('Build plan rejected');
-        expect(res.body.error).toContain('entityPlan');
+        // Grammatical copy pinned verbatim (schema-400 article grammar backlog:
+        // the old body read `must be a array`).
+        expect(res.body.error).toBe('Build plan rejected: $.entityPlan must be of type array');
         expect(chat).not.toHaveBeenCalled(); // refused before the batch leg
         expect(addEntry).not.toHaveBeenCalled(); // no ai_designer audit row
         expect(applyBlueprint).not.toHaveBeenCalled();
@@ -81,12 +82,14 @@ describe('generate refuses malformed client scopes with an honest 400 — zero s
         expect(savePendingPlan).not.toHaveBeenCalled(); // stored pending plan untouched
     });
 
-    it('names EVERY offender in one 400 (erasure-guard law)', async () => {
-        const res = await post({ entityPlan: [{ kind: 'bogus', count: -1 }], bogusField: true });
+    it('names EVERY offender in one 400 (erasure-guard law), each with grammatical type copy', async () => {
+        const res = await post({ entityPlan: [{ kind: 'bogus', count: 'two' }], bogusField: true });
         expect(res.status).toBe(400);
         expect(res.body.error).toContain('scope'); // required field named
         expect(res.body.error).toContain('entityPlan[0]'); // row kind + count named
+        expect(res.body.error).toContain('$.entityPlan[0].count must be of type integer'); // string-instead-of-integer copy
         expect(res.body.error).toContain('bogusField'); // unknown field named
+        expect(res.body.error).not.toMatch(/must be a[n]? (array|integer|object|string|number|boolean|null)\b/);
         expect(chat).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
     });

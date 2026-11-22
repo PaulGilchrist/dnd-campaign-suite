@@ -49,7 +49,9 @@ function resolveRef(ref, rootSchemas) {
 function checkType(value, type, at, errors) {
     const types = Array.isArray(type) ? type : [type];
     if (!types.some(t => (TYPE_CHECKS[t] || (() => false))(value))) {
-        errors.push(`${at} must be ${types.map(t => `a ${t}`).join(' or ')}`);
+        // 'of type X' (not 'a X'): grammatical for every JSON-Schema type incl.
+        // 'null', and unions join cleanly ('integer or null', not 'a integer or a null').
+        errors.push(`${at} must be of type ${types.join(' or ')}`);
         return false;
     }
     return true;

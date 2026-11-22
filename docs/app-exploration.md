@@ -69,7 +69,6 @@ change-data `{}` + log `[]` + sessions `[]`; disk `campaign-log.json`/`character
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (OOO) schema-400 article grammar:** `server/services/ai/authoring/schemaValidator.js:52` builds `${types.map(t => `a ${t}`)}` → user-facing copy reads `must be a array` / `a integer` / `a object`. Pick the article per type (or reword to `must be of type array`) — the honest-400 doctrine deserves clean prose. (live: `$.entityPlan must be a array` witnessed in the 400 body)
 - **2026-11-22 (OOO) incomplete-pill label casing is mixed:** `LEDGER_LANES` labels read `NPC roster` (capitalized) then `settlements/factions/quests` (lowercase) → pill copy `Ledger check incomplete — NPC roster, settlements, factions, quests unreadable` looks inconsistent when the roster lane fails. Unify style (all-lowercase or all-Title) and add a pure-fn pin.
 - **2026-11-22 (OOO) ai_* audit rows stay client-forgeable:** only `session_recap` joined SERVER_ONLY_LOG_TYPES and only note/narrative are author-gated — any client can POST a `type:'ai_director'`/`ai_ruling_applied` row with an arbitrary `characterName` (this IS the sanctioned Log-witness lane, so non-blocking, but the audit trail's trust claim is softer than the new unified attributed chrome implies). Consider a GM-origin gate on ai_* POSTs (visitors 403) while keeping the localhost witness lane.
 

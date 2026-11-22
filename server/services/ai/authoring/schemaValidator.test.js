@@ -48,6 +48,27 @@ describe('authoring schemaValidator (JSON Schema subset)', () => {
         expect(validateAgainstSchema('7', schema).ok).toBe(false);
     });
 
+    it('type-mismatch copy is grammatical for every JSON-Schema type (no "a array" articles)', () => {
+        // Backlog 2026-11-22 schema-400 article grammar: checkType reworded to
+        // `must be of type X` — pinned so the honest-400 prose never regresses.
+        expect(validateAgainstSchema({}, { type: 'array' }).errors)
+            .toEqual(['$ must be of type array']);
+        expect(validateAgainstSchema('7', { type: 'integer' }).errors)
+            .toEqual(['$ must be of type integer']);
+        for (const type of ['object', 'string', 'number', 'boolean', 'null']) {
+            const offenders = { object: [], string: 1, number: 'x', boolean: 1, null: 1 };
+            const res = validateAgainstSchema(offenders[type], { type });
+            expect(res.errors).toEqual([`$ must be of type ${type}`]);
+        }
+    });
+
+    it('multi-type unions join with " or " and each member reads grammatically', () => {
+        expect(validateAgainstSchema([], { type: ['string', 'null'] }).errors)
+            .toEqual(['$ must be of type string or null']);
+        expect(validateAgainstSchema(true, { type: ['integer', 'null'] }).errors)
+            .toEqual(['$ must be of type integer or null']);
+    });
+
     it('validates enum, const, pattern, and length/bound keywords', () => {
         expect(validateAgainstSchema('x', { enum: ['a', 'b'] }).ok).toBe(false);
         expect(validateAgainstSchema('a', { const: 'a' }).ok).toBe(true);

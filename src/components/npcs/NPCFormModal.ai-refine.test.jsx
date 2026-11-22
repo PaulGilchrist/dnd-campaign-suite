@@ -120,11 +120,11 @@ describe('NPCFormModal AI refine (authored-row projection)', () => {
 
   it('surfaces preflight/schema errors in the .ai-refine-error strip, form untouched', async () => {
     const { setFormData } = renderEditor();
-    refineEntity.mockResolvedValue({ ok: false, errors: ['hitPoints must be a integer or a null'] });
+    refineEntity.mockResolvedValue({ ok: false, errors: ['hitPoints must be of type integer or null'] });
     await openRefineAndAsk('anything');
 
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('hitPoints must be a integer or a null');
+    expect(alert.textContent).toContain('hitPoints must be of type integer or null');
     // Failed proposal: the editor form never moved (instruction text is
     // AiRefineButton-local state, so setFormData is not touched at all).
     expect(setFormData).not.toHaveBeenCalled();
