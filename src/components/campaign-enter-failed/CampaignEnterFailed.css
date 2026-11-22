@@ -19,7 +19,15 @@
   z-index: 1100;
 }
 
-.campaign-enter-failed .campaign-enter-failed-retry-btn {
-  font-style: normal;
+/* Action row: Retry + `Back to Campaigns` sit side by side under the copy.
+   The card's .ct-empty-state column keeps its own 8px gap; margin-top mirrors
+   the old single-button spacing so the row occupies the same slot. */
+.campaign-enter-failed .campaign-enter-failed-actions {
+  display: flex;
+  gap: 12px;
   margin-top: 8px;
+}
+
+.campaign-enter-failed .ct-btn {
+  font-style: normal;
 }

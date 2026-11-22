@@ -12,9 +12,12 @@ import './CampaignEnterFailed.css';
  * fails, the gate flips to THIS honest face instead: an alert-tier card
  * (global .ct-container / .ct-empty-state / .ct-btn idiom, mirroring the
  * MapUnavailable "Check Again" and ErrorBoundary reload-card patterns) whose
- * Retry button re-issues the enter GET in the SAME tab — no page reload.
+ * Retry button re-issues the enter GET in the SAME tab — no page reload — and
+ * a secondary `Back to Campaigns` button escapes to campaign selection through
+ * App's ONE back-to-selection lane (the sidebar "Campaigns" seam: closeWizards
+ * + handleBackToCampaigns), also no reload, for when the server stays down.
  */
-function CampaignEnterFailed({ campaignName, onRetry }) {
+function CampaignEnterFailed({ campaignName, onRetry, onBack }) {
   return (
     <div className="campaign-enter-failed" role="alert">
       <div className="ct-container">
@@ -23,13 +26,22 @@ function CampaignEnterFailed({ campaignName, onRetry }) {
           <span>
             Could not load {campaignName}. The server did not answer the campaign data request.
           </span>
-          <button
-            type="button"
-            className="ct-btn ct-btn-primary campaign-enter-failed-retry-btn"
-            onClick={onRetry}
-          >
-            Retry
-          </button>
+          <div className="campaign-enter-failed-actions">
+            <button
+              type="button"
+              className="ct-btn ct-btn-primary campaign-enter-failed-retry-btn"
+              onClick={onRetry}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              className="ct-btn campaign-enter-failed-back-btn"
+              onClick={onBack}
+            >
+              Back to Campaigns
+            </button>
+          </div>
         </div>
       </div>
     </div>

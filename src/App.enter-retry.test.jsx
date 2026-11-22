@@ -15,7 +15,10 @@
  *  3. a fast rejection (e.g. a 500 carrying changeDataStatus) lands on the
  *     SAME failure face without burning the timeout,
  *  4. a normal successful enter NEVER shows the failure face (no flicker),
- *     and the seam never fans out duplicate concurrent GETs.
+ *     and the seam never fans out duplicate concurrent GETs,
+ *  5. the face's `Back to Campaigns` escape returns to campaign selection in
+ *     the SAME tab (no reload) via App's ONE back-to-selection lane, and a
+ *     re-select re-runs the enter seam fresh.
  *
  * Mock timers throughout — no wall-clock burn. The change-data snapshot lane
  * is doubled so the App-level pins can watch begin/abandon call-shape; the
@@ -366,5 +369,45 @@ describe('App enter gate: bounded stall escape + unified failure/Retry face', ()
     await stallPastTimeout();
     expect(failureFace()).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('Back to Campaigns escapes the failure face to selection in-tab, and re-selecting re-runs the seam', async () => {
+    render(<App />);
+    await selectCampaign();
+    await stallPastTimeout();
+    expect(failureFace()).not.toBeNull();
+
+    // The escape rides App's ONE back-to-selection lane (sidebar "Campaigns"
+    // seam): swaps to the picker immediately, no reload, failure card gone.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Back to Campaigns' }));
+    });
+    await flush();
+
+    expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
+    expect(failureFace()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(window.location.reload).not.toHaveBeenCalled();
+
+    // Re-selecting re-runs the enter seam fresh (existing gate behavior):
+    // busy face while in flight, no stale failure face resurrected.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('select-campaign-btn'));
+    });
+    await flush();
+
+    expect(gateLoad.calls).toHaveLength(2);
+    expect(gateLoad.calls[1].opts).toEqual({ strict: true });
+    expect(failureFace()).toBeNull();
+    expect(document.querySelector('.loading-overlay')).not.toBeNull();
+
+    // Server answers the fresh attempt → campaign lands in the same tab.
+    await act(async () => {
+      gateLoad.settles[1].resolve({ round: 1, creatures: [] });
+    });
+    await flush();
+
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    expect(window.location.reload).not.toHaveBeenCalled();
   });
 });

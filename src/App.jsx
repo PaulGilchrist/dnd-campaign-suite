@@ -409,12 +409,24 @@ function useCampaignEnterGate({ charMgmtRef, wizardRef, campaignRef, consumeRest
     if (last) runEnter(last.name, last.loaded);
   }, [runEnter]);
 
+  // Back-to-selection lane: the ONE seam every exit rides — the sidebar
+  // "Campaigns" control and the CampaignEnterFailed `Back to Campaigns`
+  // escape (server durably down) share this callback (App sits at the
+  // max-statements ceiling, so the lane lives here, next to the gate's other
+  // escape). Campaign-switch law (see App.handleCampaignSelect): both seams
+  // close the wizard lanes — leaving a campaign must not leave a resurrectable
+  // open-flag behind on the never-unmounted App.
+  const backToCampaigns = useCallback(() => {
+    wizardRef.current.closeWizards();
+    campaignRef.current.handleBackToCampaigns();
+  }, [wizardRef, campaignRef]);
+
   useEffect(() => {
     campaignRef.current.setCampaignSelectCallback(runEnter);
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
   }, [runEnter, campaignRef, charMgmtRef]);
 
-  return { enterError, retryEnter };
+  return { enterError, retryEnter, backToCampaigns };
 }
 
 function seedCharServerKeys(storeName, charServerData) {
@@ -684,11 +696,11 @@ function App() {
   // Enter-seam gate: the shared change-data GET gates ALL rendering; bounded
   // stall + unified failure/Retry face live in the module-scope hook (which
   // also registers the select/delete callbacks it owns the seam for).
-  const { enterError, retryEnter } = useCampaignEnterGate({
+  const { enterError, retryEnter, backToCampaigns } = useCampaignEnterGate({
     charMgmtRef, wizardRef, campaignRef, consumeRestore, setActiveView, setCombatSummaryLoaded,
   });
 
-  const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
+  const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw } = campaignMgmt;
   const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, deleteErrorName, dismissDeleteError, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, editingCharacter, closeWizards, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
@@ -1093,9 +1105,9 @@ function App() {
   if (appData.isLoading) return <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading rules data...</div></div>;
   // Enter gate (backlog TT 2026-11-22): a stalled/fast-failed enter-seam GET
   // no longer parks on the busy face — the bounded wait in useCampaignEnterGate
-  // flips it to the honest failure face with a Retry affordance.
+  // flips it to the honest failure face with Retry + Back-to-Campaigns escapes.
   if (!combatSummaryLoaded) return enterError
-    ? <CampaignEnterFailed campaignName={campaignName} onRetry={retryEnter} />
+    ? <CampaignEnterFailed campaignName={campaignName} onRetry={retryEnter} onBack={backToCampaigns} />
     : <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading campaign...</div></div>;
 
   return (
@@ -1112,13 +1124,7 @@ function App() {
           activeCharacter={activeCharacter}
           deleteErrorName={deleteErrorName}
           onDismissDeleteError={dismissDeleteError}
-          onBackToCampaigns={() => {
-            // Campaign-switch law (see handleCampaignSelect): both seams close the
-            // wizard lanes — leaving the campaign must not leave a resurrectable
-            // open-flag behind on the never-unmounted App.
-            closeWizards();
-            handleBackToCampaigns();
-          }}
+          onBackToCampaigns={backToCampaigns}
           onAddCharacter={handleAddCharacter}
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}

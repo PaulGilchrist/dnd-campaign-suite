@@ -58,7 +58,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT (closed-tab single-pass headless
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (UI): CampaignEnterFailed face offers Retry only** — when the server is durably down there is no way BACK to campaign selection from the failure card (manual reload is the only escape, and after reload the same campaign auto-retries the same dead seam? it lands on selection — still, no in-face affordance). A secondary `Back to Campaigns` ct-btn beside Retry (wired to the existing back-to-selection lane) would complete the escape hatch. (`src/components/campaign-enter-failed/CampaignEnterFailed.jsx`)
 - **2026-11-22 (UI): world-apply refusal copy echoes the RAW transport error** — `Not applied: apply failed: pt2-race-probe` quotes whatever the lane body/error text was; a proxy HTML 500 page would flood the notice. Consider a plain-English sentence + the raw detail truncated/gated. (`src/services/ai/applyWorldProposal.js` catch, `AiWorldConsole.jsx` notice render`)
 
 ## Blocked / Not Verified (fold-gate ledger)
