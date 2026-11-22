@@ -248,11 +248,19 @@ export function seededDefaultName(prefix) {
  * The quick-create prefill, made ACTIONABLE under a campaign lock (backlog
  * 2026-11-22): the dated default commits nowhere when CAMPAIGN_LOCK is on and
  * it is not an allowlist member, so opening the modal under that lock starts
- * on the FIRST FREE ALLOWLISTED NAME — the first name in the server-reported
- * `lockNames` order whose campaign folder does not already exist. Faces:
+ * on a FREE ALLOWLISTED NAME — preferring PRESET AFFINITY (backlog
+ * 2026-11-22 RT): the first free name whose lowercased form contains the
+ * lowercased preset prefix (`qa-arena`→Arena, `qa-starter`→Starter), so the
+ * Starter modal never prefills an arena-flavored name and a zero-edit commit
+ * always lands the preset the GM actually opened. With no free affinity match
+ * it falls back to the generic law — the first FREE ALLOWLISTED NAME in the
+ * server-reported `lockNames` order whose campaign folder does not already
+ * exist. Faces:
  *   - unlocked, or the dated default itself is allowlisted → dated default
  *     (unchanged behavior);
- *   - locked, dated default refused, a free member exists → that free member;
+ *   - locked, dated default refused, a free affinity member exists → it;
+ *   - locked, dated default refused, no affinity match but a free member →
+ *     that first free member;
  *   - locked with NO free member (every allowlisted folder exists) → the dated
  *     default stays, and SeedLockNote honestly warns it will be refused
  *     (no silent invalid state — the note keeps naming it).
@@ -262,7 +270,9 @@ export function seededDefaultName(prefix) {
 export function seedPrefillName(prefix, campaignLocked, lockNames, existingCampaigns) {
   const dated = seededDefaultName(prefix);
   if (!campaignLocked || lockNames.includes(dated)) return dated;
-  return lockNames.find((name) => !existingCampaigns.includes(name)) || dated;
+  const free = lockNames.filter((name) => !existingCampaigns.includes(name));
+  const affinity = prefix.toLowerCase();
+  return free.find((name) => name.toLowerCase().includes(affinity)) || free[0] || dated;
 }
 
 /**

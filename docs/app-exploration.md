@@ -51,8 +51,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-22 (RT): **Quick-create prefill ignores preset affinity** — under a refusing `CAMPAIGN_LOCK`, `seedPrefillName` picks the first FREE allowlisted name regardless of which preset opened the modal: with `qa-arena` free, the **New Starter Adventure** modal prefills `qa-arena` (witnessed live — a starter roll would have been named qa-arena; RT accidentally created exactly that and had to delete it). Suggested: bias each preset toward a name carrying its prefix when one exists in the allowlist (`qa-arena`→Arena, `qa-starter`→Starter), fall back to the generic first-free law; `seedLockNoteText` already tracks whatever the input says, so only the prefill chooser needs the affinity. Non-blocking: the typed-name path fully works.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

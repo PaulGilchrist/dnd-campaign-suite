@@ -7,11 +7,14 @@
  * class) enumerating the allowed campaign names. The note may NEVER be false
  * about its current input: the refusal clause only appears while the field's
  * actual value is outside the allowlist. When the lock refuses the dated
- * default but a free allowlisted name exists, the modal now PREFILLS that
- * name (first free member of the server-reported lockNames order), so a
- * zero-edit Create commits. Faces pinned here:
- *   - locked + free member → prefills qa-arena, note discloses the allowlist
- *     WITHOUT claiming refusal, zero-edit Create routes the prefilled name;
+ * default but a free allowlisted name exists, the modal now PREFILLS a free
+ * name — preferring PRESET AFFINITY (the first free member whose lowercased
+ * name contains the lowercased preset prefix: Arena→qa-arena, Starter→
+ * qa-starter; backlog 2026-11-22 RT), falling back to the first free member
+ * of the server-reported lockNames order when no affinity name is free — so a
+ * zero-edit Create commits the preset actually opened. Faces pinned here:
+ *   - locked + free members → each modal prefills its OWN affinity name, the
+ *     note discloses without claiming refusal, zero-edit Create routes it;
  *   - locked + typed off-allowlist name → the note names it as refused and
  *     live-tracks the input back to honesty;
  *   - locked + NO free member → dated prefill + the honest 'will be refused'
@@ -131,9 +134,20 @@ describe('locked + free allowlisted name: actionable prefill, truthful note', ()
     expect(createSeededCampaign).not.toHaveBeenCalled();
   });
 
-  it('New Starter Adventure prefills the same first free member (server order, not preset order)', async () => {
+  it('New Starter Adventure prefills its OWN affinity name (qa-starter), not the first free member', async () => {
     mockServerConfig(LOCKED);
     await renderSelection();
+
+    const dialog = openSeedModal(/New Starter Adventure/);
+    expect(nameInput()).toHaveValue('qa-starter');
+    expect(noteText(dialog)).toBe(commitableNote);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(createSeededCampaign).not.toHaveBeenCalled();
+  });
+
+  it('affinity taken: with qa-starter existing, the Starter modal falls back to the first free member (qa-arena)', async () => {
+    mockServerConfig(LOCKED);
+    await renderSelection([...BASELINE_FOLDERS, 'qa-starter']);
 
     const dialog = openSeedModal(/New Starter Adventure/);
     expect(nameInput()).toHaveValue('qa-arena');
