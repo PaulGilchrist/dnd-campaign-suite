@@ -1,5 +1,6 @@
 import { loadEquipment } from '../../ui/dataLoader.js';
 import { parseMagicItemName } from '../core/attackCalc.js';
+import { fetchCampaignChangeData } from '../../campaign/changeDataSnapshot.js';
 
 const DAMAGE_TYPES = [
   'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Force', 'Lightning',
@@ -43,22 +44,24 @@ export async function getCombatContext(campaignName, { strict = false } = {}) {
   // board let a join normalize a live initiative board away (phantom-join
   // class, bug-eb-join-swallowed-network-fail-phantom-row). Default (lenient)
   // bytes unchanged for the dozens of consumers that treat null as "no combat".
+  // Concurrency: simultaneous reads join ONE in-flight GET
+  // (changeDataSnapshot.js); the slot clears on settle, so a later sequential
+  // load still fetches fresh, and a rejected shared promise rejects EVERY
+  // waiter — the strict rethrow above survives dedupe unchanged.
   if (!campaignName) return null;
-  let response;
+  let data;
   try {
-    response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+    data = await fetchCampaignChangeData(campaignName);
   } catch (err) {
-    console.error('[getCombatContext] Error fetching change-data:', err.message);
+    if (err && err.changeDataStatus != null) {
+      console.error('[getCombatContext] Failed to fetch change-data:', err.changeDataStatus, err.changeDataStatusText, 'for', campaignName);
+    } else {
+      console.error('[getCombatContext] Error fetching change-data:', err.message);
+    }
     if (strict) throw err;
     return null;
   }
-  if (!response.ok) {
-    console.error('[getCombatContext] Failed to fetch change-data:', response.status, response.statusText, 'for', campaignName);
-    if (strict) throw new Error(`change-data fetch failed (${response.status}) for ${campaignName}`);
-    return null;
-  }
   try {
-    const data = await response.json();
     const combatSummary = data.combatSummary || null;
     // BUG (MA-1966 infra): the baked combatSummary.activeCreatureName only moves at
     // round-wrap/resort writes, so it goes stale mid-round and legendary/gate consumers

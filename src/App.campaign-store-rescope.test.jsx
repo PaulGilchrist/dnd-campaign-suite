@@ -271,6 +271,30 @@ describe('App — campaign-store rescope on select (ghost-key eviction)', () => 
     vi.restoreAllMocks();
   });
 
+  it('a clean entry seam issues exactly ONE change-data GET (shared enter-seam snapshot)', async () => {
+    // Backlog 2026-11-22 SV: the mount seam used to fire one GET per consumer
+    // (select-callback preload, rescope hydrate, character seed, sheet mount).
+    // The select callback now BEGINS one shared read and every seam lane adopts
+    // it — this harness's mocked loadCombatSummary consumes the slot too.
+    mockState.characters = [];
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
+    });
+    const baseFetch = global.fetch;
+    let changeDataGets = 0;
+    global.fetch = vi.fn((url) => {
+      if (String(url).includes('/change-data')) changeDataGets += 1;
+      return baseFetch(url);
+    });
+    await selectCampaign();
+
+    expect(changeDataGets).toBe(1);
+    // The one shared snapshot still hydrates the store (adopt-and-evict law
+    // unchanged — hydration content, not just count, is intact).
+    expect(getStore('campaign').get('aiConfig')).toEqual(GHOST_AI_CONFIG);
+  });
+
   it('A→B switch WITHOUT reload evicts A\'s keys and adopts B\'s own snapshot (zero-character face)', async () => {
     mockState.characters = [];
     render(<App />);

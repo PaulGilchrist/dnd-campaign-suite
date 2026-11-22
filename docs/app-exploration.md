@@ -50,8 +50,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (SV): mount-seam fires THREE near-simultaneous `/change-data` GETs per campaign entry** (perf stamps ≈96/103/130 ms) — chatty enter lane; one hydrated snapshot should suffice (or the lanes should share a single in-flight promise). Cost is small but every re-select pays it. Likely `hydrateCampaignRuntimeData` in `src/App.jsx` plus per-consumer mounts. Non-blocking.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

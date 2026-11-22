@@ -33,7 +33,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import SecondaryModals from './CharActionModals.SecondaryModals.jsx';
 import { mergeModalStates } from './modalStateMerge.js';
 import { isCunningStrikeFeatureName, resolveRoundStamp } from '../../services/automation/handlers/combat/cunningStrikeUtils.js';
-import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { getCurrentCombatRound, getCombatSummary } from '../../services/encounters/combatData.js';
 
 const CLOCKWORK_CHOICE_MODAL_KEYS = {
     heal: 'clockworkCavalcadeHealModal',
@@ -300,6 +300,18 @@ function CharActionModals({
     }, [modalState, spellModalState]);
 
     useEffect(() => {
+        // Enter-seam dedupe (backlog 2026-11-22 SV): the campaign-select
+        // callback pre-loads combatSummary into the combatData cache (from the
+        // ONE shared enter-seam change-data GET) BEFORE it arms the sheet view,
+        // so adopt that snapshot by reference instead of re-fetching the same
+        // bytes on this mount (cache-first idiom of spellGates.js). The cache
+        // stays live via Initiative's SSE seeding and every action-lane load.
+        // Only a genuinely uncached mount (no board loaded yet) fetches.
+        const cached = getCombatSummary(campaignName);
+        if (cached) {
+            setCombatSummary(cached);
+            return;
+        }
         getCombatContext(campaignName).then(cs => {
             if (cs) setCombatSummary(cs);
         });

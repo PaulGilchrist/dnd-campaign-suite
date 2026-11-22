@@ -13,6 +13,7 @@ import Map from './components/map/Map.jsx';
 import MapUnavailable from './components/map/MapUnavailable.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
+import { beginCampaignChangeDataEntry, readCampaignChangeData } from './services/campaign/changeDataSnapshot.js';
 import storage from './services/ui/storage.js';
 import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
 import { isWizardOffered, markWizardOffered } from './services/ui/wizardOfferedStore.js';
@@ -267,16 +268,20 @@ function openLevelUpWizard(character, { setActiveCharacter, handleEditCharacter 
   handleEditCharacter(character);
 }
 
+// Reads the campaign's change-data snapshot through the shared enter-seam lane
+// (changeDataSnapshot.js): every mount-seam consumer — this hydrate, the
+// character seed effect, and the select callback's combatSummary preload that
+// OPENED the seam — adopts the ONE entry GET instead of each fetching the same
+// bytes concurrently (backlog 2026-11-22 SV: four near-simultaneous GETs per
+// entry). A re-select begins a fresh entry read, so server truth is still
+// re-adopted per seam, never served from the previous seam's settled bytes.
+// NULL marks "no snapshot" (unlike an EMPTY object, which honestly means
+// "campaign has no change-data"): hydrateCampaignRuntimeData must never
+// evict the whole shared store on a fetch failure, only on real server truth.
 async function fetchCampaignChangeData(campaignName) {
   try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
-    if (response.ok) {
-      return await response.json();
-    }
+    return await readCampaignChangeData(campaignName);
   } catch { /* no server — use computed defaults */ }
-  // NULL marks "no snapshot" (unlike an EMPTY object, which honestly means
-  // "campaign has no change-data"): hydrateCampaignRuntimeData must never
-  // evict the whole shared store on a fetch failure, only on real server truth.
   return null;
 }
 
@@ -545,6 +550,11 @@ function App() {
   useEffect(() => {
     campaignRef.current.setCampaignSelectCallback(async (name, loaded) => {
       charMgmtRef.current.setCharacters(loaded);
+      // Open the enter-seam snapshot BEFORE the combat preload: this fetch is
+      // the ONE change-data GET the whole mount seam hydrates from (rescope
+      // hydrate + character seed adopt it; the preload below joins its live
+      // slot — backlog 2026-11-22 SV chatty-enter fix).
+      beginCampaignChangeDataEntry(name);
       // Pre-load combatSummary for the selected campaign so attack rider maneuvers work immediately
       const cs = await loadCombatSummary(name);
       if (cs) {
