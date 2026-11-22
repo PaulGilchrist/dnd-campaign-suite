@@ -40,7 +40,7 @@ If a bounded attempt times out, treat it as missing information, not a failure t
    - When a shipped feature's exploration completes and its Coverage row exists, the roadmap stays untouched — the plan file is edited only by the implement-workflow, not by explore runs.
 
 Pay special attention to the "Coverage" section (see below). Prioritize areas marked "not explored" or "shallow" over areas already marked "deep" — your job this run is to extend coverage, not repeat what a prior run already did thoroughly. If everything is already marked "deep," pick the area most likely to have edge cases you haven't tried
-yet (unusual input combinations, concurrent SSE updates, boundary conditions) rather than re-walking the same happy path.
+yet (unusual input combinations, concurrent SSE updates, boundary conditions) rather than re-walking the same happy path — and that pick is not advisory: it is the **Novelty floor** exit gate below, every cycle must close having descended one surface/probe-class never live-probed before.
 
 ## What to do
 
@@ -94,8 +94,18 @@ Broken feature / data integrity risk / minor UX issue — pick one and justify b
 
 Do not attempt to fix the bug yourself during this session — just document it. Keep exploring after logging each one rather than stopping to investigate root cause.
 
+## Novelty floor (MANDATORY — exit gate)
+
+The floor measures COVERAGE, never findings. Bugs and improvements are not under your control; effort is — so a zero-bug, zero-improvement run PASSES if it honestly descended new ground, and fails its purpose if it only re-rode verified ground. Never meet any implicit "findings bar" by lowering the reporting standard: the CONFIRMED-before-filing rule in "When you find a bug" exists precisely to protect zero-findings runs as signal. Fabricated or nitpicked findings are worse than none (every filed bug becomes open highest-priority work for `e2e-fix-bugs`).
+
+- **Every cycle live-descends at least one surface never probed before:** a new Coverage row, or a deep row whose recorded rigs lack a named hostile-probe class. Floor menu — pick what that surface has NOT seen yet: two-tab concurrent writes; malformed input / mid-lane 500s; reload/unmount mid-action; multi-client SSE fan-out stress; dual-ruleset mixed boards (5e + 2024 chars in one combat); LAN-visitor read-only lanes under live play; admin clears concurrent with mounted boards.
+- **Novelty claim (map header, REQUIRED):** the run-header block of `docs/app-exploration.md` must state in one clause what the cycle newly descended and what came of it (e.g. `novelty: first live descent of the LAN-visitor fog lane — clean` or `novelty: two-tab concurrent quest edit — 1 bug filed`). A cycle that cannot state a novelty claim must name in the header WHY the floor was unreachable this run (roadmap-tail consumption filled the cycle; event-clear staleness re-derivation consumed it; every remaining surface lacks an un-probed menu class) — silently exiting after only re-riding verified ground is a floor violation.
+- **Zero findings + novelty satisfied = a complete cycle.** Report clean and proceed to "Before finishing" — do NOT keep digging past your bounded budget to manufacture findings.
+- **Floor exhausted** (roadmap tail empty, no not-explored/shallow Coverage rows, and no un-probed surface can be named from the menu): do not churn the map or pad the backlog — record the exhausted menu vs remaining surfaces in the run header and PROPOSE a fold in your report. The `e2e-implement-improvements` fold gate reads your novelty claim to decide "full descent cycle"; the next stub's deepen-first targets come from whatever the menu could not reach.
+
 ## Before finishing
 
+- A novelty claim in the run-header block of `docs/app-exploration.md`: one clause stating what this cycle newly descended (surface + probe class from the floor menu) and what it found, or the explicit why-not (see "Novelty floor" above)
 - A map of the app's main sections/pages and what each does
 - Key UI patterns (e.g. how forms validate, how the SSE party sync behaves, how fog of war interactions work)
 - Selectors or stable identifiers you found reliable for each major element (role, label, testid) — useful for writing tests later
