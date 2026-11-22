@@ -55,8 +55,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (QQ) Allies-button discoverability on Initiative cards:** `.allies-edit-btn` carries no per-creature accessible name — every card (players AND monsters) shows an identical icon button, so automated AND sighted users can't tell whose allies they're editing (live probe intended for NPC 1 silently edited AasimarTest). Cheap fix: `aria-label={`Edit allies for ${name}`}` + tooltip, mirroring the `input[aria-label="<Name> name"]` card law; consumers/tests key on the new label. (`src/components/initiative/` creature-card area)
-- **2026-11-22 (QQ) Starter checklist step lands on the wrong-feeling view:** `Meet the folk of Vetchfield` routes to SETTLEMENTS (the folk live as the settlement's `notableNPCs`), which reads like a mis-deep-link to NPCs — either reword the step (`See who lives in Vetchfield`) or land on NPCs filtered to the village. (`src/components/first-session/` / starter checklist component)
 - **2026-11-22 (QQ) Quick-create default names fight CAMPAIGN_LOCK allowlists:** `New Arena Battle`/`New Starter Adventure` prefill `Arena-YYYYMMDD`/`Starter-YYYYMMDD` which honest-403 under a SET lock unless an operator retypes the allowlisted throwaway name; consider surfacing the allowed names in the modal when `campaignLocked` (the Admin rename note already enumerates `lockNames` — same data is client-readable from `/api/server-config`). (`src/components/campaign-selection/CampaignSelection.jsx`)
 
 ## Blocked / Not Verified (fold-gate ledger)

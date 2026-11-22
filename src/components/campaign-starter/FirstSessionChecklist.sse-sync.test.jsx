@@ -78,7 +78,7 @@ describe('FirstSessionChecklist live SSE sync', () => {
 
   it('subscribes through the shared SSE client on mount and unsubscribes on unmount', async () => {
     const { unmount } = render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
     expect(mockSubscribe).toHaveBeenCalledWith('qa-starter', expect.any(Function));
 
@@ -89,12 +89,12 @@ describe('FirstSessionChecklist live SSE sync', () => {
 
   it('applies a regenerated seed straight from the SSE payload — no reload, no re-fetch', async () => {
     render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     expect(loadStarterSeed).toHaveBeenCalledTimes(1);
 
     capturedHandler({ key: 'starter-seed-qa-starter', data: { action: 'updated', seed: REGENERATED } });
 
-    await waitFor(() => expect(screen.getByText(/Meet the folk of BRIDGEHAM/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in BRIDGEHAM/)).toBeInTheDocument());
     expect(screen.getByText(/portal of New Tomb/)).toBeInTheDocument();
     // The echo carries the whole document — applying it must never re-GET
     // (or re-POST) the seed lane.
@@ -128,7 +128,7 @@ describe('FirstSessionChecklist live SSE sync', () => {
 
   it('ignores events from other campaigns/keys and payloads without a seed', async () => {
     render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     const boardCalls = vi.mocked(loadQuestBoard).mock.calls.length;
 
     capturedHandler({ key: 'starter-seed-other-campaign', data: { action: 'updated', seed: REGENERATED } });
@@ -138,7 +138,7 @@ describe('FirstSessionChecklist live SSE sync', () => {
     capturedHandler(null);
     await new Promise(r => setTimeout(r, 20));
 
-    expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument();
+    expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument();
     expect(screen.queryByText(/BRIDGEHAM/)).not.toBeInTheDocument();
     expect(loadStarterSeed).toHaveBeenCalledTimes(1);
     // Foreign quests-list campaigns must not trigger a board re-GET either.

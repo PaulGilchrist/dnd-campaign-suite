@@ -69,13 +69,13 @@ describe('FirstSessionChecklist', () => {
     const onBuildHeroes = vi.fn();
     await renderChecklist({ onNavigate, onBuildHeroes, isLocalhost: true });
 
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     expect(screen.getByText(/the portal of Crypt of X through the fog/)).toBeInTheDocument();
     expect(screen.getByText(/Join Dungeon Wave 1/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Build your heroes (+ Character)'));
     expect(onBuildHeroes).toHaveBeenCalled();
-    fireEvent.click(screen.getByText('Meet the folk of Thornhollow'));
+    fireEvent.click(screen.getByText('See who lives in Thornhollow'));
     expect(onNavigate).toHaveBeenCalledWith('settlements');
     fireEvent.click(screen.getByText(/the portal of Crypt of X through the fog/));
     expect(onNavigate).toHaveBeenCalledWith('mapsManager');
@@ -112,7 +112,7 @@ describe('FirstSessionChecklist', () => {
   it('shows the GM-only betrayal + regenerate rows only on localhost', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     render(<FirstSessionChecklist campaignName="qa-starter" isLocalhost={false} />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     expect(screen.queryByText(/Regenerate/)).not.toBeInTheDocument();
     expect(screen.queryByText(/🤝 Allies/)).not.toBeInTheDocument();
 
@@ -136,7 +136,7 @@ describe('FirstSessionChecklist', () => {
         isLocalhost={false}
       />
     );
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     expect(screen.queryByText('Build your heroes (+ Character)')).not.toBeInTheDocument();
     // Shared steps still render for the visitor (only the dead-end door is gone).
     expect(screen.getByText(/Review the starter quests/)).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe('FirstSessionChecklist', () => {
     loadQuestBoard.mockReturnValue(new Promise(resolve => { resolveBoard = resolve; }));
     render(<FirstSessionChecklist campaignName="qa-starter" />);
 
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
     // Pending face: the step renders but fabricates no seed-time number.
     expect(screen.getByText('Review the starter quests')).toBeInTheDocument();
     expect(screen.queryByText(/\(\d/)).not.toBeInTheDocument();
@@ -195,7 +195,7 @@ describe('FirstSessionChecklist', () => {
     // No fabricated count ever appears; the rejection is handled (logged once,
     // never left as an uncaught rejection) and siblings keep their copy.
     expect(screen.queryByText(/\(\d/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument();
+    expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument();
     expect(errorSpy).toHaveBeenCalledTimes(1);
     errorSpy.mockRestore();
   });
@@ -203,7 +203,7 @@ describe('FirstSessionChecklist', () => {
   it('dismiss hides the panel and writes nothing', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     const { container } = render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/See who lives in Thornhollow/)).toBeInTheDocument());
 
     fireEvent.click(container.querySelector('.campaign-starter-checklist-dismiss'));
     expect(container.querySelector('.campaign-starter-checklist')).toBeNull();

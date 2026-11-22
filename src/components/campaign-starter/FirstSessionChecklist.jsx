@@ -93,7 +93,7 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
     steps.push({ icon: 'fa-user-plus', label: 'Build your heroes (+ Character)', action: onBuildHeroes });
   }
   steps.push(
-    { icon: 'fa-house', label: `Meet the folk of ${settlement}`, view: 'settlements' },
+    { icon: 'fa-house', label: `See who lives in ${settlement}`, view: 'settlements' },
     { icon: 'fa-map', label: `Lead your tokens from ${settlement} to the portal of ${dungeonTitle} through the fog`, view: 'mapsManager' },
     { icon: 'fa-scroll', label: questStepLabel, view: 'quests' },
     // backlog 2026-11-11 KW: the promise reads "Join <wave>", but saved waves

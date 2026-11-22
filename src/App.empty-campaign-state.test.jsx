@@ -329,6 +329,6 @@ describe('App - zero-character empty-state card', () => {
       expect(screen.getByText('First session — Thornhollow')).toBeInTheDocument();
     });
     // Steps visibly rendered.
-    expect(screen.getByText('Meet the folk of Thornhollow')).toBeInTheDocument();
+    expect(screen.getByText('See who lives in Thornhollow')).toBeInTheDocument();
   });
 });
