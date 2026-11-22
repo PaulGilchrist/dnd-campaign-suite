@@ -50,7 +50,6 @@ change-data `{}` + log `[]`; disk cd ABSENT and `campaign-log.json` ABSENT (data
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (SV): standard New Campaign modal lacks the dialog a11y tier its seeded siblings carry** — `CampaignSelection.jsx:433-462` renders the inline `.modal-content` WITHOUT `role="dialog"`/`aria-modal`/`aria-labelledby`, while `SeededCampaignModal.jsx:68` added that whole tier (backlog 2026-11-04 CP) so screen readers reach the seeded modals like every other dialog; same family, split parity. Cheap fix: mirror the seed modal's heading id + trio on the standard modal. Non-blocking, a11y consistency.
 - **2026-11-22 (SV): mount-seam fires THREE near-simultaneous `/change-data` GETs per campaign entry** (perf stamps ≈96/103/130 ms) — chatty enter lane; one hydrated snapshot should suffice (or the lanes should share a single in-flight promise). Cost is small but every re-select pays it. Likely `hydrateCampaignRuntimeData` in `src/App.jsx` plus per-consumer mounts. Non-blocking.
 
 ## Blocked / Not Verified (fold-gate ledger)

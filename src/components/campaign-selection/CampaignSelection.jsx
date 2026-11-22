@@ -438,8 +438,14 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
              onClick={newCampaignDismiss.handleOverlayClick}
              onKeyDown={newCampaignDismiss.handleKeyDown}
            >
-             <div className="modal-content">
-               <h2>New Campaign</h2>
+             {/* a11y tier mirrors SeededCampaignModal.jsx (backlog 2026-11-04 CP, parity
+                 closed by backlog 2026-11-22 SV): role="dialog" + aria-modal +
+                 heading-labelled-by, so [role=dialog] locators and screen
+                 readers reach the standard create modal like its seeded
+                 siblings. Only one create modal mounts at a time (singleton
+                 guard), so this heading id can never collide. */}
+             <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="new-campaign-title">
+               <h2 id="new-campaign-title">New Campaign</h2>
                <input
                type="text"
                value={newCampaignName}
