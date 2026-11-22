@@ -7,6 +7,10 @@ You are the primary agent coordinating implementation of improvement opportuniti
 
 This command pairs with `e2e-explore`: explore appends dated bullets to the `## Improvement backlog` section of `docs/app-exploration.md`; this command consumes them. Consumed bullets are REMOVED from the backlog once resolved (DONE, blocked, or skipped by the user) — the backlog holds only open items, so a future run never re-attempts resolved work. Do not leave `DONE:` or `WON'T DO:` markers behind. The final run summary is the durable record of what was delivered, blocked, or skipped this run.
 
+## Questions (MANDATORY — Paul's directive 2026-11-22)
+
+Save questions for decisions only Paul can make. Do NOT ask procedural or confirmation questions with obvious answers — presenting the queue is informational, then you dispatch and proceed. Specifically, never ask things like "OK to dispatch the next item?", "proceed with this queue?", or any restatement of the default workflow. The ONLY sanctioned questions: (a) go/no-go on an explicitly flagged `L` item (step 4), and (b) ONE clarifying question when a bullet is genuinely ambiguous (step 4). Always dispatch exactly one improvement at a time and wait for its return before dispatching the next — no question is needed between items; that sequencing is the default.
+
 ## Bounded Executions (MANDATORY — no exceptions)
 
 **No execution is ever allowed to run without an explicit, SHORT timeout.** Most commands here finish in milliseconds, not minutes — a missing timeout is a bug in the command, not an optimization. This binds the primary agent AND every subagent prompt you dispatch (paste this section into each subagent's task text verbatim):
