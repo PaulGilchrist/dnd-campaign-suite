@@ -21,17 +21,22 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../../services/ai/aiClient.js', () => api);
 
-import AiDesignerSection from './AiDesignerSection.jsx';
-
 const CONFLICT_ERROR = 'The build plan was modified in another tab or session since you loaded it — reload the plan to get the newer version — your edit was NOT saved.';
 
 const STORED_PLAN = { scope: 'arc', storySummary: 'Cult on the ice', entityPlan: [{ kind: 'npc', count: 2 }], savedAt: 5 };
 
-beforeEach(() => {
+// The rejected-plan preservation memory is module-scoped (it must survive
+// component unmounts), so each test needs a fresh module instance — a plain
+// static import would bleed a parked edit into the next test's mount.
+let AiDesignerSection;
+
+beforeEach(async () => {
     Object.values(api).forEach(fn => fn.mockReset());
     api.getAiStatus.mockResolvedValue({ configured: true });
     api.loadDesignerConversation.mockResolvedValue({ messages: [], pendingPlan: STORED_PLAN, lastError: null });
     api.saveDesignerPendingPlan.mockResolvedValue({ ok: true, pending: true, savedAt: 11 });
+    vi.resetModules();
+    AiDesignerSection = (await import('./AiDesignerSection.jsx')).default;
 });
 
 async function openRehydratedEditor() {

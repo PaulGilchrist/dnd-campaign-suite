@@ -51,8 +51,6 @@ change-data `{}` + log `[]`; disk cd/log ABSENT; md5s npcs `db6666c12` / encount
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (UI23): refused pendingPlan edits are silently lost on the next view-leave** — after a freshness 409 the notice is honest, but the debounced POST already cleared `stagedPlanRef`, and `applySaveResult` does NOT re-stage the rejected bytes; leaving the Drafts view (unmount flush finds nothing) then returning rehydrates the SERVER's bytes with zero trace of the rejected edit (witnessed live: staged 9 → refused → Log → Drafts → editor reads server's 2, notice gone). The lane's founding doctrine is "navigating away never discards them" — a refused edit breaks it silently. Cheapest start: on `res.conflict` stash the rejected scope and re-arm `stagedPlanRef`/keep a draft-local copy behind the notice (and consider offering `Keep my version` beside `Reload plan`). (`src/components/campaign-builder/AiDesignerSection.jsx` `applySaveResult`/unmount cleanup)
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Nature's Sanctuary / Smite of Protection cover forks — unchanged carried (code-read only).

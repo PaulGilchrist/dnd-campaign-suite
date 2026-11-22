@@ -8,6 +8,25 @@ const PLAN_KINDS = ['faction', 'settlement', 'npc', 'quest', 'encounter', 'sessi
 // network/save debounce — coalesce per-keystroke plan edits into one pending-plan POST
 const PLAN_SAVE_DEBOUNCE_MS = 400;
 
+const PLAN_CONFLICT_FALLBACK = 'The build plan was modified in another tab or session — reload the plan to get the newer version.';
+
+// Backlog 2026-11-22 UI23: the freshness contract honestly refuses a save from
+// a stale tab, but the lane's founding doctrine is "navigating away never
+// discards them" — a refused edit must not evaporate on the next view-leave.
+// A 409'd scope is parked here (module scope, per campaign) and re-presented
+// behind the conflict notice on the next mount. This is per-client recovery
+// for bytes the SERVER refused, not a second source of truth: nothing here
+// POSTs on its own — it is consumed only by an explicit Reload plan (discard)
+// or Keep my version (write), and cleared by any save the server accepts.
+const rejectedPlanMemory = new Map();
+
+// Park a refused edit (with the notice copy and the stale stamp it echoed)
+// so a view-leave cannot silently discard it. Only real bytes are parked —
+// callers whose refused POST was a clear pass the editor's own plan instead.
+function preserveRejectedPlan(campaignName, scope, error, baseSavedAt) {
+  if (scope) rejectedPlanMemory.set(campaignName, { scope, error: error || PLAN_CONFLICT_FALLBACK, baseSavedAt });
+}
+
 function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
   const setCount = (kind, value) => {
     const list = plan.entityPlan || [];
@@ -144,17 +163,23 @@ function AiDesignerSection({ campaignName, onGenerated }) {
   const [planConflict, setPlanConflict] = useState(null); // refused-save inline notice (plain-English)
 
   // One outcome handler for every pending-plan POST: success adopts the
-  // server's new stamp (next echo stays fresh) and clears a stale notice;
-  // a 409 freshness conflict becomes the inline notice — the editor stays
-  // open with its staged bytes (never silently discarded or applied), and
-  // conflicts warn rather than error (benign rejected edit, NPC-lane law).
-  const applySaveResult = (res) => {
+  // server's new stamp (next echo stays fresh), clears a stale notice, and
+  // retires any parked rejected edit (the server now holds this tab's bytes);
+  // a 409 freshness conflict becomes the inline notice and parks the refused
+  // scope — the editor stays open with its bytes and survives a remount
+  // (never silently discarded or applied), and conflicts warn rather than
+  // error (benign rejected edit, NPC-lane law). `rejected` describes what the
+  // POST was carrying, for the preservation memory.
+  const applySaveResult = (res, rejected) => {
     if (res?.conflict) {
       console.warn('[ai-designer] pending plan conflict', res.error);
-      setPlanConflict(res.error || 'The build plan was modified in another tab or session — reload the plan to get the newer version.');
+      const message = res.error || PLAN_CONFLICT_FALLBACK;
+      setPlanConflict(message);
+      preserveRejectedPlan(campaignName, rejected?.scope, message, rejected?.baseSavedAt ?? null);
       return false;
     }
     if (res?.ok) {
+      rejectedPlanMemory.delete(campaignName);
       setPlanConflict(null);
       baseSavedAtRef.current = typeof res.savedAt === 'number' ? res.savedAt : null;
       return true;
@@ -180,25 +205,30 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     saveTimerRef.current = setTimeout(() => { // network/save debounce tick — flush latest plan POST
       saveTimerRef.current = null;
       stagedPlanRef.current = null;
-      saveDesignerPendingPlan({ campaignName, scope: next, savedAt: baseSavedAtRef.current })
-        .then(applySaveResult)
+      const echo = baseSavedAtRef.current;
+      saveDesignerPendingPlan({ campaignName, scope: next, savedAt: echo })
+        .then(res => applySaveResult(res, { scope: next, baseSavedAt: echo }))
         .catch(err => console.error('[ai-designer] pending plan save failed', err));
     }, PLAN_SAVE_DEBOUNCE_MS);
   };
 
   const clearPendingPlan = () => {
     stopPlanDebounce();
-    saveDesignerPendingPlan({ campaignName, scope: null, savedAt: baseSavedAtRef.current })
+    const echo = baseSavedAtRef.current;
+    saveDesignerPendingPlan({ campaignName, scope: null, savedAt: echo })
       .then(res => {
         // The editor closes only once the server agrees the clear is fresh —
-        // a refused (stale) clear keeps it open behind the conflict notice.
-        if (applySaveResult(res)) setPlan(null);
+        // a refused (stale) clear keeps it open behind the conflict notice,
+        // and the editor's own bytes are parked so a view-leave preserves them.
+        if (applySaveResult(res, { scope: plan, baseSavedAt: echo })) setPlan(null);
       })
       .catch(err => console.error('[ai-designer] pending plan clear failed', err));
   };
 
   // Reload-recovery affordance (mirrors the NPC lane's "Reload list"): fetch
   // the server's newest bytes into the editor and re-arm the echo stamp.
+  // Adopting the server's version is the explicit DISCARD of a parked
+  // rejected edit — the preservation memory retires with the notice.
   const reloadPendingPlan = async () => {
     stopPlanDebounce();
     setPlanConflict(null);
@@ -206,10 +236,32 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       const notes = await loadDesignerConversation({ campaignName });
       setPlan(notes.pendingPlan || null);
       baseSavedAtRef.current = notes.pendingPlan?.savedAt ?? null;
+      rejectedPlanMemory.delete(campaignName);
     } catch (err) {
       console.error('[ai-designer] pending plan reload failed', err);
       setPlanConflict('The plan could not be reloaded — try again.');
     }
+  };
+
+  // The reload affordance's twin: keep THIS editor's bytes and push them over
+  // the newer save. Re-reads the server's current stamp first (one GET) so
+  // the write rides the same freshness lane and honestly lands, then POSTs
+  // the editor's bytes (one POST) through the normal save outcome handler.
+  // Only an explicit click writes — a dwelling notice costs the server zero.
+  const keepMyVersion = async () => {
+    if (!plan || busy) return;
+    stopPlanDebounce();
+    setBusy(true);
+    try {
+      const notes = await loadDesignerConversation({ campaignName });
+      const echo = notes.pendingPlan?.savedAt ?? null;
+      const res = await saveDesignerPendingPlan({ campaignName, scope: plan, savedAt: echo });
+      applySaveResult(res, { scope: plan, baseSavedAt: echo });
+    } catch (err) {
+      console.error('[ai-designer] rejected plan keep failed', err);
+      setError('Your version of the plan could not be saved — try again.');
+    }
+    setBusy(false);
   };
 
   // Backlog 2026-11-07 DJ: authoring residue (conversation + plans + pending
@@ -227,6 +279,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       setResult(null);
       setDraft('');
       setPlanConflict(null);
+      rejectedPlanMemory.delete(campaignName); // the ledger is blank — nothing left to preserve
       baseSavedAtRef.current = null; // the ledger is blank — nothing to be stale against
     } else {
       setError(res.error || 'designer conversation clear failed');
@@ -251,8 +304,21 @@ function AiDesignerSection({ campaignName, onGenerated }) {
           const notes = await loadDesignerConversation({ campaignName });
           if (cancelled) return;
           setMessages(notes.messages || []);
-          if (notes.pendingPlan) setPlan(notes.pendingPlan);
-          baseSavedAtRef.current = notes.pendingPlan?.savedAt ?? null;
+          const rejected = rejectedPlanMemory.get(campaignName);
+          if (rejected) {
+            // A refused edit parked by a previous mount (freshness 409): the
+            // doctrine says navigating away never discards it — re-present the
+            // rejected bytes behind the maintained notice instead of silently
+            // rehydrating the server's bytes. It stays write-gated on the
+            // refused stamp: only Reload plan (discard) or Keep my version
+            // (explicit write) resolves it, and nothing POSTs on its own.
+            setPlan(rejected.scope);
+            setPlanConflict(rejected.error);
+            baseSavedAtRef.current = rejected.baseSavedAt ?? null;
+          } else {
+            if (notes.pendingPlan) setPlan(notes.pendingPlan);
+            baseSavedAtRef.current = notes.pendingPlan?.savedAt ?? null;
+          }
           if (notes.lastError?.error) setError(notes.lastError.error);
         }
       } catch {
@@ -264,14 +330,21 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       // Flushing on unmount is what makes "navigate away" lossless — and the
       // echoed stamp makes it lossless WITHOUT clobbering a newer save from
       // another tab: a stale flush is refused 409 (server keeps its bytes),
-      // and with the view gone a rejection only warns.
+      // and with the view gone a rejection only warns — but it also parks the
+      // refused bytes, so returning to the view re-presents them behind the
+      // notice instead of silently rehydrating the server's version.
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
         if (stagedPlanRef.current) {
-          saveDesignerPendingPlan({ campaignName, scope: stagedPlanRef.current, savedAt: baseSavedAtRef.current })
+          const scope = stagedPlanRef.current;
+          const echo = baseSavedAtRef.current;
+          saveDesignerPendingPlan({ campaignName, scope, savedAt: echo })
             .then(res => {
-              if (res && !res.ok) console.warn('[ai-designer] pending plan flush rejected', res.error);
+              if (res && !res.ok) {
+                console.warn('[ai-designer] pending plan flush rejected', res.error);
+                if (res.conflict) preserveRejectedPlan(campaignName, scope, res.error, echo);
+              }
             })
             .catch(err => console.error('[ai-designer] pending plan flush failed', err));
         }
@@ -306,6 +379,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       setPlan(res.scope); // route already persisted it as the pending plan
       baseSavedAtRef.current = typeof res.savedAt === 'number' ? res.savedAt : null;
       setPlanConflict(null);
+      rejectedPlanMemory.delete(campaignName); // a fresh proposal replaces any parked edit
     } else {
       setError(res.error || res.code || 'plan request failed');
     }
@@ -319,8 +393,9 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     setError(null);
     // Make sure the exact scope we are generating from is what the server holds.
     if (hadUnsaved) {
-      await saveDesignerPendingPlan({ campaignName, scope: confirmedScope, savedAt: baseSavedAtRef.current })
-        .then(applySaveResult)
+      const echo = baseSavedAtRef.current;
+      await saveDesignerPendingPlan({ campaignName, scope: confirmedScope, savedAt: echo })
+        .then(res => applySaveResult(res, { scope: confirmedScope, baseSavedAt: echo }))
         .catch(err => console.error('[ai-designer] pending plan flush failed', err));
     }
     const res = await designerGenerate({ campaignName, scope: confirmedScope });
@@ -329,6 +404,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       setResult(res);
       setPlan(null); // route cleared the server-side pending — plan consumed
       setPlanConflict(null);
+      rejectedPlanMemory.delete(campaignName); // the plan is spent — nothing left to preserve
       onGenerated?.();
     } else {
       setError((res.errors || [res.error || res.code || 'generation failed']).join('\n'));
@@ -364,6 +440,10 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       {planConflict && (
         <div className="ai-designer-conflict" role="alert">
           <span>{planConflict}</span>
+          {plan && (
+            <button type="button" className="ct-btn ai-designer-conflict-keep" disabled={busy} onClick={keepMyVersion}
+              title="Overwrite the newer saved plan with the version open here">Keep my version</button>
+          )}
           <button type="button" className="ct-btn ai-designer-conflict-reload" onClick={reloadPendingPlan}>
             <i className="fa-solid fa-rotate" /> Reload plan
           </button>
