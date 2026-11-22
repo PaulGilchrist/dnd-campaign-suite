@@ -137,38 +137,37 @@ describe('createSeededCampaign', () => {
     expect(mapsService.createMap).not.toHaveBeenCalled();
   });
 
-  it('POSTs /api/campaigns with the trimmed name and returns {name, seed, seeded}', async () => {
+  it('POSTs /api/campaigns with the trimmed name + preset type and returns {name, seed, seeded}', async () => {
     const result = await createSeededCampaign('arena', { name: ' qa-arena ', seed: 7 });
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns', expect.objectContaining({ method: 'POST' }));
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ campaignName: 'qa-arena' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ campaignName: 'qa-arena', type: 'arena' });
     expect(result.name).toBe('qa-arena');
     expect(result.seed).toBe(7);
     expect(result.seeded.maps.length).toBe(2);
     expect(result.seeded.encounters).toHaveLength(3);
   });
 
-  it('records the preset type via the campaign-meta lane after the folder POST', async () => {
+  it('carries the preset type on the create POST — no separate /meta write (backlog SS 2026-11-22)', async () => {
     await createSeededCampaign('arena', { name: 'qa-arena', seed: 7 });
-    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/qa-arena/meta',
-      expect.objectContaining({ method: 'PUT' }));
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ type: 'arena' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ campaignName: 'qa-arena', type: 'arena' });
+    expect(fetchMock.mock.calls.every(([url]) => !url.includes('/meta'))).toBe(true);
 
     fetchMock.mockClear();
     await createSeededCampaign('starter', { name: 'qa-starter', seed: 7 });
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ type: 'starter' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ campaignName: 'qa-starter', type: 'starter' });
+    expect(fetchMock.mock.calls.every(([url]) => !url.includes('/meta'))).toBe(true);
   });
 
-  it('still seeds the campaign when the meta write fails (badge-only loss)', async () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fetchMock.mockImplementation(async (url, opts) => (
-      opts?.method === 'PUT'
-        ? { ok: false, status: 403, statusText: 'Forbidden', json: async () => ({ error: 'locked' }) }
-        : { ok: true, json: async () => ({ message: 'created' }) }
-    ));
-    const result = await createSeededCampaign('arena', { name: 'qa-arena', seed: 7 });
-    expect(result.seeded.maps.length).toBe(2);
-    expect(errors).toHaveBeenCalled();
-    errors.mockRestore();
+  it('aborts before seeding when the create POST fails (meta now rides the create, so a refused create is total)', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: async () => ({ error: 'campaign type must be one of standard, arena, starter' }),
+    });
+    await expect(createSeededCampaign('arena', { name: 'qa-arena', seed: 7 }))
+      .rejects.toThrow('campaign type must be one of standard, arena, starter');
+    expect(mapsService.createMap).not.toHaveBeenCalled();
   });
 
   it('reproduces the same roll from the same seed', async () => {

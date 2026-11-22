@@ -60,6 +60,11 @@ vi.mock('../utils/campaignPaths.js', () => ({
     campaignImagesDir: (name) => `/mock/campaigns/${name}/images`,
     campaignDataDir: (name) => `/mock/campaigns/${name}/data`,
     campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
+    ensureDataDir: (name) => {
+        const dir = `/mock/campaigns/${name}/data`;
+        mockFsState.exists.add(dir);
+        return dir;
+    },
 }));
 
 vi.mock('../utils/changeData.js', () => ({
@@ -177,6 +182,79 @@ describe('campaignsAdmin - POST /api/campaigns', () => {
         const res = await request(app).post('/api/campaigns').send({ campaignName: 'test-campaign' });
         expect(res.status).toBe(500);
         expect(res.body.error).toBe('Disk full');
+    });
+});
+
+// Backlog SS 2026-11-22: the preset type must be on disk INSIDE the create
+// response — a follow-up /meta write let GET /api/campaigns report a fresh
+// folder under `folders` while `types` still said 'standard' (unbadged row in
+// the selection list). These pins prove the synchronous stamp and its ordering.
+describe('campaignsAdmin - POST /api/campaigns preset-type synchronous meta stamp', () => {
+    // The sibling POST suite's final test permanently swaps mkdirSync for a
+    // thrower; re-arm the stock behaviour so this suite's creates can mkdir.
+    beforeEach(async () => {
+        const fsMock = (await import('fs')).default;
+        fsMock.mkdirSync = vi.fn((p) => mockFsState.exists.add(p));
+    });
+    afterEach(() => {
+        removeCampaign('qa-arena');
+        vi.clearAllMocks();
+    });
+
+    it('writeFileSyncs campaign-meta.json before responding and before the campaigns-list broadcast', async () => {
+        const fsMock = (await import('fs')).default;
+        const { publish } = await import('../utils/changeData.js');
+        const order = [];
+        const originalWrite = fsMock.writeFileSync;
+        fsMock.writeFileSync = vi.fn(() => order.push('meta-write'));
+        publish.mockImplementation(() => order.push('publish'));
+        try {
+            const res = await request(createTestApp())
+                .post('/api/campaigns')
+                .send({ campaignName: 'qa-arena', type: 'arena' });
+            expect(res.status).toBe(201);
+            expect(order).toEqual(['meta-write', 'publish']);
+            expect(fsMock.writeFileSync).toHaveBeenCalledWith(
+                '/mock/campaigns/qa-arena/data/campaign-meta.json',
+                JSON.stringify({ type: 'arena' }, null, 2)
+            );
+        } finally {
+            fsMock.writeFileSync = originalWrite;
+        }
+    });
+
+    it('stamps every preset type verbatim (starter)', async () => {
+        const fsMock = (await import('fs')).default;
+        const res = await request(createTestApp())
+            .post('/api/campaigns')
+            .send({ campaignName: 'qa-arena', type: 'starter' });
+        expect(res.status).toBe(201);
+        expect(fsMock.writeFileSync).toHaveBeenCalledWith(
+            '/mock/campaigns/qa-arena/data/campaign-meta.json',
+            JSON.stringify({ type: 'starter' }, null, 2)
+        );
+    });
+
+    it('a type-less create (standard modal) writes no meta file — the absent file stays the standard channel', async () => {
+        const fsMock = (await import('fs')).default;
+        const res = await request(createTestApp())
+            .post('/api/campaigns')
+            .send({ campaignName: 'qa-arena' });
+        expect(res.status).toBe(201);
+        expect(fsMock.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('refuses an unknown type with 400 before any mkdir — no half-created folder, no meta write', async () => {
+        const fsMock = (await import('fs')).default;
+        const { publish } = await import('../utils/changeData.js');
+        const res = await request(createTestApp())
+            .post('/api/campaigns')
+            .send({ campaignName: 'qa-arena', type: 'chaos' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/campaign type must be one of standard, arena, starter/);
+        expect(mockFsState.exists.has('/mock/campaigns/qa-arena')).toBe(false);
+        expect(fsMock.writeFileSync).not.toHaveBeenCalled();
+        expect(publish).not.toHaveBeenCalled();
     });
 });
 

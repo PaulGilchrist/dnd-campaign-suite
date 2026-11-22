@@ -36,6 +36,20 @@ export const CAMPAIGN_TYPES = ['standard', 'arena', 'starter'];
 
 const metaPath = (campaign) => campaignDataFile(campaign, META_FILE);
 
+/**
+ * Synchronous meta write — the ONE writeFileSync idiom for campaign-meta.json,
+ * shared by the PUT route below and the campaign-create route
+ * (campaigns-admin.js), which stamps the preset type INSIDE the create
+ * response (backlog SS 2026-11-22: a separate follow-up meta write left a
+ * window where GET /api/campaigns reported the fresh folder under `folders`
+ * while `types` still read 'standard' — folders led types, unbadged row).
+ * The caller owns the live-sync `publish`; this writes bytes only.
+ */
+export function writeCampaignMeta(campaign, type) {
+    ensureDataDir(campaign);
+    fs.writeFileSync(metaPath(campaign), JSON.stringify({ type }, null, 2));
+}
+
 /** Resolve a campaign's type: explicit meta file, else the 'standard'
  *  default. Never throws. */
 export function resolveCampaignType(campaign) {
@@ -63,12 +77,11 @@ router.put('/api/campaigns/:campaign/meta', asyncHandler((req, res) => {
     if (!CAMPAIGN_TYPES.includes(type)) {
         return res.status(400).json({ error: `campaign meta payload must be { type: one of ${CAMPAIGN_TYPES.join(', ')} }` });
     }
-    ensureDataDir(campaign);
-    fs.writeFileSync(metaPath(campaign), JSON.stringify({ type }, null, 2));
-    // Live-sync the selection list (starter-seed doctrine, 71f617299): quick-
-    // create writes the folder first and this meta last, so the second
-    // campaigns-list event is what lands the Arena/Starter badge on the row
-    // another tab just saw appear unbadged.
+    writeCampaignMeta(campaign, type);
+    // Live-sync the selection list: every surface that renders the badge reads
+    // the types map refreshed by this event (quick-create presets arrive fully
+    // typed via the create route itself, so this lane now serves Admin/meta
+    // writers).
     publish('campaigns-list', { action: 'updated', campaign }, campaign);
     res.json({ message: 'Campaign meta saved successfully', type });
 }));

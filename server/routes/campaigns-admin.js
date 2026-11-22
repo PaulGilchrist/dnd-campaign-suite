@@ -11,6 +11,7 @@ import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campa
 import { createSnapshot, listSnapshotFiles } from '../utils/campaignSnapshots.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
 import { bucketKeySlug, censusChangeDataKeys } from '../utils/changeDataKeys.js';
+import { CAMPAIGN_TYPES, writeCampaignMeta } from './campaigns-meta.js';
 import { logCache } from './log.js';
 
 const router = express.Router();
@@ -54,16 +55,28 @@ function isLocalhost(req) {
 // lacked the isLocalhost gate every sibling here carries (owner decision: delete;
 // pin in campaigns-admin-migrate.test.js).
 
-// API endpoint to create a new campaign folder
+// API endpoint to create a new campaign folder. An optional `type`
+// ('standard' | 'arena' | 'starter') from the quick-create presets is stamped
+// into campaign-meta.json SYNCHRONOUSLY here (writeCampaignMeta — the same
+// immediate-write idiom as the mkdirs above), so a GET /api/campaigns issued
+// the instant this response returns already reports the preset type: folders
+// and types can never disagree for a fresh campaign (backlog SS 2026-11-22 —
+// the old follow-up PUT /meta write left a multi-call window where the
+// selection list rendered the new row without its badge).
 router.post('/api/campaigns', asyncHandler((req, res) => {
     if (!isLocalhost(req)) {
         return res.status(403).json({ error: 'Only available on localhost' });
     }
 
-    const { campaignName } = req.body;
+    const { campaignName, type } = req.body;
 
     if (!campaignName || campaignName.trim() === '') {
         return res.status(400).json({ error: 'Campaign name is required' });
+    }
+
+    // Validate BEFORE any mkdir so a malformed type creates no half-baked folder.
+    if (type !== undefined && !CAMPAIGN_TYPES.includes(type)) {
+        return res.status(400).json({ error: `campaign type must be one of ${CAMPAIGN_TYPES.join(', ')}` });
     }
 
     const newCampaignDir = campaignDir(campaignName.trim());
@@ -79,6 +92,12 @@ router.post('/api/campaigns', asyncHandler((req, res) => {
     fs.mkdirSync(campaignImagesDir(campaignName.trim()), { recursive: true });
     // Create data subdirectory for character change data
     fs.mkdirSync(campaignDataDir(campaignName.trim()), { recursive: true });
+
+    // Stamp the preset type before publishing and before responding (see
+    // header comment) — the SSE-triggered refetch always reads the finished pair.
+    if (type !== undefined) {
+        writeCampaignMeta(campaignName.trim(), type);
+    }
 
     // Live-sync (starter-seed doctrine, 71f617299): app-level `campaigns-list`
     // event so open campaign-selection tabs refresh their folder rows without

@@ -3,12 +3,11 @@
  *
  * One shared entry for BOTH quick-create flows:
  *   createSeededCampaign('arena' | 'starter', { name, seed })
- *     1. POST /api/campaigns { campaignName } (throws the server's message on
- *        a campaign-lock 403 so the UI can show why),
- *     2. PUT /api/campaigns/:name/meta { type } (badge lane — see
- *        campaignMetaService.js),
- *     3. runs the preset's seeding step against the fresh folder,
- *     4. returns { name, seeded } where `seeded` reports every created entity
+ *     1. POST /api/campaigns { campaignName, type } — the route stamps
+ *        campaign-meta.json synchronously (throws the server's message on a
+ *        campaign-lock 403 so the UI can show why),
+ *     2. runs the preset's seeding step against the fresh folder,
+ *     3. returns { name, seeded } where `seeded` reports every created entity
  *        (maps / encounters / quests / settlement) for UI feedback.
  *
  * Everything below RE-USES the existing generators and services (dungeon,
@@ -33,7 +32,6 @@ import { generateSettlement } from './settlementGenerator.js';
 import { saveSettlement, loadSettlement } from './settlementsService.js';
 import { saveQuests, loadQuests } from './questsService.js';
 import { loadStarterSeed, saveStarterSeed } from './starterSeedService.js';
-import { saveCampaignType } from './campaignMetaService.js';
 import { loadMonsters } from '../ui/dataLoader.js';
 import { addEntry as addLogEntry } from '../ui/logService.js';
 
@@ -511,7 +509,7 @@ export async function createSeededCampaign(presetKey, { name, seed } = {}) {
   const response = await fetch('/api/campaigns', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ campaignName }),
+    body: JSON.stringify({ campaignName, type: preset.metaType }),
   });
   if (!response.ok) {
     // Surface the server's plain-English refusal (campaign-lock 403 etc.).
@@ -525,15 +523,11 @@ export async function createSeededCampaign(presetKey, { name, seed } = {}) {
     throw new Error(serverError || `Failed to create campaign: ${response.statusText}`);
   }
 
-  // Record the type (campaign-meta.json) so list + sidebar surfaces badge this
-  // folder as Arena/Starter from creation on. A failed meta write must not
-  // abort an otherwise-seeded campaign — starter still infers from its seed
-  // document; a lost arena meta only costs the badge (logged loudly).
-  try {
-    await saveCampaignType(campaignName, preset.metaType);
-  } catch (err) {
-    console.error(`[createSeededCampaign] failed to record campaign type "${preset.metaType}":`, err);
-  }
+  // The type (campaign-meta.json) is already on disk: the create route stamps
+  // it synchronously from this POST's `type`, so list/sidebar surfaces badge
+  // the folder from the instant it exists (backlog SS 2026-11-22 — the old
+  // follow-up saveCampaignType PUT left an unbadged window between POST and
+  // meta write).
 
   const seeded = await preset.seed(campaignName, roll);
   return { name: campaignName, seed: roll, seeded };

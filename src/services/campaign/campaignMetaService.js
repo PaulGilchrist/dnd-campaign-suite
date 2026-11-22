@@ -43,23 +43,3 @@ export const loadCampaignType = async (campaignName) => {
     return 'standard';
   }
 };
-
-/** GM-only write used by the seeded-campaign orchestrator at create time. */
-export const saveCampaignType = async (campaignName, type) => {
-  const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/meta`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type }),
-  });
-  if (!response.ok) {
-    let serverError;
-    try {
-      const body = await response.json();
-      serverError = body?.error;
-    } catch {
-      // No JSON error body — fall back to statusText.
-    }
-    throw new Error(serverError || `Failed to save campaign meta: ${response.statusText}`);
-  }
-  return response.json();
-};

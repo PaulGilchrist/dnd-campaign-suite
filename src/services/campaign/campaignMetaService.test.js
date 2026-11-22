@@ -1,13 +1,12 @@
 // @maintained-by-ai
 // Campaign-type client lane: reads default ({} / 'standard') instead of
 // rejecting — a failed meta fetch must never brick the sidebar or the
-// campaign list. The GM-only write surfaces the server's error text so the
-// orchestrator can log it.
+// campaign list. Type WRITES are server-side only now: the create route stamps
+// the preset synchronously and Admin rides PUT /meta directly.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCampaignTypes, loadCampaignType, saveCampaignType } from './campaignMetaService.js';
+import { getCampaignTypes, loadCampaignType } from './campaignMetaService.js';
 
 const CAMPAIGN = 'qa-arena';
-const URL = `/api/campaigns/${CAMPAIGN}/meta`;
 
 const jsonResponse = (body, ok = true, status = 200) => ({
   ok,
@@ -45,21 +44,5 @@ describe('loadCampaignType', () => {
   it('falls back to standard when the read fails', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'boom' }, false, 500));
     await expect(loadCampaignType(CAMPAIGN)).resolves.toBe('standard');
-  });
-});
-
-describe('saveCampaignType', () => {
-  it('PUTs the { type } payload', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ message: 'ok' }));
-    await saveCampaignType(CAMPAIGN, 'arena');
-    const [url, opts] = fetchMock.mock.calls[0];
-    expect(url).toBe(URL);
-    expect(opts.method).toBe('PUT');
-    expect(JSON.parse(opts.body)).toEqual({ type: 'arena' });
-  });
-
-  it('throws the server error text (e.g. the GM-only 403)', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'Only the GM (localhost) can set the campaign type' }, false, 403));
-    await expect(saveCampaignType(CAMPAIGN, 'arena')).rejects.toThrow(/Only the GM/);
   });
 });
