@@ -238,6 +238,13 @@ describe('logService', () => {
                 .toBe('EvasiveFighter takes 112 damage (0/112 HP) — falls unconscious');
             expect(stampAuditText({ type: 'hp_change', targetName: 'Thorin', delta: -60, currentHp: 40, maxHp: 120, threshold: 'bloodied' }).message)
                 .toBe('Thorin takes 60 damage (40/120 HP) — Bloodied');
+            // Threshold-less isUnconscious fallback leg is TYPE-SPLIT too
+            // (ZA 2026-11-23 backlog): 'Knocked Unconscious' is reserved for
+            // players; an unstamped monster row never reads player-down copy.
+            expect(stampAuditText({ type: 'hp_change', targetName: 'Orc', delta: -4, currentHp: 0, maxHp: 7, isUnconscious: true }).message)
+                .toBe('Orc takes 4 damage (0/7 HP) — Defeated');
+            expect(stampAuditText({ type: 'hp_change', targetName: 'Thorin', delta: -4, currentHp: 0, maxHp: 120, isUnconscious: true, isPlayer: true }).message)
+                .toBe('Thorin takes 4 damage (0/120 HP) — Knocked Unconscious');
         });
 
         it('describes saves, healing and initiative in the badges family voice', () => {

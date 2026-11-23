@@ -302,10 +302,13 @@ function computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, s
     const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
     const isUnconscious = hpAfterDamage <= 0;
     const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
-    return { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold };
+    // Canonical player stamp source (mirrors logDamageApplication): the board row's
+    // type byte drives the log lane's player-vs-monster downed copy.
+    const isPlayer = (combatSummary?.creatures || []).some(c => c.name === pendingTargetName && c.type === 'player');
+    return { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold, isPlayer };
 }
 
-function postSaveHpChange({ pendingTargetName, campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold }) {
+function postSaveHpChange({ pendingTargetName, campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold, isPlayer }) {
     if (totalDamageDealt <= 0) return;
     const hpEntry = {
         type: 'hp_change',
@@ -318,6 +321,9 @@ function postSaveHpChange({ pendingTargetName, campaignName, totalDamageDealt, h
         damageBreakdown,
     };
     if (threshold) hpEntry.threshold = threshold;
+    // Players at 0 HP are DYING, not dead (5e) — see logDamageApplication:
+    // the audio lane voices 'player-down' vs 'monster-death' off this stamp.
+    if (isPlayer) hpEntry.isPlayer = true;
     addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
 }
 
@@ -533,11 +539,11 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
         : null;
     const secondaryFinalDamage = secondaryResult ? secondaryResult.finalDamage : 0;
 
-    const { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold } = computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, combatSummary, pendingTargetName, targetMaxHp });
+    const { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold, isPlayer } = computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, combatSummary, pendingTargetName, targetMaxHp });
 
     const damageBreakdown = buildSaveDamageBreakdown(applyResult, pending, appliedDamage, finalDamage, secondaryResult);
 
-    postSaveHpChange({ pendingTargetName, campaignName: pending.campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold });
+    postSaveHpChange({ pendingTargetName, campaignName: pending.campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold, isPlayer });
 
     syncPlayerHpRuntime({ pendingTargetName, campaignName: pending.campaignName, newHp, oldHp, isUnconscious });
 

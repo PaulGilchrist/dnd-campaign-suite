@@ -240,6 +240,7 @@ describe('wardingBondService damage lane — HP arithmetic and full hp_change en
             isHealing: false,
             isUnconscious: false,
             abilityName: 'Warding Bond',
+            isPlayer: true, // player caster carries the canonical stamp (type-split lane)
         });
         if (!inSummary) expect(getDistanceFeet).not.toHaveBeenCalled();
     });

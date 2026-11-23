@@ -98,6 +98,9 @@ const CASTER_STRIP_PREFIX = '[wardingBond] caster activeBuffs store reject:';
 // Exact key-sets copied from source literal order (:37-46 / :13-18). Values are the
 // damage/log lanes' face; key census here only identifies WHICH entry each arm saw.
 const HP_KEYS = ['type', 'targetName', 'delta', 'currentHp', 'maxHp', 'isHealing', 'isUnconscious', 'abilityName'];
+// Player-victim rows carry the canonical isPlayer stamp LAST (ZA 2026-11-23
+// type-split); NPC-caster rows keep the bare HP_KEYS shape.
+const HP_KEYS_PLAYER = [...HP_KEYS, 'isPlayer'];
 const BREAK_KEYS = ['type', 'characterName', 'abilityName', 'description', 'timestamp'];
 
 // Complete bounded microtask flush (fixed ticks; no timers exist in the service).
@@ -246,7 +249,7 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
 
         // Synchronous census: two entries attempted, in source order; console still empty.
         expect(logAttempts()).toEqual([
-            [CAMPAIGN, 'hp_change', HP_KEYS],
+            [CAMPAIGN, 'hp_change', HP_KEYS_PLAYER],
             [CAMPAIGN, 'ability_use', BREAK_KEYS],
         ]);
         expect(consoleError.mock.calls).toEqual([]);
@@ -392,7 +395,7 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
 
         // Mirror continued past the failed write: hp_change attempted with optimistic
         // bytes 7/-3 while the store stays at 10 (stranded optimistic state #1382).
-        expect(logAttempts()).toEqual([[CAMPAIGN, 'hp_change', HP_KEYS]]);
+        expect(logAttempts()).toEqual([[CAMPAIGN, 'hp_change', HP_KEYS_PLAYER]]);
         expect(addEntry.mock.calls[0][1]).toMatchObject({ currentHp: 7, delta: -3 });
         expect(store.data.get('Paladin|currentHitPoints')).toBe(10);
         expect(consoleError.mock.calls).toEqual([]); // REAL Promise: the arm is a microtask
@@ -437,7 +440,7 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
         ]);
         expect(consoleError.mock.calls).toEqual([]);
         expect(logAttempts()).toEqual([
-            [CAMPAIGN, 'hp_change', HP_KEYS],
+            [CAMPAIGN, 'hp_change', HP_KEYS_PLAYER],
             [CAMPAIGN, 'ability_use', BREAK_KEYS],
         ]);
 

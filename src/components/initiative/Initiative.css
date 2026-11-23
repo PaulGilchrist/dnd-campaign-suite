@@ -802,13 +802,17 @@
     color: #e74c3c;
 }
 
-/* Unconscious creature styling */
-.initiative .creature-card.creature-unconscious {
+/* Downed creature styling — one face, two vocabularies (ZA 2026-11-23 backlog):
+   creature-unconscious is reserved for 0-HP players (dying, death saves);
+   creature-defeated is the 0-HP monster/NPC face. Same visuals, distinct hooks. */
+.initiative .creature-card.creature-unconscious,
+.initiative .creature-card.creature-defeated {
     opacity: 0.55;
     filter: grayscale(0.7);
 }
 
-.initiative .creature-card.creature-unconscious .creature-avatar {
+.initiative .creature-card.creature-unconscious .creature-avatar,
+.initiative .creature-card.creature-defeated .creature-avatar {
     filter: grayscale(0.8);
 }
 

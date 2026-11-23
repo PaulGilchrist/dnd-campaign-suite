@@ -164,8 +164,7 @@ async function tickOneZone({ campaignName, targetName, te, cs, round }) {
 
 async function logZoneTick({ campaignName, targetName, te, save, die, roll, saveBonus, success, raw, damage, newHp, csCreature }) {
     const label = getEffectDefinition(te.effect)?.label || String(te.effect).replace(/_/g, ' ');
-    const total = roll + saveBonus;
-    await addEntry(campaignName, {
+    const total = roll + saveBonus;    await addEntry(campaignName, {
         type: 'save_result',
         characterName: targetName,
         rollType: 'zone-repeat-save',
@@ -194,6 +193,9 @@ async function logZoneTick({ campaignName, targetName, te, save, die, roll, save
         isUnconscious: newHp <= 0,
         note: `${label} turn-end repeat damage ${damage} (${die}${success ? ', halved by save' : ''}) from ${te.source || 'a lair zone'}.`,
         timestamp: Date.now(),
+        // Canonical player stamp (mirrors logDamageApplication) — see the
+        // infernalWoundService bleed-tick twin for the downed-copy rationale.
+        ...(csCreature.type === 'player' ? { isPlayer: true } : {}),
     }).catch((e) => { console.error('[zoneRepeatTurnEnd:hp]', e); });
 }
 

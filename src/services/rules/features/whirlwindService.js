@@ -96,6 +96,9 @@ export async function applyWhirlwindTurnStart(activeName, campaignName) {
         isUnconscious: newHp <= 0,
         note: `Whirlwind turn-start thunder ${damage} (${die}) from ${source} — Restrained in the whirlwind; repeats the save at turn end.`,
         timestamp: Date.now(),
+        // Canonical player stamp (mirrors logDamageApplication) — see the
+        // infernalWoundService bleed-tick twin for the downed-copy rationale.
+        ...(csCreature.type === 'player' ? { isPlayer: true } : {}),
     }).catch((e) => { console.error('[whirlwindService:turn-start-tick]', e); });
 
     await addEntry(campaignName, {

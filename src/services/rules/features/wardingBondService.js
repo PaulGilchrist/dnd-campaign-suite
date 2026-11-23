@@ -87,6 +87,10 @@ function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, ca
         isHealing: delta > 0,
         isUnconscious: newHp <= 0,
         abilityName: 'Warding Bond',
+        // Canonical player stamp (mirrors logDamageApplication): the shared
+        // damage lands on the CASTER; the log lane reads this byte to keep
+        // 'Knocked Unconscious' copy for a player caster at 0 HP.
+        ...(casterIsPlayer ? { isPlayer: true } : {}),
     }).catch((e) => { console.error("[wardingBond] Error:", e); });
     if (concentration && sharedDamage > 0) {
         const newDc = Math.max(10, Math.floor(sharedDamage / 2));

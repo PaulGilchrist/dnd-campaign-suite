@@ -252,7 +252,9 @@ describe('wardingBondService log lane — settled hp_change payload bytes', () =
         const [campaignArg, entry] = addEntry.mock.calls[0];
         expect(addEntry.mock.calls[0]).toHaveLength(2);
         expect(campaignArg).toBe(campaignName);
-        expect(Object.keys(entry)).toEqual(HP_KEYS);
+        // Player caster carries the canonical isPlayer stamp LAST (ZA 2026-11-23
+        // type-split: the log renderer's downed copy reads it); NPC rows stay bare.
+        expect(Object.keys(entry)).toEqual([...HP_KEYS, 'isPlayer']);
         expect(entry).toEqual({
             type: 'hp_change',
             targetName: 'Kestrel',          // slot = buff sourceCharacter byte (caster), :39
@@ -262,6 +264,7 @@ describe('wardingBondService log lane — settled hp_change payload bytes', () =
             isHealing: false,
             isUnconscious: false,
             abilityName: 'Warding Bond',
+            isPlayer: true,                 // caster type byte (player-victim stamp)
         });
         expect(entry.targetName).not.toBe('Harsk'); // kill-literal: struck target absent
         expect(consoleError.mock.calls).toEqual([]); // success never fires .catch (:46)

@@ -46,7 +46,11 @@ describe('Log > HpChangeEntry (damage lane)', () => {
     ['multi-target spread — bytes exactly as multiTargetHandler.js:129-130 authors them',
       { delta: -7, sourceName: 'Zar', note: 'Burning Hands (multi-target spread)' },
       'Takes Damage (Zar)Burning Hands (multi-target spread)', 'log-hp-damage', 'fa-heart-crack', '-7 HP 20/25 remaining'],
-    ['knockout', { delta: -10, currentHp: 0, isUnconscious: true }, 'Knocked Unconscious — Takes Damage', 'log-hp-damage', 'fa-heart-crack', '-10 HP 0/25 remaining'],
+    // Downed prefix is TYPE-SPLIT (ZA 2026-11-23 backlog): the same
+    // isUnconscious byte reads 'Knocked Unconscious' only beside the canonical
+    // isPlayer stamp; a threshold-less monster knockout row reads 'Defeated'.
+    ['knockout (player row carries the canonical isPlayer stamp)', { delta: -10, currentHp: 0, isUnconscious: true, isPlayer: true }, 'Knocked Unconscious — Takes Damage', 'log-hp-damage', 'fa-heart-crack', '-10 HP 0/25 remaining'],
+    ['knockout (monster row carries no isPlayer stamp)', { delta: -10, currentHp: 0, isUnconscious: true }, 'Defeated — Takes Damage', 'log-hp-damage', 'fa-heart-crack', '-10 HP 0/25 remaining'],
     ['zero delta — honest neutral arm, never \'Healed\' (#880 fix)',
       { delta: 0 }, 'No HP Change', 'log-hp-neutral', 'fa-circle-info', '0 HP 20/25 remaining'],
   ])('renders %s entry bytes', (_label, overrides, name, polarityCls, iconCls, detailsText) => {
@@ -110,8 +114,11 @@ describe('Log > HpChangeEntry (damage lane)', () => {
   // NPC lane (threshold set): name byte with signed-delta parentheses, NPC details are
   // delta-only (no current/max), and the delta!==0 guard leaves 'Defeated' bare with
   // zero delta while the entry survives (falsy-leg sibling bytes — #842 class).
+  // The dead flag is TYPE-SPLIT: a player row's threshold 'dead' byte rides
+  // 'Knocked Unconscious' (players at 0 HP are DYING, never 'Defeated').
   it.each([
     ['dead overkill', { threshold: 'dead', delta: -20 }, 'Defeated (-20)', 'log-hp-damage', 'fa-heart-crack', '-20 HP'],
+    ['dead player (threshold rides player copy)', { threshold: 'dead', delta: -20, isPlayer: true }, 'Knocked Unconscious (-20)', 'log-hp-damage', 'fa-heart-crack', '-20 HP'],
     ['bloodied', { threshold: 'bloodied', delta: -15 }, 'Bloodied (-15)', 'log-hp-damage', 'fa-heart-crack', '-15 HP'],
     ['recovering heal byte', { threshold: 'recovering', delta: 10 }, 'Recovering (+10)', 'log-healing', 'fa-heart', '+10 HP'],
     ['zero delta drops only the parentheses (neutral polarity, #880 fix)', { threshold: 'dead', delta: 0 }, 'Defeated', 'log-hp-neutral', 'fa-circle-info', '0 HP'],

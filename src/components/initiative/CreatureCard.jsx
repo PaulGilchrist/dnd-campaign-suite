@@ -739,6 +739,15 @@ function ConditionsSection({
     )
 }
 
+// TYPE-SPLIT 0-HP face (ZA 2026-11-23 backlog): a player at 0 HP is DYING and
+// keeps the creature-unconscious face (death saves); a monster/NPC at 0 HP is
+// DEFEATED and rides creature-defeated. currentHp <= 0 IS the monster death
+// model (no separate dead flag). Hoisted out of CreatureCard for complexity.
+function downedCreatureClass(creature) {
+    if (creature.currentHp > 0) return ''
+    return creature.type === 'player' ? 'creature-unconscious' : 'creature-defeated'
+}
+
 function CreatureCard({
     creature,
     isActive,
@@ -773,7 +782,7 @@ function CreatureCard({
     onToggleAway,
     localCharacterName,
 }) {
-    const isUnconscious = creature.currentHp <= 0
+    const downedClass = downedCreatureClass(creature)
     const isAway = creature.type === 'player' && creature.away === true
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? [];
     // CLA-360 display parity (mirrors openEffectAdder Initiative.jsx:502 /
@@ -800,7 +809,7 @@ function CreatureCard({
     const sanctuaryInfo = findSanctuaryInfo(allCreatures, creature.name, campaignName);
 
     return (
-        <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''} ${isAway ? 'creature-away' : ''}`}>
+        <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${downedClass} ${isAway ? 'creature-away' : ''}`}>
             <HpFeedback creatureName={creature.name} hpEvent={hpEvent} onDone={onHpFeedbackDone} />
             <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
             <AwayToggle creature={creature} isLocalhost={isLocalhost} onToggleAway={onToggleAway} />

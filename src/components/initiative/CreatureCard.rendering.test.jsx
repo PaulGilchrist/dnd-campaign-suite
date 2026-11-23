@@ -2,7 +2,7 @@
 // CreatureCard base render contract — card-hosted display bytes only.
 // Owned here (render lane):
 //   card skeleton section census + exact name byte (jsx:625-665)
-//   state-class truth table: type / active / creature-unconscious (jsx:610, 626)
+//   state-class truth table: type / active / creature-unconscious (player) / creature-defeated (npc)
 //   initiative display byte incl. unrolled fallback (jsx:150-168)
 //   target-select option population: self-excluded, secondTurn-excluded,
 //     no-target default, overlay optgroup + overlayLabel bytes (jsx:174-202)
@@ -163,17 +163,29 @@ describe('CreatureCard - rendering', () => {
         expect(container.querySelector('.creature-conditions')).toBeInTheDocument();
     });
 
-    it('tracks card state classes: type, active, creature-unconscious', () => {
+    // 0-HP card face is TYPE-SPLIT (ZA 2026-11-23 backlog): players at 0 HP
+    // keep the unconscious face (dying + death saves); monsters/NPCs render the
+    // distinct creature-defeated face and never claim the player vocabulary.
+    // Healing above 0 clears either face (same currentHp <= 0 boolean).
+    it('tracks card state classes: type, active, creature-unconscious (player) / creature-defeated (npc)', () => {
         const alive = render(<CreatureCard {...props} />).container.querySelector('.creature-card');
         expect(alive).toHaveClass('creature-card', 'player');
-        expect(alive).not.toHaveClass('npc', 'active', 'creature-unconscious');
+        expect(alive).not.toHaveClass('npc', 'active', 'creature-unconscious', 'creature-defeated');
 
-        const dead = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 1 }} isActive={false} />).container.querySelector('.creature-card');
-        expect(dead).toHaveClass('npc');
-        expect(dead).not.toHaveClass('creature-unconscious', 'active');
+        const spared = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 1 }} isActive={false} />).container.querySelector('.creature-card');
+        expect(spared).toHaveClass('npc');
+        expect(spared).not.toHaveClass('creature-unconscious', 'creature-defeated', 'active');
 
         const fallen = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 0 }} isActive={true} />).container.querySelector('.creature-card');
-        expect(fallen).toHaveClass('creature-card', 'npc', 'active', 'creature-unconscious');
+        expect(fallen).toHaveClass('creature-card', 'npc', 'active', 'creature-defeated');
+        expect(fallen).not.toHaveClass('creature-unconscious');
+
+        const downedPlayer = render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, currentHp: 0 }} isActive={false} />).container.querySelector('.creature-card');
+        expect(downedPlayer).toHaveClass('player', 'creature-unconscious');
+        expect(downedPlayer).not.toHaveClass('creature-defeated');
+
+        const healedMonster = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 3 }} isActive={false} />).container.querySelector('.creature-card');
+        expect(healedMonster).not.toHaveClass('creature-defeated', 'creature-unconscious');
     });
 
     it('shows the rolled initiative number and an empty Init placeholder when unrolled', () => {

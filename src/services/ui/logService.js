@@ -146,11 +146,15 @@ function describeRoll(entry) {
   return describeOtherRoll(entry);
 }
 
+// 0-HP vocabulary is TYPE-SPLIT (ZA 2026-11-23 backlog): monsters are DEFEATED,
+// players at 0 HP are DYING (5e) and reserve unconscious/death-save vocabulary.
+// The discriminator is the canonical isPlayer stamp every player-victim producer
+// carries (applyDamage.logDamageApplication:1309 and siblings).
 function hpThresholdClause(entry) {
   if (entry.threshold === 'dead') return entry.isPlayer ? ' — falls unconscious' : ' — Defeated';
   if (entry.threshold === 'bloodied') return ' — Bloodied';
   if (entry.threshold === 'recovering') return ' — Recovering';
-  if (entry.isUnconscious) return ' — Knocked Unconscious';
+  if (entry.isUnconscious) return entry.isPlayer ? ' — Knocked Unconscious' : ' — Defeated';
   return '';
 }
 

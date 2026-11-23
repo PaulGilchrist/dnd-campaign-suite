@@ -137,7 +137,8 @@ function logManualHpOverride({ campaignName, creature, oldHp, newHp }) {
         isHealing: delta > 0,
         // Mirrors logDamageApplication: isUnconscious: newHp <= 0 for BOTH lanes
         // (the old !isPlayer exclusion contradicted the dead threshold stamp and
-        // the card's creature-unconscious styling — bug-gm-hp-input-negative-player-hp).
+        // the card's downed styling — creature-unconscious for players,
+        // creature-defeated for monsters; bug-gm-hp-input-negative-player-hp).
         isUnconscious: newHp <= 0,
         note: 'Manual GM edit from the initiative card.',
     }

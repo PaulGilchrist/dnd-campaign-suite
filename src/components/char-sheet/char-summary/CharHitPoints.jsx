@@ -81,6 +81,11 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
                   maxHp: effectiveMaxHp,
                   isHealing: delta > 0,
                   isUnconscious: value <= 0,
+                  // The canonical player stamp (mirrors logDamageApplication's
+                  // `if (creature.type === 'player') entry.isPlayer = true`):
+                  // this lane only ever edits a player sheet, and the log's
+                  // downed copy discriminates monster vs player off this byte.
+                  isPlayer: true,
               }).catch((e) => { console.error("[CharHitPoints] Error:", e); });
           }
 

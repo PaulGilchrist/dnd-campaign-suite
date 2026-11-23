@@ -160,6 +160,10 @@ export async function applyInfernalWoundBleedTurnStart(activeName, campaignName)
         isUnconscious: newHp <= 0,
         note: `Infernal Wound (turn-start bleed ${damage} [${String(wounds[0].bleedDie || '1d10')}], ${wounds[0].source || 'the devil'})`,
         timestamp: Date.now(),
+        // Canonical player stamp (mirrors logDamageApplication): the log lane's
+        // downed copy reads it to keep 'Knocked Unconscious' for players and
+        // 'Defeated' for monsters.
+        ...(csCreature.type === 'player' ? { isPlayer: true } : {}),
     }).catch((e) => { console.error('[infernalWoundService:bleed-tick]', e); });
 }
 

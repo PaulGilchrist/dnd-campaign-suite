@@ -4,10 +4,14 @@ function formatHpDelta(delta) {
   return `${delta > 0 ? '+' : ''}${delta}`;
 }
 
-function NpcChangeName({ entry }) {
+// Threshold-flag rows (ZA 2026-11-23 backlog): the dead flag is TYPE-SPLIT —
+// monsters are 'Defeated', players at 0 HP are DYING (5e) and keep the
+// 'Knocked Unconscious' copy (same isPlayer discriminator as the dead arm of
+// logService.hpThresholdClause). Bloodied/Recovering flags are shared voice.
+function ThresholdChangeName({ entry }) {
   return (
     <>
-      {entry.threshold === 'dead' && 'Defeated'}
+      {entry.threshold === 'dead' && (entry.isPlayer ? 'Knocked Unconscious' : 'Defeated')}
       {entry.threshold === 'bloodied' && 'Bloodied'}
       {entry.threshold === 'recovering' && 'Recovering'}
       {entry.delta !== 0 && ` (${formatHpDelta(entry.delta)})`}
@@ -25,7 +29,10 @@ function NpcChangeName({ entry }) {
 // (handlePlainDamage.js:1136 -(totalDamageDealt)) — so it renders neutral text,
 // never 'Healed'/'Takes Damage' with a 0 byte. Family voice: Title-Case outcome
 // labels ('Temporary Hit Points', 'Brought Back to Life').
-function PlayerChangeName({ entry, isDamage, isZero, isTemp }) {
+// Renders the threshold-LESS rows for BOTH creature types; the downed prefix is
+// TYPE-SPLIT (ZA 2026-11-23 backlog): 'Knocked Unconscious' is player vocabulary,
+// a 0-HP monster reads 'Defeated'.
+function SignChangeName({ entry, isDamage, isZero, isTemp }) {
   const label = isDamage
     ? (entry.sourceName ? `Takes Damage (${entry.sourceName})` : 'Takes Damage')
     : isZero
@@ -35,7 +42,7 @@ function PlayerChangeName({ entry, isDamage, isZero, isTemp }) {
         : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed');
   return (
     <>
-      {entry.isUnconscious && 'Knocked Unconscious — '}
+      {entry.isUnconscious && (entry.isPlayer ? 'Knocked Unconscious — ' : 'Defeated — ')}
       {label}
       {entry.note && <span className="log-dice-formula">{entry.note}</span>}
       {entry.maximizeHealingDice && !isDamage && ' — Dice maximized by Supreme Healing'}
@@ -92,7 +99,10 @@ function PlayerHpDetails({ entry, isDamage, isTemp }) {
 export function HpChangeEntry({ entry }) {
   const isDamage = entry.delta < 0;
   const isZero = entry.delta === 0;
-  const isNpc = !!entry.threshold;
+  // Threshold-flag rows ride the ThresholdChangeName face (delta-only details);
+  // every other row rides the sign-labeled face. Neither face is type-blind any
+  // more — the dead/downed legs split monster vs player off entry.isPlayer.
+  const isThresholdRow = !!entry.threshold;
   const isTemp = entry.isTempHp;
   // Resurrection face (2026-11-14 resurrection log-family split): HoUoM moved
   // from type:'healing' into this family, retaining its resurrection:true
@@ -111,19 +121,19 @@ export function HpChangeEntry({ entry }) {
         </span>
         <span className="log-character">{entry.targetName}</span>
         <span className="log-name">
-          {isNpc ? (
-            <NpcChangeName entry={entry} />
+          {isThresholdRow ? (
+            <ThresholdChangeName entry={entry} />
           ) : isResurrection ? (
             <>Brought Back to Life{entry.note && <span className="log-dice-formula">{entry.note}</span>}</>
           ) : (
-            <PlayerChangeName entry={entry} isDamage={isDamage} isZero={isZero} isTemp={isTemp} />
+            <SignChangeName entry={entry} isDamage={isDamage} isZero={isZero} isTemp={isTemp} />
           )}
         </span>
         {isResurrection && <span className="log-resurrection-badge">Resurrection</span>}
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-hp-details">
-        {isNpc ? (
+        {isThresholdRow ? (
           <span className="log-hp-delta">{formatHpDelta(entry.delta)} HP</span>
         ) : (
           <PlayerHpDetails entry={entry} isDamage={isDamage} isTemp={isTemp} />

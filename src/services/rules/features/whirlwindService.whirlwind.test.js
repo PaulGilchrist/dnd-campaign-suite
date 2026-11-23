@@ -260,6 +260,7 @@ describe('whirlwindService — MA-0610 turn-START tick consumer (Djinni whirlwin
             isUnconscious: true,
             note: 'Whirlwind turn-start thunder 19 (6d6) from Djinni 1 — Restrained in the whirlwind; repeats the save at turn end.',
             timestamp: STAMP_MS,
+            isPlayer: true, // PC victim carries the canonical player stamp (type-split lane)
         });
         expect(logs[1]).toEqual({
             type: 'automation',

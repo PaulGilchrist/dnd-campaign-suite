@@ -96,7 +96,7 @@ async function resolveGrapplerAliveGate(te, activeName, cs, campaignName) {
 
 // Tick ledger (§45 hoist): transparent dice roll log + hp_change (delta ==
 // rolled dice) + automation tick row, whirlwindService twin copy shape.
-async function logConstrictTick({ campaignName, te, activeName, source, damage, rolls, newHp, maxHp }) {
+async function logConstrictTick({ campaignName, te, activeName, source, damage, rolls, newHp, maxHp, victimIsPlayer }) {
     const die = String(te.die || '4d8').toLowerCase();
     const damageType = te.damageType || 'Bludgeoning';
     const actionName = te.actionName || 'Constrict';
@@ -124,6 +124,9 @@ async function logConstrictTick({ campaignName, te, activeName, source, damage, 
         damageBreakdown: [{ damageType, amount: damage, resisted: false }],
         note: `Constrict turn-start grapple damage ${damage} ${damageType.toLowerCase()} (${die}) from ${source} — repeats at the start of each of ${activeName}'s turns until released${te.escapeDc != null ? ` (escape DC ${te.escapeDc})` : ''}.`,
         timestamp: Date.now(),
+        // Canonical player stamp (mirrors logDamageApplication) — see the
+        // infernalWoundService bleed-tick twin for the downed-copy rationale.
+        ...(victimIsPlayer ? { isPlayer: true } : {}),
     }).catch((e) => { console.error('[constrictGrappleService:tick-hp]', e); });
     await addEntry(campaignName, {
         type: 'automation',
@@ -179,5 +182,5 @@ export async function applyConstrictGrappleTurnStart(activeName, campaignName) {
     const newHp = Math.max(0, currentHp - damage);
 
     await applyUntypedConstrictHpLoss(cs, csCreature, activeName, newHp, campaignName);
-    await logConstrictTick({ campaignName, te, activeName, source: te.source || 'the grappler', damage, rolls: result.rolls, newHp, maxHp: resolveVictimMaxHp(csCreature, activeName, campaignName) });
+    await logConstrictTick({ campaignName, te, activeName, source: te.source || 'the grappler', damage, rolls: result.rolls, newHp, maxHp: resolveVictimMaxHp(csCreature, activeName, campaignName), victimIsPlayer: csCreature.type === 'player' });
 }

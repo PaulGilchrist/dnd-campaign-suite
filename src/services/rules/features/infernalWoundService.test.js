@@ -188,7 +188,7 @@ describe('MA-0367 applyInfernalWoundBleedTurnStart', () => {
         expect(storageWrites).toEqual([]);
         expect(cacheWrites).toEqual([]);
         expect(addEntryLogs.slice(logBase).map(stripTs)).toEqual([
-            { type: 'hp_change', targetName: 'Hero', delta: -7, currentHp: 23, maxHp: 50, isHealing: false, isUnconscious: false, note: 'Infernal Wound (turn-start bleed 7 [1d10], Bearded Devil 1)' },
+            { type: 'hp_change', targetName: 'Hero', delta: -7, currentHp: 23, maxHp: 50, isHealing: false, isUnconscious: false, note: 'Infernal Wound (turn-start bleed 7 [1d10], Bearded Devil 1)', isPlayer: true },
         ]);
 
         dieTable = { '1d10': 30 };
@@ -197,7 +197,7 @@ describe('MA-0367 applyInfernalWoundBleedTurnStart', () => {
         expect(readStore('Hero', 'currentHitPoints')).toBe(0);
         expect(writes.slice(wBase)).toEqual([['Hero', 'currentHitPoints', 23, CAMPAIGN], ['Hero', 'currentHitPoints', 0, CAMPAIGN]]);
         expect(addEntryLogs.slice(logBase + 1).map(stripTs)).toEqual([
-            { type: 'hp_change', targetName: 'Hero', delta: -30, currentHp: 0, maxHp: 50, isHealing: false, isUnconscious: true, note: 'Infernal Wound (turn-start bleed 30 [1d10], Bearded Devil 1)' },
+            { type: 'hp_change', targetName: 'Hero', delta: -30, currentHp: 0, maxHp: 50, isHealing: false, isUnconscious: true, note: 'Infernal Wound (turn-start bleed 30 [1d10], Bearded Devil 1)', isPlayer: true },
         ]);
     });
 
