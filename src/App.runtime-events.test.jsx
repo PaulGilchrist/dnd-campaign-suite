@@ -350,15 +350,17 @@ describe('App - Runtime Events & State Management', () => {
       });
     });
 
-    it('auto-opens the creation wizard when the selected campaign has no characters', async () => {
+    it('does NOT auto-open the creation wizard when the selected campaign has no characters', async () => {
+      // Owner doctrine 2026-11-23: zero-character entry lands on the normal
+      // first-run view (empty-state card), never an auto-mounted wizard.
       localStorage.removeItem('character-wizard-offered:test-campaign');
       await renderInCampaign([]);
 
-      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+      expect(document.querySelectorAll('[class*=wizard]').length).toBe(0);
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      // The offer stamps the per-campaign display pref (backlog KA 2026-11-18)
-      // so a re-select after Cancel lands on the navigable shell instead.
-      expect(localStorage.getItem('character-wizard-offered:test-campaign')).toBe('1');
+      // The retired pref facade stays retired: no offer key is ever stamped.
+      expect(localStorage.getItem('character-wizard-offered:test-campaign')).toBeNull();
     });
   });
 

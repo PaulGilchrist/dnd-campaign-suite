@@ -96,7 +96,7 @@ export default function LevelUpCelebration({ campaignName, characters, armed, on
     // The wizard handoff rides the edit wizard's PUT save lane, which is
     // refuseUnlessGm server-side (bug-visitor-edit-wizard-unguarded-character-
     // file-put). The character wizard is GM authoring: hide the door from
-    // visitors exactly as the zero-char auto-offer, sidebar Add Character and
+    // visitors exactly as the sidebar Add Character and
     // starter Build-heroes lanes already do (dead-end-door doctrine,
     // bug-zero-char-auto-wizard-traps-lan-visitor-creation-is-gm-only) — the
     // banner itself stays a pure celebration on every screen.

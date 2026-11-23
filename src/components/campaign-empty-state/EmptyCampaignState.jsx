@@ -7,10 +7,11 @@ import './EmptyCampaignState.css';
 /**
  * Empty-state card for a loaded campaign whose roster has no characters yet
  * (backlog UM 2026-11-20): the shell used to render a fully blank main stage
- * once the offer-once creation wizard had been consumed, leaving the sidebar
- * "Add Character" button as the only door. Mirrors the MapUnavailable
- * placeholder pattern (global .ct-container + .ct-empty-state + .ct-btn
- * classes, scoped accent CSS).
+ * for a zero-character campaign, leaving the sidebar "Add Character" button
+ * as the only door. Zero-character entry never auto-opens the wizard (owner
+ * doctrine 2026-11-23), so this card is the standard first-run stage for
+ * seedless campaigns. Mirrors the MapUnavailable placeholder pattern (global
+ * .ct-container + .ct-empty-state + .ct-btn classes, scoped accent CSS).
  *
  * Seeded starter campaigns additionally offer the checklist affordance: the
  * seed read is the EXACT gate FirstSessionChecklist keys its own visibility

@@ -1,21 +1,22 @@
 // @improved-by-ai
 /**
  * App-level contract for the zero-character empty-state card
- * (backlog UM 2026-11-20).
+ * (backlog UM 2026-11-20, owner doctrine 2026-11-23).
  *
- * A zero-character campaign whose offer-once wizard has been consumed used to
- * land on a FULLY BLANK main stage — nav + dice tray, no affordance, the
- * sidebar "Add Character" the only door. The card renders on exactly the blank
- * stage: campaign loaded + zero characters + no view active + no wizard open.
+ * A zero-character campaign has ALWAYS landed on a FULLY BLANK main stage
+ * since the retired offer-once auto-wizard was removed — nav + dice tray, no
+ * affordance, the sidebar "Add Character" the only door. The card renders on
+ * exactly the blank stage: campaign loaded + zero characters + no view active
+ * + no wizard open.
  *
  * Pinned here:
- *  - stamped offer + zero characters → empty-state card ("Add your first
- *    character"), no wizard, no char sheet;
+ *  - zero characters → empty-state card ("Add your first character"), no
+ *    auto-wizard, no char sheet;
  *  - pressing the card's button opens the SAME creation wizard as the sidebar
  *    Add Character, and the card yields while the wizard is mounted;
- *  - while the offer-once auto-wizard is (auto-)mounted the card is absent —
- *    the existing App.jsx select-callback offer is un-regressed (its own
- *    contract lives in App.wizard-offered.test.jsx);
+ *  - entry NEVER auto-mounts a wizard — the card owns the blank stage from
+ *    the first frame (the no-auto-open contract lives in
+ *    App.no-auto-wizard.test.jsx);
  *  - a campaign WITH characters renders the sheet and NEVER the card;
  *  - seeded starter campaign: the card ALSO offers "Open the starter
  *    checklist", and activating it surfaces the FirstSessionChecklist content
@@ -175,10 +176,6 @@ const SEED = {
   },
 };
 
-function offeredKey(name) {
-  return `character-wizard-offered:${name}`;
-}
-
 function jsonResponse(body) {
   return { ok: true, json: () => Promise.resolve(body) };
 }
@@ -241,13 +238,13 @@ describe('App - zero-character empty-state card', () => {
     vi.restoreAllMocks();
   });
 
-  it('stamped offer + zero characters lands on the empty-state card, not a blank stage', async () => {
-    localStorage.setItem(offeredKey('qa-arena'), '1');
+  it('zero characters lands on the empty-state card, not a blank stage', async () => {
     mockState.campaignName = 'qa-arena';
     render(<App />);
     await selectCampaign();
 
-    // No auto-wizard (stamped), no sheet — and the stage is NOT blank.
+    // No auto-wizard (owner doctrine 2026-11-23), no sheet — and the stage
+    // is NOT blank.
     expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
     expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     const card = screen.getByRole('button', { name: /Add your first character/ });
@@ -257,7 +254,6 @@ describe('App - zero-character empty-state card', () => {
   });
 
   it('pressing "Add your first character" opens the same wizard the sidebar Add Character opens, and the card yields while it is mounted', async () => {
-    localStorage.setItem(offeredKey('qa-arena'), '1');
     mockState.campaignName = 'qa-arena';
     render(<App />);
     await selectCampaign();
@@ -275,19 +271,23 @@ describe('App - zero-character empty-state card', () => {
     });
   });
 
-  it('no empty state while the offer-once auto-wizard is mounted; the card appears after Cancel', async () => {
+  it('no wizard auto-mounts on entry — the card owns the blank stage from the start, and still after an explicit open + cancel', async () => {
     mockState.campaignName = 'qa-arena';
     render(<App />);
     await selectCampaign();
 
-    // Unconsumed offer → the select callback auto-opens the wizard…
+    // Owner doctrine 2026-11-23: zero-character entry never auto-opens the
+    // wizard, so the card takes the blank stage immediately.
+    expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+    expect(localStorage.getItem('character-wizard-offered:qa-arena')).toBeNull();
+    const card = screen.getByRole('button', { name: /Add your first character/ });
+    expect(card).toBeInTheDocument();
+
+    // The card yields only to an EXPLICIT wizard open, and returns after it.
+    fireEvent.click(card);
     await waitFor(() => {
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
     });
-    expect(localStorage.getItem(offeredKey('qa-arena'))).toBe('1');
-    expectNoEmptyState();
-
-    // …and only once the wizard is gone does the card take the blank stage.
     fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Add your first character/ })).toBeInTheDocument();
@@ -308,7 +308,6 @@ describe('App - zero-character empty-state card', () => {
   it('seeded starter: the card also offers the checklist, and activating it surfaces the checklist content', async () => {
     const { loadStarterSeed } = await import('./services/campaign/starterSeedService.js');
     loadStarterSeed.mockResolvedValue(SEED);
-    localStorage.setItem(offeredKey('qa-starter'), '1');
     mockState.campaignName = 'qa-starter';
     render(<App />);
     await selectCampaign();

@@ -366,8 +366,9 @@ describe('App - Map Navigation & View Management', () => {
       });
 
       // Leave and switch to a different, characterless campaign: the select
-      // callback opens the creation wizard and never resets activeView, while
-      // the campaignName effect clears mapsView to 'none' — the blank sub-state.
+      // callback never resets activeView onto a sheet AND (owner doctrine
+      // 2026-11-23) never auto-opens the creation wizard — while the
+      // campaignName effect clears mapsView to 'none', the blank sub-state.
       fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
@@ -378,16 +379,17 @@ describe('App - Map Navigation & View Management', () => {
         fireEvent.click(screen.getByTestId('select-campaign-btn'));
       });
       await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+        expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
       });
-      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+      expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
       await flushEffects();
 
       // Campaign select now resets activeView (regression bug-stale-character-
       // sheet-cross-campaign-writes, 2026-11-04 CR): the stale "Maps"
       // indicator from the PREVIOUS campaign can no longer survive the switch
-      // — the zero-character wizard is the only surface — so no indicator
-      // renders and the maps pane stays unmounted until Maps is clicked.
+      // — the zero-character first-run view is the only surface — so no
+      // indicator renders and the maps pane stays unmounted until Maps is
+      // clicked.
       expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
       expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();

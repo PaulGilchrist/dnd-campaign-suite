@@ -4,7 +4,7 @@
 // (PUT /<Name>.json) is refuseUnlessGm server-side. The banner stays a pure
 // celebration on every screen (all clients), but the dead-end door — walk a
 // visitor through the full wizard, 403 at the final save — is hidden from
-// non-localhost origins exactly like the zero-char auto-offer, the sidebar
+// non-localhost origins exactly like the sidebar
 // Add Character door and the starter Build-heroes row
 // (bug-zero-char-auto-wizard-traps-lan-visitor-creation-is-gm-only).
 import { render, screen, fireEvent, act } from '@testing-library/react';

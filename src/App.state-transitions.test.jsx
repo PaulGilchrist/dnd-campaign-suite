@@ -15,8 +15,9 @@
  *    click (a stale mapsView of type 'map' would silently swallow the
  *    click on the player branch of handleMapsClick). Selecting a campaign
  *    also drops the previous campaign's character sheet — a zero-character
- *    campaign must show ONLY its auto-opened wizard, never the stale sheet
- *    whose Rest buttons would write ghost buckets into the new campaign
+ *    campaign must show NO stale sheet and (owner doctrine 2026-11-23) NO
+ *    auto-opened wizard — a stale sheet's
+ *    Rest buttons would write ghost buckets into the new campaign
  *    (bug-stale-character-sheet-cross-campaign-writes).
  *  - Idempotent sidebar navigation: re-clicking the button for the view
  *    you are already on keeps you there (view + sidebar indicator intact),
@@ -408,13 +409,15 @@ describe('App - State Transitions', () => {
       });
 
       // New campaign owns the shell, and the stale sheet (with its Rest
-      // affordances) is gone — the zero-character wizard is the only surface.
+      // affordances) is gone — and per owner doctrine 2026-11-23 NO wizard
+      // auto-opens on zero-character entry either.
       await waitFor(() => {
         expect(screen.getByTestId('sidebar-campaign').textContent).toBe('qa-arena');
       });
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
       expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
-      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+      expect(document.querySelectorAll('[class*=wizard]').length).toBe(0);
 
       // Nothing carrying the old character's bucket was written to the new
       // campaign while it had no roster to seed from. (The one-time

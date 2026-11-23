@@ -17,7 +17,6 @@ import { beginCampaignChangeDataEntry, readCampaignChangeData, abandonCampaignCh
 import CampaignEnterFailed from './components/campaign-enter-failed/CampaignEnterFailed.jsx';
 import storage from './services/ui/storage.js';
 import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
-import { isWizardOffered, markWizardOffered } from './services/ui/wizardOfferedStore.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import { characterFileName } from './services/campaign/characterFileName.js';
@@ -384,26 +383,21 @@ function useCampaignEnterGate({ charMgmtRef, wizardRef, campaignRef, consumeRest
     if (loaded.length > 0) {
       charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
       setActiveView('charSheet');
-    } else if (campaignRef.current.isLocalhost && !isWizardOffered(name)) {
-      // Offer the creation wizard ONCE per campaign per client (localStorage
-      // display pref, backlog KA 2026-11-18): re-selecting a zero-character
-      // campaign after cancelling must not re-arm the modal that swallows
-      // every next click. The shell stays navigable — the sidebar "Add
-      // Character" button and starter checklist still open the wizard.
-      // GM-origin gate (LAN-visitor bug 2026-11-20): character creation is
-      // localhost-only (Sidebar CharacterList door, EmptyCampaignState add
-      // button, server POST refuseUnlessGm), so a visitor never gets the
-      // dead-end auto-open. isLocalhost first ⇒ no offer made means no key
-      // burned, so a later GM session on this browser still gets its offer.
-      markWizardOffered(name);
-      wizardRef.current.handleAddCharacter();
     }
+    // Zero-character entry NEVER auto-opens the creation wizard (owner
+    // doctrine 2026-11-23): both seeded presets (qa-arena, qa-starter) and
+    // plain campaigns land on their normal first-run view — the starter
+    // checklist and/or the EmptyCampaignState card — with hero building an
+    // explicit click (sidebar "Add Character", the card's "Add your first
+    // character" button, or the checklist's Build-heroes step). The old
+    // offer-once auto-open seam (and its localStorage pref facade) is fully
+    // removed; the GM-only character-creation server guard is untouched.
     // Post-rollback auto-selection: land the GM back on the Admin view
     // instead of the character sheet after the full page reload.
     if (consumeRestore(name)) {
       setActiveView('campaignRepair');
     }
-  }, [charMgmtRef, wizardRef, campaignRef, consumeRestore, setActiveView, setCombatSummaryLoaded]);
+  }, [charMgmtRef, consumeRestore, setActiveView, setCombatSummaryLoaded]);
 
   const retryEnter = useCallback(() => {
     const last = lastEnterRef.current;
@@ -603,9 +597,9 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
 
 // Zero-character empty-state gate (backlog UM 2026-11-20): the card owns the
 // BLANK main stage only — an active view (any sidebar destination) or an open
-// creation/edit wizard (including the offer-once auto-wizard) means the stage
-// already has content. Hoisted to module level so App stays inside the
-// lint statement/complexity caps (MapsAreaView precedent).
+// creation/edit wizard means the stage already has content. Hoisted to module
+// level so App stays inside the lint statement/complexity caps (MapsAreaView
+// precedent).
 function EmptyCampaignStage({ activeView, characters, showCharacterWizard, showEditCharacterWizard, campaignName, onAddCharacter, onOpenChecklist, isLocalhost }) {
   if (activeView || characters.length > 0 || showCharacterWizard || showEditCharacterWizard) return null;
   return (
@@ -836,7 +830,7 @@ function App() {
   // a campaign resurrected a stale wizard session — and the edit lane re-seeded from
   // the NEW campaign-load activeCharacter (first roster entry), silently re-targeting
   // the GM's edit at the wrong character file. closeWizards() runs BEFORE the select
-  // callback below, so the intentional zero-character wizard offer still opens.
+  // callback below, so a re-entered campaign never repaints a surviving session.
   const handleCampaignSelect = (campaign, characters) => {
     setCombatSummaryLoaded(false);
     setActiveView(null);
@@ -1157,12 +1151,12 @@ function App() {
             in FirstSessionChecklist) — 'load' auto-opens the builder's
             saved-wave list; every other step navigates as before. */}
         <FirstSessionChecklist key={checklistEpoch} campaignName={campaignName} onNavigate={(view, intent) => handleChecklistNavigate(view, intent, setActiveView)} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
-        {/* Zero-character empty state (backlog UM 2026-11-20): once the
-            offer-once auto-wizard is consumed, selecting a campaign with no
-            characters used to leave the main stage fully blank (nav + dice
-            tray, no affordance). The card only owns the blank stage — any
-            real view (activeView set) or an open wizard replaces it; the
-            sidebar "Add Character" lane is untouched. */}
+        {/* Zero-character empty state (backlog UM 2026-11-20, owner doctrine
+            2026-11-23): a zero-character campaign lands here — the main stage
+            used to go fully blank once the retired offer-once auto-wizard was
+            consumed (nav + dice tray, no affordance). The card only owns the
+            blank stage — any real view (activeView set) or an open wizard
+            replaces it; the sidebar "Add Character" lane is untouched. */}
         <EmptyCampaignStage
           activeView={activeView}
           characters={characters}
