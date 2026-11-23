@@ -28,8 +28,8 @@
  * deliberately NOT covered here — dead CSS gets no contract.
  */
 
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
@@ -203,9 +203,12 @@ describe('App.css', () => {
     });
 
     it('only consumes theme tokens that are globally defined or have a fallback', () => {
-      const definedTokens = new Set(
-        [...themeCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1])
-      );
+      const definedTokens = new Set([
+        ...[...themeCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]),
+        // Layout tokens owned by App.css itself (e.g. --sidebar-w, declared
+        // next to the dock law it shares a breakpoint with) count as defined.
+        ...topRules.filter((r) => r.selector === ':root').flatMap((r) => Object.keys(r.props)),
+      ]);
 
       const used = [...css.matchAll(/var\(\s*(--[\w-]+)((?:[^()]|\([^()]*\))*)\)/g)];
       expect(used.length, 'App.css should consume theme tokens via var()').toBeGreaterThan(0);
@@ -215,7 +218,7 @@ describe('App.css', () => {
         const hasFallback = rest.trim().startsWith(',');
         expect(
           hasFallback || definedTokens.has(token),
-          `theme token ${token} is used without fallback but never declared in index.css`
+          `theme token ${token} is used without fallback but never declared in index.css or App.css :root`
         ).toBe(true);
       }
     });
@@ -241,7 +244,14 @@ describe('App.css', () => {
       const sidebar = styleFor('.sidebar', parseRules(sidebarCss));
       expect(sidebar, 'Sidebar.css should style .sidebar').not.toBeNull();
       expect(sidebar.position, 'sidebar should be fixed').toBe('fixed');
-      expect(styleFor('.app-body')['padding-left'], 'gutter must match .sidebar width').toBe(sidebar.width);
+      // The gutter rides the --sidebar-w token — the single pairing point with
+      // the fixed-overlay family — so the contract is: token feeds the gutter,
+      // and the token's desktop value equals the sidebar width.
+      expect(styleFor('.app-body')['padding-left']).toBe('var(--sidebar-w)');
+      expect(
+        styleFor(':root')['--sidebar-w'],
+        'gutter token must match .sidebar width'
+      ).toBe(sidebar.width);
     });
 
     it('renders .half-line as a half-em vertical spacer', () => {
@@ -445,7 +455,7 @@ describe('App.css', () => {
     const sidebarMediaRules = () => sidebarMediaQueries.get(normalize(MEDIA));
 
     it('releases the 180px gutter to a ≤40px toggle column at small widths', () => {
-      const desktop = parseFloat(styleFor('.app-body')['padding-left']);
+      const desktop = parseFloat(styleFor(':root')['--sidebar-w']);
       const mobile = styleInMedia(MEDIA, '.app-body');
       expect(mobile, `expected ${MEDIA} to restyle .app-body`).not.toBeNull();
       const gutter = parseFloat(mobile['padding-left']);
@@ -500,6 +510,82 @@ describe('App.css', () => {
         .toBeGreaterThan(parseInt(backdrop['z-index'], 10));
       expect(parseInt(backdrop['z-index'], 10))
         .toBeGreaterThan(parseInt(styleFor('.sidebar', sidebarTopRules)['z-index'], 10));
+    });
+  });
+
+  describe('fixed-overlay sidebar carve-out (bug-overlay-family-hardcodes-sidebar-carveout)', () => {
+    const MEDIA = '@media (max-width: 768px)';
+
+    /** Every fixed scrim that used to hard-code the 180px sidebar gutter.
+     *  Below the dock breakpoint the sidebar is out of the flow, so an
+     *  overlay that keeps the carve-out loses viewport it no longer needs:
+     *  dead left strip, shoved-right modal, footer buttons clipped past
+     *  100vw (measured live at 420×800). */
+    const OVERLAY_FAMILY = [
+      ['components/common/SavePromptModal.css', '.sp-overlay'],
+      ['components/common/DeathSavePromptModal.css', '.dsp-overlay'],
+      ['components/common/ConditionChoiceModal.css', '.cc-overlay'],
+      ['components/common/ConcentrationPromptModal.css', '.cnp-overlay'],
+      ['components/common/popup.css', '.popup-overlay'],
+      ['components/sidebar/DiceTray.css', '.dice-tray-popup-overlay'],
+      ['components/initiative/EffectAdder.css', '.ea-overlay'],
+      ['components/initiative/QuickMonsterSpawn.css', '.qms-overlay'],
+      ['components/encounter/MonsterCardModal.css', '.mc-overlay'],
+      ['components/char-sheet/modals/CircleOfTheLandSpellsModal.css', '.cotl-overlay'],
+      ['components/char-sheet/modals/ResourcePoolModal.css', '.resource-pool-overlay'],
+      ['components/char-sheet/modals/NaturalRecoveryModal.css', '.nr-overlay'],
+      ['components/char-sheet/modals/FontOfMagicModal.css', '.font-of-magic-overlay'],
+    ];
+
+    it('declares --sidebar-w at the sidebar width and zeroes it at the dock breakpoint', () => {
+      expect(styleFor(':root'), 'App.css must own the :root gutter token').not.toBeNull();
+      expect(styleFor(':root')['--sidebar-w']).toBe('180px');
+      const docked = styleInMedia(MEDIA, ':root');
+      expect(docked, `${MEDIA} must release the overlay carve-out entirely`).not.toBeNull();
+      expect(docked['--sidebar-w']).toBe('0px');
+      // Tie-hardening: the override shares the :root tier, so the media block
+      // must parse after the base declaration.
+      expect(
+        css.indexOf(MEDIA),
+        '768px block must parse after the base :root rule'
+      ).toBeGreaterThan(css.indexOf(':root'));
+    });
+
+    it('anchors every fixed overlay scrim on the gutter token', () => {
+      for (const [file, selector] of OVERLAY_FAMILY) {
+        const rules = parseStylesheet(readCss(join(SRC_DIR, file))).topRules;
+        const props = styleFor(selector, rules);
+        expect(props, `${file}: rule for "${selector}" should exist`).not.toBeNull();
+        expect(props.position, `${file}: "${selector}" is fixed page chrome`).toBe('fixed');
+        expect(
+          props.left,
+          `${file}: "${selector}" must follow the sidebar gutter token`
+        ).toBe('var(--sidebar-w)');
+        if (props.width !== undefined) {
+          expect(
+            props.width,
+            `${file}: "${selector}" width must subtract the token, not a literal`
+          ).toBe('calc(100vw - var(--sidebar-w))');
+        } else {
+          // right-inset siblings (ea/qms/mc tiers) need only the token left.
+          expect(props.right, `${file}: "${selector}" must inset right at 0`).toBe('0');
+        }
+      }
+    });
+
+    it('keeps the whole stylesheet tree free of hard-coded sidebar carve-outs', () => {
+      // Census guard: a NEW overlay must ride the token, not re-hard-code
+      // the gutter (comments stripped, so historical prose cannot pass or fail).
+      const offenders = [];
+      for (const entry of readdirSync(SRC_DIR, { recursive: true })) {
+        if (!String(entry).endsWith('.css')) continue;
+        const file = join(SRC_DIR, String(entry));
+        const source = readCss(file);
+        if (/left:\s*180px/.test(source) || /calc\(\s*100vw\s*-\s*180px\s*\)/.test(source)) {
+          offenders.push(relative(SRC_DIR, file));
+        }
+      }
+      expect(offenders, 'fixed overlays must use var(--sidebar-w), never a literal gutter').toEqual([]);
     });
   });
 

@@ -4,10 +4,19 @@
     flex-direction: column;
 }
 
+/* Sidebar gutter token — the horizontal carve-out reserved for the fixed
+   sidebar. Declared here, next to the dock law it shares a breakpoint with,
+   so the .app-body gutter and the fixed-position overlay family (scrim rules
+   using left: var(--sidebar-w)) release together when the sidebar docks
+   off-canvas (bug-overlay-family-hardcodes-sidebar-carveout). */
+:root {
+    --sidebar-w: 180px;
+}
+
 .app-body {
     display: flex;
     gap: 0;
-    padding-left: 180px;
+    padding-left: var(--sidebar-w);
     flex: 1;
     min-height: 0;
 }
@@ -25,6 +34,13 @@
    (0-2-0 vs 0-1-0): with no sidebar mounted there is no toggle either, and
    the gutter is zero. */
 @media (max-width: 768px) {
+  /* Docked sidebar leaves the flow, so the overlay family releases the whole
+     carve-out (full-viewport scrims, centered modals); .app-body alone keeps
+     the ≤40px toggle column. */
+  :root {
+    --sidebar-w: 0px;
+  }
+
   .app-body {
     padding-left: 36px;
   }

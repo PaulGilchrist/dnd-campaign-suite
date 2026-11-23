@@ -1,8 +1,8 @@
 .sp-overlay {
   position: fixed;
   top: 0;
-  left: 180px;
-  width: calc(100vw - 180px);
+  left: var(--sidebar-w);
+  width: calc(100vw - var(--sidebar-w));
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.85);
   z-index: 2000;
