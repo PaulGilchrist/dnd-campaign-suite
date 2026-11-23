@@ -24,9 +24,10 @@
 // entries ARE decoded here — see cueForLogEntry for why those moments have
 // no other voice.
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import { cueForLogEntry, playCue, alreadyCued } from '../../services/ui/audioCues.js';
+import NatFlourish from './NatFlourish/NatFlourish.jsx';
 
 // PER-ROW IDEMPOTENCE (improve 2026-11-21, CCC backlog): a duplicate delivery
 // of the same log row — an SSE resend after a brief drop, or a remount
@@ -36,6 +37,12 @@ import { cueForLogEntry, playCue, alreadyCued } from '../../services/ui/audioCue
 // memory survives this component's remounts; bound/eviction law lives in
 // audioCues.js). Rows with no cue never touch the set.
 export default function CombatCues({ campaignName }) {
+    // Full-screen Nat20/Fumble flourish (Phase 6): the visual layer fires on
+    // EVERY client (the whole table reacts); the audio twin inside playCue is
+    // sound-screen-gated (soundOwner.js), so exactly one device voices it.
+    // Keyed by the row GUID — a fresh crit replaces the live flourish, and
+    // the component self-removes on animationend (no timers).
+    const [flourish, setFlourish] = useState(null);
     useEffect(() => {
         if (!campaignName) return undefined;
         return subscribeToSSE(campaignName, (event) => {
@@ -45,8 +52,18 @@ export default function CombatCues({ campaignName }) {
             if (!cue) return;
             if (alreadyCued(event.data.id)) return;
             playCue(cue);
+            if (cue === 'crit' || cue === 'fumble') {
+                setFlourish({ kind: cue, id: event.data.id });
+            }
         });
     }, [campaignName]);
 
-    return null;
+    if (!flourish) return null;
+    return (
+        <NatFlourish
+            key={flourish.id}
+            kind={flourish.kind}
+            onDone={() => setFlourish(null)}
+        />
+    );
 }

@@ -73,7 +73,7 @@ export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = 
 
     return (
         <div className="ai-config-row">
-            <label>
+            <label title="off: no AI traffic at all. suggest: the model proposes, you confirm every action. autopilot: safe atomic actions apply themselves; anything needing judgement returns needs_human and waits for you.">
                 <span>Mode</span>
                 <select value={mode} onChange={(e) => setMode(e.target.value)}>
                     <option value="off">off</option>

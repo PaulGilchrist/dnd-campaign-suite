@@ -18,6 +18,9 @@ import {
 import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
+import LootRevealModal from './LootRevealModal.jsx'
+import GMCopilot from '../GMCopilot/GMCopilot.jsx'
+import { useGmCopilot } from '../../hooks/management/useGmCopilot.js'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/popup.jsx'
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx'
@@ -339,6 +342,62 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
             onTargetChange={onTargetChange}
             isLocalhost={isLocalhost}
             isPlayerSummoned={controller !== null}
+        />
+    )
+}
+
+// GM Copilot (learnability plan Phase 1): the "running a monster" card on the
+// live board. Non-character rows (joined monsters/NPCs — names absent from the
+// character roster) arm the tip; opening ANY creature stat block (viewingMonster
+// becomes truthy — the same lane every avatar click rides) settles it: the
+// lesson was learned by doing. GM screens only, never the TV layer.
+// Module-scope like the other hoisted helpers to keep Initiative under its
+// eslint ceiling.
+function InitiativeMonsterTip({ campaignName, creatures, characters, monsterCardOpened, isLocalhost, tvMode }) {
+    const { isSettled, markSeen } = useGmCopilot(campaignName)
+    const characterNames = new Set((characters || []).map(c => c.name))
+    const hasMonsters = (creatures || []).some(c => !characterNames.has(c.name))
+    React.useEffect(() => {
+        if (monsterCardOpened && !isSettled('monster-avatars')) {
+            markSeen('monster-avatars')
+        }
+    }, [monsterCardOpened, isSettled, markSeen])
+    return (
+        <GMCopilot campaignName={campaignName} tipId="monster-avatars" when={isLocalhost && !tvMode && hasMonsters} />
+    )
+}
+
+// Empty-board branch (GM Copilot Phase 1): the one-time combat-flow card rides
+// above the empty state on GM screens; opening the Encounter Builder from it
+// settles the tip (GMCopilot's action lane), × dismisses forever. Hoisted for
+// the same Initiative-complexity reason as InitiativeEmptyState above.
+function InitiativeEmptyBranch({ campaignName, characters, isLocalhost, onOpenEncounters, onAddCharacter }) {
+    return (<>
+        {isLocalhost && (
+            <GMCopilot
+                campaignName={campaignName}
+                tipId="initiative-flow"
+                onAction={onOpenEncounters}
+                actionLabel={onOpenEncounters ? 'Open Encounter Builder' : undefined}
+            />
+        )}
+        <InitiativeEmptyState characters={characters} isLocalhost={isLocalhost} onOpenEncounters={onOpenEncounters} onAddCharacter={onAddCharacter} />
+    </>)
+}
+
+// Staged loot reveal mount (engagement plan Phase 6): the show-gate lives in
+// the hoisted helper so Initiative itself gains zero branches (eslint
+// complexity ceiling). Award closes the celebration and arms the existing
+// two-step confirm in the Loot panel — no award lane is duplicated here.
+function InitiativeLootReveal({ show, lootData, characters, onClose, onAward }) {
+    if (!show) return null
+    return (
+        <LootRevealModal
+            lootEntries={lootData.lootEntries}
+            totalEncounterXp={lootData.totalEncounterXp}
+            characters={characters}
+            onClose={onClose}
+            onAward={onAward}
         />
     )
 }
@@ -688,6 +747,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         handleGenerateLoot,
         handleAwardLoot,
         handleClearLoot,
+        showLootReveal,
+        setShowLootReveal,
     } = useLootHandlers(campaignName, characters, combatSummary)
 
     // Save result window event listeners
@@ -944,6 +1005,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             )}
             <EvictFailureToast campaignName={campaignName} />
             <VictoryBanner visible={victoryVisible} onDismiss={dismissVictory} result={lastCombatResult} />
+            {/* Staged loot reveal (engagement plan Phase 6): rides a fresh
+                Generate Loot only — the panel/textarea/draft underneath stay
+                the single source; Award arms the existing two-step confirm. */}
+            <InitiativeLootReveal
+              show={showLootReveal}
+              lootData={lootData}
+              characters={characters}
+              onClose={() => setShowLootReveal(false)}
+              onAward={() => { setShowLootReveal(false); setShowAwardLoot(true); }}
+            />
             {combatSummary && combatSummary.creatures && boardHasSubjects(combatSummary, characters) ? (
              <>
              <div className='combat-header'>
@@ -951,6 +1022,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  {tvMode && <TvMusicTransport campaignName={campaignName} isLocalhost={isLocalhost} />}
                  <TvToggleButton tvMode={tvMode} onToggle={toggleTvMode} />
              </div>
+             {/* GM Copilot monster tip (Phase 1) — GM screens only, never the
+                 TV layer (both gates live inside the hoisted helper, keeping
+                 Initiative under its eslint complexity ceiling). */}
+             <InitiativeMonsterTip
+                 campaignName={campaignName}
+                 creatures={combatSummary.creatures}
+                 characters={characters}
+                 monsterCardOpened={!!viewingMonster}
+                 isLocalhost={isLocalhost}
+                 tvMode={tvMode}
+             />
              <TvNextUpStrip creatures={nextUpCreatures} />
              {/* Shared dice on the TV layer (roadmap Item 5): last few roll
                  results projected big, read-only off the synced log lane.
@@ -1150,7 +1232,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 />
             )}
             </>
-            ) : <InitiativeEmptyState characters={characters} isLocalhost={isLocalhost} onOpenEncounters={onOpenEncounters} onAddCharacter={onAddCharacter} />}
+            ) : (
+                <InitiativeEmptyBranch
+                    campaignName={campaignName}
+                    characters={characters}
+                    isLocalhost={isLocalhost}
+                    onOpenEncounters={onOpenEncounters}
+                    onAddCharacter={onAddCharacter}
+                />
+            )}
         </div>
     )
 }

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { isLocalhostBrowser } from '../../services/ui/isLocalhostBrowser.js';
 
 function useCampaignManagement() {
   const [showCampaignSelection, setShowCampaignSelection] = useState(true);
@@ -6,11 +7,7 @@ function useCampaignManagement() {
   const onCampaignSelectRef = useRef(null);
   const onDeleteCampaignRef = useRef(null);
 
-  const isLocalhost =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname === '::1' ||
-    /^127\./.test(window.location.hostname);
+  const isLocalhost = isLocalhostBrowser();
 
 
 

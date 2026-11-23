@@ -11,7 +11,7 @@
 // unsubscribe on unmount. There is deliberately NO initial GET — mounts never
 // replay a backlog. Row fixtures carry a server-style id because every log.js
 // append stamps one on the wire.
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CombatCues from './CombatCues.jsx';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
@@ -145,5 +145,59 @@ describe('CombatCues', () => {
         emit({ key: 'combatSummary-test-campaign', data: { type: 'roll', rollType: 'attack', hit: true } });
         emit({ data: null });
         expect(playCue).not.toHaveBeenCalled();
+    });
+
+    // ── Nat-flourish visual twin (Phase 6) ──
+    describe('full-screen Nat flourish', () => {
+        const fire = (row) => {
+            render(<CombatCues campaignName='test-campaign' />);
+            // The flourish is React state — an SSE callback firing outside a
+            // React event needs act() to flush the render (playCue-only tests
+            // above never needed it because the spy is not state).
+            act(() => emit(logEvent(row)));
+        };
+
+        it('a crit append renders the golden flourish, aria-hidden and click-through', () => {
+            fire({ id: 'fl-1', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
+            const flourish = document.querySelector('.nat-flourish-crit');
+            expect(flourish).not.toBeNull();
+            expect(flourish).toHaveAttribute('aria-hidden', 'true');
+            expect(flourish.textContent).toBe('CRITICAL HIT!');
+        });
+
+        it('a fumble append renders the red CRITICAL MISS flourish', () => {
+            fire({ id: 'fl-2', type: 'roll', rollType: 'attack', hit: false, isNatural1: true });
+            const flourish = document.querySelector('.nat-flourish-fumble');
+            expect(flourish).not.toBeNull();
+            expect(flourish.textContent).toBe('CRITICAL MISS!');
+        });
+
+        it('ordinary hits and saves never flourished — only the two table-moments', () => {
+            fire({ id: 'fl-3', type: 'roll', rollType: 'attack', hit: true });
+            emit(logEvent({ id: 'fl-4', type: 'roll', rollType: 'save', saveResult: 'success' }));
+            expect(document.querySelector('.nat-flourish')).toBeNull();
+        });
+
+        it('a duplicate delivery of the same crit row does not re-flourish (per-row idempotence)', () => {
+            const row = { id: 'fl-5', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true };
+            fire(row);
+            const first = document.querySelector('.nat-flourish-crit');
+            act(() => emit(logEvent(row)));
+            expect(document.querySelector('.nat-flourish-crit')).toBe(first);
+        });
+
+        it('the flourish element carries the self-removal contract (onAnimationEnd → unmount)', () => {
+            // jsdom has no animation-event plumbing (RTL's animationEnd never
+            // reaches React's delegated listener here), so the contract is
+            // pinned on the fiber props directly; the browser lifecycle is
+            // verified live (Playwright): appear → CSS keyframe → animationend
+            // → onDone → removed.
+            fire({ id: 'fl-6', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
+            const flourish = document.querySelector('.nat-flourish-crit');
+            const propsKey = Object.keys(flourish).find((k) => k.startsWith('__reactProps$'));
+            expect(typeof flourish[propsKey].onAnimationEnd).toBe('function');
+            act(() => flourish[propsKey].onAnimationEnd());
+            expect(document.querySelector('.nat-flourish')).toBeNull();
+        });
     });
 });

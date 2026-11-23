@@ -13,8 +13,7 @@
 // not scheduled game logic.
 //
 // Unlock model: browsers refuse media playback until the user has interacted
-// with the page. The service settles `unlocked` two ways: a one-time
-// `pointerdown` listener armed EAGERLY at module load, and — because SPA
+// with the page. The service settles `unlocked` two ways: a one-time// `pointerdown` listener armed EAGERLY at module load, and — because SPA
 // lazy-loading can make the module EVALUATE after the session's clicks — a
 // `navigator.userActivation.hasBeenActive` check on every attempt. A cue
 // attempted while still locked fails SILENTLY — no throw, no console noise,
@@ -30,6 +29,8 @@
 // identical events in one batch collapses into one audible hit — the
 // same-key floor, complemented per ROW by alreadyCued below (the SSE log lane's
 // duplicate-delivery guard). No wall-clock throttle anywhere.
+
+import { isSoundOwnerHere } from './soundOwner.js';
 
 // cue key → served URL. public/ is served statically in dev (express + Vite)
 // and copied into dist/ by the build, so these paths resolve in both modes.
@@ -148,13 +149,17 @@ function obtain(key) {
 }
 
 // Playback gate shared by every entry point: unknown key is a programming
-// error (loud), locked/disabled/audio-less is a silent honest no-op.
+// error (loud), locked/disabled/audio-less is a silent honest no-op. The
+// Sound Owner law (Phase 5, soundOwner.js) joins it: the table has ONE set of
+// speakers — a non-owner tab returns silently even with its own SFX toggle
+// on (the toggle now governs the owner screen loudness, not per-seat play).
 function gate(key) {
     if (!CUE_URLS[key]) {
         console.error(`[audioCues] unknown cue "${key}"`);
         return false;
     }
     if (!isSfxEnabled()) return false;
+    if (!isSoundOwnerHere()) return false;
     refreshUnlock();
     if (!unlocked) {
         unlockOnFirstGesture();
@@ -192,6 +197,7 @@ export function startLoop(key) {
         return;
     }
     if (!isSfxEnabled() || typeof Audio === 'undefined') return;
+    if (!isSoundOwnerHere()) return;
     refreshUnlock();
     if (!unlocked) {
         pendingLoop = key;

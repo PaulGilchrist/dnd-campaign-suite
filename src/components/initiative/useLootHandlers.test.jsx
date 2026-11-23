@@ -133,6 +133,24 @@ describe('useLootHandlers', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
+        it('a real haul raises the loot-reveal ceremony; an honest empty roll does not', async () => {
+            const { result: withLoot } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+            generateLootFromCombatSummary.mockResolvedValueOnce(
+                { lootEntries: ['Pearl ring (25 gp)'], totalEncounterXp: 100 });
+            await act(async () => { withLoot.current.handleGenerateLoot(); });
+            expect(withLoot.current.showLootReveal).toBe(true);
+
+            generateLootFromCombatSummary.mockResolvedValueOnce(
+                { lootEntries: ['No loot for these monsters'], totalEncounterXp: 450 });
+            const { result: emptyRoll } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+            await act(async () => { emptyRoll.current.handleGenerateLoot(); });
+            // The sentinel row keeps the plain panel — blank dice is never
+            // celebrated as "spoils" (XP rides the panel's own summary).
+            expect(emptyRoll.current.showLootReveal).toBe(false);
+        });
+
         // Lawful-shape pin (flipped from the old honest-crash-through-catch pin,
         // #875): the handler normalizes the producer result once, so null and
         // absent-lootEntries resolve to the producer's own zero-loot constant

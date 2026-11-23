@@ -145,7 +145,7 @@ const server = app.listen(PORT, () => {
     // Load character change data from disk at startup
     readFile();
 
-    // Save change data on process exit to prevent loss from 1-min debounce
+    // Save change data on process exit to prevent loss from the 2s debounce window
     process.on('exit', () => { saveFile(); });
 
     // Start keep-alive health check
@@ -229,7 +229,9 @@ app.use(campaignsChangedata);
 // Campaign admin routes (create, rename, delete campaign)
 app.use(campaignsAdmin);
 
-// Campaign log routes (must be before wildcard catch-all in sseRoutes)
+// Campaign log routes — mounted AFTER campaignsChangedata; this works because
+// the change-data routes explicitly defer key==='log' with next(), so
+// /api/campaigns/:campaign/log falls through to here.
 app.use(logRoutes);
 
 // Spell overlay routes (transient, broadcast only)

@@ -11,6 +11,7 @@
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { SESSION_PHASES, setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js'
+import TryNextSection from './TryNextSection.jsx'
 // Ledger filter list, extracted to a plain .js module so the server allowlist
 // pin test can derive it (see auditTypes.js).
 import { AUDIT_TYPES } from './auditTypes.js'
@@ -47,7 +48,7 @@ function entryMatchesAudit(e) {
     return AUDIT_TYPES.includes(type) || automationType.startsWith('ai_') || automationType === 'manual_takeover'
 }
 
-export default function SessionSection({ campaignName }) {
+export default function SessionSection({ campaignName, characters = [], onNavigate }) {
     // sessionState rides the synced store so SSE moves the pills in every view.
     const [sessionState] = useSyncedState('campaign', 'sessionState', null, campaignName)
     const phase = sessionState?.phase || readSessionPhase(campaignName)
@@ -109,6 +110,9 @@ export default function SessionSection({ campaignName }) {
                     Last moved by {sessionState.changedBy}.
                 </p>
             )}
+
+            {/* "Try next" invitations (Phase 2): additive only — see TryNextSection. */}
+            <TryNextSection campaignName={campaignName} characters={characters} onNavigate={onNavigate} />
 
             <div className="session-audit">
                 <div className="session-audit-head">

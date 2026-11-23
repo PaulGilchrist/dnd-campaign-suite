@@ -1,0 +1,157 @@
+/* Loot reveal — self-scoped overlay/dialog (same tokens and dim as the app's
+   modal furniture). The staged feel is CSS-only: each row starts hidden and
+   lands on its own nth-child delay; the chest + XP + buttons follow the rows. */
+.loot-reveal-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1100;
+}
+
+.loot-reveal {
+  animation: loot-reveal-pop 320ms ease-out;
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  max-width: 520px;
+  padding: 1.1rem 1.4rem;
+  width: min(520px, 92vw);
+}
+
+.loot-reveal-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.loot-reveal-head h3 {
+  color: var(--color-header);
+  margin: 0;
+}
+
+.loot-reveal-head h3 .fa-box-open {
+  color: #ffcc00;
+}
+
+.loot-reveal-close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+
+.loot-reveal-close:hover {
+  color: var(--color-text);
+}
+
+.loot-reveal-items {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.loot-reveal-items li {
+  animation: loot-reveal-line 380ms ease-out both;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--color-text);
+  padding: 0.4rem 0.2rem;
+}
+
+.loot-reveal-items li:nth-child(1) { animation-delay: 220ms; }
+.loot-reveal-items li:nth-child(2) { animation-delay: 420ms; }
+.loot-reveal-items li:nth-child(3) { animation-delay: 620ms; }
+.loot-reveal-items li:nth-child(4) { animation-delay: 820ms; }
+.loot-reveal-items li:nth-child(5) { animation-delay: 1020ms; }
+.loot-reveal-items li:nth-child(6) { animation-delay: 1220ms; }
+.loot-reveal-items li:nth-child(7) { animation-delay: 1420ms; }
+.loot-reveal-items li:nth-child(8) { animation-delay: 1620ms; }
+.loot-reveal-items li:nth-child(9) { animation-delay: 1820ms; }
+.loot-reveal-items li:nth-child(n+10) { animation-delay: 2020ms; }
+
+.loot-reveal-xp {
+  animation: loot-reveal-line 380ms ease-out both;
+  animation-delay: 2220ms;
+  color: var(--color-header);
+  font-weight: 600;
+  margin-top: 0.7rem;
+}
+
+.loot-reveal-xp .fa-star {
+  color: #ffcc00;
+}
+
+.loot-reveal-actions {
+  animation: loot-reveal-line 380ms ease-out both;
+  animation-delay: 2420ms;
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.loot-reveal-btn {
+  border-radius: 4px;
+  border: 1px solid var(--color-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+}
+
+.loot-reveal-btn-award {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.loot-reveal-btn-award:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.loot-reveal-btn-edit {
+  background: var(--background-color-button-secondary);
+  border-color: var(--border-color);
+  color: var(--color-text);
+}
+
+.loot-reveal-btn-edit:hover {
+  background: var(--background-color-button-secondary-hover);
+}
+
+@keyframes loot-reveal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes loot-reveal-line {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loot-reveal,
+  .loot-reveal-items li,
+  .loot-reveal-xp,
+  .loot-reveal-actions {
+    animation-delay: 0ms;
+    animation-duration: 1ms;
+  }
+}

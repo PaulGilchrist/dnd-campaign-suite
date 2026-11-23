@@ -55,6 +55,7 @@ import ConcentrationPromptModal from './components/common/ConcentrationPromptMod
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
+import HelpDrawer from './components/HelpDrawer/HelpDrawer.jsx';
 import EmptyCampaignState from './components/campaign-empty-state/EmptyCampaignState.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
 import { getDocumentTitle } from './routes/config.js';
@@ -653,6 +654,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
         onDeleteCampaign={onDeleteCampaign}
         restoredSnapshot={restoredSnapshot}
         isLocalhost={isLocalhost}
+        onNavigate={(view) => setActiveView(view)}
       />
     ),
   };
@@ -886,7 +888,7 @@ function App() {
   // FirstSessionChecklist, surfacing a checklist this client had dismissed
   // (its dismiss flag is per-client UI state, reset by a remount — nothing
   // is written to the server).
-  const [checklistEpoch, setChecklistEpoch] = useState(0);
+  const [checklistEpoch, setChecklistEpoch] = useState(0), [helpOpen, setHelpOpen] = useState(false); // multi-declarator: App is AT the max-statements ceiling
 
   useEffect(() => {
     setActiveMapName(null);
@@ -1148,6 +1150,7 @@ function App() {
           onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
           campaignType={campaignType}
+          onHelpClick={() => setHelpOpen(true)}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
         {/* onNavigate forwards the step's optional intent (see the wave step
@@ -1256,6 +1259,9 @@ function App() {
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <ConditionChoiceModal />
+        {/* In-app help drawer (Phase 3): opened from the sidebar "?"; overlays
+            whatever view is live and closes on backdrop / × / Escape. */}
+        <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} activeView={activeView} />
         {/* LEVEL UP celebration (roadmap Item 8): every screen, every client —
             mounted OUTSIDE the view outlet so it survives view navigation,
             exactly like the adjudication prompts. Pure presentation over the

@@ -1,0 +1,6 @@
+/* Sound-screen note chip — same visual family as the ambience
+   .music-remote-note chip it sits beside (that class carries the base
+   styling); this rule only spaces the chip off the icon button. */
+.sound-owner-note {
+  margin-left: 0.5rem;
+}

@@ -1,0 +1,60 @@
+/* Nat20/Fumble flourish — one-shot full-screen celebration. Keyframes do the
+   whole lifecycle (the component unmounts on animationend, zero timers).
+   Colors reuse the semantic tiers: gold = the app's spotlight/crit family,
+   red = debuff/fumble family. */
+.nat-flourish {
+  align-items: center;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  pointer-events: none;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1200;
+}
+
+.nat-flourish-text {
+  animation: nat-flourish-pop 1100ms ease-out forwards;
+  font-size: clamp(2.4rem, 8vw, 5rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+}
+
+.nat-flourish-crit .nat-flourish-text {
+  /* Same gold as the turn spotlight (#ffcc00, Initiative.css). */
+  color: #ffcc00;
+}
+
+.nat-flourish-fumble .nat-flourish-text {
+  color: var(--color-error-light);
+}
+
+@keyframes nat-flourish-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  30% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05) translateY(-10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nat-flourish-text {
+    animation-duration: 600ms;
+  }
+}

@@ -11,7 +11,7 @@
   - `src/routes/config.js` — Client-side view config
 - `server/` — Express API
   - `server/routes/` — One route file per domain (campaigns, maps, NPCs, encounters, log, SSE, etc.)
-  - `server/utils/` — `changeData.js` (in-memory cache → disk, 10s debounce), `jsonEntityCrud.js` (CRUD factory), `imageUtils.js`
+  - `server/utils/` — `changeData.js` (in-memory cache → disk, 2s debounce; log route has its own 1s debounce), `jsonEntityCrud.js` (CRUD factory), `imageUtils.js`
 - `public/data/` — 5e JSON rule data (24 files)
 - `public/data/2024/` — 2024 Essentials JSON rule data (8 files)
 - `public/campaigns/:name/` — Runtime campaign data (character JSON, maps, logs, encounter/faction/quest data)
@@ -32,6 +32,10 @@ npm run test:coverage                             # Vitest with coverage (v8 →
 
 **Always run `npm run lint` and `npm run test:run` after changes.** Lint enforces zero warnings.
 
+## Plan Files (MANDATORY — every agent and subagent)
+
+All planning documents for this project are written to **`.opencode/plans/`** (the repo folder, git-visible). **NEVER write project plans to the global `~/.opencode/plan/` folder** — unless the user explicitly directs otherwise for a specific file. If a harness instruction names the global folder, the project folder wins.
+
 ## Git Permissions
 
 Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git blame`, `git grep`, `git ls-files`, `git stash list`, `git stash show`, `git remote -v`, `git branch`.
@@ -49,8 +53,8 @@ Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git
 **Consumers:**
 - `ConditionEffectBadges.jsx` — renders target effects via CreatureBadge
 - `CreatureCard.jsx` — all condition/target/feature badges via CreatureBadge
-- `CharConditions.jsx` — condition save badges and concentration via CreatureBadge
-- `CharSummary.jsx` — new `char-summary-badges` section with ConditionEffectBadges + special feature badges (Wild Shape, Majesty, Wrath of the Sea, Sanctuary, Reckless Attack, Hunter's Mark marked-by, Concentration)
+- `char-sheet/char-summary/CharConditions.jsx` — condition save badges and concentration via CreatureBadge
+- `char-sheet/char-summary/CharSummary.jsx` — `char-summary-badges` section with ConditionEffectBadges + special feature badges (Wild Shape, Majesty, Wrath of the Sea, Sanctuary, Reckless Attack, Hunter's Mark marked-by, Concentration)
 
 **Key gotcha:** All remove buttons now have the same title `"Remove effect"`. Tests that check for remove buttons must account for possible duplicates from multiple active badges.
 
@@ -65,7 +69,7 @@ Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git
 
 - **JavaScript, not TypeScript** — `.js` and `.jsx` only
 - **ES modules** — `import`/`export`, `"type": "module"` in package.json
-- **React 19** — functional components, hooks, `React.StrictMode` in `main.jsx`
+- **React 19** — functional components, hooks (no `React.StrictMode` in `main.jsx` — mounting the whole tree twice would double-fire the server-first write lanes)
 - **No inline styles** — use CSS files; component-specific styles must be scoped to that component
 - **Font Awesome** — `@fortawesome/fontawesome-free` imported globally in `main.jsx`; use `<i className="fa-solid fa-...">`
 - **Lodash** — available (`cloneDeep`, `merge`, etc.)
@@ -88,7 +92,7 @@ This application has **never been released** — we want no legacy code. When ad
 - **SSE re-render loop:** Always use `skipSync=true` in `setRuntimeObject` when applying SSE-echoed data. The server already has the data; re-POSTing causes loops.
 - **ONE shared SSE connection per campaign:** Never `new EventSource` directly. Use `subscribeToSSE(campaignName, handler)` from `src/services/ui/sseClient.js` (or the `Subscriber` component / `useLog` hook). Multiple EventSources exhaust the browser's ~6-connection-per-host pool, starving normal fetches — map create/delete showed as endless spinners + `TypeError: Load failed` in prod (dev masks it because Vite's proxy on :5173 has its own pool).
 - **PlayerStats is single source of truth:** `rulesFactory.getPlayerStats()` → `PlayerStats` is the canonical character data. Don't derive state from elsewhere.
-- **Route order matters in Express:** `campaigns-changedata.js` must be mounted after `campaigns-character.js` in `server.js` so `.json` character file routes aren't captured by the `:key` wildcard. Same reason `campaigns-starter-seed.js` (GET/PUT `/api/campaigns/:campaign/starter-seed`) and `campaigns-meta.js` (GET/PUT `/api/campaigns/:campaign/meta`) are mounted BEFORE `campaigns-changedata.js` — otherwise the generic `:campaign/:key` wildcard swallows `/starter-seed` or `/meta` as a change-data key.
+- **Route order matters in Express:** `campaigns-changedata.js` must be mounted after `campaigns-character.js` in `server.js` so `.json` character file routes aren't captured by the `:key` wildcard. Same reason `campaigns-starter-seed.js` (GET/PUT `/api/campaigns/:campaign/starter-seed`) and `campaigns-meta.js` (GET/PUT `/api/campaigns/:campaign/meta`) are mounted BEFORE `campaigns-changedata.js` — otherwise the generic `:campaign/:key` wildcard swallows `/starter-seed` or `/meta` as a change-data key. The log routes are the reverse case: they mount AFTER `campaigns-changedata.js` and depend on its `key === 'log'` guards calling `next()` (`campaigns-changedata.js:81`, `:305`) so `/api/campaigns/:campaign/log` falls through — never remove those guards.
 - **GM monster execution flow:** the GM clicks a monster's avatar in Initiative → `MonsterCardModal` opens (full stat block) → clicking an action's dice chip (`mc-dice-link`) rolls through the engine (`handleAttack`). **Invariant (owner): `npcs.json` is reserved for CUSTOM NPCs — pre-made monsters NEVER live there; they join via the Encounter Builder and pull real stats from `monsters.json`.** Enforced at the server (npcs CRUD bestiary-name guard, plain-English 400); a same-named placeholder NPC otherwise shadow-blocks the real stat block in the avatar→modal lane (found live 2026-10-13).
 - **Dual ruleset data paths:** 5e data lives in `/data/`, 2024 data in `/data/2024/`. Shared data (equipment, monsters) is only in `/data/`. See `src/services/ui/dataLoader.js` `getDataPath()`.
 - **GM features are localhost-only:** Encounter builder, map editing, quest/faction/NPC management are enabled on localhost; network clients get read-only view. **Exception (owner-ratified 2026-11-08):** the spell-overlay transport is visitor-writable shared-table authoring — see "Map Lane Write Authority" below.

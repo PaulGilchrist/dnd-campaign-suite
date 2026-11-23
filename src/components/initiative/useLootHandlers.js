@@ -62,6 +62,11 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
     const [lootTextValue, setLootTextValue] = useState(() => readStoredLootDraft().text)
     const [showAwardLoot, setShowAwardLoot] = useState(false)
     const [awardingLoot, setAwardingLoot] = useState(false)
+    // Loot reveal (engagement plan Phase 6): a fresh GENERATION celebrates —
+    // staged modal over the raw table. Pure per-client presentation: the
+    // draft/award lanes underneath are untouched, and zero-loot generations
+    // stay honest (no entries → no celebration).
+    const [showLootReveal, setShowLootReveal] = useState(false)
 
     // draftRef mirrors the latest on-screen draft; lastWrittenRef is the last
     // draft committed to the store/DELETE lane. Their inequality means an
@@ -129,6 +134,9 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
         setLootData({ lootEntries: draft.lootEntries, totalEncounterXp: draft.totalEncounterXp })
         setLootTextValue(draft.text)
         setShowAwardLoot(false)
+        // Remote clear/award while our reveal is open → retire the celebration
+        // with the panel it celebrates.
+        setShowLootReveal(false)
     }), [])
 
     const handleGenerateLoot = useCallback(async () => {
@@ -149,6 +157,10 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
             const totalEncounterXp = lootResult?.totalEncounterXp || 0
             setLootData({ lootEntries, totalEncounterXp })
             setLootTextValue(lootEntries.join('\n'))
+            // Reveal law: only a haul with at least one REAL line earns the
+            // "Spoils of battle" ceremony — an honest empty roll (the shared
+            // no-loot sentinel) or a pure-XP seam keeps the plain panel.
+            if (filterNoLootSentinel(lootEntries).length > 0) setShowLootReveal(true)
         } catch (error) {
             // Lawful entry now means generator rejection only — null/partial
             // results resolve to honest zero-loot state instead of landing
@@ -246,6 +258,7 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
         setLootData({ lootEntries: [], totalEncounterXp: 0 })
         setLootTextValue('')
         setShowAwardLoot(false)
+        setShowLootReveal(false)
         // Clear-× fully wipes the persisted draft (criterion 4), synchronously
         // so a fast view-switch cannot remount-hydrate the just-cleared draft.
         commitDraft('', [], 0)
@@ -263,5 +276,7 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
         handleGenerateLoot,
         handleAwardLoot,
         handleClearLoot,
+        showLootReveal,
+        setShowLootReveal,
     }
 }

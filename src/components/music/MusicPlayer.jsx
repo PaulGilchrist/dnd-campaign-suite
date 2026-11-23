@@ -8,6 +8,7 @@ import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/music
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import MusicSfxControls from './MusicSfxControls.jsx';
+import SoundOwnerControl from './SoundOwnerControl.jsx';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
@@ -867,8 +868,12 @@ function MusicPlayer({ campaignName, visible = true }) {
         />
         {/* Per-client combat/UI sound cues (roadmap Item 10): sits on the
             same audio-settings row because it IS audio — but a localStorage
-            pref, not the shared 'music' store key beside it. */}
+            pref, not the shared 'music' store key beside it. Phase 5 law:
+            playback itself is gated to the sound screen (soundOwner.js);
+            this toggle/volume governs that screen's cue loudness. */}
         <MusicSfxControls />
+        {/* Sound-screen role (Phase 5): one speaker for the whole table. */}
+        <SoundOwnerControl campaignName={campaignName} />
         {/* aria-label (backlog 2026-11-01, a11y parity with the 7c547abdc mood
             select): icon-only button, so expose its name explicitly; title is
             kept for the hover tooltip and existing getByTitle test locators. */}

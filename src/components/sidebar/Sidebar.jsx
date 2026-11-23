@@ -50,6 +50,10 @@ const NAV_ITEMS = [
     // arenaHidden: it is an in-combat lookup (party saves/status/quick ref),
     // not a campaign planning view, so an arena battle keeps it.
     { view: 'gmScreen', onClick: 'onGMScreenClick', localhostOnly: true },
+    // In-app help drawer (learnability plan Phase 3): opens an overlay, not a
+    // view. Slotted gmScreen→initiative so the nav stays alphabetical (pinned
+    // by Sidebar.test 'renders nav buttons in alphabetical order by label').
+    { help: true, icon: 'fa-circle-question', label: 'Help' },
     { view: 'initiative', onClick: 'onInitiativeClick' },
     { view: 'partyInventory', onClick: 'onInventoryClick', arenaHidden: true },
     { view: 'campaignLog', onClick: 'onLogClick' },
@@ -111,6 +115,16 @@ function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRu
                     </div>
                 )}
             </>
+        );
+    }
+
+    // In-app help drawer opener (Phase 3): an overlay, not a view — no
+    // activeView highlight applies.
+    if (item.help) {
+        return (
+            <button className="sidebar-section-header" onClick={handlers.onHelpClick}>
+                <i className={`fa-solid ${icon}`}></i> {displayLabel}
+            </button>
         );
     }
 
@@ -178,7 +192,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onHelpClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
     // Display-only Rules-launchpad feedback (popup blocked) — mirrors the
     // sessions/encounter/music toast idiom (auto-hide timer is a benign UI
@@ -212,7 +226,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onHelpClick };
     const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
     const navItems = campaignType === 'arena'
         ? NAV_ITEMS.filter(item => !item.arenaHidden)
@@ -253,7 +267,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
 
                 {navItems.map((item) => (
                     <NavButton
-                        key={item.view || 'rules'}
+                        key={item.view || (item.help ? 'help' : 'rules')}
                         item={item}
                         activeView={activeView}
                         handlers={navHandlers}

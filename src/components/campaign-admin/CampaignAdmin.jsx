@@ -460,7 +460,7 @@ function CensusBody({ census, censusError }) {
     );
 }
 
-function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [], isLocalhost = false }) {
+function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [], isLocalhost = false, onNavigate }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
@@ -931,7 +931,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
             <EnforcementSection campaignName={campaignName} />
 
             {/* L5 Phase 4 §10: session state machine console + enforcement/AI audit ledger. */}
-            <SessionSection campaignName={campaignName} />
+            <SessionSection campaignName={campaignName} characters={characters} onNavigate={onNavigate} />
 
             {/* L5-005 §9.2: AI referee console (aiConfig unset/off ⇒ no console, no traffic). */}
             <AiRefereeSection campaignName={campaignName} characters={characters} />

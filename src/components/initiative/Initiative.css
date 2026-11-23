@@ -3,6 +3,16 @@
 .initiative {
     width: 100%;
     min-height: 100vh;
+    /* Size to content, not to the row-flex stretch: .app-body stretches its
+       children to exactly the viewport height, which pinned this column at
+       100vh. A stacked day (copilot tip + board + controls + a multi-row
+       loot panel) then had no height left to give — the carousel's cards
+       painted past their box and the loot section overlaid them. With
+       flex-start the item grows with content (min-height still centers a
+       short board at full viewport, the classic face), and tall days scroll
+       the document exactly like the character sheet does. (owner-reported
+       card overflow, 2026-11-22.) */
+    align-self: flex-start;
     display: flex;
     flex-direction: column;
     justify-content: center;

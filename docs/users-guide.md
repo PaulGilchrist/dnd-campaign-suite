@@ -90,7 +90,7 @@ That's it — nothing to enable, nothing to configure. This is levels 2–4 work
 
 On the campaign-selection screen (GM link) two quick-create buttons sit beside **Add**:
 
-- **New Arena Campaign** builds a throwaway pickup-arena folder in seconds: two carved
+- **New Arena Battle** builds a throwaway pickup-arena folder in seconds: two carved
   sparring halls (one activated) plus a saved **sparring encounter pool** of classic low-CR
   monsters (goblins, skeletons, kobolds, wolves…). Everything resolves through the normal
   generator services — the names are real bestiary names, so joined monsters pull their
@@ -104,7 +104,7 @@ On the campaign-selection screen (GM link) two quick-create buttons sit beside *
 
 ### The Starter campaign (seeded, replayable sandbox)
 
-**New Starter Campaign** seeds a ready-to-play teaching sandbox from the existing
+**New Starter Adventure** seeds a ready-to-play teaching sandbox from the existing
 generators — a different world every roll, the same learnable shape:
 
 - A generated **village** (services, named folk, rumours that reference the current

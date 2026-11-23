@@ -72,6 +72,8 @@ export const SPECIAL_TOP_LEVEL_KEYS = new Set([
     'pendingStarryChaliceHeal',  // postCastHealService.js
     'loot-draft',                // useLootHandlers.js LOOT_DRAFT_KEY
     'leadingEvasionSelections',  // evasionUtils.js LEADING_EVASION_KEY
+    'gmCopilot',                 // useGmCopilot.js GM_COPILOT_KEY (settled GM tips)
+    'soundOwner',                // soundOwner.js SOUND_OWNER_KEY (one-speaker role)
 ]);
 
 // Dynamic campaign-scope families that carry a per-instance suffix.

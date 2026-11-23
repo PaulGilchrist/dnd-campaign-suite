@@ -50,6 +50,9 @@ change-data `{}` + log `[]`; disk cd/log ABSENT; ALL 10 data md5s byte-match the
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
+- **2026-11-22 (learnability plan, main-session):** `PolymorphSelectionModal.focus.test.jsx` "opens with focus INSIDE the overlay" flaked ONCE in a full `test:run` (1/37,249; passed in isolation and in the next two full runs) — suspected focus-timing under parallel load; watch for recurrence before touching.
+- **2026-11-22:** initiative column overflow fixed (`align-self: flex-start` in Initiative.css) after the copilot-tip era made the pinned-100vh stretch visible — if a future change re-pins `.initiative` height, re-test the stress face: 800px viewport + open tip card + multi-row loot textarea (cards must scroll, never overlay the Loot section).
+
 
 ## Blocked / Not Verified (fold-gate ledger)
 

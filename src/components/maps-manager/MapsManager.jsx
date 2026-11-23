@@ -11,6 +11,7 @@ import AiDressButton from './AiDressButton.jsx';
 import { regenerateMapDocument, describeGenerationOpts } from '../../services/maps/regenerateMap.js';
 import './MapsManager.css';
 import DraftFlag from '../common/DraftFlag.jsx';
+import GMCopilot from '../GMCopilot/GMCopilot.jsx';
 
 const GENERATE_BUTTONS = {
     indoor: {
@@ -175,6 +176,10 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     // fires the activate/deactivate confirmations (MapToggleNotice sink).
     // 4000ms mirrors CampaignSelection's post-delete notice duration.
     const { message: toggleNotice, show: showToggleNotice } = useEphemeralToast(4000);
+    // GM Copilot (Phase 1): arms the one-time "the map is live" explainer
+    // after a successful activation. Per-tab trigger; the settled state is
+    // the shared gmCopilot campaign key, so it never repeats on any device.
+    const [justActivated, setJustActivated] = useState(false);
 
     const generateModalOpeners = { indoor: setShowGenerateModal, outdoor: setShowTerrainModal };
 
@@ -273,6 +278,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             setError(null);
             await mapsService.activateMap(campaignName, fileName);
             showToggleNotice(`Map "${mapName || fileName}" activated`);
+            setJustActivated(true);
             await loadMapsList();
         } catch (err) {
             setError(err.message || 'Failed to activate map');
@@ -445,6 +451,14 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             <div className="maps-manager-header">
                 <h2>Maps</h2>
             </div>
+
+            <GMCopilot
+                campaignName={campaignName}
+                tipId="map-activate"
+                when={justActivated}
+                onAction={() => setJustActivated(false)}
+                actionLabel="Got it"
+            />
 
             <div className="maps-manager-create">
                 <input

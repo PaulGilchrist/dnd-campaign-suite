@@ -97,6 +97,16 @@ export const CAMPAIGN_KEYS = new Set([
     // the row) and only a reload mounted the "Opportunity Attack on <mover>"
     // affordance.
     'pendingOAs',
+    // GM Copilot settled tips (learnability plan Phase 1): written campaign-
+    // level (useGmCopilot → setRuntimeValue('campaign','gmCopilot')); unreg-
+    // istered, a dismissal on one GM browser would echo to a ghost CHARACTER
+    // store (bug-victory-stamp-not-sse-adopted-missing-campaign-key family)
+    // and only land on reload.
+    'gmCopilot',
+    // Sound-screen role (learnability plan Phase 5): claim writes campaign-
+    // level (soundOwner.js); every other tab's mute chip and cue gate must
+    // follow the claim live, not on reload (same misroute family as above).
+    'soundOwner',
 ]);
 
 /**
