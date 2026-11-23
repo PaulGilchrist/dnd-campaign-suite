@@ -252,6 +252,24 @@ function AwayNotice({ props }) {
     );
 }
 
+// Extra Attack chain affordance (ZB 2026-11-23 backlog): during a 2+ swing
+// Attack action the swing popups were byte-identical, leaving the GM no way
+// to tell which swing a Done commits. The chain threads an ordinal on the
+// roll context (useExtraAttackChain) and buildPopupData carries it here —
+// ABSENT on single-swing presses, so those faces stay byte-identical.
+// Affordance only: no roll, log row, latch or Cancel-refund behavior rides
+// this field. Sits after RollSummary so its trailing digit never abuts the
+// total's digits in a raw textContent read (QA readability law above).
+function ExtraAttackSwingNotice({ props }) {
+    const swing = props.extraAttackSwing;
+    if (!swing) return null;
+    return (
+        <div className="dice-roll-extra-attack-swing">
+            <i className="fa-solid fa-rotate"></i> Swing {swing.swing} of {swing.of}
+        </div>
+    );
+}
+
 // HHH 2026-11-21 improve damage-chip-disclosure: the Actions-table DAMAGE-column
 // chip is the ungated direct roller (useSimpleDamageRoll) — it rolls freely even
 // while the paired HIT chip's shot is refused by the armed-target/line-of-sight
@@ -1171,6 +1189,7 @@ function DiceRollResult(props) {
             <RollHeader props={props} state={state} />
             <RollSummary props={props} state={state} />
 
+            <ExtraAttackSwingNotice props={props} />
             <AwayNotice props={props} />
             <DirectRollNotice props={props} />
             <FloorNotices props={props} state={state} />

@@ -91,9 +91,12 @@ export default function useCharActionsAttackHandlers({
     // Reckless/Brutal confirm + cancel). Arms the Extra Attack chain BEFORE
     // the roll so the chain watcher owns the popup host from swing one — a
     // fresh press replaces any leftover chain (see useExtraAttackChain).
+    // The chain answers with the swing-1 ordinal when it armed (popup
+    // affordance only); null (no chain / latch spent) keeps the popup face
+    // byte-identical to a single-swing attack.
     function stageAttackRoll(attack) {
-        beginExtraAttackChain?.(attack);
-        return rollWeaponSwing({ attack, buildCtx, rollAttack, exhaustionPenalty });
+        const swing = beginExtraAttackChain?.(attack) || null;
+        return rollWeaponSwing({ attack, buildCtx, rollAttack, exhaustionPenalty, swing });
     }
 
     function runAttackClick(attack) {

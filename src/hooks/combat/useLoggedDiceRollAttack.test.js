@@ -226,6 +226,17 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
             expect(popupOf().hit).toBeUndefined();
         });
 
+        it('transports context.extraAttackSwing onto the popup, absent when unchained', async () => {
+            // Extra Attack chain ordinal (ZB affordance): the roll-context
+            // field rides the popup payload untouched…
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', extraAttackSwing: { swing: 2, of: 2 } });
+            expect(popupOf(0).extraAttackSwing).toEqual({ swing: 2, of: 2 });
+            // …and stays absent on every unchained roll (single-swing faces
+            // byte-identical).
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
+            expect(popupOf(1).extraAttackSwing).toBeUndefined();
+        });
+
         it('floors a low d20 to 10 when context.d20Floor10, flipping miss to hit', async () => {
             rollD20.mockReturnValueOnce(5);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 15 });

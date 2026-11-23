@@ -18,11 +18,15 @@ const EXTRA_ATTACK_TURN_LATCH_KEY = '_extraAttackGrantedTurn';
  * The one attack-roll step, shared by the press seam (swing 1, armed by
  * beginExtraAttackChain) and the chain advance (swings 2+). buildCtx is
  * rebuilt per swing so advantage/buff/target reads are current at the swing.
+ * swing ({swing, of}) is the chain-context ordinal (ZB 2026-11-23 affordance):
+ * it rides the roll context into the popup payload ONLY when the chain armed
+ * the swing, so a single-swing popup stays byte-identical to pre-chain faces.
  */
-export function rollWeaponSwing({ attack, buildCtx, rollAttack, exhaustionPenalty }) {
+export function rollWeaponSwing({ attack, buildCtx, rollAttack, exhaustionPenalty, swing }) {
     return buildCtx(attack).then(ctx => {
         const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-        rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
+        const rollContext = swing ? { ...ctx, extraAttackSwing: swing } : ctx;
+        rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, rollContext);
     });
 }
 
@@ -43,7 +47,7 @@ export default function useExtraAttackChain({
     // damage pipeline's component-local resumeRef stash in
     // useAttackDamageResolution) — the durable per-turn fact lives in the
     // runtime-store latch, and every resolved swing logs its own roll row.
-    const chainRef = useRef(null); // { attack, extraAttacks, remaining, grantLogged, popupSeen, commitPending, commitPendingSeen }
+    const chainRef = useRef(null); // { attack, extraAttacks, total, remaining, grantLogged, popupSeen, commitPending, commitPendingSeen }
 
     function readCurrentCreature() {
         // CLA-044: top-level activeCreatureName is truth; cs cache only as fallback.
@@ -68,10 +72,10 @@ export default function useExtraAttackChain({
         // A fresh press replaces any leftover chain (a stalled one can only
         // be a harness/abandonment residue — the new action owns the host).
         chainRef.current = null;
-        if (!isExtraAttackEligibleRow(attack)) return;
+        if (!isExtraAttackEligibleRow(attack)) return null;
         const extraAttacks = getExtraAttacks(playerStats);
-        if (!(extraAttacks > 0)) return;
-        if (!grantAttackActionBudget()) return;
+        if (!(extraAttacks > 0)) return null;
+        if (!grantAttackActionBudget()) return null;
         // The grant row is NOT written here: a press whose staged hit is
         // cancelled is fully voided (its attack_cancelled row says "no damage
         // applied"), and the log must never assert attacks that never resolve.
@@ -79,12 +83,17 @@ export default function useExtraAttackChain({
         chainRef.current = {
             attack,
             extraAttacks,
+            total: extraAttacks + 1,
             remaining: extraAttacks,
             grantLogged: false,
             popupSeen: false,
             commitPending: false,
             commitPendingSeen: false,
         };
+        // The press popup is swing 1 of the chain — the ordinal rides the
+        // popup so the GM can tell which swing a Done commits (affordance
+        // only; rolls/log rows/latch are untouched).
+        return { swing: 1, of: extraAttacks + 1 };
     }
 
     // One automation/extra_attack row per granted Attack action, written the
@@ -108,7 +117,10 @@ export default function useExtraAttackChain({
         chain.popupSeen = false;
         chain.commitPending = false;
         chain.commitPendingSeen = false;
-        rollWeaponSwing({ attack: chain.attack, buildCtx, rollAttack, exhaustionPenalty })
+        // Swing number: total minus the swings still queued after this one's
+        // staging (lv6: first advance → 2 of 2; lv18: 2 of 3, then 3 of 3).
+        const swing = { swing: chain.total - chain.remaining, of: chain.total };
+        rollWeaponSwing({ attack: chain.attack, buildCtx, rollAttack, exhaustionPenalty, swing })
             .catch((e) => { console.error('[useExtraAttackChain:swing-error]', e); });
     }
 

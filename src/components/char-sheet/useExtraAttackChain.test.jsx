@@ -67,9 +67,10 @@ function Harness({ control, popupHtml = null, sheetModalMounted = false, chainPr
 }
 
 function begin(control, attack = LONGSWORD) {
-    act(() => { control.result.beginExtraAttackChain(attack); });
+    let ordinal;
+    act(() => { ordinal = control.result.beginExtraAttackChain(attack); });
+    return ordinal;
 }
-
 function logRows(automationType) {
     return addEntry.mock.calls
         .map(c => c[1])
@@ -95,7 +96,9 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
     it('lv6 5e fighter press arms one queued swing; the grant row lands on the first advance, never at press', async () => {
         const control = makeControl();
         const view = render(<Harness control={control} />);
-        begin(control);
+        // The press carries the swing-1 ordinal so its popup reads "Swing 1
+        // of 2" (ZB affordance) — popup metadata only.
+        expect(begin(control)).toEqual({ swing: 1, of: 2 });
 
         expect(control.store._extraAttackGrantedTurn).toEqual({ round: 1, activeCreature: PLAYER });
         // Regression pin (bug-extra-attack-grant-survives-attack-cancel): the
@@ -108,7 +111,10 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
         expect(logRows('extra_attack')[0].description)
             .toBe(`${PLAYER} takes the Attack action with Extra Attack — 2 weapon attacks with Longsword.`);
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
-        expect(control.rollAttack).toHaveBeenCalledWith('Longsword', 6, { hitBonus: 6 });
+        // The queued swing's roll context carries its ordinal alongside the
+        // buildCtx fields (ZB affordance); rolls/bonuses themselves unchanged.
+        expect(control.rollAttack).toHaveBeenCalledWith('Longsword', 6,
+            { hitBonus: 6, extraAttackSwing: { swing: 2, of: 2 } });
 
         await cycle(view, control); // chain finished — the second drain rolls nothing and re-logs nothing
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
@@ -118,15 +124,19 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
     it('lv18 2024 fighter stages 2 queued swings (3 attacks per press)', async () => {
         const control = makeControl(playerStats(18, fighter2024Levels, '2024'));
         const view = render(<Harness control={control} />);
-        begin(control);
+        expect(begin(control)).toEqual({ swing: 1, of: 3 });
         expect(logRows('extra_attack')).toHaveLength(0);
 
         await cycle(view, control); // first advance writes the single grant row
         expect(logRows('extra_attack')).toHaveLength(1);
         expect(logRows('extra_attack')[0].description).toContain('3 weapon attacks');
+        expect(control.rollAttack).toHaveBeenLastCalledWith('Longsword', 6,
+            { hitBonus: 6, extraAttackSwing: { swing: 2, of: 3 } });
 
         await cycle(view, control);
         expect(control.rollAttack).toHaveBeenCalledTimes(2);
+        expect(control.rollAttack).toHaveBeenLastCalledWith('Longsword', 6,
+            { hitBonus: 6, extraAttackSwing: { swing: 3, of: 3 } });
         expect(control.buildCtx).toHaveBeenCalledTimes(2);
         expect(control.buildCtx).toHaveBeenLastCalledWith(LONGSWORD);
 
@@ -142,8 +152,9 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
         await cycle(view, control);
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
 
-        // Press again this turn: the grant latch refuses a fresh chain.
-        begin(control);
+        // Press again this turn: the grant latch refuses a fresh chain — and
+        // with it any ordinal (the re-press popup stays a plain single swing).
+        expect(begin(control)).toBeNull();
         expect(logRows('extra_attack')).toHaveLength(1);
         await cycle(view, control);
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
@@ -322,14 +333,15 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
     it('non-Extra-Attack characters and bonus-action rows never arm a chain', async () => {
         const wizard = makeControl({ name: PLAYER, level: 10, class: { name: 'Wizard', class_levels: wizardLevels } });
         const wizardView = render(<Harness control={wizard} />);
-        begin(wizard);
+        // No chain, no ordinal — the wizard's Longsword popup renders bare.
+        expect(begin(wizard)).toBeNull();
         await cycle(wizardView, wizard);
         expect(wizard.rollAttack).not.toHaveBeenCalled();
         wizardView.unmount();
 
         const control = makeControl();
         const view = render(<Harness control={control} />);
-        begin(control, { name: 'Dagger', type: 'Bonus Action', weaponType: 'melee' });
+        expect(begin(control, { name: 'Dagger', type: 'Bonus Action', weaponType: 'melee' })).toBeNull();
         expect(logRows('extra_attack')).toHaveLength(0);
         await cycle(view, control);
         expect(control.rollAttack).not.toHaveBeenCalled();

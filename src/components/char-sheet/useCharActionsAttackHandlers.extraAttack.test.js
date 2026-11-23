@@ -123,7 +123,35 @@ describe('useCharActionsAttackHandlers — Extra Attack chain seam', () => {
         expect(deps.beginExtraAttackChain).toHaveBeenCalledTimes(1);
         expect(deps.beginExtraAttackChain).toHaveBeenCalledWith(attack);
         expect(deps.rollAttack).toHaveBeenCalledTimes(1);
+        // Unchained press (mock chain returns nothing) — the roll context is
+        // byte-identical to the pre-ordinal face (no extraAttackSwing key).
         expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7, { hitBonus: 9 });
+    });
+
+    it('a chain-armed press threads the swing-1 ordinal onto the roll context', async () => {
+        const deps = createDeps({ beginExtraAttackChain: vi.fn(() => ({ swing: 1, of: 2 })) });
+        const handlers = useCharActionsAttackHandlers(deps);
+
+        handlers.handleAttackClick(makeAttack());
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // The ordinal rides INSIDE a copy of the buildCtx result — the swing
+        // itself (name, bonus) and the ctx fields are untouched.
+        expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7,
+            { hitBonus: 9, extraAttackSwing: { swing: 1, of: 2 } });
+    });
+
+    it('a null chain answer keeps the roll context ordinal-free', async () => {
+        const deps = createDeps({ beginExtraAttackChain: vi.fn(() => null) });
+        const handlers = useCharActionsAttackHandlers(deps);
+
+        handlers.handleAttackClick(makeAttack());
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7, { hitBonus: 9 });
+        expect(deps.rollAttack.mock.calls[0][2]).not.toHaveProperty('extraAttackSwing');
     });
 
     it('a press denied by the action-economy gate registers no chain and rolls nothing', () => {

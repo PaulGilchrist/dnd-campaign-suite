@@ -222,6 +222,15 @@ function opportunityAttackTransportField(context) {
     return { isOpportunityAttack: context?.isOpportunityAttack || false };
 }
 
+// ZB 2026-11-23 affordance: the Extra Attack chain swing ordinal (armed by
+// useExtraAttackChain, threaded on the roll context) rides the popup data so
+// DiceRollResult can label which swing a Done commits. Absent (undefined) on
+// every unchained roll — single-swing faces stay byte-identical. Hoisted
+// spread helper (buildPopupData sits at the complexity cap).
+function extraAttackSwingField(context) {
+    return { extraAttackSwing: context?.extraAttackSwing };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -398,6 +407,7 @@ function buildPopupData({ ctx, context, name, rollType, targetAc, targetName, ch
         characterName,
         campaignName,
         availableSuperiorityManeuvers,
+        ...extraAttackSwingField(context),
     };
 }
 
