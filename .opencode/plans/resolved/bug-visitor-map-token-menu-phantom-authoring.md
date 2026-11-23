@@ -31,3 +31,17 @@ Thread `isLocalhost` into the three context-menu renderers and render a read-onl
 
 ## Severity
 Minor UX issue tipping into data-trust risk — nothing corrupts the server (the guard is honest), but a player-visible control performs a full confirm ceremony for a write that silently never happened, teaching players that map state they "edited" is unreliable.
+
+## Resolution
+**FIXED 2026-11-23 (fix subagent).** Confirmed live, root-caused, minimal sibling-pattern fix.
+
+**What was actually wrong.** The "Likely location" guess narrowed on re-verification: only ONE opener is ungated. The placed-item lane (`PlacedItems.jsx` — both the prop `dragChrome` at `:173` and the creature-token hit areas at `:343`) and the indoor POI lane (`IndoorPoiLayer.jsx:52`) ALREADY render their context-menu hit areas only under `{isLocalhost && ...}`. The lone leak was the player-token circle in `src/components/map/Players.jsx` (the old `:99` `onContextMenu`): it called `setSelectedPlayer(player)` for any origin, and `PlayerContextMenu` (rendered unconditionally in `Map.jsx`) is pure authoring chrome (Remove/Light/✕ — no read-only row worth keeping). The `flushSave` non-GM drop in `useMapLoader.js` and the server 403 stay untouched as defense-in-depth. No dual-ruleset twin (pure client UI lane); the 3D scene and hex map have no player-token context lane.
+
+**Change.** `src/components/map/Players.jsx` — the circle's `onContextMenu` is now attached only when `isLocalhost` (`onContextMenu={isLocalhost ? ... : undefined}`), mirroring the sibling gates verbatim. A visitor right-click bubbles to the svg root's `preventDefault` (`Map.jsx:721`): no browser menu, no phantom authoring menu, zero new state, zero new events.
+
+**Regression test.** New `src/components/map/Players.context-menu-gate.test.jsx` (3 tests): GM origin fires `setSelectedPlayer`; visitor origin renders the token but fires NO opener; the visitor-owned-token ring (local sidebar selection) still paints and is also opener-less. Order run: new file 3/3 green → whole folder `npx vitest run src/components/map/` **103 files / 946 tests green** (pre-existing GM opener pin `Players.test.jsx:219` still passes) → `npm run lint` clean (zero warnings).
+
+**Live re-verification (dev pair, GM :5173 localhost + visitor :5173 via en0 IP, `isolatedContext:'lan'`, sandbox indoor map `lighting:true` + two roster tokens, activated):**
+- Visitor reload adopts the pristine server doc (2 tokens, veil `light-cell-player-dark` 48); synthetic AND trusted (`mouse.click button:'right'`) right-clicks on BOTH token circles → ZERO `.item-context-menu`, zero selection rects, fetch-recorder shows zero non-GET map/change-data writes; console 0 errors.
+- GM control re-ride unchanged: right-click opens the full menu (`Remove from Map` / `Light: bright` / ✕), the Light press cycles the label to `Light: dim` and the server doc persists `light:"dim"` within ~2 s; the visitor tab ADOPTS the echo live (player-dark 48→159) with still no menu; `Remove from Map` still arms the named `Remove "AasimarTest" from the map?` `DeleteConfirmModal` and Cancel leaves both tokens intact.
+- Closeout: sandbox map deactivated + DELETED (ghost-404), closed-tab admin clears GET-verified `change-data {}` + `log []` + overlays `[]`, maps back to the 4 baseline docs, battle-arena md5 `94fcd0bfe` pin-held, dev pair killed.

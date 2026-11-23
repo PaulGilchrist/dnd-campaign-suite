@@ -96,11 +96,25 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                             cy={cy}
                             r={RADIUS}
                             className={`creature-circle ${dragging?.playerId === player.id ? 'dragging' : ''} ${dragging?.playerId === player.id && dragging?.invalid ? 'drag-invalid' : ''} ${isSelected ? 'selected' : ''}`}
-                            onContextMenu={(e) => {
+                            // Authoring chrome is GM-only: this opener is gated
+                            // exactly like the placed-item sibling lanes, which
+                            // only mount their context-menu hit areas for
+                            // localhost (PlacedItems.jsx `{isLocalhost &&
+                            // dragChrome}` / creature hit areas; IndoorPoiLayer
+                            // .jsx `{isLocalhost && ...}`). Visitor-origin tabs
+                            // used to get the full PlayerContextMenu — Light
+                            // cycle + named Remove-from-Map confirm — whose
+                            // writes flushSave silently drops, a phantom
+                            // edit rolled back by the next unrelated echo
+                            // (bug-visitor-map-token-menu-phantom-authoring).
+                            // With no handler here a visitor right-click
+                            // bubbles to the svg root's preventDefault: no
+                            // browser menu, no phantom authoring menu.
+                            onContextMenu={isLocalhost ? (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setSelectedPlayer(player);
-                            }}
+                            } : undefined}
                         />
                         <PlayerTokenOverlays
                             cx={cx}
