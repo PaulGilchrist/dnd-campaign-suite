@@ -192,7 +192,7 @@ function NPCFormModal({
                     trial-and-error. Mirrors handleCloseModal's stale path. */}
                 {errorConflict && onReloadList && (
                   <button
-                    className="ct-btn npcs-error-reload-btn"
+                    className="ct-btn ct-btn-sm npcs-error-reload-btn"
                     onClick={onReloadList}
                   >
                     <i className="fa-solid fa-rotate" /> Reload list

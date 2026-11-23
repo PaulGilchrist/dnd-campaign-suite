@@ -110,6 +110,9 @@ const { topRules, mediaQueries } = parseStylesheet(css);
 /** Sessions lane ships a wider planner modal; its width law lives here. */
 const sessionsCss = parseRules(readCss(join(SRC_DIR, 'components/sessions/Sessions.css')));
 
+/** NPCs lane ships a wider stat editor; its width law lives here too. */
+const npcsCss = parseRules(readCss(join(SRC_DIR, 'components/npcs/NPCs.css')));
+
 /**
  * Cascade-aware lookup: merges declarations from every top-level rule whose
  * (possibly comma-grouped) selector matches, later rules winning.
@@ -416,6 +419,31 @@ describe('App.css', () => {
         parseFloat(shared.width)
       );
     });
+
+    it('lets the NPC stat editor actually widen past the shared 520px card', () => {
+      // Same specificity law (kit convergence tranche 3): the old bare
+      // `.npcs-modal { max-width: 640px }` (0-1-0) lost to `.ct-container
+      // .ct-modal` (0-2-0) and was dead code — the lane now ships the
+      // compound tier + viewport cap, mirroring the sessions planner.
+      const npcsWidth = styleFor('.ct-container .ct-modal.npcs-modal', npcsCss);
+      expect(
+        npcsWidth,
+        'NPCs.css must out-specify .ct-container .ct-modal (compound selector)'
+      ).not.toBeNull();
+      expect(npcsWidth.width, 'stat editor width must be viewport-capped (vw) as well as px').toMatch(
+        /vw/
+      );
+      const px = parseFloat(npcsWidth.width.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '');
+      expect(
+        px,
+        'stat editor must be wider than the shared 520px card'
+      ).toBeGreaterThan(parseFloat(styleFor('.ct-container .ct-modal').width));
+      // The retired bare-class dead rule must not come back.
+      expect(
+        styleFor('.npcs-modal', npcsCss),
+        'bare .npcs-modal rule is dead under the kit tier — it was retired'
+      ).toBeNull();
+    });
   });
 
   describe('campaign tool form fields', () => {
@@ -493,6 +521,34 @@ describe('App.css', () => {
       // The disabled rule outranks both variants on specificity (0-3-0 vs
       // 0-2-0), so one muted family covers default/primary/danger alike.
       expect(danger.background ?? 'none', 'danger variant should stay ghost (no background)').toBe('none');
+    });
+
+    it('ships the compact sm tier in the kit, ordered after the base it out-sizes', () => {
+      // ct-* kit convergence (tranche 3): `.ct-btn-sm` used to live as a bare
+      // 0-1-0 rule in NPCs.css — dead under `.ct-container .ct-btn` (0-2-0)
+      // everywhere a container existed. It is now a container-scoped kit tier
+      // in App.css, so the move must not regress in either direction.
+      const sm = styleFor('.ct-container .ct-btn-sm');
+      expect(sm, 'the kit must own a container-scoped .ct-btn-sm tier').not.toBeNull();
+      const base = styleFor('.ct-container .ct-btn');
+      expect(
+        parseFloat(sm.padding),
+        'sm tier must be more compact than the base tier'
+      ).toBeLessThan(parseFloat(base.padding));
+      expect(
+        parseFloat(sm['font-size']),
+        'sm tier must set a smaller type than the base tier'
+      ).toBeLessThan(parseFloat(base['font-size']));
+      // Tie-hardening law: same 0-2-0 tier as the base — file order is
+      // load-bearing, so the sm rule MUST be parsed after the base rule.
+      const smIndex = topRules.findIndex(
+        (r) => normalizeSelector(r.selector) === '.ct-container .ct-btn-sm'
+      );
+      const baseIndex = topRules.findIndex(
+        (r) => normalizeSelector(r.selector) === '.ct-container .ct-btn'
+      );
+      expect(smIndex, 'sm tier rule missing').toBeGreaterThan(-1);
+      expect(smIndex, 'sm tier must be ordered after the base tier').toBeGreaterThan(baseIndex);
     });
   });
 

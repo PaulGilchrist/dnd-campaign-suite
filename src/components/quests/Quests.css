@@ -111,10 +111,12 @@
 }
 
 /* "Reload list" one-click recovery inside a 409 conflict banner — rides the
-   global .ct-btn styling, sized small, own line under the copy. */
+   global .ct-btn .ct-btn-sm tiers (its former dead `padding` line — 0-1-0,
+   always out-specified by the 0-2-0 base tier — is retired with the kit's sm
+   tier going live, tranche 3); this rule keeps only the block placement the
+   kit does not own. */
 .quests-error-reload-btn {
   display: block;
   width: fit-content;
   margin-top: 8px;
-  padding: 4px 10px;
 }

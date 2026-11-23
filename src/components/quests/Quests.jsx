@@ -87,7 +87,7 @@ function QuestFormModal({ editingQuest, formData, setFormData, campaignName, sav
               {error}
               {errorConflict && onReloadList && (
                 <button
-                  className="ct-btn quests-error-reload-btn"
+                  className="ct-btn ct-btn-sm quests-error-reload-btn"
                   onClick={onReloadList}
                 >
                   <i className="fa-solid fa-rotate" /> Reload list
@@ -171,7 +171,7 @@ function QuestFormModal({ editingQuest, formData, setFormData, campaignName, sav
           </div>
           <div className="ct-modal-buttons">
             <button
-              className="ct-btn ct-btn"
+              className="ct-btn"
               onClick={onClose}
               disabled={saving}
             >

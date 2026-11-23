@@ -534,6 +534,19 @@ button.hidden {
   background: var(--background-color-button-secondary-hover);
 }
 
+/* Compact size tier (ct-* kit convergence tranche 3): this kit variant's only
+   rule lived in NPCs.css as a bare `.ct-btn-sm` (0-1-0) — dead everywhere it
+   mattered, because the 0-2-0 base tier above always won padding/font-size.
+   Moved into the kit, container-scoped like every sibling tier, and ORDERED
+   after the base (same 0-2-0 tier — bundle order is load-bearing, tranche-1
+   tie-hardening law) so every lane advertising "sized like .ct-btn-sm"
+   (Initiative/Encounters/Log tranches 1–2, Sessions/Quests/NPCs tranche 3)
+   finally gets its compact footprint. */
+.ct-container .ct-btn-sm {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
 /* Disabled canon (backlog drafts-panel-contrast-family): the old
    opacity: 0.5 dim compounded over dark surfaces into <4.5:1 labels (and
    illegible ghost text on the primary fill). Token-based muting keeps the

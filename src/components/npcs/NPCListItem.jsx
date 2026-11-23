@@ -70,7 +70,7 @@ function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
             </span>
           )}
           <button
-            className="npcs-init-btn"
+            className="npcs-init-btn ct-btn ct-btn-sm"
             disabled={!hasStats}
             onClick={(e) => {
               e.stopPropagation();

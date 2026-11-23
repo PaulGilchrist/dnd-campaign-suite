@@ -362,7 +362,7 @@ function BannerNotice({ banner, onReloadList }) {
           trial-and-error. Mirrors NPCs.jsx's stale-close path. */}
       {banner.kind === 'error' && banner.conflict && onReloadList && (
         <button
-          className="ct-btn sessions-error-reload-btn"
+          className="ct-btn ct-btn-sm sessions-error-reload-btn"
           onClick={onReloadList}
         >
           <i className="fa-solid fa-rotate" /> Reload list

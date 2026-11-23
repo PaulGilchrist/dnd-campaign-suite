@@ -83,36 +83,17 @@
   margin-top: 2px;
 }
 
-/* Add to Initiative button in list */
-.npcs-init-btn {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--background-color-surface);
-  color: var(--color-link);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+/* Add to Initiative chip in list — .ct-* kit convergence (tranche 3): the
+   bespoke skin (link-tinted fill + opacity: 0.45 disabled dim, which the kit's
+   disabled canon calls a WCAG AA violation on dark surfaces) was retired; the
+   chip rides .ct-btn .ct-btn-sm (scoped by the view root's .ct-container).
+   The .npcs-init-btn class survives on the element as a locator/documentation
+   hook (referenced by the Sessions quick-action comments) — only its nowrap
+   row-layout intent is re-anchored here at the compound tier (the kit base
+   has no white-space rule; long "Add <name> to Initiative" labels must stay
+   on one line inside the row). */
+.ct-container .npcs-init-btn {
   white-space: nowrap;
-}
-
-.npcs-init-btn:hover {
-  background: var(--color-link);
-  color: var(--color-background);
-  border-color: var(--color-link);
-}
-
-.npcs-init-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.npcs-init-btn:disabled:hover {
-  background: var(--background-color-surface);
-  color: var(--color-link);
-  border-color: var(--border-color);
 }
 
 /* Warning when an NPC has stats but no weapon attacks */
@@ -134,9 +115,12 @@
   margin: 4px 0 10px;
 }
 
-/* Wider modal for stats */
-.npcs-modal {
-  max-width: 640px;
+/* Wider modal for stats. Specificity law (playbook §5, same trap as the old
+   .sessions-modal): a bare `.npcs-modal` (0-1-0) LOSES to the shared
+   `.ct-container .ct-modal` (0-2-0), so this lane's intended 640px never
+   applied — the compound tier + viewport cap mirrors the planner idiom. */
+.ct-container .ct-modal.npcs-modal {
+  width: min(640px, 92vw);
 }
 
 /* Avatar upload section */
@@ -369,11 +353,11 @@
   margin-top: 0;
 }
 
-/* Small button variant */
-.ct-btn-sm {
-  font-size: 0.78rem;
-  padding: 4px 10px;
-}
+/* Small button variant — .ct-* kit convergence (tranche 3): this kit tier's
+   rule MOVED to App.css's Buttons section (`.ct-container .ct-btn-sm`), where
+   it sits ordered after the base tier it must out-order and scoped like every
+   sibling kit rule. A lane CSS file owning a global kit class was style-bleed
+   by construction; it must not come back. */
 
 /* Print: hide inactive tabs in normal view */
 .npcs-tab-hidden {
@@ -392,12 +376,14 @@
 }
 
 /* "Reload list" one-click recovery inside a 409 conflict banner — rides the
-   global .ct-btn styling, sized like .ct-btn-sm, own line under the copy. */
+   global .ct-btn .ct-btn-sm tiers (its former dead `padding` line — 0-1-0,
+   always out-specified by the 0-2-0 base tier — is retired with the kit's sm
+   tier going live, tranche 3); this rule keeps only the block placement the
+   kit does not own. */
 .npcs-error-reload-btn {
   display: block;
   width: fit-content;
   margin-top: 8px;
-  padding: 4px 10px;
 }
 
 @media print {
