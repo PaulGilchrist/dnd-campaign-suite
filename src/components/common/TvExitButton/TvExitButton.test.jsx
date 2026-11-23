@@ -36,6 +36,16 @@ describe('TvExitButton', () => {
         expect(button).toHaveAttribute('title', 'Exit TV presentation mode');
     });
 
+    it('carries the no-print class so the corner float never stamps onto paper', () => {
+        // Print-UX pin (QA backlog 2026-11-23): `.no-print` is the repo-wide
+        // @media print suppression class (index.css) used by the sidebar and
+        // the sheet's automation chips; jsdom cannot resolve the print sheet
+        // itself, so the className contract is the testable seam.
+        localStorage.setItem('initiative-tv', '1');
+        const { container } = render(<TvExitButton />);
+        expect(container.querySelector('.tv-exit-button.no-print')).toBeInTheDocument();
+    });
+
     it('click exits immediately: pref persists OFF and the button unmounts', () => {
         localStorage.setItem('initiative-tv', '1');
         render(<TvExitButton />);

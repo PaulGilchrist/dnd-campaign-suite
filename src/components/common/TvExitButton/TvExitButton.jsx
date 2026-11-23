@@ -21,7 +21,7 @@ export default function TvExitButton() {
     return (
         <button
             type="button"
-            className="tv-exit-button"
+            className="tv-exit-button no-print"
             onClick={exitTvPresentation}
             aria-label="Exit TV mode"
             title="Exit TV presentation mode"
