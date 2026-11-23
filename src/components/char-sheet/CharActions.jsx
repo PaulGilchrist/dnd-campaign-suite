@@ -39,6 +39,7 @@ import CharBonusActions from './CharBonusActions.jsx';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import useCharActionsAttackHandlers from './useCharActionsAttackHandlers.js';
+import useExtraAttackChain from './useExtraAttackChain.js';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import useCharActionsEventListeners from './useCharActionsEventListeners.js';
@@ -312,12 +313,17 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
     // autoDamage but no damageApplied) — staged damage still only commits or
     // honestly cancels. Purely per-client UI state; no timers.
     const pendingSavePrompts = useRuntimeValue('campaign', 'pendingSavePrompts', campaignName);
+    // Rider-chain save prompts armed by this sheet's attacker (or by the
+    // current popup's target) — the chain is mid-drain while any is live.
+    // Shared by the damageApplied auto-retire below and the Extra Attack
+    // chain drain watcher (useExtraAttackChain) — one predicate, one owner.
+    const chainPromptArmed = React.useMemo(() => Object.values(pendingSavePrompts || {}).some(p =>
+        p?.attackerName === playerStats.name || (!!popupHtml?.targetName && p?.targetName === popupHtml.targetName)),
+    [pendingSavePrompts, playerStats.name, popupHtml]);
     useEffect(() => {
         if (popupHtml?.damageApplied !== true) return;
-        const chainPromptArmed = Object.values(pendingSavePrompts || {}).some(p =>
-            p?.attackerName === playerStats.name || (!!popupHtml.targetName && p?.targetName === popupHtml.targetName));
         if (sheetModalMounted || chainPromptArmed) setPopupHtml(null);
-    }, [popupHtml, sheetModalMounted, pendingSavePrompts, playerStats.name, setPopupHtml]);
+    }, [popupHtml, sheetModalMounted, chainPromptArmed, setPopupHtml]);
 
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState('campaign', 'cleavePending', false, campaignName);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState('campaign', 'cleaveSecondTargets', [], campaignName);
@@ -330,6 +336,24 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         playerName: playerStats.name,
         campaignName,
         popupHtml,
+        setRuntimeValue,
+    });
+
+    // Extra Attack chain — while a pressed Attack-action weapon row has
+    // unused Extra Attack swings queued, stage the next swing's popup once
+    // this sheet's popup/modal/save-prompt host has fully drained (the exact
+    // dwell surface the attack-row dim above models).
+    const { beginExtraAttackChain } = useExtraAttackChain({
+        playerName: playerStats.name,
+        campaignName,
+        playerStats,
+        popupHtml,
+        sheetModalMounted,
+        chainPromptArmed,
+        buildCtx,
+        rollAttack,
+        exhaustionPenalty,
+        getRuntimeValue,
         setRuntimeValue,
     });
 
@@ -354,6 +378,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         getRuntimeValue,
         setRuntimeValue,
         setPopupHtml,
+        beginExtraAttackChain,
     });
 
     // Modal handlers extracted to hook

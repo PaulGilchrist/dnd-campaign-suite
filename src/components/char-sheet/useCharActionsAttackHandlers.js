@@ -12,6 +12,7 @@ import { endFriendsOnHostileAction } from '../../services/rules/features/friends
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js'
 import { selectBrutalStrikeRiders } from '../../services/combat/brutalStrikeSelection.js'
 import { grantFleetStep } from '../../services/rules/features/fleetStepService.js'
+import { rollWeaponSwing } from './useExtraAttackChain.js'
 
 function readBrutalStrikeOffer(passives) {
     const brutalStrikePassives = selectBrutalStrikeRiders(passives);
@@ -38,6 +39,7 @@ export default function useCharActionsAttackHandlers({
     getRuntimeValue,
     setRuntimeValue,
     setPopupHtml,
+    beginExtraAttackChain,
 }) {
     // CLA-274 Soulknife Psychic Blades action economy: the Attack-action blade
     // row stamps the round it attacks; the second-blade Bonus Action row is only
@@ -85,6 +87,15 @@ export default function useCharActionsAttackHandlers({
         runAttackClick(attack);
     }
 
+    // The single attack-roll seam for every press continuation site (press,
+    // Reckless/Brutal confirm + cancel). Arms the Extra Attack chain BEFORE
+    // the roll so the chain watcher owns the popup host from swing one — a
+    // fresh press replaces any leftover chain (see useExtraAttackChain).
+    function stageAttackRoll(attack) {
+        beginExtraAttackChain?.(attack);
+        return rollWeaponSwing({ attack, buildCtx, rollAttack, exhaustionPenalty });
+    }
+
     function runAttackClick(attack) {
         // L5-001/002: enforcement gate (no-op while enforcement off). Bonus action
         // rows charge the bonusAction bucket; an attack roll charges its slot here
@@ -125,10 +136,7 @@ export default function useCharActionsAttackHandlers({
 
         if (openRecklessChoiceModal(attack)) return;
 
-        buildCtx(attack).then(ctx => {
-            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); });
+        stageAttackRoll(attack).catch((e) => { console.error("[CharActions] Error:", e); });
     }
 
     // Returns true when the press was refused (loud `.mc-no-target-refusal`
@@ -303,10 +311,7 @@ export default function useCharActionsAttackHandlers({
         }
 
         setModalState({ recklessAttackModal: null });
-        buildCtx(attack).then(ctx => {
-            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
+        stageAttackRoll(attack).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
             if (brutalStrikeChoice?.useBrutalStrike) {
                 setRuntimeValue(playerName, '_brutalStrikeNoAdvantage', null, campaignName);
                 // CLA-044 sticky safety: the sticky is consumed synchronously
@@ -322,10 +327,7 @@ export default function useCharActionsAttackHandlers({
         const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
         setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: getCurrentCombatRound(campaignName), activeCreature: currentCreature }, campaignName);
         setModalState({ recklessAttackModal: null });
-        buildCtx(attack).then(ctx => {
-            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); });
+        stageAttackRoll(attack).catch((e) => { console.error("[CharActions] Error:", e); });
     }
 
     // CLA-044 sticky safety: the arming attack is the consuming attack — if
@@ -357,10 +359,7 @@ export default function useCharActionsAttackHandlers({
             }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
         }
         setModalState({ recklessAttackModal: null });
-        buildCtx(attack).then(ctx => {
-            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
+        stageAttackRoll(attack).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
             // rollBrutalStrikeAttack consumes the sticky synchronously on the
             // hit path; anything still armed here is leftover — clear it.
             if (consumed) {
@@ -373,10 +372,7 @@ export default function useCharActionsAttackHandlers({
         clearBrutalStrikeSticky();
         setModalState({ recklessAttackModal: null });
         if (attack) {
-            buildCtx(attack).then(ctx => {
-                const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-                rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-            }).catch((e) => { console.error("[CharActions] Error:", e); });
+            stageAttackRoll(attack).catch((e) => { console.error("[CharActions] Error:", e); });
         }
     }
 

@@ -141,6 +141,12 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
       description: `${attacker} cancelled ${attackName}${targetNote} after the hit roll — staged damage voided, no damage applied.`,
       timestamp: Date.now(),
     }).catch((e) => { console.error('[AttackResultPopup] attack_cancelled log failed:', e); });
+    // Extra Attack chain: cancelling staged damage leaves the rest of the
+    // Attack action unused — the chain watcher (useExtraAttackChain) drops
+    // the queued swings. Sibling of the Done `dice-roll-done` dispatch.
+    window.dispatchEvent(new CustomEvent('attack-staged-cancelled', {
+        detail: { characterName: attacker, attackName },
+    }));
     if (onClose) onClose();
   }, [popupHtml, campaignName, attackerName, onClose]);
 
