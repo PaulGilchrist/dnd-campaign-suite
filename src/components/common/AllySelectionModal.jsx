@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import './AllySelectionModal.css';
 import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 
 export default function AllySelectionModal({
     title,
@@ -19,6 +20,16 @@ export default function AllySelectionModal({
     // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
     const overlayRef = useRef(null);
     useOverlayEntranceFocus(overlayRef);
+    // Modal-family dismissal law (backlog ZA 2026-11-23): Escape and a PURE
+    // backdrop click route to the same inert onCancel lane as the Cancel
+    // button — nothing is written on dismiss (SeededCampaignModal/
+    // DeleteConfirmModal precedent, drag-guard included). The window-rescue
+    // lane of the shared hook answers Escape with focus stranded on BODY;
+    // panelSelector points at this family's .sp-modal tier. No create is ever
+    // in flight here, so nothing gates `disabled` — the draft unmounts with
+    // the modal on every close path.
+    const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
+        useModalDismiss(onCancel, { panelSelector: '.sp-modal' });
 
     const toggleCreature = (name) => {
         setSelected(prev =>
@@ -53,7 +64,14 @@ export default function AllySelectionModal({
     const label = title || 'Select Allies';
 
     return (
-        <div className="sp-overlay" ref={overlayRef}>
+        <div
+            className="sp-overlay"
+            ref={overlayRef}
+            role="presentation"
+            onMouseDown={handleOverlayMouseDown}
+            onClick={handleOverlayClick}
+            onKeyDown={handleKeyDown}
+        >
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${iconClass}`}></i> {label}

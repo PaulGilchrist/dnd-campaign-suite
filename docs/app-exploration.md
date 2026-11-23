@@ -78,7 +78,7 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 - Extra Attack is display-only (ZA, FILED `bug-extra-attack-display-only-never-rolls`): `classRules*.js` computes `extraAttacks` flat `level > 4 ? 1 : 0` even at lv11/17, and nothing in `rules-actions.js`/the pipeline reads it — every weapon press commits one attack in BOTH rulesets. Don't build multi-attack test expectations on the current build.
 - The 12-file fixed-overlay family still hardcodes `left:180px` while the sidebar now docks below 768px (ZA, FILED `bug-overlay-family-hardcodes-sidebar-carveout`) — any narrow-viewport overlay probe will trip this until fixed.
-- AllySelectionModal (`sp-overlay` family) does NOT dismiss on Escape (Cancel only) — unlike the DeleteConfirmModal/create family laws; pressing Escape expecting dismissal leaves it open and its buttons then intercept pointer events on whatever you click next (live click burn witnessed).
+- AllySelectionModal (`sp-overlay` family) answers Escape/pure-backdrop via the shared `useModalDismiss` law (shipped 2026-11-23 improve ally-modal-escape-dismiss — Cancel/× unchanged); the rider/save `.sp-overlay` prompts are still Cancel-only — pressing Escape on those leaves them mounted and their scrim then intercepts pointer events on whatever you click next (live click burn witnessed).
 - A dead MONSTER logs/renders with the player-down vocabulary: `hp_change` row `— Knocked Unconscious` (`isUnconscious: newHp <= 0` is deliberately "BOTH lanes", `createCreatureHandlers.js:138`, type-ungated) and card class `creature-unconscious`, while the same event counts as `defeated` in the victory bank — vocabulary mismatch, owner-ambiguous, backlog-not-not-filed (ZA).
 - Quick-spawn sort face: a monster with a real init roll sorts ABOVE the select-baked skeletons whose initiative inputs sit empty (ZA) — board order is DESC-by-init-with-unrolled-at-back, alphabetical within the unrolled block.
 - Forged `lastCombatResult` (wildcard POST) nulls the stored `attackEvidence`, so the app's NEXT Clear re-celebrates on the still-current `lastAttack` — the celebrated:false prep-tidy law only witnesses honestly with an intact chain (ZA, harness poison; the app's own chain re-verified silent after one honest clear).
@@ -110,7 +110,6 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (ZA 2026-11-23) AllySelectionModal has no Escape/pure-backdrop dismissal (Cancel-only; Escape-left-open modals then intercept clicks) — adopt the `useModalDismiss.js` family law like DeleteConfirmModal/create modals; doubles as the escape hatch once the 420px clipped-Cancel bug (`bug-overlay-family-hardcodes-sidebar-carveout`) is fixed.
 - (ZA 2026-11-23) `TvNextUpStrip` children have no stable per-item class/testid (the whole lane reads as container text) — add `.tv-next-up-item[data-name]` so tests/automation can assert the wrap list per creature.
 - (ZA 2026-11-23) Observation, possibly intentional: TV-mode GM tabs keep editable name/initiative/target/control inputs on presentation cards (only HP becomes a span) — if the table-mounted TV screen is meant glanceable, consider a display-only tier there too; owner call.
 
