@@ -87,7 +87,7 @@ function NaturalRecoveryModal({ playerStats, campaignName, onClose }) {
                 )}
 
                 <div className="nr-actions">
-                    <button className="char-btn" onClick={onClose}>
+                    <button className="char-btn ct-btn" onClick={onClose}>
                         {alreadyGranted || alreadyUsed ? 'Close' : 'Cancel (save for later)'}
                     </button>
                 </div>

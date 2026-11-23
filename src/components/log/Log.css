@@ -1,7 +1,9 @@
-.log-view {
-    flex: 1;
+/* .ct-* kit convergence (tranche 2): the root carries .ct-container (App.css),
+   which supplies flex:1 + width:100%. The two-class compound re-anchors this
+   view's asymmetric gutter against the kit's 20px padding at equal-or-higher
+   specificity so bundle order never becomes load-bearing. */
+.log-view.ct-container {
     padding: 20px 32px 20px 20px;
-    width: 100%;
 }
 
 .log-toolbar h2 {
@@ -83,29 +85,11 @@
     border-color: var(--color-primary);
 }
 
-.log-add-btn {
-    padding: 6px 12px;
-    font-size: 0.88rem;
-    border-radius: 4px;
-    border: 1px solid var(--color-primary);
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
-    cursor: pointer;
-    height: 32px;
-}
-
-.log-add-btn:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-}
-
-/* Disable-until-valid affordance — mirrors the .ct-btn:disabled canon (App.css) */
-.log-add-btn:disabled {
-    background: var(--background-color-disabled);
-    color: var(--color-text-secondary);
-    border-color: var(--border-color);
-    cursor: not-allowed;
-}
+/* The composer's post button rides the global kit (.ct-btn .ct-btn-primary
+   tiers scoped by the root .ct-container) — the bespoke .log-add-btn skin,
+   hover and disabled canon were removed with the .ct-* convergence
+   (tranche 2); the .log-add-btn class survives only as the test/locator
+   hook. */
 
 /* Filter toolbar — the single filter affordance row (client-side only) */
 .log-filters {
@@ -157,24 +141,9 @@
     border-color: var(--color-primary);
 }
 
-.log-filter-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 6px 12px;
-    font-size: 0.82rem;
-    background: var(--background-color-input);
-    color: var(--color-text);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.log-filter-clear:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
+/* "Clear filters" rides the global kit (.ct-btn .ct-btn-sm, scoped by the root
+   .ct-container) — the bespoke filter-clear skin and hover rule were
+   removed with the .ct-* convergence (tranche 2). */
 
 .log-filter-count {
     margin-left: auto;
@@ -191,31 +160,15 @@
     padding: 10px 0 4px 0;
 }
 
-.log-load-older-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 16px;
-    font-size: 0.85rem;
-    background: var(--background-color-input);
-    color: var(--color-text);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    cursor: pointer;
-}
+/* The "Load older entries" button rides the global kit (.ct-btn .ct-btn-sm,
+   scoped by the root .ct-container); the row wrapper above still owns the
+   centering. The bespoke load-older skin/hover were removed with the
+   .ct-* convergence (tranche 2). */
 
-.log-load-older-btn:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-/* Loading & empty states */
-.log-loading,
-.log-empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--color-text-muted);
-}
+/* Loading & empty states ride the kit's .ct-empty-state (App.css, scoped by
+   the root .ct-container); the .log-loading/.log-empty class tokens survive
+   as test-locator hooks only — their bespoke centering rule was removed with
+   the .ct-* convergence (tranche 2). */
 
 /* Log entries list */
 .log-entries {

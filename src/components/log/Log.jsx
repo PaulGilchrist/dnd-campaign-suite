@@ -78,7 +78,10 @@ function LogFilterBar({ filters, typeOptions, rollTypeOptions, characterOptions,
         </select>
       </div>
       {hasActiveFilters && (
-        <button type="button" className="log-filter-clear" onClick={onClear}>
+        /* .ct-* kit convergence (tranche 2): the retired bespoke filter-clear
+           skin now rides the shared kit (.ct-btn .ct-btn-sm scoped by the view
+           root's .ct-container). */
+        <button type="button" className="ct-btn ct-btn-sm" onClick={onClear}>
           <i className="fas fa-xmark"></i> Clear filters
         </button>
       )}
@@ -149,7 +152,10 @@ function LogComposer({ isLocalhost, authorGroups, author, composeType, noteText,
           onKeyDown={onKeyDown}
           disabled={!canPost}
         />
-        <button className="log-add-btn" onClick={onPost} disabled={!canPost || !noteText.trim()} title={copy.post} aria-label={copy.post}><i className="fas fa-plus"></i></button>
+        {/* .ct-* kit convergence (tranche 2): the post button rides the kit's
+            primary tier; the pinned .log-add-btn token survives as the test/
+            locator hook while its bespoke App-level skin was retired. */}
+        <button className="log-add-btn ct-btn ct-btn-primary" onClick={onPost} disabled={!canPost || !noteText.trim()} title={copy.post} aria-label={copy.post}><i className="fas fa-plus"></i></button>
       </div>
       {!canPost && (
         <div className="log-post-disabled-hint no-print">
@@ -246,8 +252,12 @@ export default function Log({ campaignName, characters, isLocalhost }) {
   const visibleEntries = [...filteredEntries].reverse().slice(0, windowSize);
   const hasOlderEntries = filteredEntries.length > windowSize;
 
+  // .ct-* kit convergence (tranche 2): the view root carries .ct-container so
+  // every App.css kit tier (.ct-btn / .ct-btn-primary / .ct-btn-sm /
+  // .ct-empty-state — all descendant-scoped under .ct-container) styles this
+  // view, mirroring the CampaignAdmin `ct-container campaign-admin` idiom.
   return (
-    <div className="campaign-tool log-view">
+    <div className="campaign-tool log-view ct-container">
       <div className="log-toolbar">
         <h2><i className="fas fa-scroll"></i> Campaign Log</h2>
       </div>
@@ -279,12 +289,14 @@ export default function Log({ campaignName, characters, isLocalhost }) {
         />
       )}
 
-      {!initialized && <div className="log-loading no-print">Loading log...</div>}
+      {/* View-level empty/loading faces ride the kit's .ct-empty-state; the
+          pinned .log-loading/.log-empty tokens survive as test hooks. */}
+      {!initialized && <div className="log-loading ct-empty-state no-print">Loading log...</div>}
       {initialized && logEntries.length === 0 && (
-        <div className="log-empty no-print">No entries yet. Roll dice or add a note to get started.</div>
+        <div className="log-empty ct-empty-state no-print">No entries yet. Roll dice or add a note to get started.</div>
       )}
       {initialized && logEntries.length > 0 && filteredEntries.length === 0 && (
-        <div className="log-empty no-print">No entries match the current filters.</div>
+        <div className="log-empty ct-empty-state no-print">No entries match the current filters.</div>
       )}
 
       <div className="log-entries">
@@ -295,7 +307,7 @@ export default function Log({ campaignName, characters, isLocalhost }) {
 
       {initialized && hasOlderEntries && (
         <div className="log-load-older-row no-print">
-          <button type="button" className="log-load-older-btn" onClick={() => setWindowSize(size => size + LOG_WINDOW_SIZE)}>
+          <button type="button" className="ct-btn ct-btn-sm" onClick={() => setWindowSize(size => size + LOG_WINDOW_SIZE)}>
             <i className="fas fa-angle-double-down"></i> Load older entries
           </button>
         </div>

@@ -282,17 +282,17 @@ describe('App.css', () => {
   });
 
   describe('character summary buttons', () => {
-    it('lays out compact, clickable character buttons that brighten on hover', () => {
+    it('lays out the toolbar group; button skins ride the ct-* kit', () => {
       expectStyles('.char-btn-group', { display: 'flex', 'align-items': 'center' });
-      const btn = styleFor('.char-btn');
-      expectStyles('.char-btn', {
-        border: '1px solid var(--border-color)',
-        cursor: 'pointer',
-        'white-space': 'nowrap',
-      });
-      expect(btn['background-color'], '.char-btn should sit unobtrusively in the bar').toBe('transparent');
-      expectStyles('.char-btn:hover', { opacity: '1' });
-      expect(parseFloat(btn.opacity), 'resting .char-btn should be dimmed below its hover state').toBeLessThan(1);
+      // .ct-* kit convergence (tranche 2): the bespoke .char-btn skin was
+      // removed — every former .char-btn site now rides the global kit tiers
+      // (.ct-container .ct-btn / -primary / -danger / -sm). The .char-btn
+      // class token survives on the buttons as a locator hook only, so the
+      // retired rule must NOT come back.
+      expect(
+        topRules.filter((r) => ['.char-btn', '.char-btn:hover'].includes(normalizeSelector(r.selector))),
+        '.char-btn styling rules were retired with the ct-* kit convergence'
+      ).toHaveLength(0);
     });
   });
 

@@ -152,10 +152,10 @@ function FontOfMagicModal({ playerStats, campaignName, onClose }) {
         </div>
 
         <div className="font-of-magic-actions">
-          <button className="char-btn" onClick={handleApply} disabled={!canApply}>
+          <button className="char-btn ct-btn ct-btn-primary" onClick={handleApply} disabled={!canApply}>
             <i className="fa-solid fa-check"></i> Apply Conversion
           </button>
-          <button className="char-btn" onClick={onClose}>
+          <button className="char-btn ct-btn" onClick={onClose}>
             <i className="fa-solid fa-times"></i> Cancel
           </button>
         </div>

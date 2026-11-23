@@ -328,7 +328,7 @@ function SongOfRestSection({ songOfRestDie, applied, onApply }) {
             <h4>Song of Rest</h4>
             <p>Roll d{songOfRestDie} + CON bonus and add to recovered HP.</p>
             <div className="short-rest-dice-row">
-                <button className="char-btn" onClick={onApply}>
+                <button className="char-btn ct-btn ct-btn-primary" onClick={onApply}>
                     <i className="fa-solid fa-music"></i> Apply Song of Rest (d{songOfRestDie})
                 </button>
             </div>
@@ -346,7 +346,7 @@ function SorcerousRestorationSection({ restoration, available, requested, restor
                 {requested ? (
                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
                   ) : (
-                    <button className="char-btn" onClick={onRequest} disabled={!available}>
+                    <button className="char-btn ct-btn ct-btn-primary" onClick={onRequest} disabled={!available}>
                         <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
                     </button>
                   )}
@@ -378,7 +378,7 @@ function BolsteringTreatsSection({ visible, crafted, proficiency, onCraft }) {
                 {crafted ? (
                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
                   ) : (
-                    <button className="char-btn" onClick={onCraft}>
+                    <button className="char-btn ct-btn ct-btn-primary" onClick={onCraft}>
                         <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
                     </button>
                   )}
@@ -448,13 +448,13 @@ function NaturalRecoverySection({ naturalRecovery, available, maxLevels, budgetR
                                         <td>{available}</td>
                                         <td className="short-rest-nr-controls">
                                             <button
-                                                className="char-btn char-btn-sm"
+                                                className="char-btn ct-btn ct-btn-sm"
                                                 onClick={() => onChange(level, -1)}
                                                 disabled={!canRemove}
                                             >-</button>
                                             <span className="short-rest-nr-count">{selected}</span>
                                             <button
-                                                className="char-btn char-btn-sm"
+                                                className="char-btn ct-btn ct-btn-sm"
                                                 onClick={() => onChange(level, 1)}
                                                 disabled={!canAdd}
                                             >+</button>
@@ -479,7 +479,7 @@ function ArcaneRecoverySection({ arcaneRecovery, available, requested, maxSlots,
                 {requested ? (
                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
                   ) : (
-                    <button className="char-btn" onClick={onRequest} disabled={!available}>
+                    <button className="char-btn ct-btn ct-btn-primary" onClick={onRequest} disabled={!available}>
                         <i className="fas fa-book-open"></i> Recover Spell Slots
                     </button>
                   )}
@@ -499,7 +499,7 @@ function MemorizeSpellSection({ hasMemorizeSpell, available, usedSinceRest, mode
                     usedSinceRest ? (
                         <span className="short-rest-applied"><i className="fas fa-book"></i> Already used this rest</span>
                       ) : (
-                        <button className="char-btn" onClick={onEnterMode}>
+                        <button className="char-btn ct-btn" onClick={onEnterMode}>
                             <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
                         </button>
                       )
@@ -507,7 +507,7 @@ function MemorizeSpellSection({ hasMemorizeSpell, available, usedSinceRest, mode
                      <div>
                          <div className="short-rest-memorize-field">
                              <label>Remove prepared spell: </label>
-                             <select className="char-btn" value={from || ''} onChange={e => onChangeFrom(e.target.value)}>
+                             <select className="char-btn ct-btn" value={from || ''} onChange={e => onChangeFrom(e.target.value)}>
                                  <option value="">-- Select spell to remove --</option>
                                  {fromOptions.map(s => (
                                      <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
@@ -516,7 +516,7 @@ function MemorizeSpellSection({ hasMemorizeSpell, available, usedSinceRest, mode
                          </div>
                          <div className="short-rest-memorize-field">
                              <label>Add from spellbook: </label>
-                            <select className="char-btn" value={to || ''} onChange={e => onChangeTo(e.target.value)}>
+                            <select className="char-btn ct-btn" value={to || ''} onChange={e => onChangeTo(e.target.value)}>
                                 <option value="">-- Select spell to add --</option>
                                 {toOptions.map(s => (
                                     <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
@@ -524,10 +524,10 @@ function MemorizeSpellSection({ hasMemorizeSpell, available, usedSinceRest, mode
                             </select>
                         </div>
                         <div className="short-rest-dice-row">
-                            <button className="char-btn" onClick={onSwap} disabled={!from || !to}>
+                            <button className="char-btn ct-btn ct-btn-primary" onClick={onSwap} disabled={!from || !to}>
                                 <i className="fas fa-check"></i> Swap Spell
                             </button>
-                            <button className="char-btn" onClick={onCancel}>
+                            <button className="char-btn ct-btn" onClick={onCancel}>
                                 Cancel
                             </button>
                         </div>
@@ -890,10 +890,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                     <h4>Hit Dice</h4>
                     <p>d{hitDie} &mdash; {remainingHitDice} of {maxHitDice} remaining</p>
                     <div className="short-rest-dice-row">
-                        <button className="char-btn" onClick={handleRollOne} disabled={remainingHitDice <= 0}>
+                        <button className="char-btn ct-btn" onClick={handleRollOne} disabled={remainingHitDice <= 0}>
                             <i className="fa-solid fa-dice"></i> Roll One
                         </button>
-                        <button className="char-btn" onClick={handleRollAll} disabled={remainingHitDice <= 0}>
+                        <button className="char-btn ct-btn" onClick={handleRollAll} disabled={remainingHitDice <= 0}>
                             <i className="fa-solid fa-dice-d6"></i> Roll All ({remainingHitDice})
                         </button>
                     </div>
@@ -938,10 +938,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                     )}
 
                 <div className="short-rest-actions">
-                    <button className="char-btn" onClick={handleComplete}>
+                    <button className="char-btn ct-btn ct-btn-primary" onClick={handleComplete}>
                         <i className="fa-solid fa-check"></i> Complete Short Rest
                     </button>
-                    <button className="char-btn" onClick={onClose}>Cancel</button>
+                    <button className="char-btn ct-btn" onClick={onClose}>Cancel</button>
                 </div>
             </div>
         </div>

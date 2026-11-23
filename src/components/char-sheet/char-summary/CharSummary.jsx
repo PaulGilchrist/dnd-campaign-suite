@@ -192,8 +192,8 @@ function XpModal({ xpDelta, setXpDelta, displayXp, isInXpMode, handleXpSave, han
                     )}
                 </div>
                 <div className='xp-modal-actions'>
-                    <button className='char-btn' onClick={handleXpSave}>Apply</button>
-                    <button className='char-btn' onClick={onClose}>Cancel</button>
+                    <button className='char-btn ct-btn ct-btn-primary' onClick={handleXpSave}>Apply</button>
+                    <button className='char-btn ct-btn' onClick={onClose}>Cancel</button>
                 </div>
             </div>
         </div>
@@ -687,10 +687,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
                         <div className='char-btn-group no-print'>
-                            <button className="char-btn" onClick={onEditCharacter} title="Edit Character" aria-label={`Edit "${playerStats.name}"`}><i className="fas fa-pen"></i> Edit</button>
-                            <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character" aria-label={`Delete "${playerStats.name}"`}>Delete</button>
-                            <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
-                            <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
+                            <button className="char-btn ct-btn" onClick={onEditCharacter} title="Edit Character" aria-label={`Edit "${playerStats.name}"`}><i className="fas fa-pen"></i> Edit</button>
+                            <button className="char-btn ct-btn ct-btn-danger" onClick={handleDeleteCharacter} title="Delete Character" aria-label={`Delete "${playerStats.name}"`}>Delete</button>
+                            <button className="char-btn ct-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
+                            <button className="char-btn ct-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
                             <ShortRestButton onClick={() => setShowShortRest(true)} />
                             <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
                         </div>

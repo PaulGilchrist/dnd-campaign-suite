@@ -1,4 +1,9 @@
-.char-sheet {
+/* .ct-* kit convergence (tranche 2): the root carries .ct-container (App.css),
+   whose 20px padding must not reflow the sheet — this two-class compound keeps
+   the sheet's own width cap and 10px gutter deterministic against bundle
+   order (same tie-hardening idiom as `.initiative.ct-container`). The kit's
+   flex:1 + width:100% cap harmlessly at the max-width here. */
+.char-sheet.ct-container {
     max-width: 900px;
     padding: 10px;
 }
@@ -250,8 +255,10 @@
 }
 
 @media print {
-    .char-sheet {
-        padding: 0;
+    /* One compound: same-specificity print values must not lose to the
+       screen `.char-sheet.ct-container` cap above. */
+    .char-sheet.ct-container {
         max-width: 7.75in;
+        padding: 0;
     }
 }

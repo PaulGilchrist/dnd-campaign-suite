@@ -112,14 +112,14 @@ function MoonlightStepResourceModal({ playerStats, campaignName, onClose }) {
             </tbody>
           </table>
           <div className="resource-pool-actions">
-            <button className="char-btn" onClick={handleConvert} disabled={!canConvert}>
+            <button className="char-btn ct-btn ct-btn-primary" onClick={handleConvert} disabled={!canConvert}>
               <i className="fa-solid fa-check"></i> Expend Level {selectedLevel} Slot
             </button>
           </div>
         </div>
 
         <div className="resource-pool-actions resource-pool-cancel">
-          <button className="char-btn" onClick={onClose}>
+          <button className="char-btn ct-btn" onClick={onClose}>
             <i className="fa-solid fa-times"></i> Cancel
           </button>
         </div>

@@ -678,7 +678,12 @@ function CharSheetContent({
 
     return (<Provider value={value}>
         <React.Fragment>
-            <div className='char-sheet' data-testid='char-sheet'>
+            {/* .ct-* kit convergence (tranche 2): the view root carries
+                .ct-container so every App.css kit tier (.ct-btn / .ct-btn-primary /
+                .ct-btn-danger / .ct-btn-sm — all descendant-scoped under
+                .ct-container) styles the sheet toolbar, rest buttons and the
+                feature-modal action buttons that mount inside this subtree. */}
+            <div className='char-sheet ct-container' data-testid='char-sheet'>
                 <CharSummary
                     playerStats={playerStats}
                     onDeleteCharacter={onDeleteCharacter}

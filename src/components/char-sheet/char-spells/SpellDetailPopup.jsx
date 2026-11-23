@@ -456,13 +456,13 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         })()}
         <div className="spell-detail-actions">
           <button
-            className="char-btn"
+            className="char-btn ct-btn ct-btn-primary"
             onClick={handleCast}
             disabled={!canCast}
           >
             <i className="fa-solid fa-wand-magic"></i> Cast Spell
           </button>
-          <button className="char-btn char-btn-secondary" onClick={onClose}>
+          <button className="char-btn ct-btn" onClick={onClose}>
             <i className="fa-solid fa-times"></i> Close
           </button>
         </div>

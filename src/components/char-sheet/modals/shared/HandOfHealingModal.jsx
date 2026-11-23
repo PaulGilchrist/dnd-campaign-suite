@@ -238,7 +238,7 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
                         : 'Select the condition to remove with the free Physician\u2019s Touch:'}</p>
                     <div className="healing-cure-options">
                         {[...new Set(cureableConditions)].map((condition, i) => (
-                            <button key={`${condition}-${i}`} className="char-btn" onClick={() => removeCondition(condition)}>
+                            <button key={`${condition}-${i}`} className="char-btn ct-btn" onClick={() => removeCondition(condition)}>
                                 <i className="fas fa-check-circle"></i> Remove {condition}
                             </button>
                         ))}
@@ -294,7 +294,7 @@ function HandOfHealingResultStage({ healName, result, monkName, campaignName, ha
                 />
 
                 <div className="short-rest-actions">
-                    <button className="char-btn" onClick={onClose}>
+                    <button className="char-btn ct-btn" onClick={onClose}>
                         <i className="fa-solid fa-check"></i> Done
                     </button>
                 </div>
@@ -352,7 +352,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkN
                         <h3 id="hand-of-healing-modal-title"><i className="fas fa-hand-sparkles"></i> {healName}</h3>
                         <div className="short-rest-section">{healError}</div>
                         <div className="short-rest-actions">
-                            <button className="char-btn" onClick={onClose}>
+                            <button className="char-btn ct-btn" onClick={onClose}>
                                 <i className="fa-solid fa-check"></i> Done
                             </button>
                         </div>

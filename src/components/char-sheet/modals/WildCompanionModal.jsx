@@ -108,7 +108,7 @@ function WildCompanionModal({ playerStats, campaignName, onClose }) {
             </tbody>
           </table>
           <div className="resource-pool-actions">
-            <button className="char-btn" onClick={handleSpellSlot} disabled={!slotHasAvailable}>
+            <button className="char-btn ct-btn ct-btn-primary" onClick={handleSpellSlot} disabled={!slotHasAvailable}>
               <i className="fa-solid fa-check"></i> Expend Level {selectedLevel} Slot
             </button>
           </div>
@@ -121,7 +121,7 @@ function WildCompanionModal({ playerStats, campaignName, onClose }) {
             <p className="resource-pool-blocked">You have no Wild Shape uses remaining.</p>
           ) : (
             <div className="resource-pool-actions">
-              <button className="char-btn" onClick={handleWildShape}>
+              <button className="char-btn ct-btn ct-btn-primary" onClick={handleWildShape}>
                 <i className="fa-solid fa-check"></i> Expend 1 Wild Shape
               </button>
             </div>
@@ -129,7 +129,7 @@ function WildCompanionModal({ playerStats, campaignName, onClose }) {
         </div>
 
         <div className="resource-pool-actions resource-pool-cancel">
-          <button className="char-btn" onClick={onClose}>
+          <button className="char-btn ct-btn" onClick={onClose}>
             <i className="fa-solid fa-times"></i> Cancel
           </button>
         </div>

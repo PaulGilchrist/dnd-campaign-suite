@@ -59,7 +59,7 @@ function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedCond
                             return (
                                 <button
                                     key={entry.key}
-                                    className={`char-btn${isSelected ? ' cure-btn-active' : ''}`}
+                                    className={`char-btn ct-btn${isSelected ? ' cure-btn-active' : ''}`}
                                     onClick={() => toggleCondition(entry.key)}
                                 >
                                     <i className={`fa-solid fa-${isSelected ? 'check-circle' : 'circle'}`}></i> {entry.label}
@@ -69,7 +69,7 @@ function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedCond
                     </div>
                     <div className="short-rest-dice-row">
                         <button
-                            className="char-btn"
+                            className="char-btn ct-btn ct-btn-primary"
                             onClick={applyBatchCure}
                             disabled={selectedConditions.length === 0 || safePool < batchTotalCost}
                         >
@@ -100,7 +100,7 @@ function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedCond
                     <h4>Cure Conditions ({cureCost} HP each)</h4>
                     <div className="short-rest-dice-row">
                         {curableEntries.map((entry) => (
-                            <button key={entry.key} className="char-btn" onClick={() => applyCure(entry.key)} disabled={safePool < cureCost}>
+                            <button key={entry.key} className="char-btn ct-btn" onClick={() => applyCure(entry.key)} disabled={safePool < cureCost}>
                                 <i className="fas fa-shield-alt"></i> {entry.label}
                             </button>
                         ))}
@@ -136,7 +136,7 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
                         className="healing-amount-input"
                     />
                 </label>
-                <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied) || noHealCapacity}>
+                <button className="char-btn ct-btn ct-btn-primary" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied) || noHealCapacity}>
                     <i className="fas fa-heart"></i> Apply Heal
                 </button>
             </div>
@@ -208,7 +208,7 @@ function HealingDiceSection({ resolvedTargetName, targetCurrentHp, targetMaxHp, 
         <div className="short-rest-section">
             <h4>Roll Dice — {resolvedTargetName} ({targetCurrentHp} / {targetMaxHp} HP){effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
             <div className="short-rest-dice-row">
-                <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse) || noHealCapacity}>
+                <button className="char-btn ct-btn ct-btn-primary" onClick={applyDiceHeal} disabled={safePool <= 0 || (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse) || noHealCapacity}>
                     <i className="fas fa-dice-d12"></i> Roll a d{dieType}
                 </button>
             </div>
@@ -333,7 +333,7 @@ function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, reso
             {log.length > 0 && <HealingLogSection log={log} />}
 
             <div className="short-rest-actions">
-                <button className="char-btn" onClick={handleClose}>
+                <button className="char-btn ct-btn" onClick={handleClose}>
                     <i className="fa-solid fa-check"></i> Done
                 </button>
             </div>

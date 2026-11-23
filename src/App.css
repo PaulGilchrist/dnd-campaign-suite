@@ -125,28 +125,15 @@
     color: var(--color-header);
 }
 
-/* Character summary button group */
+/* Character summary button group — layout only. The bespoke .char-btn /
+   .char-btn:hover skins were removed with the .ct-* kit convergence
+   (tranche 2): every former .char-btn button now rides the global
+   .ct-container .ct-btn / -primary / -danger / -sm tiers (the .char-btn
+   class remains on the elements as a locator hook). */
 .char-btn-group {
     display: flex;
     gap: 4px;
     align-items: center;
-}
-
-.char-btn {
-    padding: 2px 6px;
-    font-size: 11px;
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--color-text);
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
-    white-space: nowrap;
-}
-
-.char-btn:hover {
-    opacity: 1;
-    border-color: var(--color-hover);
 }
 
 button.download {

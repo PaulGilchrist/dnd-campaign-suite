@@ -82,7 +82,7 @@ function CircleOfTheLandSpellsModal({ playerStats, campaignName, onClose }) {
                 )}
 
                 <div className="cotl-actions">
-                    <button className="char-btn" onClick={onClose}>Cancel</button>
+                    <button className="char-btn ct-btn" onClick={onClose}>Cancel</button>
                 </div>
             </div>
         </div>

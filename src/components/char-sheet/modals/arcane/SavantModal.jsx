@@ -28,7 +28,7 @@ function SavantModal({ payload, onConfirm, onClose }) {
                     <div style={{ marginBottom: '12px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>{school} spell 1:</label>
                         <select
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             value={selected1}
                             onChange={e => setSelected1(e.target.value)}
                             style={{ width: '100%' }}
@@ -42,7 +42,7 @@ function SavantModal({ payload, onConfirm, onClose }) {
                     <div style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>{school} spell 2:</label>
                         <select
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             value={selected2}
                             onChange={e => setSelected2(e.target.value)}
                             style={{ width: '100%' }}
@@ -54,7 +54,7 @@ function SavantModal({ payload, onConfirm, onClose }) {
                         </select>
                     </div>
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn ct-btn-primary"
                         onClick={handleConfirm}
                         disabled={!selected1 || !selected2 || selected1 === selected2}
                         style={{ width: '100%', marginBottom: '8px' }}
@@ -63,7 +63,7 @@ function SavantModal({ payload, onConfirm, onClose }) {
                     </button>
                     {selectedSpells?.length > 0 && (
                         <button
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             onClick={() => onConfirm(null, null)}
                             style={{ width: '100%', opacity: 0.7 }}
                         >

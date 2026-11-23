@@ -49,11 +49,11 @@ export default function UpcastPopup({ spell, levels, onConfirm, onCancel }) {
             })}
           </div>
           <div className="upcast-actions">
-            <button className="char-btn char-btn-secondary" onClick={onCancel}>
+            <button className="char-btn ct-btn" onClick={onCancel}>
               Cancel
             </button>
             <button
-              className="char-btn"
+              className="char-btn ct-btn ct-btn-primary"
               onClick={() => onConfirm(Number(selectedLevel))}
               disabled={!canCast}
             >

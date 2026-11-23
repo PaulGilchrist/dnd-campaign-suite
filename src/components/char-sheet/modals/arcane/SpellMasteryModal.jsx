@@ -27,7 +27,7 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                     <div style={{ marginBottom: '12px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Level 1 spell:</label>
                         <select
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             value={selectedLevel1}
                             onChange={e => setSelectedLevel1(e.target.value)}
                             style={{ width: '100%' }}
@@ -41,7 +41,7 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                     <div style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Level 2 spell:</label>
                         <select
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             value={selectedLevel2}
                             onChange={e => setSelectedLevel2(e.target.value)}
                             style={{ width: '100%' }}
@@ -53,7 +53,7 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                         </select>
                     </div>
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn ct-btn-primary"
                         onClick={handleConfirm}
                         disabled={
                             (!selectedLevel1 && !selectedLevel2) ||
@@ -67,7 +67,7 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                     </button>
                     {hasSelection && (
                         <button
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             onClick={() => onConfirm(null, null)}
                             style={{ width: '100%', opacity: 0.7 }}
                         >

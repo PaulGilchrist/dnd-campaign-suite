@@ -53,7 +53,7 @@ function ForwardConversionSection({ fwdHasConversion, fwdPrereqsMet, currentWS, 
             </tbody>
           </table>
           <div className="resource-pool-actions">
-            <button className="char-btn" onClick={handleForward} disabled={!canForward}>
+            <button className="char-btn ct-btn ct-btn-primary" onClick={handleForward} disabled={!canForward}>
               <i className="fa-solid fa-check"></i> Expend Level {selectedLevel} Slot
             </button>
           </div>
@@ -100,7 +100,7 @@ function ArchdruidConversionSection({ isArchdruid, currentWS, currentSlots, maxS
             </tbody>
           </table>
           <div className="resource-pool-actions">
-            <button className="char-btn" onClick={handleArchdruidConvert} disabled={!archdruidCanConvert}>
+            <button className="char-btn ct-btn ct-btn-primary" onClick={handleArchdruidConvert} disabled={!archdruidCanConvert}>
               <i className="fa-solid fa-check"></i> Convert {archdruidUses} Wild Shape &rarr; Level {archdruidTargetLevel} Slot
             </button>
           </div>
@@ -122,7 +122,7 @@ function ReverseConversionSection({ isArchdruid, revHasConversion, revPrereqsMet
         <p className="resource-pool-blocked">Already used this conversion this Long Rest.</p>
       ) : (
         <div className="resource-pool-actions">
-          <button className="char-btn" onClick={handleReverse}>
+          <button className="char-btn ct-btn ct-btn-primary" onClick={handleReverse}>
             <i className="fa-solid fa-check"></i> Convert 1 Wild Shape &rarr; Level 1 Slot
           </button>
         </div>
@@ -248,7 +248,7 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
         <ReverseConversionSection isArchdruid={isArchdruid} revHasConversion={revHasConversion} revPrereqsMet={revPrereqsMet} currentWS={currentWS} handleReverse={handleReverse} />
 
         <div className="resource-pool-actions resource-pool-cancel">
-          <button className="char-btn" onClick={onClose}>
+          <button className="char-btn ct-btn" onClick={onClose}>
             <i className="fa-solid fa-times"></i> Cancel
           </button>
         </div>

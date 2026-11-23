@@ -75,7 +75,7 @@ function CommandModal({ spell, metaCtx, targetName, playerStats, campaignName, m
 
                 <div className="command-actions">
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn ct-btn-primary"
                         onClick={handleCast}
                         disabled={casting}
                     >
@@ -83,7 +83,7 @@ function CommandModal({ spell, metaCtx, targetName, playerStats, campaignName, m
                         {casting ? 'Casting...' : 'Cast Spell'}
                     </button>
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn"
                         onClick={onClose}
                         disabled={casting}
                     >

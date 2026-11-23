@@ -98,7 +98,7 @@ function ArcaneVigorModal({ hitDieSize, spellcastingAbility, spellcastingAbility
                     <p>d{hitDieSize} — {availableHitDice} of {storedHitDice} remaining (up to {diceCount} dice allowed)</p>
                     <div className="arcane-vigor-dice-row">
                         <button
-                            className="char-btn"
+                            className="char-btn ct-btn"
                             onClick={handleRollDie}
                             disabled={availableHitDice <= 0 || diceCapReached || healingApplied}
                         >
@@ -136,14 +136,14 @@ function ArcaneVigorModal({ hitDieSize, spellcastingAbility, spellcastingAbility
 
                 <div className="arcane-vigor-actions">
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn ct-btn-primary"
                         onClick={handleApplyHealing}
                         disabled={rolledDice.length === 0 || healingApplied}
                     >
                         <i className="fa-solid fa-heart"></i> Apply Healing
                     </button>
                     <button
-                        className="char-btn"
+                        className="char-btn ct-btn"
                         onClick={onClose}
                         disabled={healingApplied}
                     >
