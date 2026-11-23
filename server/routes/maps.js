@@ -4,7 +4,7 @@ import path from 'path';
 import lodash from 'lodash';
 import { publish, activeMaps, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
+import { campaignMapsDir, campaignImagesDir, normalizeMapFile } from '../utils/campaignPaths.js';
 // Shared with the client hex editor (hex-map/hooks/useMapLoader.js seeds the
 // same centre when a stored document carries no partyPosition) so the create
 // stamp and the editor fallback can never drift (backlog JT 2026-11-11).
@@ -643,6 +643,79 @@ const saveResponse = (requestedDoc, storedDoc, message = 'Map saved successfully
     && storedDoc?.gridSize !== requestedDoc.gridSize,
 });
 
+// Orphaned token-art prune (deferred D shipped 2026-11-22): the /token-image
+// upload lane writes images/token-<ts>-<rand>.<ext> under the campaign's
+// images/ dir and the placedItems row keeps only that RELATIVE path. Replace
+// ("upload over existing art") and "Remove art" both ride this whole-doc PUT,
+// which used to leave the superseded file on disk forever. The PUT's single
+// save seam now diffs stored rows vs the incoming document and unlinks any
+// token upload nothing references anymore.
+//
+// Naming gate: ONLY the /token-image upload shape `images/token-…<ext>` is a
+// prune CANDIDATE — non-token assets (ElderPaladin.png character portraits,
+// emoji fallbacks carrying no path at all) can never be named here, and the
+// no-slash filename class makes `../../` traversal impossible BY CONSTRUCTION
+// (the executor below still normalizes + verifies containment as defense in
+// depth against anything unforeseen).
+//
+// Keep-set: a path still referenced by ANY row of the INCOMING document —
+// placedItems (the shared-token case: two rows on one upload), players or
+// items — is never pruned, so one row changing its art while another still
+// points at the old file keeps that file. A row DELETED from placedItems also
+// orphans its upload by the same diff (nothing references it after the save).
+// Pure (no fs): returns the deduped relative paths to prune; [] for every
+// no-op save, so echo lanes never touch the images dir at all.
+const TOKEN_ART_PATTERN = /^images\/token-[^/\\]+?\.(?:png|jpe?g|gif|webp)$/i;
+const TOKEN_ART_CANDIDATE_ROWS = ['placedItems'];
+const TOKEN_ART_KEEP_ROWS = ['placedItems', 'players', 'items'];
+
+const rowImagePaths = (doc, arrays) => {
+  const paths = [];
+  for (const key of arrays) {
+    const rows = doc?.[key];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (typeof row?.imagePath === 'string') paths.push(row.imagePath);
+    }
+  }
+  return paths;
+};
+
+export function orphanedTokenArt(storedData, incomingData) {
+  const kept = new Set(rowImagePaths(incomingData, TOKEN_ART_KEEP_ROWS));
+  const orphans = [];
+  const seen = new Set();
+  for (const path_ of rowImagePaths(storedData, TOKEN_ART_CANDIDATE_ROWS)) {
+    if (!TOKEN_ART_PATTERN.test(path_) || kept.has(path_) || seen.has(path_)) continue;
+    seen.add(path_);
+    orphans.push(path_);
+  }
+  return orphans;
+}
+
+// Executes the diff at the save seam. Failures NEVER fail the save (criterion:
+// the document write already succeeded — an orphaned file is a disk-hygiene
+// miss, not data loss): every unlink error is console.error'd, never silent,
+// and the route still answers its normal success shape. campaignImagesDir is
+// resolved lazily so no-op saves (empty prune list) never build a path.
+function pruneOrphanedTokenArt(campaign, storedData, mapData) {
+  const orphans = orphanedTokenArt(storedData, mapData);
+  if (orphans.length === 0) return;
+  const imagesDir = path.resolve(campaignImagesDir(campaign));
+  for (const rel of orphans) {
+    const filePath = path.resolve(imagesDir, rel.replace(/^images\//, ''));
+    if (!filePath.startsWith(imagesDir + path.sep)) {
+      console.error(`[maps] token-art prune REFUSED (outside images dir): ${JSON.stringify(rel)}`);
+      continue;
+    }
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (e) {
+      console.error(`[maps] token-art prune failed for ${rel}:`, e);
+    }
+  }
+}
+
 // PUT /api/campaigns/:campaign/maps/:mapname - Save map data
 router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
@@ -713,6 +786,12 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   }
 
   fs.writeFileSync(filePath, JSON.stringify(mapData, null, 2));
+
+  // Orphaned token-art prune (deferred D, shipped 2026-11-22): stored rows vs
+  // the freshly-saved document — superseded/removed images/token-* uploads
+  // nothing references anymore are unlinked here. Runs AFTER the write, never
+  // fails the save (see pruneOrphanedTokenArt).
+  pruneOrphanedTokenArt(campaign, storedData, mapData);
 
   // Broadcast map data change for real-time sync
   const eventMapName = fileName.replace(/\.json$/, '');
