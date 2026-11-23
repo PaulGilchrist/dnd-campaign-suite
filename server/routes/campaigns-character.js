@@ -10,11 +10,15 @@ import { normalizeCharacterName, characterFileName } from '../utils/characterNam
 const router = express.Router();
 
 // Authority (mirrors maps.js refuseUnlessGm / quests.js / campaigns-admin.js):
-// character creation AND deletion are GM-only writes — network clients get a
-// read-only view (AGENTS.md). The client hides the sidebar "Add Character"
-// affordance (Sidebar.jsx CharacterList isLocalhost gate); this route guard is
-// the server seam that makes it structural (bug-player-view-can-create-characters,
-// delete gate: bug-character-delete-no-gm-gate).
+// character creation, full-file EDIT (the wizard's PUT save lane) AND deletion
+// are GM-only writes — network clients get a read-only view (AGENTS.md). The
+// client hides the sidebar "Add Character" affordance (Sidebar.jsx
+// CharacterList isLocalhost gate) and the sheet's Edit/Delete/Upload group
+// (CharSummary isLocalhost gate); these route guards are the server seam that
+// makes it structural (bug-player-view-can-create-characters, delete gate:
+// bug-character-delete-no-gm-gate, PUT gate:
+// bug-visitor-edit-wizard-unguarded-character-file-put). The partial-merge
+// PATCH lane below stays open by design (player gameplay writes).
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 function refuseUnlessGm(req, res) {
@@ -149,16 +153,22 @@ function syncCharacterImage(campaign, character, originalImagePath, requireNameM
     if (renamedImagePath) character.imagePath = renamedImagePath;
 }
 
-// API endpoint to update an existing character in a campaign
-// INTENTIONAL non-GM write (Paul's adjudication, bug-character-delete-no-gm-gate):
-// unlike create/delete, the .json PUT lane (save/rename + image move) stays
-// open to network clients — players legitimately write their OWN character
-// file through it (runtime-sync lane, AGENTS.md server-first pattern). The
-// write is full-object-replace guarded by the shape check below; GM-model
-// host-gating is deliberately NOT applied here.
+// API endpoint to update an existing character in a campaign — the character
+// wizard's full-file save/rename lane. GM-only, mirroring create and delete
+// (bug-visitor-edit-wizard-unguarded-character-file-put). The earlier owner
+// adjudication (bug-character-delete-no-gm-gate) kept this lane open on the
+// premise that player clients write their OWN file through it; that premise
+// does not hold in the current code — every player runtime write rides the
+// change-data wildcard (keys without a `.json` suffix, POST/PATCH) or the
+// character PATCH lane below (material-component consumption). The sole
+// client caller of this lane is campaignService.updateCharacter, reached
+// only from the GM edit wizard (useCharacterWizard.handleEditWizardComplete).
 router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     const { campaign, file } = req.params;
     if (file === 'log' || !file.endsWith('.json')) return next();
+    // Gate AFTER the fall-through guard (same shape as the DELETE sibling):
+    // non-`.json` keys must reach the change-data router regardless of origin.
+    if (!refuseUnlessGm(req, res)) return;
     const character = req.body;
 
     if (!campaign || !file || !character) {
@@ -223,7 +233,14 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     res.json({ message: 'Character updated successfully' });
 }));
 
-// API endpoint to merge partial data into an existing character file
+// API endpoint to merge partial data into an existing character file.
+// INTENTIONAL non-GM write (LAN trust model, mirrors the origin-neutral
+// change-data store): a player's own client merges gameplay updates into its
+// OWN character file through this lane — materialComponents.js consumes spell
+// material components here (partial inventory merge). Do NOT add
+// refuseUnlessGm without first giving LAN players another material-
+// consumption lane; contrast the full-file PUT wizard lane above, which has
+// no player consumer and IS GM-gated.
 router.patch('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     const { campaign, file } = req.params;
     if (file === 'log' || !file.endsWith('.json')) return next();

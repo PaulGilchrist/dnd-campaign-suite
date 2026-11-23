@@ -172,9 +172,12 @@ describe('campaignsCharacter — DELETE localhost authority gate', () => {
     });
 
     it('player read lane unchanged: non-localhost GET of a character file still 200', async () => {
-        // Scope pin: only the destructive DELETE write gained the gate — the
-        // network read view and the intentional player-writes-own-file PUT
-        // lane (see PUT handler comment) stay open.
+        // Scope pin: DELETE gained this file's gate — the network READ lane
+        // stays open, and so does the partial-merge PATCH lane (player
+        // material-component writes). The full-file PUT wizard lane gained its
+        // own refuseUnlessGm gate later (bug-visitor-edit-wizard-unguarded-
+        // character-file-put; the earlier PUT-stays-open adjudication in the
+        // header predates that gate).
         setupFs({
             [CHAR_FILE]: { name: 'Victim', level: 20 },
         });

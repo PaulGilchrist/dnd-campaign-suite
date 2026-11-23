@@ -508,6 +508,32 @@ function useMountAffordances(playerStats, campaignName) {
     return { showMountModal, mountModalCreatures, mountName, handleMountModalOpen, handleMountConfirm, handleMountModalClose, handleDismount };
 }
 
+// Sheet-header action group. The authoring trio (Edit → full character wizard,
+// Delete, Upload → authoring import) renders ONLY on localhost origins
+// (bug-visitor-edit-wizard-unguarded-character-file-put): the wizard save
+// lane (PUT <Name>.json) and DELETE are refuseUnlessGm server-side, so a
+// visitor door is a dead end — mirror the Sidebar CharacterList isLocalhost
+// gate (bug-player-view-can-create-characters). Download stays for every
+// client: it exports the already-open read view (GET is open to all).
+// Extracted as its own component to keep CharSummary inside the complexity
+// ratchet.
+function CharHeaderButtons({ isLocalhost, playerStats, campaignName, onEditCharacter, onUploadClick, onSaveClick, onDeleteCharacter, onShortRest, onLongRest }) {
+    return (
+        <div className='char-btn-group no-print'>
+            {isLocalhost && (
+                <>
+                    <button className="char-btn ct-btn" onClick={onEditCharacter} title="Edit Character" aria-label={`Edit "${playerStats.name}"`}><i className="fas fa-pen"></i> Edit</button>
+                    <button className="char-btn ct-btn ct-btn-danger" onClick={onDeleteCharacter} title="Delete Character" aria-label={`Delete "${playerStats.name}"`}>Delete</button>
+                    <button className="char-btn ct-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
+                </>
+            )}
+            <button className="char-btn ct-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
+            <ShortRestButton onClick={onShortRest} />
+            <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
+        </div>
+    );
+}
+
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -686,14 +712,17 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div className='char-header-text'>
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
-                        <div className='char-btn-group no-print'>
-                            <button className="char-btn ct-btn" onClick={onEditCharacter} title="Edit Character" aria-label={`Edit "${playerStats.name}"`}><i className="fas fa-pen"></i> Edit</button>
-                            <button className="char-btn ct-btn ct-btn-danger" onClick={handleDeleteCharacter} title="Delete Character" aria-label={`Delete "${playerStats.name}"`}>Delete</button>
-                            <button className="char-btn ct-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
-                            <button className="char-btn ct-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
-                            <ShortRestButton onClick={() => setShowShortRest(true)} />
-                            <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
-                        </div>
+                        <CharHeaderButtons
+                            isLocalhost={isLocalhost}
+                            playerStats={playerStats}
+                            campaignName={campaignName}
+                            onEditCharacter={onEditCharacter}
+                            onUploadClick={onUploadClick}
+                            onSaveClick={onSaveClick}
+                            onDeleteCharacter={handleDeleteCharacter}
+                            onShortRest={() => setShowShortRest(true)}
+                            onLongRest={onLongRest}
+                        />
                     </div>
                     <CharacterSummaryText playerStats={playerStats} levelSuffix={levelSuffix} handleXpModalOpen={handleXpModalOpen} />
                 </div>

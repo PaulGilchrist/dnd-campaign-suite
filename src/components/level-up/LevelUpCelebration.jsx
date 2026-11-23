@@ -45,6 +45,7 @@ import './LevelUpCelebration.css';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { impliedLevelFromXp } from '../../services/character/levelProgression.js';
 import { playCue } from '../../services/ui/audioCues.js';
+import { isLocalhostBrowser } from '../../services/ui/isLocalhostBrowser.js';
 
 const XP_MODE_EXPERIENCE = 'experience';
 
@@ -92,6 +93,14 @@ function CharacterLevelWatcher({ character, campaignName, armed, onCrossing }) {
 
 export default function LevelUpCelebration({ campaignName, characters, armed, onOpenWizard }) {
     const [crossings, setCrossings] = React.useState([]);
+    // The wizard handoff rides the edit wizard's PUT save lane, which is
+    // refuseUnlessGm server-side (bug-visitor-edit-wizard-unguarded-character-
+    // file-put). The character wizard is GM authoring: hide the door from
+    // visitors exactly as the zero-char auto-offer, sidebar Add Character and
+    // starter Build-heroes lanes already do (dead-end-door doctrine,
+    // bug-zero-char-auto-wizard-traps-lan-visitor-creation-is-gm-only) — the
+    // banner itself stays a pure celebration on every screen.
+    const isLocalhost = isLocalhostBrowser();
 
     // A celebration belongs to the campaign that earned it; switching
     // campaigns (or a roster reload for another one) never carries banners over.
@@ -158,17 +167,23 @@ export default function LevelUpCelebration({ campaignName, characters, armed, on
                             <div key={crossing.name} className="level-up-line">
                                 <span className="level-up-name">{crossing.name}</span>
                                 <span className="level-up-levels">Level {crossing.from} → {crossing.to}</span>
-                                <button
-                                    type="button"
-                                    className="level-up-open"
-                                    onClick={() => openWizard(crossing.name)}
-                                >
-                                    <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                                    Open wizard
-                                </button>
+                                {isLocalhost && (
+                                    <button
+                                        type="button"
+                                        className="level-up-open"
+                                        onClick={() => openWizard(crossing.name)}
+                                    >
+                                        <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                                        Open wizard
+                                    </button>
+                                )}
                             </div>
                         ))}
-                        <div className="level-up-prompt">Open the wizard to choose your new features.</div>
+                        <div className="level-up-prompt">
+                            {isLocalhost
+                                ? 'Open the wizard to choose your new features.'
+                                : 'The GM will open the wizard to choose the new features.'}
+                        </div>
                         <button type="button" className="level-up-dismiss" onClick={dismissAll}>Continue</button>
                     </div>
                 </div>
