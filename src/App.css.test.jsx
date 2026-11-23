@@ -113,6 +113,11 @@ const sessionsCss = parseRules(readCss(join(SRC_DIR, 'components/sessions/Sessio
 /** NPCs lane ships a wider stat editor; its width law lives here too. */
 const npcsCss = parseRules(readCss(join(SRC_DIR, 'components/npcs/NPCs.css')));
 
+/** Initiative GM control row + Encounters toolbar ride the narrow-viewport
+ *  wrap law (2026-11-23 backlog); their rules live in the lane CSS. */
+const initiativeCss = parseRules(readCss(join(SRC_DIR, 'components/initiative/Initiative.css')));
+const encounterCss = parseRules(readCss(join(SRC_DIR, 'components/encounter/EncounterBuilder.css')));
+
 /**
  * Cascade-aware lookup: merges declarations from every top-level rule whose
  * (possibly comma-grouped) selector matches, later rules winning.
@@ -301,11 +306,18 @@ describe('App.css', () => {
 
   describe('campaign tool container and header', () => {
     it('fills the content area with a spread header and an actionable new button', () => {
-      expectStyles('.ct-container', { flex: '1', width: '100%' });
+      // border-box shared kit law (2026-11-23 narrow-viewport backlog): the
+      // 100% width must INCLUDE the padding — as content-box every kit screen
+      // overflowed the window by 2×padding at narrow viewports (Initiative
+      // rode this law privately; promoted to the kit tier).
+      expectStyles('.ct-container', { flex: '1', width: '100%', 'box-sizing': 'border-box' });
+      // Toolbar-wrap shared kit law: header rows wrap on overflow instead of
+      // parking buttons off-window (promoted from the 600px media block).
       expectStyles('.ct-container .ct-header', {
         display: 'flex',
         'justify-content': 'space-between',
         'align-items': 'center',
+        'flex-wrap': 'wrap',
       });
       expectStyles('.ct-container .ct-title', { color: 'var(--color-header)' });
       expectStyles('.ct-container .ct-new-btn', {
@@ -314,6 +326,28 @@ describe('App.css', () => {
         cursor: 'pointer',
       });
       expectChanges('.ct-container .ct-new-btn', '.ct-container .ct-new-btn:hover', 'background');
+    });
+  });
+
+  describe('narrow-viewport toolbar wrap (2026-11-23 backlog)', () => {
+    it('wraps the Initiative header and GM control rows in the lane CSS', () => {
+      // Mirrors the shared .ct-header wrap law: at 420×760 the control row
+      // must drop buttons onto wrapped rows instead of past the window edge.
+      expect(
+        styleFor('.initiative .combat-controls', initiativeCss)?.['flex-wrap'],
+        'Initiative.css: .combat-controls must wrap on overflow'
+      ).toBe('wrap');
+      expect(
+        styleFor('.initiative .combat-header', initiativeCss)?.['flex-wrap'],
+        'Initiative.css: .combat-header must wrap on overflow'
+      ).toBe('wrap');
+    });
+
+    it('wraps the Encounter Builder toolbar in the lane CSS', () => {
+      expect(
+        styleFor('.encounter-builder .encounter-actions', encounterCss)?.['flex-wrap'],
+        'EncounterBuilder.css: .encounter-actions must wrap on overflow'
+      ).toBe('wrap');
     });
   });
 
@@ -555,7 +589,7 @@ describe('App.css', () => {
   describe('responsive styles (max-width: 600px)', () => {
     const MEDIA = '@media (max-width: 600px)';
 
-    it('tightens the gutter, wraps the header, and stretches the modal to the viewport', () => {
+    it('tightens the gutter and stretches the modal to the viewport', () => {
       // Tighter than desktop proves the breakpoint actually overrides.
       const desktop = parseFloat(styleFor('.ct-container').padding);
       const mobile = styleInMedia(MEDIA, '.ct-container');
@@ -564,7 +598,13 @@ describe('App.css', () => {
         parseFloat(mobile.padding),
         'small screens should reduce .ct-container padding'
       ).toBeLessThan(desktop);
-      expectStyles('.ct-container .ct-header', { 'flex-wrap': 'wrap' }, MEDIA);
+      // The header wrap law was PROMOTED to the base tier (2026-11-23
+      // narrow-viewport backlog) so wide screens wrap on overflow too — the
+      // media block must not keep a stale duplicate.
+      expect(
+        styleInMedia(MEDIA, '.ct-container .ct-header'),
+        'header wrap law lives in the base tier, not the 600px block'
+      ).toBeNull();
       const mobileModal = styleInMedia(MEDIA, '.ct-container .ct-modal');
       expect(mobileModal.width, 'modal should size to the viewport on small screens').toMatch(/vw$/);
       expect(

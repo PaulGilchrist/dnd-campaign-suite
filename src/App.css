@@ -154,20 +154,34 @@ button.hidden {
 /* ============ Campaign Tool Shared Styles ============ */
 /* Shared by Factions, Notes, NPCs, Quests */
 
-/* --- Container --- */
+/* --- Container ---
+   Shared kit law (2026-11-23 narrow-viewport backlog): border-box so the
+   100% width already INCLUDES the padding. As content-box the padding was
+   added on top of the flex-stretched width, pushing every kit screen ~2×
+   padding past the window edge at narrow viewports (Encounters +40px,
+   NPCs/Quest Board +24px at 420px) and forcing a horizontal document
+   scroll. Initiative already rode this law privately (.initiative.css:19);
+   promoted here so every kit container benefits consistently. */
 .ct-container {
   flex: 1;
   padding: 20px;
   width: 100%;
+  box-sizing: border-box;
 }
 
-/* --- Header --- */
+/* --- Header ---
+   Shared kit toolbar-wrap law (2026-11-23 narrow-viewport backlog): header rows
+   wrap instead of parking buttons off-window on phone/tablet-class viewports.
+   flex-wrap only engages on overflow, so wide screens keep the one-row face
+   byte-identically. Was @media (max-width: 600px)-only; promoted to the base
+   tier so every kit toolbar benefits consistently. */
 .ct-container .ct-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .ct-container .ct-title {
@@ -586,10 +600,6 @@ button.hidden {
 @media (max-width: 600px) {
   .ct-container {
     padding: 12px;
-  }
-
-  .ct-container .ct-header {
-    flex-wrap: wrap;
   }
 
   .ct-container .ct-modal {

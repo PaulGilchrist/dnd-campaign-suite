@@ -16,6 +16,14 @@
   margin-bottom: 16px;
 }
 
+/* Grid min-width:0 law (2026-11-23 narrow-viewport backlog): the default
+   min-width:auto let the filter panel's select min-content (≈362px) blow the
+   track and push the whole builder past the window edge at 420px. Children may
+   shrink to the track; wide-face layout is unchanged. */
+.encounter-builder .encounter-top-row > * {
+  min-width: 0;
+}
+
 @media (max-width: 768px) {
   .encounter-builder .encounter-top-row { grid-template-columns: 1fr; }
 }
@@ -81,6 +89,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
+}
+
+/* Narrow-viewport tier (2026-11-23 backlog): the two-column party-level grid's
+   min-content (≈336px) blew the filter panel past the window at 420px — it
+   collapses to one column on the same 768px seam as .encounter-top-row. */
+@media (max-width: 768px) {
+  .encounter-builder .player-levels { grid-template-columns: 1fr; }
 }
 
 .encounter-builder .player-level-row {
@@ -597,8 +612,12 @@
 /* The toolbar buttons ride the global .ct-btn kit (.ct-container .ct-btn tiers,
    convergence tranche 1) — the `.encounter-actions .encounter-btn` inline-flex
    helper and the secondary/generate/join variants were removed with it. */
+/* Wraps on overflow like the shared .ct-container .ct-header kit law
+   (2026-11-23 narrow-viewport backlog) so Generate/Save/Load siblings stay
+   in-window at phone/tablet widths; unchanged one-row face when they fit. */
 .encounter-builder .encounter-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }

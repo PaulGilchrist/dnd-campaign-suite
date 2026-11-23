@@ -29,11 +29,16 @@
     padding: 16px;
 }
 
+/* Narrow-viewport kit law (2026-11-23 backlog, mirrors the shared
+   .ct-container .ct-header wrap in App.css): the header and the GM control row
+   wrap on overflow instead of pushing buttons past the window edge on
+   phone/tablet-class viewports; one-row face unchanged at wide widths. */
 .initiative .combat-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
+    flex-wrap: wrap;
 }
 
 .initiative .combat-header h4 {
@@ -45,6 +50,7 @@
 .initiative .combat-controls {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
