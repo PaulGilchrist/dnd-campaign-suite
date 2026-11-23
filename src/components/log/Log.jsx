@@ -257,7 +257,7 @@ export default function Log({ campaignName, characters, isLocalhost }) {
   // .ct-empty-state — all descendant-scoped under .ct-container) styles this
   // view, mirroring the CampaignAdmin `ct-container campaign-admin` idiom.
   return (
-    <div className="campaign-tool log-view ct-container">
+    <div className="campaign-tool log-view ct-container" data-testid="campaign-log-view">
       <div className="log-toolbar">
         <h2><i className="fas fa-scroll"></i> Campaign Log</h2>
       </div>

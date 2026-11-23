@@ -28,10 +28,15 @@ describe('Log .ct-* kit classes (tranche 2 convergence)', () => {
     beforeEachSetup();
   });
 
-  it('view root carries the kit scoping container', () => {
+  it('view root carries the kit scoping container and the stable testid', () => {
     setup(Log, []);
     const root = q('.log-view');
     expect(root).toHaveClass('ct-container');
+    // Stable container hook (improvement XY 2026-11-23): the Log root is the
+    // ONLY [data-testid="campaign-log-view"] node in the view — e2e probes
+    // count exactly one here and zero on other views.
+    expect(root).toHaveAttribute('data-testid', 'campaign-log-view');
+    expect(document.querySelectorAll('[data-testid="campaign-log-view"]')).toHaveLength(1);
   });
 
   it('composer post button rides ct-btn ct-btn-primary alongside the pinned token', () => {
