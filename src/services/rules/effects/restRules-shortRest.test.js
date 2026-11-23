@@ -223,7 +223,11 @@ describe('applyShortRest', () => {
     it.each([
       ['Second Wind spent recharges exactly one use', makeStats(), 'secondWindUses', 0, 'secondWindUses', 1],
       ['Second Wind at max writes nothing', makeStats(), 'secondWindUses', 1, 'secondWindUses', undefined],
-      ['no class_levels table means no max — nothing to recharge', makeStats({ class: { name: 'Fighter' } }), 'secondWindUses', 0, 'secondWindUses', undefined],
+      // fix bug-5e-fighter-extra-attacks-second-wind-zeroed: the 5e max comes
+      // from the shared resolver's 5e canon (one use at every level), not from
+      // a table column the 5e table never had — a missing row no longer means
+      // no recharge.
+      ['no class_levels table still recharges the 5e single use', makeStats({ class: { name: 'Fighter' } }), 'secondWindUses', 0, 'secondWindUses', 1],
       ['Barbarian 2024 Rage recharges one use on a short rest', barbarian('2024'), 'ragePoints', 1, 'ragePoints', 2],
       ['Barbarian 2024 Rage at max writes nothing', barbarian('2024'), 'ragePoints', 2, 'ragePoints', undefined],
       ['5e Barbarian has no short-rest rage recharge', barbarian('5e'), 'ragePoints', 1, 'ragePoints', undefined],

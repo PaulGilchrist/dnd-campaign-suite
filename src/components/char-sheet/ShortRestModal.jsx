@@ -10,6 +10,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js'
 import { loadSpellData } from '../../services/ui/dataLoader.js'
+import { computeSecondWindMax } from '../../services/rules/trackedResources.js'
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 
 // CLA-011: single merged batch write (slots + consumption) and once-per-long-rest
@@ -111,7 +112,9 @@ function findClassLevel(playerStats) {
 }
 
 function collectFighterResourceLabel(playerStats, campaignName, restoredResources) {
-    const maxSW = findClassLevel(playerStats)?.second_wind || 0;
+    // The shared resolver owns both ruleset shapes (5e rows carry no
+    // top-level second_wind — fix bug-5e-fighter-extra-attacks-second-wind-zeroed).
+    const maxSW = computeSecondWindMax(playerStats);
     const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
     if (currentSW < maxSW) restoredResources.push('Second Wind');
 }

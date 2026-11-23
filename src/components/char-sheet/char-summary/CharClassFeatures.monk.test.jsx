@@ -105,13 +105,20 @@ describe('MonkFeatures', () => {
   });
 
   describe('extra attacks', () => {
-    // Reads class_levels[level - 1] exactly — never searches other entries.
+    // fix bug-5e-fighter-extra-attacks-second-wind-zeroed (census leg): the
+    // 5e monk table carries no extra_attacks column — 5e grants a single
+    // Extra Attack at level 5. The 2024 branch reads class_levels[level - 1]
+    // exactly — never searches other entries.
     it.each([
-      [5, [null, null, null, null, { level: 5, extra_attacks: 2 }], 2],
-      [5, [null, null, null, null, { level: 5 }], 0],
-      [10, [null, { level: 2, extra_attacks: 1 }], 0],
-    ])('level %i with class_levels %j renders Extra Attacks: %i', (level, class_levels, expected) => {
+      ['5e below level 5', '5e', 4, [{ level: 4 }], 0],
+      ['5e at level 5', '5e', 5, [{ level: 5 }], 1],
+      ['5e at level 20 (still one Extra Attack)', '5e', 20, [{ level: 20 }], 1],
+      ['2024 reads class_levels[level - 1].extra_attacks', '2024', 5, [null, null, null, null, { level: 5, extra_attacks: 2 }], 2],
+      ['2024 row without the column', '2024', 5, [null, null, null, null, { level: 5 }], 0],
+      ['2024 never searches other entries', '2024', 10, [null, { level: 2, extra_attacks: 1 }], 0],
+    ])('%s renders Extra Attacks: %i', (_label, rules, level, class_levels, expected) => {
       const stats = monkStats(level, {
+        rules,
         class: { name: 'Monk', major: {}, subclass: {}, class_levels, fightingStyles: [] },
       });
       const section = renderMonk(stats);

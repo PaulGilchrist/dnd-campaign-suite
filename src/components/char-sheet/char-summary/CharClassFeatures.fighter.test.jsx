@@ -140,19 +140,28 @@ describe('FighterFeatures', () => {
       .toHaveTextContent(`Action Surge Uses: ${max}/${max}`);
   });
 
+  // fix bug-5e-fighter-extra-attacks-second-wind-zeroed: 2024 reads the
+  // top-level extra_attacks column; the 5e table nests it under
+  // class_specific — a top-level-only read zeroed every 5e Fighter.
   it.each([
-    ['reads Extra Attacks from classLevel.extra_attacks', 5, { extra_attacks: 2 }, 2],
-    ['defaults Extra Attacks to 0 when absent', 3, {}, 0],
-  ])('%s', (_label, level, classLevelData, expected) => {
-    const section = renderFighter(fighterStats(level, classLevelData));
+    ['2024 reads classLevel.extra_attacks', '2024', 5, { extra_attacks: 2 }, 2],
+    ['5e reads classLevel.class_specific.extra_attacks', '5e', 5, { class_specific: { extra_attacks: 2 } }, 2],
+    ['5e ignores the 2024-only top-level column', '5e', 5, { extra_attacks: 2 }, 0],
+    ['defaults Extra Attacks to 0 when absent', '5e', 3, {}, 0],
+  ])('extra attacks: %s', (_label, rules, level, classLevelData, expected) => {
+    const section = renderFighter(fighterStats(level, classLevelData, { rules }));
     expect(section.textContent).toContain(`Extra Attacks: ${expected}`);
   });
 
   it.each([
-    ['tracks uses from classLevel.second_wind', 1, { second_wind: 1 }, 1],
-    ['tracks 0 uses when classLevel lacks second_wind', 1, {}, 0],
-  ])('second wind: %s', (_label, level, classLevelData, uses) => {
-    renderFighter(fighterStats(level, classLevelData));
+    ['2024 tracks uses from classLevel.second_wind', '2024', 1, { second_wind: 2 }, 2],
+    ['2024 without a matching row tracks 0 uses', '2024', 1, {}, 0],
+    // 5e canon (classes.json Fighter lv1 'Second Wind'): exactly one use,
+    // recharged by a rest, at every level — never the dead 0/0 row.
+    ['5e tracks one use at level 1', '5e', 1, {}, 1],
+    ['5e tracks one use at level 18 with class_specific rows', '5e', 18, { class_specific: { action_surges: 2, extra_attacks: 2 } }, 1],
+  ])('second wind: %s', (_label, rules, level, classLevelData, uses) => {
+    renderFighter(fighterStats(level, classLevelData, { rules }));
     expect(screen.getByTestId('tracked-resource-secondWindUses'))
       .toHaveTextContent(`Second Wind: ${uses}/${uses}`);
   });

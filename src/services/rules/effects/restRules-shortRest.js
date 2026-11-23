@@ -13,7 +13,7 @@ import { getShortRestResources, computeShortRestHpNewCurrent, spellSlotLevels } 
 import utils from '../../../services/ui/utils.js'
 import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
-import { computeSuperiorityDiceMax } from '../trackedResources.js'
+import { computeSuperiorityDiceMax, computeSecondWindMax } from '../trackedResources.js'
 
 // Wizard school savants: reset per-spell free cast tracking on short rest,
 // in original evaluation order.
@@ -94,7 +94,9 @@ function addFighterResourceUpdates(name, playerStats, updates, campaignName) {
   if (maxSD > 0) {
     updates.superiorityDice = maxSD
   }
-  const maxSW = findClassLevel(playerStats)?.second_wind || 0
+  // 5e table rows carry no top-level second_wind — the shared resolver owns
+  // both ruleset shapes (fix bug-5e-fighter-extra-attacks-second-wind-zeroed).
+  const maxSW = computeSecondWindMax(playerStats)
   const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0)
   if (currentSW < maxSW) {
     updates.secondWindUses = Math.min(maxSW, currentSW + 1)

@@ -8,6 +8,7 @@ import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { getAuraRangeFromStats } from '../../../services/combat/auras/auraOfProtection.js';
+import { computeSecondWindMax } from '../../../services/rules/trackedResources.js';
 import Popup from '../../common/popup.jsx';
 function barbarianRageScaling2024(classLevel) {
     return {
@@ -327,6 +328,16 @@ function computeActionsurgeMax(playerStats, classLevel) {
     return classLevel?.class_specific?.action_surges || 0;
 }
 
+// fix bug-5e-fighter-extra-attacks-second-wind-zeroed: mirror the Action Surge
+// branch. extra_attacks is top-level only in the 2024 table; the 5e table
+// nests it under class_specific (public/data/classes.json Fighter).
+function computeExtraAttacksMax(playerStats, classLevel) {
+    if (playerStats.rules === '2024') {
+        return classLevel?.extra_attacks || 0;
+    }
+    return classLevel?.class_specific?.extra_attacks || 0;
+}
+
 function computeSuperiorityStats(playerStats, isBattleMaster) {
     const hasSuperiorityDice = isBattleMaster || playerStats.class.fightingStyles?.includes('Superior Technique');
     if (!hasSuperiorityDice) return { hasSuperiorityDice: false, superiorityDiceMax: 0, superiorityDieType: 0 };
@@ -381,7 +392,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
           <div data-testid="char-class-fighter">
               <TrackedResourceInput label="Action Surge Uses" resourceKey="actionSurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               {hasEnergy && <EnergyDiceSection playerStats={playerStats} campaignName={campaignName} classLevel={classLevel} />}
-               <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
+               <div><b>Extra Attacks: </b>{computeExtraAttacksMax(playerStats, classLevel)}</div>
                <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles ? (
                    <span>{playerStats.class.fightingStyles.map((style, idx) => (
                        <React.Fragment key={style}>
@@ -393,7 +404,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
                    ))}</span>
                ) : 'N/A'}</div>
                {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => computeSecondWindMax(playerStats)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                {hasSuperiorityDice && (
                    <>
                    <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -427,7 +438,14 @@ function MonkElementalBadges({ elementalAttunementActive, elementalAttunementEle
     );
 }
 
+// fix bug-5e-fighter-extra-attacks-second-wind-zeroed (same-file census leg):
+// extra_attacks is a top-level column only in the 2024 table. The 5e monk
+// table carries no such key at all — the 5e PHB grants a single Extra Attack
+// at monk level 5 (the same threshold classRules.js uses for paladin/ranger).
 function monkExtraAttacks(playerStats) {
+    if (playerStats.rules !== '2024') {
+        return playerStats.level >= 5 ? 1 : 0;
+    }
     return playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0;
 }
 

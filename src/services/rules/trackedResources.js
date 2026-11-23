@@ -133,7 +133,7 @@ export const GATED_TRACKED_KEYS = [
   'arcaneWardHp',             // arcane_ward passive present (Abjurer/item grant)
   'arcaneWardMax',            // mirror of arcaneWardHp
   // martial lane — owner = Fighter/Barbarian class+level rows, automation grants
-  'secondWindUses',           // classLevel.second_wind > 0 (Fighter; canonical casing)
+  'secondWindUses',           // computeSecondWindMax > 0 (Fighter; canonical casing)
   'actionSurgeUses',          // resolveActionSurgeMax > 0 (Fighter lv2+; canonical casing)
   'ragePoints',               // resolveRageMax > 0 (Barbarian)
   'superiorityDice',          // computeSuperiorityDiceMax > 0 (Battle Master / Superior Technique)
@@ -219,6 +219,24 @@ function battleMasterDiceMax(playerStats, classLevel, is2024) {
   if (playerStats.level >= 15) return 6
   if (playerStats.level >= 7) return 5
   return 4
+}
+
+// Single source of truth for a Fighter's Second Wind USE COUNT (fix
+// bug-5e-fighter-extra-attacks-second-wind-zeroed, mirrors the
+// computeActionsurgeMax dual-shape idiom). 2024 reads the disk table verbatim
+// (public/data/2024/classes.json top-level second_wind). The 5e table carries
+// NO second_wind column, so 5e derives from its own canon: classes.json
+// Fighter lv1 'Second Wind': "Once you use this feature, you must finish a
+// short or long rest before you can use it again." — exactly ONE use at every
+// level (no 5e feature adds uses; the multi-use ladder is 2024-only and rides
+// the table branch above).
+export function computeSecondWindMax(playerStats) {
+  if (playerStats?.class?.name !== 'Fighter') return 0
+  if (playerStats.rules === '2024') {
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
+    return classLevel?.second_wind || 0
+  }
+  return 1
 }
 
 export function computeSuperiorityDiceMax(playerStats) {
@@ -329,10 +347,12 @@ function resolveAdrenalineRushMax(playerStats) {
 
 function addMartialResources(resources, { playerStats, classLevel, is2024 }) {
   // improve tracked-resource-ghost-keys (owned-only pass): all STATICALLY
-  // OWNABLE — see GATED_TRACKED_KEYS. Owner rows (e.g. a 5e Fighter whose
-  // exact-level class_levels row lacks second_wind) still seed their formula
-  // value when the lane's data exists; the ownership predicate decides.
-  const maxSW = classLevel?.second_wind || 0
+  // OWNABLE — see GATED_TRACKED_KEYS. Owner rows seed their formula value
+  // when the lane's data exists; the ownership predicate decides. The 5e
+  // table carries no top-level second_wind column (that read zeroed every
+  // 5e Fighter's pool — fix bug-5e-fighter-extra-attacks-second-wind-zeroed),
+  // so the shared computeSecondWindMax resolver owns both ruleset shapes.
+  const maxSW = computeSecondWindMax(playerStats)
   if (maxSW > 0) {
     resources.secondWindUses = { current: maxSW, max: maxSW }
   }

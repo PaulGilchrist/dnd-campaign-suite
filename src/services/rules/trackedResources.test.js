@@ -324,11 +324,14 @@ describe('computeTrackedResources', () => {
     expect(result.kiPoints).toEqual({ current: 4, max: 4 });
   });
 
-  it('fighter 5e: secondWind/actionSurge read the EXACT-level class_levels row; the lower-case twins are NEVER seeded (case-dup retired)', () => {
+  it('fighter 5e: secondWind seeds from the 5e single-use canon, actionSurge reads the EXACT-level class_specific row; the lower-case twins are NEVER seeded (case-dup retired)', () => {
     const fighter = (classLevels) => basePlayerStats({
       rules: '5e', level: 7, class: wizardClass({ name: 'Fighter', class_levels: classLevels }),
     });
-    const match = [{ level: 7, second_wind: 1, class_specific: { action_surges: 2 } }];
+    // fix bug-5e-fighter-extra-attacks-second-wind-zeroed: the 5e table has no
+    // top-level second_wind column — the seed is the resolver's 5e canon (1),
+    // never a table read; a stray 2024-shaped column on a 5e row is IGNORED.
+    const match = [{ level: 7, second_wind: 9, class_specific: { action_surges: 2 } }];
     const result = computeTrackedResources(fighter(match));
     expect({
       sw: result.secondWindUses,
@@ -345,9 +348,12 @@ describe('computeTrackedResources', () => {
     expect(ALL_TRACKED_RESOURCES).not.toContain('secondwindUses');
     expect(ALL_TRACKED_RESOURCES).not.toContain('actionsurgeUses');
 
-    // level-3 row must NOT satisfy a level-7 query — unowned data -> ABSENT,
-    // not a 0-ghost (owned-only pass).
+    // level-3 row must NOT satisfy a level-7 query for ACTION SURGE —
+    // unowned data -> ABSENT, not a 0-ghost (owned-only pass). Second Wind,
+    // by contrast, no longer depends on the row at all on 5e.
     const miss = computeTrackedResources(fighter([{ level: 3, second_wind: 1, class_specific: { action_surges: 2 } }]));
+    expect(miss).not.toHaveProperty('actionSurgeUses');
+    expect(miss.secondWindUses).toEqual({ current: 1, max: 1 });
     expect(miss).not.toHaveProperty('secondwindUses');
     expect(miss).not.toHaveProperty('actionsurgeUses');
   });
