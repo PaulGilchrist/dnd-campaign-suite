@@ -4,3 +4,10 @@
 .sound-owner-note {
   margin-left: 0.5rem;
 }
+
+/* Zero-TV-screen qualifier leg (backlog 2026-11-22) — the global warning
+   token tints the "0 screens are in TV mode right now" tail so the stranding
+   face catches the eye without new chrome. */
+.sound-owner-note-zero {
+  color: var(--color-warning);
+}

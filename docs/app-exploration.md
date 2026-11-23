@@ -83,7 +83,6 @@ change-data + log files ABSENT on disk (post-live sweep; battle-arena.json resto
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (LEARN, sound-owner strand edge):** `soundOwner {screen:'tv'}` with NO tab running TV mode silences the whole table — every tab honestly reads "Sound plays on the TV screen", but that screen may not exist and the only escape is knowing the Music-view button. Consider (owner call): a "0 screens are in TV mode right now" qualifier on the note when no connected tab carries the pref, or auto-reverting the claim when the last TV tab closes. Law-adjacent: do NOT gate who may claim (shared-table authoring posture) — copy/quality-of-life only. `src/services/ui/soundOwner.js`, `SoundOwnerControl.jsx`.
 - **2026-11-22 (LEARN, console hygiene):** during programmatic reloads (Playwright navigations) the SSE lane escalated three `[SSE] connection error` lines to console.error (visible in the vite-attributed log) although the benign-streak policy says unload rows stay debug — `pageUnloading` is set at `pagehide`, which can land AFTER the final EventSource error on CDP-driven navigations. Cosmetic under harnesses, but it dents the "console is a clean error signal" law; consider also treating CONNECTING errors with `document.visibilityState==='hidden'` as benign. `src/services/ui/sseClient.js:55-71`.
 
 

@@ -6,6 +6,9 @@ import {
   claimSoundScreen,
   isSoundOwnerHere,
   soundScreenLabel,
+  tvScreensOf,
+  nextTvPresenceValue,
+  releaseTvPresenceKeepalive,
 } from './soundOwner.js';
 
 // jsdom default hostname is 'localhost' → the GM branch of the predicate;
@@ -50,5 +53,56 @@ describe('soundOwner', () => {
   it('labels read as plain English for both screens', () => {
     expect(soundScreenLabel('gm')).toBe('the GM machine');
     expect(soundScreenLabel('tv')).toBe('the TV screen');
+  });
+
+  describe('TV-screen presence lane (backlog 2026-11-22)', () => {
+    // The per-page token is random — locate it as the diff against a known
+    // foreign marker instead of pinning its (unknowable) bytes.
+    const ownTokenOf = (value, baseline = {}) =>
+      Object.keys(tvScreensOf(value)).find((k) => !(k in baseline));
+
+    it('marks presence on the existing key as an additive tvScreens sub-field', () => {
+      const claim = { screen: 'tv' };
+      const marked = nextTvPresenceValue(claim, true);
+      const token = ownTokenOf(marked);
+      expect(token).toBeTruthy();
+      expect(marked.screen).toBe('tv'); // the claim rides untouched
+      expect(marked.tvScreens).toEqual({ [token]: true });
+      // A second announce is a no-op — no write churn (no heartbeat clock).
+      expect(nextTvPresenceValue(marked, true)).toBeNull();
+    });
+
+    it('strips ONLY this page\'s token; the last strip restores the claim-only shape', () => {
+      const marked = nextTvPresenceValue({ screen: 'tv' }, true);
+      const token = ownTokenOf(marked);
+      const both = { screen: 'tv', tvScreens: { [token]: true, 'tab-foreign': true } };
+      const stripped = nextTvPresenceValue(both, false);
+      expect(stripped.tvScreens).toEqual({ 'tab-foreign': true }); // peer marker rides untouched
+      expect(nextTvPresenceValue(stripped, false)).toBeNull();    // already absent → silent
+      // Only our own marker present: emptying drops the field entirely.
+      expect(nextTvPresenceValue(marked, false)).toEqual({ screen: 'tv' });
+    });
+
+    it('presence writes never fabricate a claim: no value, no write', () => {
+      expect(nextTvPresenceValue(null, true)).toBeNull();
+      expect(nextTvPresenceValue(null, false)).toBeNull();
+      expect(tvScreensOf(null)).toEqual({});
+      expect(tvScreensOf({ screen: 'tv' })).toEqual({});
+    });
+
+    it('pagehide release keepalive-POSTs the stripped value to the soundOwner key', () => {
+      const marked = nextTvPresenceValue({ screen: 'tv' }, true);
+      expect(releaseTvPresenceKeepalive('Test Camp', marked)).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const [url, init] = fetch.mock.calls[0];
+      expect(url).toBe('/api/campaigns/Test%20Camp/soundOwner');
+      expect(init.method).toBe('POST');
+      expect(init.keepalive).toBe(true);
+      expect(JSON.parse(init.body)).toEqual({ value: { screen: 'tv' } });
+      // Nothing marked → nothing sent (the non-TV tab stays write-silent).
+      fetch.mockClear();
+      expect(releaseTvPresenceKeepalive('Test Camp', { screen: 'tv' })).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

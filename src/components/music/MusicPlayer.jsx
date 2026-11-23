@@ -6,6 +6,7 @@ import { MOODS, DEFAULT_VOLUME, getTracksForMood, extractVideoId, buildMoodList,
 import { DEFAULT_MUSIC, normalizeMusic, pauseCommit, pauseLogEntry, stopCommit, stopLogEntry } from '../../services/ui/musicTransport.js';
 import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
+import { useTvSoundPresence } from '../../hooks/ui/useTvSoundPresence.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import MusicSfxControls from './MusicSfxControls.jsx';
 import SoundOwnerControl from './SoundOwnerControl.jsx';
@@ -216,6 +217,13 @@ function MusicToast({ toast }) {
 function MusicPlayer({ campaignName, visible = true }) {
   const [rawMusic, setMusic] = useSyncedState('campaign', 'music', DEFAULT_MUSIC, campaignName);
   const music = useMemo(() => normalizeMusic(rawMusic), [rawMusic]);
+
+  // TV-screen presence beacon (soundOwner.js presence lane): this component
+  // stays mounted for the whole campaign session (see the header above), so
+  // a TV-mode tab marks itself in shared state wherever its user navigates —
+  // the non-owner note's "0 screens are in TV mode right now" qualifier
+  // follows this tab's life, not just the Music view.
+  useTvSoundPresence(campaignName);
 
   // Merged sidebar catalogue (improve 2026-11-07): frozen starter MOODS plus
   // this campaign's customCategories. Display order stays A–Z; MOODS itself
