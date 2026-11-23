@@ -24,6 +24,15 @@ const BUSY_STATUS_TEXT = {
     'regenerating-adventure': 'Re-rolling the adventure...'
 };
 
+// Honest per-lane advisory for the Clear Change Data success strip (backlog
+// XY 2026-11-23): the server broadcasts a null retire ONLY for combatSummary
+// (campaigns-admin.js clear-change-data) — every other cleared change-data
+// key has no retire echo, so mounted tabs keep their local mirrors until
+// reload. The wording must never claim the initiative board stays stale (it
+// retires live), and carries no connected-session count: no cheap GET
+// exposes the server's SSE subscriber array to the client.
+const STALE_SESSIONS_ADVISORY = 'The initiative board retires live in every open tab, but other cleared state (HP, conditions, spell slots, effects) may keep showing on all open tabs — including this one — until each tab reloads.';
+
 function formatBytes(bytes) {
     if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '';
     if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -159,6 +168,9 @@ function StatusDisplay({ status }) {
                 <>
                     <i className={`fas ${status.error ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i>
                     {status.error ? status.error : status.success}
+                    {status.advisory && (
+                        <span className="admin-status-advisory">{status.advisory}</span>
+                    )}
                 </>
             )}
         </div>
@@ -619,7 +631,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
             if (!res.ok) {
                 setStatus({ error: data.error });
             } else {
-                setStatus({ success: data.message });
+                setStatus({ success: data.message, advisory: STALE_SESSIONS_ADVISORY });
                 // The clear sweeps every phantom bucket — re-census so the
                 // honest "none" face shows without a page reload.
                 loadCensus();

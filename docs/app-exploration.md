@@ -79,5 +79,4 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (XY 2026-11-23) Admin → Clear Change Data answers only the acting tab; with other tabs mounted there is zero feedback about how many live clients still hold stale state (see bug-admin-clear… for the data leg). A post-clear note ("N sessions may still show old state until reload") would close the loop without protocol work.
 - (XY 2026-11-23) `[findFeat] NOT FOUND` logs one console.error PER render pass (×3 identical per mount when data is missing) — dedupe to once-per-name-per-load to keep console-diff probes cheap.

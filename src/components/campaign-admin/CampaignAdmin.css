@@ -86,6 +86,15 @@
     color: #fecaca;
 }
 
+/* Secondary honest-advisory line inside a status strip (Clear Change Data
+   stale-sessions note). Block child of the strip, no new modal tier. */
+.campaign-admin .admin-status-advisory {
+    display: block;
+    margin-top: 4px;
+    font-style: italic;
+    opacity: 0.85;
+}
+
 .campaign-admin .admin-snapshots {
     margin-top: 12px;
 }
