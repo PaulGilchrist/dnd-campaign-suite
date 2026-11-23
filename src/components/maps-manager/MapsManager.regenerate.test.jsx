@@ -162,6 +162,16 @@ describe('MapsManager Regenerate confirm dialog', () => {
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
     });
 
+    it('the confirm copy promises tokens stay — pinned verbatim (the service merge honours it)', async () => {
+        // bug-map-regenerate-wrecks-placed-tokens (2026-11-23): this promise once lied
+        // about placedItems. The copy is now law — regenerateMap.test.js pins the
+        // matching behaviour (foreign tokens survive, generator-authored entries
+        // replaced). If either face changes, BOTH tests move together.
+        const dialog = await openRegenerateDialog();
+        expect(dialog).toHaveTextContent('Names, description and tokens stay');
+        expect(dialog).toHaveTextContent('the generated layout (and any hand-edits to it) is replaced');
+    });
+
     it('a failed regenerate surfaces the inline banner and never re-opens', async () => {
         regenerateMapDocument.mockRejectedValue(new Error('Failed to save map data'));
         await openRegenerateDialog();

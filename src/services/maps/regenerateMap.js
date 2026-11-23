@@ -25,7 +25,9 @@ const GENERATORS = {
 // generationOpts, seed — the slug stays because the PUT targets the same segment) or
 // user/view state (zoom/pan/partyPosition/pois/revealed/…) and is never touched here.
 // Note the dungeon twins RETURN `name`/`description`/`players:[]` too — deliberately
-// absent from this list so a regenerated map keeps its authored label, blurb and tokens.
+// absent from this list so a regenerated map keeps its authored label and blurb.
+// `placedItems` is the ONE replaced field that carries authored data too (see
+// mergeRegeneratedPlacedItems): it is merged by id, never swapped wholesale.
 const LAYOUT_FIELDS_BY_MODE = {
     adjacent: ['gridSize', 'walls', 'placedItems', 'generationMode'],
     bsp: ['gridSize', 'walls', 'placedItems'],
@@ -60,6 +62,22 @@ export function describeGenerationOpts(generationOpts) {
     return `Generated with: ${parts.join(' · ')}`;
 }
 
+// The Regenerate confirm copy promises "Names, description and tokens stay", and
+// placedItems holds BOTH faces: generator-authored props (deterministic ids —
+// torch-<room>-<x>-<y>, npc-<n>, door-<n>, …) AND GM tokens riding the same array
+// (Quick-Spawn stamps quick-spawn-<slug>-<x>-<y>, hand-drops take utils.guid() ids —
+// neither shape can collide with a generator id). So a regenerate replaces ONLY the
+// generator-authored entries: each fresh item wins over a same-id current entry (a
+// moved or deleted prop reverts — hand-edits to the generated layout are replaced)
+// and every current entry whose id the generator never authored survives verbatim.
+// Id-set preservation mirrors the token-art orphan-prune keep-set in
+// server/routes/maps.js.
+function mergeRegeneratedPlacedItems(currentItems, generatedItems) {
+    const generatedIds = new Set((generatedItems || []).map(item => item.id));
+    const preserved = (currentItems || []).filter(item => !generatedIds.has(item.id));
+    return [...(generatedItems || []), ...preserved];
+}
+
 // Pure merge: fresh generator output over the CURRENT document, replacing only the
 // stamped mode's layout fields. Throws on an unknown mode — a corrupt stamp must fail
 // loudly rather than PUT a half-derived document.
@@ -71,7 +89,10 @@ export function buildRegeneratedDocument(doc, generationOpts) {
     const generated = generator(generationOpts);
     const next = { ...doc };
     for (const field of LAYOUT_FIELDS_BY_MODE[generationOpts.mode]) {
-        if (generated[field] !== undefined) next[field] = generated[field];
+        if (generated[field] === undefined) continue;
+        next[field] = field === 'placedItems'
+            ? mergeRegeneratedPlacedItems(doc.placedItems, generated.placedItems)
+            : generated[field];
     }
     return next;
 }

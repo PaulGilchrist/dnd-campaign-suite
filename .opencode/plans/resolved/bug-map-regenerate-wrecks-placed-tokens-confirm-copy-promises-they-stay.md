@@ -41,3 +41,59 @@ Either way, add a test pinning the promise against both token arrays (one `playe
 ## Severity
 
 Data integrity risk — a "cannot be undone" confirmation whose stated preservation guarantee is false; GMs who stamped monster tokens via Quick-Spawn or hand-dressed a dungeon lose that placement silently on one Regenerate click.
+
+## Resolution
+
+FIXED 2026-11-23 (fix subagent, orchestrator-directed face: HONOUR the copy, do not weaken it).
+
+**What was actually wrong** (confirmed, matching the diagnosis in "Likely location"):
+`buildRegeneratedDocument` in `src/services/maps/regenerateMap.js` copied the freshly
+generated `placedItems` VERBATIM over the current document for `bsp`/`adjacent` modes
+(`LAYOUT_FIELDS_BY_MODE`), destroying every GM-placed token that rides that array —
+Quick-Spawn stamps (`quick-spawn-<slug>-<x>-<y>`, `spawnTokenPlacement.js`), hand-dropped
+items (`utils.guid()` ids, `useMapDrops.js`) and manual tokens alike — while the
+DeleteConfirmModal copy the GM had just clicked promised "Names, description and tokens
+stay … This cannot be undone." Only `players[]` party tokens actually stayed.
+
+**Fix implemented** — `src/services/maps/regenerateMap.js`: a new
+`mergeRegeneratedPlacedItems(currentItems, generatedItems)` id-merge, mirrored on the
+token-art orphan-prune keep-set law in `server/routes/maps.js` (preservation computed by
+id-set membership, never array wholesale). `buildRegeneratedDocument` now routes the
+`placedItems` field through it: each fresh generated entry wins over a same-id current
+entry (so hand-moved/deleted generator props REVERT — "any hand-edits to it is replaced"
+stays true), and every current entry whose id the generator never authored survives
+verbatim. Generator ids are deterministic prefixed forms (`torch-<room>-<x>-<y>`,
+`npc-<n>`, `door-<n>`, …) and foreign ids are `quick-spawn-*`/guid forms, so the two
+sets cannot collide. Terrain mode is untouched (its LAYOUT_FIELDS never included
+placedItems). The dialog copy needed no change — the fix makes it honest.
+
+**Regression tests** (promise pinned both ways):
+- `src/services/maps/regenerateMap.test.js` — new test: a hand-moved generator prop
+  (`door-1` at a foreign cell) is replaced by the generated one, while `chair-2-0`
+  (id the roll no longer authors), `quick-spawn-goblin-5-4` and `zzz-token-1` survive
+  verbatim, and `players[]` still survives; the `buildRegeneratedDocument` purity test
+  now also proves the stored `placedItems` array is never mutated.
+- `src/components/maps-manager/MapsManager.regenerate.test.jsx` — new test pins the
+  confirm-copy promise strings ("Names, description and tokens stay" / "the generated
+  layout (and any hand-edits to it) is replaced") so copy and behaviour move together.
+
+**Live verification (test-campaign, :5173, localhost GM):**
+- Pre-fix repro re-walked first: `ZZGen Keep` (BSP, seed 1203926556) stamped with
+  `zzz-token-1` 'ZZZ Carrier' in `placedItems` + `zzz-party-1` in `players[]` → dialog
+  read verbatim "…Names, description and tokens stay — the generated layout (and any
+  hand-edits to it) is replaced. This cannot be undone." → confirmed → disk GET proved
+  the placedItems token GONE (57→56) while the players token survived. Bug confirmed live.
+- Post-fix leg A (`ZZGen Keep`): re-stamped `zzz-token-2` 'ZZZ Carrier 2' + hand-moved
+  `torch-0-2-4` (2,4)→(1,1) → Regenerate → GET: `ZZZ Carrier 2` SURVIVED, players token
+  survived, the moved torch REVERTED to (2,4), zero duplicate ids, 0 console errors.
+- Post-fix leg B (adjacent twin, `ZZGen Keep 2`, seed 402849703): stamped
+  `quick-spawn-goblin-3-6` + hand-moved `torch-0-0`→(0,0) → Regenerate → GET: quick-spawn
+  token SURVIVED (placedItems 52→53), the torch REVERTED to (19,3), walls regenerate
+  cleanly (483), `generationMode: adjacent` intact, no duplicate ids.
+- Suites: `npx vitest run` on the two touched files 23/23; touched folders
+  `src/services/maps src/components/maps-manager` 40 files / 604 tests all passing;
+  `npm run lint` zero warnings.
+- Cleanup: both `ZZGen Keep*` maps deleted via MapsManager (maps dir back to the 4
+  baseline docs), Admin panel cleared change-data (`{}`) and campaign log (`[]`),
+  overlays `[]` baseline held.
+

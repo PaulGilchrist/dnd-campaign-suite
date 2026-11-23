@@ -4,7 +4,10 @@
 // generateAdjacentDungeon, BSP → generateDungeon, Terrain → generateHexTerrain), the
 // PUT must land on the SAME doc preserving every identity field (name, displayName,
 // createdAt, description, players, generationOpts, seed) while replacing only the
-// mode's generated layout fields, and exactly ONE campaign-log audit row names the map
+// mode's generated layout fields — `placedItems` merged BY ID (generator-authored
+// entries replaced, foreign GM tokens preserved — the "tokens stay" confirm-copy law,
+// bug-map-regenerate-wrecks-placed-tokens 2026-11-23), and exactly ONE campaign-log
+// audit row names the map
 // on success (none on a failed GET/PUT). The generators are mocked here — seeded
 // byte-determinism of the real trio is engine law (rng.js), proven live.
 
@@ -189,7 +192,42 @@ describe('regenerateMapDocument — PUT preserves identity, replaces layout', ()
         expect(body.description).not.toBe('A dank generated den.');
     });
 
+    it('honours the “tokens stay” promise: foreign placedItems tokens survive, generator-authored entries are replaced', async () => {
+        // bug-map-regenerate-wrecks-placed-tokens (2026-11-23): the confirm copy says
+        // "Names, description and tokens stay" and placedItems is the GM token layer
+        // (Quick-Spawn stamps quick-spawn-*, hand-drops take guid ids). Replace only
+        // entries whose id the fresh roll authors; preserve every foreign entry.
+        const doc = storedDoc({
+            generationOpts: BSP_OPTS,
+            placedItems: [
+                { id: 'door-1', gridX: 9, gridY: 9, type: 'door' }, // hand-MOVED generator prop
+                { id: 'chair-2-0', gridX: 1, gridY: 1, type: 'chair' }, // id the new roll never authors
+                { id: 'quick-spawn-goblin-5-4', type: 'npc', name: 'Goblin', gridX: 5, gridY: 4, visible: true },
+                { id: 'zzz-token-1', type: 'npc', name: 'ZZZ Carrier', gridX: 3, gridY: 3, visible: true },
+            ],
+        });
+        mapsService.loadMapData.mockResolvedValue(doc);
+        await regenerateMapDocument(CAMPAIGN, 'gen-cave.json', BSP_OPTS);
+
+        const [, , body] = mapsService.saveMapData.mock.calls[0];
+        // Fresh generator output leads the array…
+        expect(body.placedItems[0]).toEqual(dungeonOutput('bsp').placedItems[0]);
+        // …and the same-id current entry is REPLACED by the generated one (the
+        // hand-moved door reverts to the generated cell — "hand-edits are replaced").
+        const doorRows = body.placedItems.filter(i => i.id === 'door-1');
+        expect(doorRows).toHaveLength(1);
+        expect(doorRows[0].gridX).toBe(3);
+        // Foreign GM tokens survive VERBATIM, in current order after the generated set.
+        expect(body.placedItems).toContainEqual({ id: 'chair-2-0', gridX: 1, gridY: 1, type: 'chair' });
+        expect(body.placedItems).toContainEqual({ id: 'quick-spawn-goblin-5-4', type: 'npc', name: 'Goblin', gridX: 5, gridY: 4, visible: true });
+        expect(body.placedItems).toContainEqual({ id: 'zzz-token-1', type: 'npc', name: 'ZZZ Carrier', gridX: 3, gridY: 3, visible: true });
+        expect(body.placedItems).toHaveLength(4);
+        // The players[] party token still survives (unchanged law, pinned alongside).
+        expect(body.players).toEqual(doc.players);
+    });
+
     it('terrain PUT replaces terrain/rivers and keeps pois/partyPosition', async () => {
+
         mapsService.loadMapData.mockResolvedValue(storedOutdoorDoc());
         await regenerateMapDocument(CAMPAIGN, 'gen-field.json', TERRAIN_OPTS);
 
@@ -239,11 +277,18 @@ describe('regenerateMapDocument — PUT preserves identity, replaces layout', ()
 
 describe('buildRegeneratedDocument', () => {
     it('returns a new object and leaves the stored doc untouched', () => {
-        const doc = storedDoc();
+        const doc = storedDoc({
+            placedItems: [{ id: 'zzz-token-1', type: 'npc', name: 'ZZZ Carrier', gridX: 3, gridY: 3 }],
+        });
         const next = buildRegeneratedDocument(doc, ADJACENT_OPTS);
         expect(next).not.toBe(doc);
         expect(doc.walls).toEqual(['9,9']);
+        expect(doc.placedItems).toHaveLength(1); // current array never mutated by the merge
         expect(next.walls).toEqual(['0,0', '1,0']);
+        expect(next.placedItems).toEqual([
+            { id: 'door-1', gridX: 3, gridY: 4, type: 'door' },
+            { id: 'zzz-token-1', type: 'npc', name: 'ZZZ Carrier', gridX: 3, gridY: 3 },
+        ]);
     });
 });
 
