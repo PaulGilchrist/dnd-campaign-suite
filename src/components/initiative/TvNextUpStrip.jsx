@@ -8,7 +8,7 @@ export default function TvNextUpStrip({ creatures }) {
         <div className='tv-next-up' aria-label='Up next'>
             <span className='tv-next-up-label'>Up next</span>
             {creatures.map(c => (
-                <span key={c.name} className={`tv-next-chip ${c.type}`}>
+                <span key={c.name} data-name={c.name} className={`tv-next-up-item tv-next-chip ${c.type}`}>
                     <i className={`fa-solid ${c.type === 'player' ? 'fa-user' : 'fa-dragon'}`}></i> {c.name}
                 </span>
             ))}
