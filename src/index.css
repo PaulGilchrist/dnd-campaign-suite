@@ -523,10 +523,15 @@ th {
     }
 }
 
+/* Narrow-viewport scroller law (2026-11-23 lane-debt backlog): twin of the
+   .char-actions .attacks rule in CharActions.css — the fixed 450px reaction
+   tracks scroll within the row instead of growing the document at narrow
+   viewports; unchanged whenever the tracks fit. */
 .char-reactions .attacks {
     display: grid;
     grid-template-columns: 120px 80px 100px 80px 70px;
     text-align: center;
+    overflow-x: auto;
 }
 
 .char-reactions .attacks > div {

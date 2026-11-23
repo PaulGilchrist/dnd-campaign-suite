@@ -18,9 +18,14 @@
     font-size: 1.5em;
 }
 
-/* Create map input row */
+/* Create map input row. Narrow-viewport wrap law (2026-11-23 lane-debt
+   backlog): the input + type selector + Create Map + Generate buttons carry
+   ~741px of intrinsic width and no wrap, so at 420px the generate button
+   parked ~320px past the window edge and grew the document. The row wraps
+   on overflow; wide screens keep the one-row face. */
 .maps-manager-create {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 16px;
     align-items: center;
@@ -118,8 +123,17 @@
 
 .maps-manager-item {
     display: flex;
+    /* Narrow-viewport wrap laws (2026-11-23 lane-debt backlog): the seven
+       nowrap, shrink-guaranteed action buttons are ~588px of intrinsic
+       width, so at 420px the action lane overflowed the row and grew the
+       document (741px docSW). The row wraps (actions drop under the name)
+       and the action cluster itself wraps onto short lines; every button
+       stays reachable and the document holds at innerWidth. Wide screens
+       keep the one-row face. */
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    row-gap: 8px; /* space between the wrapped rows only — column-gap stays 0 so the one-row desktop face is untouched */
     padding: 12px 16px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -188,8 +202,13 @@
 
 .maps-manager-item-actions {
     display: flex;
+    flex-wrap: wrap; /* twin of the row wrap law above — the cluster itself wraps onto short lines at narrow widths */
     gap: 6px;
-    flex-shrink: 0;
+    /* flex-shrink: 0 retired with the 2026-11-23 narrow-viewport lane pass:
+       it pinned the cluster to its 588px max-content width even on a wrapped
+       row line, so it overflowed the document. With wrap active it now
+       shrinks to the line and its buttons re-flow; the desktop one-row face
+       is untouched because the cluster already fits there. */
 }
 
 .maps-manager-item-actions button {

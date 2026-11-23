@@ -4,10 +4,19 @@
     background-color: var(--background-color-header);
 }
 
+/* Narrow-viewport scroller law (2026-11-23 lane-debt backlog): the fixed
+   grid tracks (645px, 725px with the 2024 Mastery column) overflow their
+   fitted container at narrow viewports and grow the document. Mirrors the
+   Encounters-lane idiom: the row becomes its own overflow-x scroller so
+   every cell stays reachable while the document width holds at innerWidth.
+   At desktop widths the tracks fit the 880px container, so no scrollbar
+   appears and the face is unchanged. The @media print block below keeps
+   its own compound column anchors. */
 .char-actions .attacks {
     display: grid;
     grid-template-columns: 150px 60px 80px 100px 100px 155px;
     text-align: center;
+    overflow-x: auto;
 }
 .char-actions .attacks > div {
     padding-right: 10px;

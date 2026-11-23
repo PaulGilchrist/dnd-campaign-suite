@@ -60,5 +60,3 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 ## Improvement backlog
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
-
-- **2026-11-23 collapsible-sidebar run — narrow-viewport lane debt remains at 420×760 (NOT sidebar-caused):** after the sidebar release (36px gutter, content region 384px) the CharSheet face still overflows the document (`docSW` 771), Log 490, Maps-manager 741 — fixed-width lane content inside those screens (`CharSheet` `.char-btn-group`/`.attacks` rows, Log composer/list ~70px, Maps-manager preview). Old-180px-gutter simulation proves the sidebar now contributes zero overflow (634→490 Log, ~915→771 sheet). Per screen: apply the three-law kit fixes (playbook §5: wrap / border-box / grid `min-width:0`) to the lane CSS.

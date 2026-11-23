@@ -24,6 +24,20 @@
     text-align: center;
     width: 100%;
 }
+/* Narrow-viewport wrap law (2026-11-23 lane-debt backlog): the table's
+   min-content width is the SUM of its seven columns' longest unbreakable
+   words (a "Concentration"-class token pins one column at ~98px, total
+   388-390px), so at 420px the table overflowed the 364px sheet content by
+   ~16px and grew the document. `overflow-wrap: anywhere` lets those tokens
+   break so the min-content shrinks below the container; it only engages
+   when a word genuinely cannot fit the column, so wide screens (where the
+   100%-width table has slack) render byte-identically. Chosen over an
+   overflow-x scroller because .spell-popup-parent must stay
+   overflow:visible to host the spell detail popups. */
+.char-spells .table-spells th,
+.char-spells .table-spells td {
+    overflow-wrap: anywhere;
+}
 .char-spells .table-spells tr {
     background-color: var(--background-color-body);
 }

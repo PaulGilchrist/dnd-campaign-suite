@@ -122,6 +122,18 @@ const npcsCss = parseRules(readCss(join(SRC_DIR, 'components/npcs/NPCs.css')));
 const initiativeCss = parseRules(readCss(join(SRC_DIR, 'components/initiative/Initiative.css')));
 const encounterCss = parseRules(readCss(join(SRC_DIR, 'components/encounter/EncounterBuilder.css')));
 
+/** Narrow-viewport lane-debt pass (2026-11-23 backlog): CharSheet, Log and
+ *  Maps-manager lane rules pin the wrap / border-box / min-width:0 kit laws
+ *  in their own component stylesheets. */
+const charActionsCss = parseRules(readCss(join(SRC_DIR, 'components/char-sheet/CharActions.css')));
+const charSpellsCss = parseRules(readCss(join(SRC_DIR, 'components/char-sheet/char-spells/CharSpells.css')));
+const charSlotLevelsCss = parseRules(readCss(join(SRC_DIR, 'components/char-sheet/char-spells/CharSpellSlots.css')));
+const logLaneCss = parseRules(readCss(join(SRC_DIR, 'components/log/Log.css')));
+const mapsManagerCss = parseRules(readCss(join(SRC_DIR, 'components/maps-manager/MapsManager.css')));
+// index.css carries an @media print block before .char-reactions .attacks —
+// use the block-aware parser so media rules never taint the lookup.
+const indexTopRules = parseStylesheet(themeCss).topRules;
+
 /**
  * Cascade-aware lookup: merges declarations from every top-level rule whose
  * (possibly comma-grouped) selector matches, later rules winning.
@@ -295,7 +307,10 @@ describe('App.css', () => {
 
   describe('character summary buttons', () => {
     it('lays out the toolbar group; button skins ride the ct-* kit', () => {
-      expectStyles('.char-btn-group', { display: 'flex', 'align-items': 'center' });
+      // flex-wrap is the narrow-viewport wrap law (2026-11-23 lane-debt
+      // backlog): the 6-button group exceeds the 384px content region at
+      // 420px, so the row must wrap instead of parking buttons off-window.
+      expectStyles('.char-btn-group', { display: 'flex', 'align-items': 'center', 'flex-wrap': 'wrap' });
       // .ct-* kit convergence (tranche 2): the bespoke .char-btn skin was
       // removed — every former .char-btn site now rides the global kit tiers
       // (.ct-container .ct-btn / -primary / -danger / -sm). The .char-btn
@@ -352,6 +367,75 @@ describe('App.css', () => {
         styleFor('.encounter-builder .encounter-actions', encounterCss)?.['flex-wrap'],
         'EncounterBuilder.css: .encounter-actions must wrap on overflow'
       ).toBe('wrap');
+    });
+  });
+
+  describe('narrow-viewport lane debt (2026-11-23 backlog)', () => {
+    it('scrolls the fixed-track attack/reaction grids inside their rows', () => {
+      // The 645/725px fixed grid tracks cannot wrap without breaking the
+      // table columns, so the Encounters-lane scroller idiom applies: the
+      // row owns an overflow-x scroller and the document holds at
+      // innerWidth (live-proved 420×760: row sw 725 / cw 364, docSW 420).
+      expect(
+        styleFor('.char-actions .attacks', charActionsCss)?.['overflow-x'],
+        'CharActions.css: .attacks must be its own overflow-x scroller'
+      ).toBe('auto');
+      expect(
+        styleFor('.char-reactions .attacks', indexTopRules)?.['overflow-x'],
+        'index.css: .char-reactions .attacks must be its own overflow-x scroller'
+      ).toBe('auto');
+    });
+
+    it('lets long spell-table tokens wrap instead of forcing width', () => {
+      // The spells table min-content is the SUM of its seven columns'
+      // longest unbreakable tokens (~390px at 420 viewports); anywhere-wrap
+      // shrinks it below the container. A scroller was rejected because
+      // .spell-popup-parent must stay overflow:visible for spell popups.
+      expect(
+        styleFor('.char-spells .table-spells th', charSpellsCss)?.['overflow-wrap'],
+        'CharSpells.css: spell table cells must allow anywhere-wrapping of long tokens'
+      ).toBe('anywhere');
+    });
+
+    it('wraps the spell-slot level row so its grid track can shrink', () => {
+      expect(
+        styleFor('.char-spell-slots.levels', charSlotLevelsCss)?.['flex-wrap'],
+        'CharSpellSlots.css: the slot row must wrap on overflow'
+      ).toBe('wrap');
+    });
+
+    it('wraps the Log composer and shrinks its flexed inputs', () => {
+      expect(
+        styleFor('.log-add-note', logLaneCss)?.['flex-wrap'],
+        'Log.css: the composer row must wrap on overflow'
+      ).toBe('wrap');
+      expect(
+        styleFor('.log-add-note textarea', logLaneCss)?.['min-width'],
+        'Log.css: the flexed textarea must be allowed below its intrinsic size'
+      ).toBe('0');
+      expect(
+        styleFor('.log-add-note input[type="text"]', logLaneCss)?.['min-width'],
+        'Log.css: the flexed input must be allowed below its intrinsic size'
+      ).toBe('0');
+    });
+
+    it('wraps the Maps-manager create row, list rows and action clusters', () => {
+      expect(
+        styleFor('.maps-manager-create', mapsManagerCss)?.['flex-wrap'],
+        'MapsManager.css: the create row must wrap on overflow'
+      ).toBe('wrap');
+      expect(
+        styleFor('.maps-manager-item', mapsManagerCss)?.['flex-wrap'],
+        'MapsManager.css: list rows must wrap (actions drop under the name)'
+      ).toBe('wrap');
+      const actions = styleFor('.maps-manager-item-actions', mapsManagerCss);
+      expect(actions?.['flex-wrap'], 'MapsManager.css: action clusters must wrap on overflow').toBe('wrap');
+      // The retired flex-shrink: 0 pinned the cluster to its 588px
+      // max-content width even on a wrapped line — it must not come back.
+      expect(
+        actions['flex-shrink'],
+        'MapsManager.css: .maps-manager-item-actions must stay shrinkable so wrapping engages'
+      ).not.toBe('0');
     });
   });
 

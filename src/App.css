@@ -141,11 +141,16 @@
    .char-btn:hover skins were removed with the .ct-* kit convergence
    (tranche 2): every former .char-btn button now rides the global
    .ct-container .ct-btn / -primary / -danger / -sm tiers (the .char-btn
-   class remains on the elements as a locator hook). */
+   class remains on the elements as a locator hook).
+   Narrow-viewport wrap law (2026-11-23 lane-debt backlog): the 6-button
+   group is wider than the 384px content region at 420px, so the row wraps
+   on overflow instead of parking buttons past the window edge; wide
+   screens keep the one-row face byte-identically. */
 .char-btn-group {
     display: flex;
     gap: 4px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 button.download {

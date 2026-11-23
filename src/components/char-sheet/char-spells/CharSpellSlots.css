@@ -7,4 +7,10 @@
     align-items: center;
     display: flex;
     flex-direction: row;
+    /* Narrow-viewport wrap law (2026-11-23 lane-debt backlog): the header +
+       up to nine fixed 28px level cards are ~214px of no-wrap min-content,
+       which forced the parent .spell-abilities `auto` track past the sheet
+       content edge at 420px. Wrapping shrinks the track's min-content to
+       one card, so the grid fits; wide screens keep the one-row face. */
+    flex-wrap: wrap;
 }

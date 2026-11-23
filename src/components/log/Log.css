@@ -17,10 +17,18 @@
     color: var(--color-primary);
 }
 
-/* Add note input area — detached card so it never reads as a filter row */
+/* Add note input area — detached card so it never reads as a filter row.
+   Narrow-viewport wrap law (2026-11-23 lane-debt backlog): the composer's
+   fixed intrinsic children (As: label + author select + type select) plus
+   the post button exceed the 332px content region at 420px, crushing the
+   flex:1 textarea to ~26px and parking the button ~70px past the window
+   edge. The row wraps on overflow (input field + button drop to their own
+   line) and the min-width:0 law lets the flexed input/textarea shrink
+   honestly instead of forcing width; wide screens keep the one-row face. */
 .log-add-note {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 14px;
     padding: 10px 12px;
@@ -55,6 +63,7 @@
 
 .log-add-note input[type="text"] {
     flex: 1;
+    min-width: 0; /* narrow-viewport law (2026-11-23 backlog): a flexed input must be allowed below its intrinsic default size */
     padding: 6px 12px;
     font-size: 0.88rem;
     background: var(--background-color-input);
@@ -70,6 +79,7 @@
 
 .log-add-note textarea {
     flex: 1;
+    min-width: 0; /* narrow-viewport law (2026-11-23 backlog): twin of the input rule above */
     min-height: 50px;
     resize: vertical;
     padding: 8px 12px;
