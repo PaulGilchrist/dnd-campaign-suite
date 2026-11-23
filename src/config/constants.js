@@ -32,7 +32,6 @@ export const DEFAULT_FORM_DATA = {
       },
     expertSkills: [],
     feats: [],
-    fightingStyles: [],
     race: { name: 'Human', subrace: { name: '' } },
     immunities: [],
     inventory: {

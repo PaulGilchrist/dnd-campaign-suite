@@ -27,3 +27,22 @@ Decide the one canonical shape. Given `quickBuildService` writes `class.fighting
 
 ## Severity
 Minor UX issue escalating to data-integrity-adjacent: no crash and both current wizard-shaped characters render fine, but a live console-silent code path lies about its contract, a shipped fixture renders N/A for data it declares, and any future consumer of the mapping (Blind Fighting, Superior Technique dice) silently no-ops.
+
+## Resolution
+**FIXED 2026-11-23** — canonical shape chosen per the no-legacy-compat policy: `class.fightingStyles` (the wizard/quick-build writer and every consumer already speak it; both `getClass` implementations carry it — 5e via lodash merge `classRules.js:33`, 2024 via `Object.assign` `classRules2024.js:97-100`).
+
+Root cause was exactly as diagnosed: `rules.getPlayerStats` lifted the file's TOP-LEVEL `fightingStyles` onto `playerStats.class.fightingStyles`, then `rulesFactory.getPlayerStats` (`rulesFactory.js:103`) replaced `playerStats.class` with a fresh `cr.getClass(allClasses, playerSummary)` merge built from the RAW file — the lift never reached any consumer. Live repro re-confirmed first: EvasiveFighter sheet `[data-testid="char-class-fighter"]` rendered `Fighting Styles: N/A` with fiber probe `playerStats.fightingStyles = ['Superior Technique']` / `playerStats.class.fightingStyles === undefined`.
+
+Changes:
+- `public/campaigns/test-campaign/EvasiveFighter.json` — migrated top-level `"fightingStyles": ["Superior Technique"]` into `class.fightingStyles` (the one canonical shape). Dice lane unaffected: EF is a Battle Master, so `automationExpressions.js:62-63` keeps the subclass d12 by design (`majorName !== 'Battle Master'` guard).
+- `public/campaigns/test-campaign/DraconicDragon.json` — DELETED the stray top-level `["Dueling"]` (never reached any consumer — the class already carried `class.fightingStyles` so the lift never fired; removal is behavior-preserving). NOT merged into `class.fightingStyles`: promoting a style the engine has never honored would be a gameplay-content decision, not a migration.
+- `src/services/rules/rules.js` — DELETED the no-op lift block (former :451-453).
+- `src/services/character/rulesetSwitchPreview.js` — `hasChosenFightingStyle` dual-reader now reads `class.fightingStyles` only (the retired top-level branch was unpinned legacy leniency).
+- `src/config/constants.js` — removed the top-level `fightingStyles: []` from `DEFAULT_FORM_DATA` (the wizard writes `class.fightingStyles`; the template key is what minted the dead top-level `[]` into every wizard-created file — visible in Frostfall/Testing fixtures, left untouched there as production data that reads inert).
+- `src/services/rules/rules.getPlayerStats.test.js` — 5e golden moved to the canonical shape (mock `getClass`s updated to mirror the real merge-carry contract); added T6 no-legacy pin: a retired top-level array grants NOTHING to `class` (exact `toStrictEqual`).
+- **New** `src/services/rules/rulesFactory.fightingStyles.test.js` — regression lane running the REAL `classRules.getClass`/`classRules2024.getClass` through `rulesFactory.getPlayerStats`: T1/T1b pin file-carried `class.fightingStyles` SURVIVING the :103 class re-assignment for both rulesets (with merge neighbors — subclass/major/class_levels/proficiencies — intact); T2 pins the retired lift stays dead at the factory seam.
+
+Verification:
+- Live re-ride on :5173 (test-campaign, GM localhost): EvasiveFighter Fighter block now reads `Fighting Styles: Superior Technique`; fiber probe `playerStats.class.fightingStyles = ['Superior Technique']`, `'Superior Technique' in includes`, `Combat Superiority` special action present, `_trackedResources.superiorityDice` registered. Control DraconicDragon unchanged (`class.fightingStyles = ['Great Weapon Fighting']`, sheet still renders it, top-level absent). Wizard edit-open smoke (mount merge + Ruleset step) opens/closes zero-write.
+- Tests: new lane 3/3; `src/services/rules/` folder 378 files/3930 tests; `rules+character+hooks/wizard` 462 files/5221 tests; FULL suite `npm run test:run` 3535 files / 37539 tests, all green. `npm run lint` zero warnings; `no-timers-guard` OK.
+- Closeout: closed-tab two-pass admin clear — change-data `{}`, log `[]`, overlays `[]` after each pass.

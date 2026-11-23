@@ -448,10 +448,6 @@ const rules = {
         const { classRules: cr, raceRules: rr } = getSubModules(playerStats, playerSummary);
 
           playerStats.class = cr.getClass(allClasses, playerSummary);
-          // Map top-level fightingStyles to class.fightingStyles for fighting style handlers
-          if (playerStats.fightingStyles && !playerStats.class.fightingStyles) {
-              playerStats.class.fightingStyles = playerStats.fightingStyles;
-          }
           playerStats.wildMagicSurgeTable = await loadWildMagicSurgeTable();
           playerStats.race = rr.getRace(allRaces, playerSummary);
           applyPowerfulBuild(playerStats);

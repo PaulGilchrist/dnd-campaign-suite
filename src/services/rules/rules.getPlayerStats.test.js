@@ -27,8 +27,8 @@
 // ORCHESTRATION ORDER MAP (observable; each step's output byte is pinned in the
 // goldens so a deleted/reordered trunk step flips a byte):
 //   :432 cloneDeep → :435 runtime Fey/Shadow seeds → :438 rules type → :440
-//   proficiency floor((lv-1)/4+2) → :444 cr.getClass → :446-448 fightingStyles
-//   top-level→class map → :449 wildMagicSurgeTable → :450 rr.getRace → :451/:452
+//   proficiency floor((lv-1)/4+2) → :444 cr.getClass (canonical persisted
+//   class.fightingStyles rides the merge) → :449 wildMagicSurgeTable → :450 rr.getRace → :451/:452
 //   raceTraits → :453 getMagicItems (5e null / 2024 [] dispatch) → :456-459
 //   2024-only senses seed + equipment passthrough → :461 initActionArrays
 //   (+class.expertise merge) → :463 getActions tuple → :466 fighting styles +
@@ -164,6 +164,9 @@ vi.mock('../character/classRules.js', () => ({
       languages: [],
       class_levels: [],
       expertise: playerSummary.class?.expertise || [],
+      // Mirrors the REAL 5e merge (classRules.js:33 lodash merge preserves
+      // file-carried keys like fightingStyles).
+      ...(playerSummary.class?.fightingStyles ? { fightingStyles: playerSummary.class.fightingStyles } : {}),
     })),
     getFeatures: vi.fn(() => ({
       actions: [{ name: 'Action Surge' }],
@@ -183,6 +186,9 @@ vi.mock('../character/classRules2024.js', () => ({
       major: playerSummary.class?.major || null,
       languages: [],
       class_levels: [],
+      // Mirrors the REAL 2024 Object.assign (classRules2024.js:97-100
+      // preserves file-carried keys like fightingStyles).
+      ...(playerSummary.class?.fightingStyles ? { fightingStyles: playerSummary.class.fightingStyles } : {}),
     })),
     getFeatures: vi.fn(() => ({
       actions: [{ name: 'Extra Attack' }],
@@ -340,12 +346,17 @@ describe('rules.getPlayerStats trunk orchestration', () => {
   // (:432-:566) contributes a pinned byte; deleting/reordering any step flips
   // at least one key. Owns immunities/resistances at rules-root (transferred
   // by rules-playerStats-senses-speed.test.js:6, formerly :290 toBeDefined).
-  // fightingStyles: ['Defense'] exercises the top-level→class.fightingStyles
-  // map at :446-448 (sole owner — every other lane injects class.fightingStyles
-  // directly via the classRules mock; Defense itself adds NO AC without armor,
-  // rules-armorClass.js:21 — so AC stays 10+DEX).
+  // class.fightingStyles: ['Defense'] exercises the canonical persisted shape
+  // riding the cr.getClass merge into the golden (the former top-level
+  // fightingStyles→class lift step is DELETED per the no-legacy
+  // fightingStyles migration — bug-rulesfactory-wipes-fightingstyles-mapping;
+  // end-to-end survival through the factory re-assignment is pinned by
+  // rulesFactory.fightingStyles.test.js; Defense itself adds NO AC without
+  // armor, rules-armorClass.js:21 — so AC stays 10+DEX).
   it('5e golden: every trunk step contributes exact bytes in fixed order', async () => {
-    const result = await getStats(makeSummary({ fightingStyles: ['Defense'] }))
+    const result = await getStats(makeSummary({
+      class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Defense'] },
+    }))
 
     expect(result).toStrictEqual({
       name: 'Trunk Fighter',
@@ -353,7 +364,6 @@ describe('rules.getPlayerStats trunk orchestration', () => {
       level: 5,
       background: 'Soldier',
       feats: [],
-      fightingStyles: ['Defense'],
       proficiency: 3,
       class: {
         name: 'Fighter',
@@ -590,5 +600,23 @@ describe('rules.getPlayerStats trunk orchestration', () => {
 
     expect(result.expertise).toStrictEqual(['Stealth', 'Perception'])
     expect(result.proficiencies).toStrictEqual(['Bagpipes'])
+  })
+
+  // T6 — no-legacy pin (bug-rulesfactory-wipes-fightingstyles-mapping): the
+  // top-level fightingStyles→class.fightingStyles lift step is DELETED. A
+  // summary carrying ONLY the retired top-level shape must reach no consumer:
+  // the clone keeps the inert byte, class gains no fightingStyles key
+  // (toStrictEqual below). Re-adding a lift at either seam flips this pin.
+  it('retired top-level fightingStyles shape grants nothing to class', async () => {
+    const result = await getStats(makeSummary({ fightingStyles: ['Defense'] }))
+
+    expect(result.fightingStyles).toStrictEqual(['Defense'])
+    expect(result.class).toStrictEqual({
+      name: 'Fighter',
+      subclass: { name: 'Champion' },
+      languages: [],
+      class_levels: [],
+      expertise: [],
+    })
   })
 })

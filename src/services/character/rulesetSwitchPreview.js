@@ -84,8 +84,7 @@ function subclassNameOf(formData) {
 }
 
 function hasChosenFightingStyle(formData) {
-  return (formData?.class?.fightingStyles?.length || 0) > 0
-    || (formData?.fightingStyles?.length || 0) > 0;
+  return (formData?.class?.fightingStyles?.length || 0) > 0;
 }
 
 /**
