@@ -252,6 +252,11 @@ function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }
                 type="number"
                 defaultValue={creature.initiative ?? ''}
                 placeholder="Init"
+                // Accessibility census (backlog XY 2026-11-23): every card input
+                // carries the "<Name> <field>" aria-label convention — this one
+                // rendered unlabeled (census INPUT:null), so tests keyed off a
+                // positional null. Mirrors "<Name> current HP" (CreatureHp.jsx).
+                aria-label={`${creature.name} initiative`}
             />
         </div>
     )
