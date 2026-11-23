@@ -65,6 +65,35 @@ export function createSseEventHandler({
     handleOverlayEvent,
 }) {
     async function handleCombatSummaryChange(data) {
+        // Cleared-key echo (admin clear-change-data / full-reset publish
+        // change-<c>-combatSummary:null — campaigns-admin.js — and the wildcard
+        // key DELETE publishes null the same way): the server board is GONE.
+        // Retire the mounted board exactly like the companion spell-overlay
+        // {action:'clear'} retires mounted map geometry. Nulling the state
+        // renders the "No one is on the initiative board yet" empty state;
+        // nulling the refs and evicting the module cache makes the stale board
+        // un-POSTable — pre-fix the dispatcher dropped this echo, the board
+        // kept rendering, and the next Next/Prev turn-walk re-persisted the
+        // whole cleared combatSummary (admin clear silently undone).
+        // ZERO writes on this lane — a retirement must not re-create any
+        // cleared key. The raw setter guarantees the state retires even when
+        // the equality guard's ref never saw a board (the mount merge adopts
+        // via the raw setter, and valuesEqual(undefined, null) is true, which
+        // would otherwise swallow the first guarded null); the guarded setter
+        // keeps the guard ref in sync so a byte-identical re-seed board echoed
+        // later is still adopted (raw-only would leave the guard holding the
+        // old board and silently skip it, parking the tab on the empty state).
+        if (data === null) {
+            combatSummaryRef.current = null
+            activeCreatureNameRef.current = null
+            lastAppliedTurnStartCreatureRef.current = null
+            lastExpirySweepCreatureRef.current = null
+            setCombatSummaryCache(null, campaignName)
+            setCombatSummary(null)
+            setCombatSummaryG(null)
+            setActiveCreatureNameG(null)
+            return
+        }
         if (!data?.creatures) return
         const merged = cloneDeep(data)
         if (!merged.activeCreatureName) {
@@ -192,8 +221,8 @@ export function createSseEventHandler({
         // legacy {} stored under this key) must never poison the round gate with
         // "[object Object]" or crash expireStaleEffects' toLowerCase. null/
         // undefined are legitimate "no active creature" sentinels — the dispatch
-        // above already drops them (event.data == null) — so only truthy
-        // non-strings are rejected here.
+        // above drops them for every key except the combatSummary cleared-key
+        // lane — so only truthy non-strings are rejected here.
         if (newActive && typeof newActive !== 'string') {
             console.error('[sseHandlers] Ignoring malformed activeCreatureName echo:', newActive)
             return
@@ -219,7 +248,16 @@ export function createSseEventHandler({
     }
 
     return async function handleEvent(event) {
-        if (event.key == null || event.data == null) return
+        if (event.key == null) return
+        // A null payload on the combatSummary key is the cleared-key broadcast —
+        // let exactly that one through to the retirement branch above (mirror of
+        // the root-Subscriber discriminator in App.jsx handleRuntimeEvent). Every
+        // other null stays dropped: the stored activeCreatureName null is the
+        // per-board "no active creature" sentinel (bug-zero-creature-initiative-
+        // null-name — passing it would run the echo seam on a null and crash
+        // expireStaleEffects), and character-bucket nulls are already mirrored
+        // into the campaign store by the root App subscriber.
+        if (event.data == null && event.key !== `change-${campaignName}-combatSummary`) return
 
         if (event.key.startsWith('spell-overlay-')) {
             // Thread the owner's setter (Initiative.jsx passes setOverlays here) —

@@ -13,7 +13,8 @@
 //   change-{campaign}-activeCreatureName     → turn mirror: name state, CLA-307/MN-003 outgoing turn-end (skipSync), round-scoped turn-start gate (:106-135)
 //   change-{campaign}-<other key>            → setRuntimeStateTick catch-all; 'log'/'spell-overlay' excluded (:156-163)
 //
-// Old→new map (29→15): nullish-key/data→T2 · overlay-delegate→T1 · foreign-campaign→T2 ·
+// Old→new map (29→15): nullish-key/non-cleared-null-data→T2 (the cleared-key combatSummary
+// null now retires the board — pinned in sseHandlers.cleared-board-retire.test.jsx) · overlay-delegate→T1 · foreign-campaign→T2 ·
 // no/undefined-creatures-skip + empty-adopt→T6 · valid-event→T4 · fill-activeName + no-override→T5 ·
 // round-regression + default-round→T7 · lastAttack-noop→T2 · update-refs + expire + cache→T8 ·
 // apply-on-change + persist-gate-key + combatSummary-update→T11 · no-apply-prev-same/no-apply-gate-match/
@@ -159,7 +160,12 @@ describe('createSseEventHandler', () => {
 
     it('writes nothing for nullish key/data, foreign campaigns, and the lastAttack echo', async () => {
         await handler({ key: null, data: { creatures: [] } });
-        await handler({ key: `change-${campaignName}-combatSummary`, data: null });
+        // Null data is only meaningful on the combatSummary cleared-key lane
+        // (sseHandlers.cleared-board-retire.test.jsx); every other null echo
+        // stays dropped — the activeCreatureName null sentinel must never run
+        // the echo seam (bug-zero-creature-initiative-null-name).
+        await handler({ key: `change-${campaignName}-activeCreatureName`, data: null });
+        await handler({ key: `change-${campaignName}-someCharacterKey`, data: null });
         await handler({ key: 'change-other-campaign-combatSummary', data: { round: 2, creatures: [] } });
         await handler({ key: `change-${campaignName}-lastAttack`, data: { attackerName: 'Goblin' } });
         expect(mocks.setCombatSummary).not.toHaveBeenCalled();
