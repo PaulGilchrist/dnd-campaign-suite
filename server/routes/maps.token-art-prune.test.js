@@ -1,5 +1,5 @@
 // @maintained-by-ai
-// ─── Lane: orphaned token-art prune on the whole-doc PUT (deferred D shipped 2026-11-22) ─
+// ─── Lane: orphaned token-art prune on the whole-doc PUT + DELETE seam (deferred D shipped 2026-11-22; DELETE sweep shipped on bug-map-delete-regenerate-strand-token-art-forever) ─
 // The /token-image upload lane writes images/token-<ts>-<rand>.<ext> and the
 // placedItems row keeps only that relative path; replace ("upload over
 // existing art") and "Remove art" both ride the indoor whole-document PUT,
@@ -9,8 +9,15 @@
 // deletion prunes), echo/shared-reference KEEPS, non-token assets and
 // traversal-shaped paths are never prune candidates, and an unlink failure
 // (missing file, EPERM) logs via console.error while the save still answers
-// its normal success shape. In-memory fs (maps.put-gridsize-clamp.test.js
-// idiom) — real disk is never touched.
+// its normal success shape. The map DELETE route (inherited by the Admin
+// Regenerate roll through the client's deleteMap) additionally sweeps the
+// images dir disk-wide after unlinking the document — the row-diff is blind
+// once the doc is gone, so files nothing references anymore are reclaimed
+// there. Pinned DELETE faces: last-reference prunes, live cross-map and
+// character-document references keep, orphan reclaim, non-token assets
+// survive, unreadable live docs fail the whole sweep closed, and no disk
+// condition ever fails the delete. In-memory fs
+// (maps.put-gridsize-clamp.test.js idiom) — real disk is never touched.
 import express from 'express';
 import path from 'path';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -35,6 +42,15 @@ vi.mock('fs', () => ({
         }),
         mkdirSync: vi.fn((p) => {
             MOCK_FS.set(p, { __directory__: true });
+        }),
+        // Lists the BASENAMES of every MOCK_FS entry living inside `p`
+        // (files and seeded sub-directory keys alike — callers filter).
+        readdirSync: vi.fn((p) => {
+            const names = [];
+            for (const key of MOCK_FS.keys()) {
+                if (key !== p && path.posix.dirname(key) === p) names.push(path.posix.basename(key));
+            }
+            return names;
         }),
         unlinkSync: vi.fn((p) => {
             unlinkCalls.push(p);
@@ -62,6 +78,8 @@ vi.mock('../utils/changeData.js', () => ({
 
 const mapsDir = '/mock/campaigns/test-campaign/maps';
 const imagesDir = '/mock/campaigns/test-campaign/images';
+const campaignRoot = '/mock/campaigns/test-campaign';
+const dataDir = `${campaignRoot}/data`;
 const FILE = `${mapsDir}/art-map.json`;
 
 const ART_A = 'images/token-1-aaa.png';
@@ -286,6 +304,157 @@ describe('maps PUT — orphaned token-art prune (deferred D)', () => {
 
         expect(res.status).toBe(200);
         expect(unlinkCalls).toEqual([]);
+    });
+});
+
+// ─── DELETE seam ─
+// The route unlinks the map document then sweeps the images dir disk-wide
+// (candidates = files matching the token-upload naming gate; a file survives
+// when any REMAINING live document — maps/, character files at the campaign
+// root, data/*.json — still names its path). The same mocked unlinkSync records
+// the map-file unlink FIRST, so token assertions expect it as a prefix.
+function seedImagesDir() {
+    MOCK_FS.set(imagesDir, { __directory__: true });
+}
+
+// Extra map document (the cross-map shared-reference keep face needs a live
+// sibling doc; seedIndoor already covers the one being deleted).
+function seedSiblingMap(slug, placedItems) {
+    MOCK_FS.set(`${mapsDir}/${slug}.json`, {
+        displayName: slug,
+        name: slug,
+        type: 'indoor',
+        gridSize: 20,
+        walls: [],
+        placedItems,
+        players: [],
+    });
+}
+
+function deleteMap(slug = 'art-map') {
+    return request(createTestApp()).delete(`/api/campaigns/test-campaign/maps/${slug}`);
+}
+
+describe('maps DELETE — stranded token-art sweep (map-delete + Admin Regenerate seam)', () => {
+    it('deleting the LAST document that names a token upload unlinks the file', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        seedFile(ART_A);
+        seedImagesDir();
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Map deleted successfully');
+        expect(unlinkCalls).toEqual([FILE, `${imagesDir}/token-1-aaa.png`]);
+        expect(MOCK_FS.has(FILE)).toBe(false);
+        expect(MOCK_FS.has(`${imagesDir}/token-1-aaa.png`)).toBe(false);
+    });
+
+    it('a sibling live map still naming the path keeps it — and it prunes when that doc goes too', async () => {
+        // art-map references A (shared) + B (exclusive); sibling references A.
+        seedIndoor([tokenRow('t1', ART_A), tokenRow('t2', ART_B)]);
+        seedSiblingMap('sibling-map', [tokenRow('t3', ART_A)]);
+        seedFile(ART_A);
+        seedFile(ART_B);
+        seedImagesDir();
+
+        const first = await deleteMap();
+        expect(first.status).toBe(200);
+        // Only the map file + the exclusive B prune; A lives on the sibling.
+        expect(unlinkCalls).toEqual([FILE, `${imagesDir}/token-2-bbb.png`]);
+        expect(MOCK_FS.has(`${imagesDir}/token-1-aaa.png`)).toBe(true);
+
+        const second = await deleteMap('sibling-map');
+        expect(second.status).toBe(200);
+        expect(unlinkCalls[unlinkCalls.length - 1]).toBe(`${imagesDir}/token-1-aaa.png`);
+        expect(MOCK_FS.has(`${imagesDir}/token-1-aaa.png`)).toBe(false);
+    });
+
+    it('the sweep reclaims token files NO document names (pre-fix strays and PUT-seam misses)', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        seedFile(ART_A); // referenced by the doc being deleted
+        seedFile(ART_B); // stray: nothing on disk names it anymore
+        seedImagesDir();
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(unlinkCalls).toEqual([FILE, `${imagesDir}/token-1-aaa.png`, `${imagesDir}/token-2-bbb.png`]);
+    });
+
+    it('non-token assets are never sweep candidates (ElderPaladin.png survives every map delete)', async () => {
+        seedIndoor([]);
+        seedFile('ElderPaladin.png');
+        seedFile('portraits/token-nested.png'); // nested path fails the gate
+        seedFile(ART_A); // lone token → reclaimed
+        seedImagesDir();
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(unlinkCalls).toEqual([FILE, `${imagesDir}/token-1-aaa.png`]);
+        expect(MOCK_FS.has(`${imagesDir}/ElderPaladin.png`)).toBe(true);
+        expect(MOCK_FS.has(`${imagesDir}/portraits/token-nested.png`)).toBe(true);
+    });
+
+    it('a character document still naming the path keeps the upload', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        seedFile(ART_A);
+        seedImagesDir();
+        MOCK_FS.set(campaignRoot, { __directory__: true });
+        MOCK_FS.set(`${campaignRoot}/Elder.json`, JSON.stringify({ name: 'Elder', imagePath: ART_A }));
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(unlinkCalls).toEqual([FILE]);
+        expect(MOCK_FS.has(`${imagesDir}/token-1-aaa.png`)).toBe(true);
+    });
+
+    it('an unreadable live document fails the whole sweep closed (delete still answers success)', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        seedFile(ART_A);
+        seedImagesDir();
+        // A data/ entry that exists in the listing but throws on read.
+        MOCK_FS.set(dataDir, { __directory__: true });
+        MOCK_FS.set(`${dataDir}/npcs.json`, undefined);
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Map deleted successfully');
+        expect(unlinkCalls).toEqual([FILE]); // nothing token-related unlinked
+        expect(MOCK_FS.has(`${imagesDir}/token-1-aaa.png`)).toBe(true);
+        expect(errorSpy.mock.calls.some((args) => String(args[0]).includes('strand sweep skipped'))).toBe(true);
+    });
+
+    it('an unlink error never fails the delete (console.error, success shape intact)', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        seedFile(ART_A);
+        seedImagesDir();
+        const fs = (await import('fs')).default;
+        fs.unlinkSync
+            .mockImplementationOnce((p) => {
+                unlinkCalls.push(p);
+                MOCK_FS.delete(p); // the map file itself
+            })
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+            });
+
+        const res = await deleteMap();
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Map deleted successfully');
+        expect(errorSpy.mock.calls.some((args) => String(args[0]).includes('token-art prune failed'))).toBe(true);
+    });
+
+    it('a campaign without an images dir deletes cleanly (sweep no-ops)', async () => {
+        seedIndoor([tokenRow('t1', ART_A)]);
+        // imagesDir intentionally NOT seeded.
+        const res = await deleteMap();
+        expect(res.status).toBe(200);
+        expect(unlinkCalls).toEqual([FILE]);
     });
 });
 

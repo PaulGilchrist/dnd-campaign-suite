@@ -716,6 +716,67 @@ function pruneOrphanedTokenArt(campaign, storedData, mapData) {
   }
 }
 
+// DELETE-seam strand sweep (bug-map-delete-regenerate-strand-token-art-forever):
+// the save-seam prune above diffs ONE document, so it can only ever name art
+// that some still-stored row references. Deleting a map document (and the
+// Admin Regenerate roll, whose retired-dungeon delete rides this same route
+// through the client's deleteMap) removes the LAST row-set that could name its
+// token uploads — after the unlink nothing on disk can ever hand those files
+// to the save-seam prune, so they would live forever. Sweep the images dir
+// disk-wide instead: candidates are the images/token-* upload files
+// themselves (same naming gate, so nested paths, non-upload names and
+// dot-directories can never qualify); a candidate survives when ANY remaining
+// live document still names its relative path — every map JSON, every
+// character file and every data/*.json entity doc (NPC rows carry imagePath
+// strings). The keep test is raw-text ON PURPOSE: it covers the shared
+// cross-map reference the per-document PUT diff cannot see and works for any
+// row shape; log/change-data text living under data/ can only KEEP files,
+// never force a deletion. Fail-closed: an unreadable live document aborts the
+// whole sweep (an incomplete keep-set must never delete), and — same doctrine
+// as the save-seam prune — no disk condition ever fails the delete; every
+// error is console.error'd, never silent. Runs AFTER the map unlink so the
+// deleted document drops out of the keep set.
+function pruneStrandedTokenArt(campaign) {
+  try {
+    const imagesDir = path.resolve(campaignImagesDir(campaign));
+    if (!fs.existsSync(imagesDir)) return;
+    const candidates = fs
+      .readdirSync(imagesDir)
+      .filter((name) => TOKEN_ART_PATTERN.test(`images/${name}`))
+      .map((name) => `images/${name}`);
+    if (candidates.length === 0) return;
+    const campaignRoot = path.dirname(imagesDir);
+    const liveDocumentText = (dir) =>
+      fs.existsSync(dir)
+        ? fs
+            .readdirSync(dir)
+            .filter((name) => name.endsWith('.json'))
+            .map((name) => fs.readFileSync(path.join(dir, name), 'utf-8'))
+            .join('\n')
+        : '';
+    const liveText = [
+      liveDocumentText(campaignMapsDir(campaign)),
+      liveDocumentText(campaignRoot),
+      liveDocumentText(path.join(campaignRoot, 'data')),
+    ].join('\n');
+    for (const rel of candidates) {
+      if (liveText.includes(rel)) continue;
+      const filePath = path.resolve(imagesDir, rel.replace(/^images\//, ''));
+      if (!filePath.startsWith(imagesDir + path.sep)) {
+        console.error(`[maps] token-art prune REFUSED (outside images dir): ${JSON.stringify(rel)}`);
+        continue;
+      }
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (e) {
+        console.error(`[maps] token-art prune failed for ${rel}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error('[maps] token-art strand sweep skipped:', e);
+  }
+}
+
 // PUT /api/campaigns/:campaign/maps/:mapname - Save map data
 router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
@@ -819,6 +880,12 @@ router.delete('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) 
   }
 
   fs.unlinkSync(filePath);
+
+  // The last row-set that could name this map's token uploads just went with
+  // the document — sweep the images disk-wide so nothing is stranded forever
+  // (Admin Regenerate inherits this through the same route). Never fails the
+  // delete; see pruneStrandedTokenArt.
+  pruneStrandedTokenArt(campaign);
 
   // If this was the active map, clear it. Reconcile BOTH sources of truth:
   // the in-memory activeMaps (written by /activate) AND the persisted '__map__'
