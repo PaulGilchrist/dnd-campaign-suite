@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cloneDeep } from 'lodash';
-import { findFeat } from './featFinder.js';
+import { findFeat, resetFeatFinderMissLog } from './featFinder.js';
 import feats5e from '../../../public/data/feats.json';
 import feats2024 from '../../../public/data/2024/feats.json';
 
@@ -20,10 +20,18 @@ import feats2024 from '../../../public/data/2024/feats.json';
 // (found-lanes assert the spy stayed silent — the documented 'Boon Of Fortitude
 // sheet-mount' noise class, MA-1891/1893 registry citations, is a MISS-side log;
 // hit-side silence is the epic-boon regression kept from the prior suite).
+// Miss logs are once-per-name-per-load (XY 2026-11-23 dedupe) — the repeat-miss
+// silence law itself is pinned in the sibling featFinder.miss-log-dedupe.test.js.
 
 const FIRST5_5E = feats5e.slice(0, 5).map(f => f.name);
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  // once-per-name dedupe is module-scoped — reset between tests so each test
+  // observes fresh first-occurrence logs (pins cross-test name reuse in the
+  // miss-taxonomy and both-miss-paths cases below).
+  resetFeatFinderMissLog();
+});
 
 describe('findFeat — exact-then-stripped name lookup over caller table (pure, disk rows)', () => {
   it('DISK LAW both rulesets: every real row resolves to identity with zero logs; census 0 parenthetical rows', () => {

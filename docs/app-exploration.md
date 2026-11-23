@@ -78,5 +78,3 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 ## Improvement backlog
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
-
-- (XY 2026-11-23) `[findFeat] NOT FOUND` logs one console.error PER render pass (×3 identical per mount when data is missing) — dedupe to once-per-name-per-load to keep console-diff probes cheap.
