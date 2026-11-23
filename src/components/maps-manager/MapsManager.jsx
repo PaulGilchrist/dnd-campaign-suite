@@ -48,18 +48,15 @@ function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
     );
 }
 
-// Row Regenerate-button faces (VG backlog 2026-11-12; list-envelope data VX 2026-11-12).
-// Two honest states, both known at list-render time — the server folds each doc's small
-// generationOpts stamp into the /maps list row (no per-row whole-doc GET): stamped doc
-// → enabled with the read-only "Generated with: …" stamp tooltip (the row-tooltip
-// pattern the Description button already rides); doc WITHOUT the stamp (legacy
-// fixtures, hand-authored maps) → disabled with the plain-English reason.
-const LEGACY_REGENERATE_TITLE = 'No generation options recorded for this map';
-
-function regenerateFace(generationOpts) {
-    if (generationOpts) return { disabled: false, title: describeGenerationOpts(generationOpts) };
-    return { disabled: true, title: LEGACY_REGENERATE_TITLE };
-}
+// Row Regenerate-button render gate (VG backlog 2026-11-12; list-envelope data
+// VX 2026-11-12; render-only-when-stamped doctrine owner-ratified 2026-11-23).
+// The server folds each doc's small generationOpts stamp into the /maps list row
+// (no per-row whole-doc GET), so the face is known at list-render time: a stamped
+// doc renders the enabled control with the read-only "Generated with: …" stamp
+// tooltip (the row-tooltip pattern the Description button already rides); a doc
+// WITHOUT the stamp (seeded dungeons, hand-authored maps) renders NO Regenerate
+// control at all — the old permanently-disabled face was a dead button whose only
+// message was why it was dead (ZB backlog 2026-11-23).
 
 // Regenerate gate over the same shared DeleteConfirmModal a11y tier as the row's
 // Delete (role="dialog", initial focus on Cancel, Tab trap); confirm label follows
@@ -201,9 +198,10 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         loadMapsList();
     }, [loadMapsList]);
 
-    // The row Regenerate faces derive straight from each list row's generationOpts —
-    // the server folds the small (≤10-key) stamp into the /maps list envelope
-    // (server/routes/maps.js list builder), so mounting this view fires ZERO whole-doc
+    // Whether a row renders its Regenerate control derives straight from the list
+    // row's generationOpts — the server folds the small (≤10-key) stamp into the
+    // /maps list envelope (server/routes/maps.js list builder), so mounting this
+    // view fires ZERO whole-doc
     // GETs (the old lazy per-row stamp-probe fetched every full map document,
     // 1800-cell terrain docs included, just to render a tooltip — VX backlog
     // 2026-11-12). A campaign switch simply re-fetches the list.
@@ -510,9 +508,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
 
             {maps.length > 0 && (
                 <ul className="maps-manager-list">
-                    {maps.map(map => {
-                        const face = regenerateFace(map.generationOpts);
-                        return (
+                    {maps.map(map => (
                         <li
                             key={map.fileName}
                             className={`maps-manager-item ${map.isActive ? 'active' : ''}`}
@@ -584,25 +580,27 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     proposal on the live document — preview first, GM Apply is
                                     the only write, through the normal map save lane. */}
                                 <AiDressButton campaignName={campaignName} map={map} />
-                                {/* Row Regenerate from the doc's generationOpts stamp, carried on the
-                                    list row itself (VG backlog 2026-11-12, VX list-envelope fold):
-                                    enabled with a read-only "Generated with: …" tooltip on stamped
-                                    rows; an honest disabled face (zero writes on any interaction)
-                                    on legacy docs. */}
-                                <button
-                                    className="regenerate-btn"
-                                    onClick={() => setRegeneratingMap(map.fileName)}
-                                    disabled={face.disabled}
-                                    title={face.title}
-                                    aria-label={`Regenerate "${map.name}"`}
-                                >
-                                    <i className="fa-solid fa-rotate"></i> Regenerate
-                                </button>
+                                {/* Row Regenerate renders ONLY on docs carrying the
+                                    generationOpts stamp, read off the list row itself
+                                    (VG backlog 2026-11-12, VX list-envelope fold;
+                                    render-only-when-stamped owner-ratified 2026-11-23):
+                                    enabled with a read-only "Generated with: …" tooltip.
+                                    Unstamped docs (seeded dungeons, hand-authored maps)
+                                    render no control at all. */}
+                                {map.generationOpts && (
+                                    <button
+                                        className="regenerate-btn"
+                                        onClick={() => setRegeneratingMap(map.fileName)}
+                                        title={describeGenerationOpts(map.generationOpts)}
+                                        aria-label={`Regenerate "${map.name}"`}
+                                    >
+                                        <i className="fa-solid fa-rotate"></i> Regenerate
+                                    </button>
+                                )}
                                 <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>
-                        );
-                    })}
+                    ))}
                 </ul>
             )}
 

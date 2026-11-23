@@ -268,7 +268,7 @@ describe('describeGenerationOpts — read-only tooltip copy', () => {
         );
     });
 
-    it('absent stamp yields null so the caller shows the honest legacy face', () => {
+    it('absent stamp yields null (no stamp, no "Generated with:" line to render)', () => {
         expect(describeGenerationOpts(null)).toBeNull();
         expect(describeGenerationOpts(undefined)).toBeNull();
     });

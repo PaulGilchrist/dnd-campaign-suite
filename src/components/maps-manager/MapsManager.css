@@ -228,9 +228,8 @@
     border-color: #555;
 }
 
-/* Disabled row-action face (Regenerate on legacy docs, VG backlog 2026-11-12) —
-   mirrors the create lane's button:disabled face above so every honest dead button
-   in this view reads the same. */
+/* Row-action buttons stay inert-styled when disabled (mirrors the create lane's
+   button:disabled face above) so every honest dead button reads the same. */
 .maps-manager-item-actions button:disabled {
     opacity: 0.5;
     cursor: not-allowed;

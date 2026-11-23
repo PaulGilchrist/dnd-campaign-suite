@@ -1,14 +1,16 @@
-// @maintained-by-ai: 2026-11-12
+// @maintained-by-ai: 2026-11-23
 // Row-level Regenerate-from-stamped-opts lane (VG backlog 2026-11-12; list-envelope
-// data VX 2026-11-12): rows whose LIST envelope carries generationOpts get an ENABLED
+// data VX 2026-11-12; render-only-when-stamped doctrine owner-ratified 2026-11-23):
+// rows whose LIST envelope carries generationOpts get an ENABLED
 // `Regenerate "<label>"` button whose title is the read-only "Generated with: …" stamp
-// tooltip; legacy docs (no stamp) get an honest DISABLED face ("No generation options
-// recorded for this map") — clicking it opens nothing and writes nothing. The face is
-// known at list-render time: mounting fires ZERO whole-doc loadMapData calls (the old
-// lazy per-row stamp-probe is retired). Confirm rides the shared DeleteConfirmModal
-// role="dialog" tier with the starter lane's "Yes, Regenerate" label; Cancel closes
-// with zero writes. The generator-dispatch / PUT-preservation / audit-row legs live
-// beside the service in ../services/maps/regenerateMap.test.js.
+// tooltip; docs WITHOUT the stamp (seeded dungeons, hand-authored maps) render NO
+// Regenerate button at all — the old permanently-disabled face whose only message was
+// "No generation options recorded for this map" is retired (ZB backlog 2026-11-23).
+// The face is known at list-render time: mounting fires ZERO whole-doc loadMapData
+// calls (the old lazy per-row stamp-probe is retired). Confirm rides the shared
+// DeleteConfirmModal role="dialog" tier with the starter lane's "Yes, Regenerate"
+// label; Cancel closes with zero writes. The generator-dispatch / PUT-preservation /
+// audit-row legs live beside the service in ../services/maps/regenerateMap.test.js.
 
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -69,7 +71,7 @@ const GENERATED_MAP = {
     isActive: false,
     generationOpts: ADJACENT_OPTS,
 };
-const LEGACY_MAP = { fileName: 'battle-arena.json', name: 'Battle Arena', type: 'indoor', isActive: false };
+const UNSTAMPED_MAP = { fileName: 'battle-arena.json', name: 'Battle Arena', type: 'indoor', isActive: false };
 
 const props = {
     campaignName: 'test-campaign',
@@ -78,10 +80,11 @@ const props = {
 };
 
 const regenButton = (name) => screen.getByRole('button', { name: `Regenerate "${name}"` });
+const queryRegenButton = (name) => screen.queryByRole('button', { name: `Regenerate "${name}"` });
 
 beforeEach(() => {
     vi.resetAllMocks();
-    mapsService.loadMaps.mockResolvedValue({ maps: [GENERATED_MAP, LEGACY_MAP] });
+    mapsService.loadMaps.mockResolvedValue({ maps: [GENERATED_MAP, UNSTAMPED_MAP] });
     mapsService.loadMapData.mockResolvedValue({ description: '' });
     regenerateMapDocument.mockResolvedValue({});
 });
@@ -99,11 +102,12 @@ describe('MapsManager row Regenerate faces', () => {
         expect(button).toBeEnabled();
     });
 
-    it('legacy row: disabled Regenerate with the honest "no options recorded" tooltip', async () => {
+    it('unstamped row: renders NO Regenerate button at all', async () => {
         await renderManager();
-        const button = regenButton('Battle Arena');
-        await waitFor(() => expect(button).toHaveAttribute('title', 'No generation options recorded for this map'));
-        expect(button).toBeDisabled();
+        // The row itself is present — only the Regenerate control is absent.
+        expect(screen.getByText('Battle Arena')).toBeInTheDocument();
+        await waitFor(() => expect(queryRegenButton('Battle Arena')).not.toBeInTheDocument());
+        expect(screen.queryByText('No generation options recorded for this map')).not.toBeInTheDocument();
     });
 
     it('the face is known at list-render time — no "Checking…" transient and no per-row probe', async () => {
@@ -114,16 +118,13 @@ describe('MapsManager row Regenerate faces', () => {
         expect(mapsService.loadMapData).not.toHaveBeenCalled();
         expect(regenButton('Gen Cave')).toBeEnabled();
         expect(regenButton('Gen Cave')).toHaveAttribute('title', ADJACENT_TOOLTIP);
-        expect(regenButton('Battle Arena')).toBeDisabled();
+        expect(queryRegenButton('Battle Arena')).not.toBeInTheDocument();
         expect(screen.queryByText('Checking generation options…')).not.toBeInTheDocument();
     });
 
-    it('clicking the disabled legacy face opens NO dialog and causes ZERO writes', async () => {
+    it('an unstamped row offers nothing to click — no button, no dialog, ZERO writes', async () => {
         await renderManager();
-        const button = regenButton('Battle Arena');
-        await waitFor(() => expect(button).toBeDisabled());
-
-        fireEvent.click(button);
+        expect(queryRegenButton('Battle Arena')).not.toBeInTheDocument();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(regenerateMapDocument).not.toHaveBeenCalled();
         expect(mapsService.saveMapData).not.toHaveBeenCalled();

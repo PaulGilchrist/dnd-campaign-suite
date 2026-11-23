@@ -115,5 +115,3 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (ZB 2026-11-23) Maps manager shows a permanently-disabled `AI Dress` control on seeded dungeon rows with tooltip "No generation options recorded for this map" — either seed dress options with the preset or hide the affordance on seeded docs; currently it's a dead button whose only message is why it's dead.
-

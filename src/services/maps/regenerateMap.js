@@ -2,8 +2,10 @@
 // stamp (generator-opts-persistence improve) into a player-facing feature. The stamp
 // carries every knob the create modal actually consumed, so the doc alone re-derives
 // its own map: run the same CLIENT generator with the STAMPED opts verbatim and PUT
-// the result back onto the same document. Docs without the stamp (owner fixtures,
-// hand-authored maps) never reach this lane — the row face stays disabled.
+// the result back onto the same document. Under the render-only-when-stamped doctrine
+// (owner-ratified 2026-11-23) the row's Regenerate control renders ONLY for docs that
+// carry the stamp — docs without it (owner fixtures, hand-authored maps) never render
+// the affordance and never reach this lane.
 import { generateDungeon, generateAdjacentDungeon } from './dungeonGenerator.js';
 import { generateHexTerrain } from './hexTerrainGenerator.js';
 import * as mapsService from './mapsService.js';
@@ -39,8 +41,8 @@ const MODE_LABELS = {
 const titleCase = (value) => String(value).charAt(0).toUpperCase() + String(value).slice(1);
 
 // Read-only "Generated with: …" tooltip copy (criterion: mode, seed, gridSize plus the
-// mode-specific keys of the stamp). Returns null for an absent stamp so the caller can
-// show the honest legacy face instead of an empty tooltip.
+// mode-specific keys of the stamp). Returns null for an absent stamp so the Regenerate
+// confirm dialog can degrade its options line instead of showing an empty parenthesis.
 export function describeGenerationOpts(generationOpts) {
     if (!generationOpts || !generationOpts.mode) return null;
     const opts = generationOpts;
