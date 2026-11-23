@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState, seedTrackedResources } from '../../hooks/runtime/useRuntimeState.js';
+import { clearRuntimeState, seedTrackedResources, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import {
   SOUND_OWNER_KEY,
   readSoundScreen,
@@ -88,6 +88,27 @@ describe('soundOwner', () => {
       expect(nextTvPresenceValue(null, false)).toBeNull();
       expect(tvScreensOf(null)).toEqual({});
       expect(tvScreensOf({ screen: 'tv' })).toEqual({});
+    });
+
+    it('claimSoundScreen carries the presence map verbatim across a flip (backlog 2026-11-23)', () => {
+      const marked = nextTvPresenceValue({ screen: 'tv' }, true);
+      const token = ownTokenOf(marked);
+      seedTrackedResources('campaign', {
+        [SOUND_OWNER_KEY]: { screen: 'tv', tvScreens: { [token]: true, 'tab-foreign': true } },
+      });
+      claimSoundScreen('Test Camp', 'gm');
+      // The new screen rides with BOTH tokens untouched — no zero-TV window.
+      expect(getRuntimeValue('campaign', SOUND_OWNER_KEY)).toEqual({
+        screen: 'gm',
+        tvScreens: { [token]: true, 'tab-foreign': true },
+      });
+    });
+
+    it('claimSoundScreen on an empty store writes the canonical claim-only shape', () => {
+      claimSoundScreen('Test Camp', 'tv');
+      const stored = getRuntimeValue('campaign', SOUND_OWNER_KEY);
+      expect(stored).toEqual({ screen: 'tv' });
+      expect('tvScreens' in stored).toBe(false); // no phantom empty map
     });
 
     it('pagehide release keepalive-POSTs the stripped value to the soundOwner key', () => {

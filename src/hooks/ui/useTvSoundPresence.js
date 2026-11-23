@@ -34,12 +34,20 @@ export function useTvSoundPresence(campaignName) {
 
   // Announce/withdraw on pref flips and shared-key echoes (a foreign claim
   // flip or a clobbering write re-arms this tab's marker on the next echo —
-  // self-healing with no heartbeat clock).
+  // self-healing with no heartbeat clock). One carve-out (backlog 2026-11-23):
+  // a strip is HELD while this tab is still in TV mode but the claim has
+  // moved off 'tv' — the zero-TV note only qualifies a 'tv' claim, so the
+  // marker is invisible there, and keeping it lets claimSoundScreen carry it
+  // across a tv→gm→tv round trip with no zero-window. Strips still fire
+  // whenever this tab actually leaves TV mode (pref off) or the claim still
+  // names tv while this page is not a speaker.
   useEffect(() => {
     if (!campaignName) return;
     const next = nextTvPresenceValue(owner, present);
-    if (next) setRuntimeValue('campaign', SOUND_OWNER_KEY, next, campaignName);
-  }, [campaignName, owner, present]);
+    if (next && (present || !tvPref)) {
+      setRuntimeValue('campaign', SOUND_OWNER_KEY, next, campaignName);
+    }
+  }, [campaignName, owner, present, tvPref]);
 
   const latestRef = useRef({ campaignName, present });
   latestRef.current = { campaignName, present };
@@ -47,10 +55,13 @@ export function useTvSoundPresence(campaignName) {
   useEffect(() => {
     // Reload/tab-close teardown twin of MusicPlayer's pagehide release:
     // keepalive carries the strip past navigation so peers stop seeing this
-    // screen the moment it is gone.
+    // screen the moment it is gone. Attempted even when the beacon is not
+    // self-claiming: a marker HELD under a non-'tv' claim (above) must still
+    // leave on graceful departure — nextTvPresenceValue answers null when
+    // nothing is marked, so TV-silent tabs still never POST.
     const release = () => {
-      const { campaignName: name, present: isPresent } = latestRef.current;
-      if (!name || !isPresent) return;
+      const { campaignName: name } = latestRef.current;
+      if (!name) return;
       releaseTvPresenceKeepalive(name, getRuntimeValue('campaign', SOUND_OWNER_KEY));
     };
     // bfcache resume: pagehide already fired (SSE closed, marker stripped)

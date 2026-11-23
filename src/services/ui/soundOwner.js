@@ -34,8 +34,21 @@ export function readSoundScreen() {
   return value?.screen === 'tv' ? 'tv' : 'gm';
 }
 
+/**
+ * Move the one-speaker claim (backlog 2026-11-23): a read-modify-write in the
+ * presence lane's shape — the additive `tvScreens` map rides VERBATIM beside
+ * the new `screen`, so a tv→gm→tv round trip never opens the zero-TV window
+ * the wholesale `{ screen }` write used to flash on peers. No markers present
+ * keeps the canonical claim-only shape (the beacon lane never stores an
+ * empty map, and tvScreensOf reads absence as {}). A foreign mark that lands
+ * between the last echo and this click is re-armed by that tab's beacon on
+ * the next echo — the same self-heal residual the presence lane carries.
+ */
 export function claimSoundScreen(campaignName, screen) {
-  return setRuntimeValue('campaign', SOUND_OWNER_KEY, { screen }, campaignName);
+  const screens = tvScreensOf(getRuntimeValue('campaign', SOUND_OWNER_KEY));
+  const value = { screen };
+  if (Object.keys(screens).length > 0) value.tvScreens = screens;
+  return setRuntimeValue('campaign', SOUND_OWNER_KEY, value, campaignName);
 }
 
 /** True when THIS browser is the screen that should be making sound. */

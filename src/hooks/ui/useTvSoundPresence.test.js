@@ -119,4 +119,53 @@ describe('useTvSoundPresence', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(Object.values(posted()[2].tvScreens)).toEqual([true]);
   });
+
+  it('a claim flip off tv HOLDS the marker while the tab is still in TV mode (no round-trip zero-window)', () => {
+    saveTvPref(true);
+    seedTrackedResources('campaign', { [SOUND_OWNER_KEY]: { screen: 'tv' } });
+    renderHook(() => useTvSoundPresence('Test Camp'));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const token = Object.keys(
+      tvScreensOf(getRuntimeValue('campaign', SOUND_OWNER_KEY)))[0];
+    // The announce echo lands (nothing to do), then the claim flips to gm
+    // with the marker carried (the fixed claimSoundScreen shape).
+    act(() => {
+      seedTrackedResources('campaign', {
+        [SOUND_OWNER_KEY]: { screen: 'tv', tvScreens: { [token]: true } },
+      });
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    act(() => {
+      seedTrackedResources('campaign', {
+        [SOUND_OWNER_KEY]: { screen: 'gm', tvScreens: { [token]: true } },
+      });
+    });
+    expect(fetch).toHaveBeenCalledTimes(1); // held — no strip under a gm claim
+    // Leaving TV mode for real strips through the shared lane, claim or no claim.
+    act(() => saveTvPref(false));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(posted()[1]).toEqual({ screen: 'gm' });
+  });
+
+  it('pagehide strips even a marker held under a gm claim (graceful departure leaves no stale token)', () => {
+    saveTvPref(true);
+    seedTrackedResources('campaign', { [SOUND_OWNER_KEY]: { screen: 'tv' } });
+    const { unmount } = renderHook(() => useTvSoundPresence('Test Camp'));
+    const token = Object.keys(
+      tvScreensOf(getRuntimeValue('campaign', SOUND_OWNER_KEY)))[0];
+    act(() => {
+      seedTrackedResources('campaign', {
+        [SOUND_OWNER_KEY]: { screen: 'gm', tvScreens: { [token]: true } },
+      });
+    });
+    expect(fetch).toHaveBeenCalledTimes(1); // held, unstripped
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const [, init] = fetch.mock.calls[1];
+    expect(init.keepalive).toBe(true);
+    expect(JSON.parse(init.body).value).toEqual({ screen: 'gm' }); // own token gone, claim kept
+    unmount();
+  });
 });
