@@ -3,13 +3,19 @@
 // Contract: ONE shared EventSource per campaign, fan-out to all handlers, native
 // EventSource auto-reconnect (NO hand-rolled reconnect loops, NO timers — every
 // branch below is driven by directly invoking the on* slots of a mocked
-// EventSource). Severity law (2026-11-11 improve sse-console-cleanliness):
+// EventSource). Severity law (2026-11-11 improve sse-console-cleanliness,
+// sharpened 2026-11-22 improve sse-unload-race-console-hygiene):
 // error events while readyState===CONNECTING are the BENIGN reconnect face —
 // logged at console.debug until RECONNECT_ERROR_ESCALATION (3) consecutive
 // failures prove the API is persistently unreachable under a live tab, then
 // console.error. readyState===CLOSED (native retry definitively over) is always
-// console.error. A pagehide (reload/tab-close) pins the whole teardown face to
-// debug. Successful open/message resets the streak.
+// console.error. Teardown pins the face to debug two ways: (1) the latched
+// `pageUnloading` flag, stamped by the EARLIEST unload signal — `beforeunload`
+// fires before `pagehide`, so an EventSource error that beats pagehide on
+// CDP-driven navigations still reads unloading; (2) `document.visibilityState`
+// === 'hidden' READ AT ERROR TIME (never latched — a backgrounded tab returns
+// and must keep its visible-tab escalation). Successful open/message resets the
+// streak; hidden/unloading only change the LOG LEVEL, never the counting.
 // Each test re-imports the module fresh (vi.resetModules) so the module-level
 // `pageUnloading` flag and `sources` pool never leak between faces.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -53,6 +59,16 @@ describe('sseClient', () => {
     let debugSpy;
     let errorSpy;
 
+    // Override document.visibilityState (a prototype accessor in jsdom) with an
+    // own property on the instance; afterEach deletes it and the prototype's
+    // default 'visible' shows through again.
+    function setVisibility(state) {
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            get: () => state,
+        });
+    }
+
     // Fresh module instance per test: pageUnloading/sources are module state.
     async function freshImport() {
         vi.resetModules();
@@ -67,6 +83,7 @@ describe('sseClient', () => {
     });
 
     afterEach(() => {
+        Reflect.deleteProperty(document, 'visibilityState');
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
@@ -196,6 +213,65 @@ describe('sseClient', () => {
             source.fireError();
             expect(errorSpy).not.toHaveBeenCalled();
             expect(debugSpy).toHaveBeenCalledTimes(4);
+        });
+
+        it('beforeunload alone (the unload race: error lands before pagehide) pins the mature streak to debug', async () => {
+            // Rig for the CDP-navigation race: on programmatic reloads the final
+            // EventSource error can fire BEFORE pagehide is observed. The code
+            // guards this by stamping pageUnloading on beforeunload too (the
+            // earlier unload signal), so the rig dispatches ONLY beforeunload —
+            // pagehide is never fired — and a mature streak stays debug.
+            const { subscribeToSSE } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            const source = MockEventSource.instances[0];
+            source.readyState = MockEventSource.CONNECTING;
+
+            window.dispatchEvent(new Event('beforeunload'));
+
+            source.fireError();
+            source.fireError();
+            source.fireError();
+            source.fireError();
+            expect(errorSpy).not.toHaveBeenCalled();
+            expect(debugSpy).toHaveBeenCalledTimes(4);
+        });
+
+        it('CONNECTING error while document.visibilityState is hidden logs debug, never console.error', async () => {
+            const { subscribeToSSE } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            const source = MockEventSource.instances[0];
+            source.readyState = MockEventSource.CONNECTING;
+
+            setVisibility('hidden');
+
+            // A backgrounded tab reconnecting is not an outage the user can see —
+            // even a mature streak stays debug while hidden.
+            source.fireError();
+            source.fireError();
+            source.fireError();
+            source.fireError();
+            expect(errorSpy).not.toHaveBeenCalled();
+            expect(debugSpy).toHaveBeenCalledTimes(4);
+        });
+
+        it('hidden-ness is read at error time — a tab returning to visible keeps future escalation live', async () => {
+            const { subscribeToSSE } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            const source = MockEventSource.instances[0];
+            source.readyState = MockEventSource.CONNECTING;
+
+            // Streak starts while backgrounded (still counted — hidden only
+            // changes the log LEVEL, never the counter semantics).
+            setVisibility('hidden');
+            source.fireError();
+
+            // Tab returns to the foreground: delete the own-property override so
+            // the jsdom prototype's 'visible' shows through (nothing is latched).
+            Reflect.deleteProperty(document, 'visibilityState');
+
+            source.fireError();
+            source.fireError();
+            expect(errorSpy).toHaveBeenCalledWith('[SSE] connection error', expect.any(Error));
         });
     });
 });

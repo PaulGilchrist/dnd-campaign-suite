@@ -22,10 +22,20 @@ const RECONNECT_ERROR_ESCALATION = 3;
 
 // Browser-driven teardown flag: during unload (reload/tab-close) EventSource
 // fires a final benign error row — keep it at debug no matter the streak.
+// Stamped on `beforeunload` TOO (not just `pagehide`): on CDP-driven navigations
+// the final EventSource error can land AFTER pagehide but always after
+// beforeunload, so the earlier of the two unload signals wins the race. Both are
+// one-way unload signals — once the browser starts tearing the document down it
+// never aborts to a live page in our browsers, so latching is safe (2026-11-22
+// improve sse-unload-race-console-hygiene). Hidden-ness is deliberately NOT
+// latched here: a backgrounded tab returns to the foreground, so
+// document.visibilityState is READ AT ERROR TIME inside onerror instead.
 let pageUnloading = false;
-window.addEventListener('pagehide', () => {
+const markPageUnloading = () => {
     pageUnloading = true;
-});
+};
+window.addEventListener('beforeunload', markPageUnloading);
+window.addEventListener('pagehide', markPageUnloading);
 
 export const subscribeToSSE = (campaignName, handler) => {
     const key = campaignName || '';
@@ -62,8 +72,12 @@ export const subscribeToSSE = (campaignName, handler) => {
             if (reconnecting) {
                 entry.consecutiveErrors += 1;
             }
+            // Hidden-ness is read HERE, at error time — never latched — so a tab
+            // that backgrounds and returns keeps its future visible-tab escalation.
             const benign = reconnecting
-                && (pageUnloading || entry.consecutiveErrors < RECONNECT_ERROR_ESCALATION);
+                && (pageUnloading
+                    || document.visibilityState === 'hidden'
+                    || entry.consecutiveErrors < RECONNECT_ERROR_ESCALATION);
             if (benign) {
                 console.debug('[SSE] connection error — reconnecting', err);
             } else {

@@ -83,8 +83,6 @@ change-data + log files ABSENT on disk (post-live sweep; battle-arena.json resto
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-22 (LEARN, console hygiene):** during programmatic reloads (Playwright navigations) the SSE lane escalated three `[SSE] connection error` lines to console.error (visible in the vite-attributed log) although the benign-streak policy says unload rows stay debug — `pageUnloading` is set at `pagehide`, which can land AFTER the final EventSource error on CDP-driven navigations. Cosmetic under harnesses, but it dents the "console is a clean error signal" law; consider also treating CONNECTING errors with `document.visibilityState==='hidden'` as benign. `src/services/ui/sseClient.js:55-71`.
-
 
 ## Blocked / Not Verified (fold-gate ledger)
 
