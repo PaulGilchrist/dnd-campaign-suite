@@ -95,7 +95,7 @@ describe('assertCanAct charge-on-allow (L5-002 §7.2)', () => {
         });
         const popup = vi.fn();
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'action', charge: true, setPopupHtml: popup }))
-            .toEqual({ allowed: false, reason: 'No actions left this turn.' });
+            .toEqual({ allowed: false, rule: 'actionEconomy', reason: 'No actions left this turn.' });
         expect(turnStateReads).toBe(2);
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(popup).toHaveBeenCalledWith('No actions left this turn.');
@@ -103,6 +103,7 @@ describe('assertCanAct charge-on-allow (L5-002 §7.2)', () => {
             type: 'enforcement_denied',
             creature: 'Rakan',
             bucket: 'action',
+            rule: 'actionEconomy',
         }));
     });
 

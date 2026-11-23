@@ -103,8 +103,12 @@ function readAwayFlag(creatureName) {
     return row?.away === true;
 }
 
-/** Popup + audit log on denial (audit requires campaignName; popup sink optional per call site). */
-function reportDenial(ctx, reason) {
+/** Popup + audit log on denial (audit requires campaignName; popup sink optional per call site).
+ * `rule` is the canonical denial class (canTakeAction gate name, or the
+ * producer's own class — 'lineOfSight'/'movementBudget'/'opportunityAttack'
+ * stamp it at their own addEntry sites). It rides the log row so the GM
+ * first-denial copilot (DenialExplainer) classifies without parsing prose. */
+function reportDenial(ctx, reason, rule) {
     const { campaignName, creatureName, bucket, source, setPopupHtml } = ctx;
     if (typeof setPopupHtml === 'function') setPopupHtml(reason);
     if (campaignName) {
@@ -113,6 +117,7 @@ function reportDenial(ctx, reason) {
             creature: creatureName,
             bucket,
             source,
+            rule,
             reason,
         }).catch((e) => { console.error('[assertCanAct] denial log failed:', e); });
     }
@@ -148,7 +153,7 @@ export function assertCanAct(input) {
     // shared canTakeAction builder (never an ad-hoc string at the call site).
     if (ctx.cannotAct) {
         const reason = cannotActReason(ctx.cannotActReason);
-        if (enforcementOn) reportDenial(ctx, reason);
+        if (enforcementOn) reportDenial(ctx, reason, 'condition');
         else if (typeof ctx.setPopupHtml === 'function') ctx.setPopupHtml(reason);
         return { allowed: false, reason };
     }
@@ -173,7 +178,7 @@ export function assertCanAct(input) {
     });
 
     if (!result.allowed) {
-        reportDenial(ctx, result.reason);
+        reportDenial(ctx, result.reason, result.rule);
         return result;
     }
 
@@ -185,8 +190,8 @@ export function assertCanAct(input) {
     if (ctx.charge && enforcement.actionEconomy && isChargeableBucket(ctx.bucket)) {
         const charged = chargeSlot({ creatureName: ctx.creatureName, bucket: ctx.bucket, campaignName: ctx.campaignName });
         if (!charged) {
-            const spent = { allowed: false, reason: 'No actions left this turn.' };
-            reportDenial(ctx, spent.reason);
+            const spent = { allowed: false, rule: 'actionEconomy', reason: 'No actions left this turn.' };
+            reportDenial(ctx, spent.reason, spent.rule);
             return spent;
         }
     }

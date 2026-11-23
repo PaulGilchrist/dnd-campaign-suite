@@ -20,6 +20,7 @@ import { getCreatureController } from '../../services/encounters/creatureControl
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import LootRevealModal from './LootRevealModal.jsx'
 import GMCopilot from '../GMCopilot/GMCopilot.jsx'
+import DenialExplainer from '../GMCopilot/DenialExplainer.jsx'
 import { useGmCopilot } from '../../hooks/management/useGmCopilot.js'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/popup.jsx'
@@ -1033,6 +1034,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  isLocalhost={isLocalhost}
                  tvMode={tvMode}
              />
+             {/* First-denial explainer (deferred plan A): one-time card for
+                 the latest enforcement_denied `rule` class, watched off the
+                 shared log SSE lane. All gates (GM-only, never the TV layer)
+                 live inside DenialExplainer — Initiative stays under its
+                 complexity ceiling. */}
+             <DenialExplainer campaignName={campaignName} tvMode={tvMode} />
              <TvNextUpStrip creatures={nextUpCreatures} />
              {/* Shared dice on the TV layer (roadmap Item 5): last few roll
                  results projected big, read-only off the synced log lane.

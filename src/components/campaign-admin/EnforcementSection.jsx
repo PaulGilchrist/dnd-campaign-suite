@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
+import { ENFORCEMENT_PRESETS, CUSTOM_PRESET, matchPreset, describeConsequences } from '../../config/enforcementPresets.js'
 import './EnforcementSection.css'
 
 // Trailing debounce for enforcement checkbox writes (backlog 2026-10-24): every click
@@ -114,6 +115,17 @@ export default function EnforcementSection({ campaignName }) {
         ? { ...flags, mode: 'on' }
         : { ...ENFORCEMENT_DEFAULTS, mode: 'off' })
 
+    // Preset row (deferred plan A): a preset click writes mode:'on' + its flag
+    // map through the SAME debounced lane (a burst stays one POST, and the
+    // checkbox fieldset/derived card refresh optimistically off `draft`).
+    // The active chip is DERIVED by matchPreset on the current flags — nothing
+    // preset-shaped is ever stored, so any checkbox move after a preset click
+    // reads Custom the instant it happens. The row lives outside the flag
+    // fieldset (disabled-fieldset occlusion law — same reason as the bulk row).
+    const activePreset = matchPreset(flags)
+    const applyPreset = (preset) => writeDebounced({ ...ENFORCEMENT_DEFAULTS, ...preset.flagMap, mode: 'on' })
+    const consequences = describeConsequences(flags)
+
     return (
         <div className="admin-section enforcement-section">
             <h3><i className="fas fa-gavel"></i> Enforcement</h3>
@@ -129,6 +141,43 @@ export default function EnforcementSection({ campaignName }) {
                 <p className="enforcement-hint">
                     Master switch. With Enforcement OFF the game plays exactly as before — nothing is gated.
                 </p>
+            </div>
+
+            <div className="enforcement-presets" role="group" aria-label="Enforcement presets">
+                {ENFORCEMENT_PRESETS.map(p => (
+                    <button
+                        key={p.id}
+                        type="button"
+                        className={`session-phase-pill ${activePreset.id === p.id ? 'active' : ''}`}
+                        title={p.title}
+                        onClick={() => applyPreset(p)}
+                    >
+                        {p.label}
+                    </button>
+                ))}
+                <span
+                    className={`session-phase-pill ${activePreset.id === CUSTOM_PRESET.id ? 'active' : ''}`}
+                    title="Whatever the checkboxes say — any manual change lands here"
+                >
+                    {CUSTOM_PRESET.label}
+                </span>
+            </div>
+
+            {/* Live consequence card — derived from the flags, never stored
+                (the flags stay the single source of truth). Renders under a
+                disarmed master too: harmless preview copy. */}
+            <div className="enforcement-consequences" aria-live="polite">
+                <p>
+                    <b>Referee will:</b>{' '}
+                    {consequences.will.length
+                        ? consequences.will.join('; ')
+                        : 'nothing yet — pick a preset or tick a box below.'}
+                </p>
+                {consequences.willNot.length > 0 && (
+                    <p className="enforcement-consequences-off">
+                        <b>Referee will not:</b> {consequences.willNot.join('; ')}.
+                    </p>
+                )}
             </div>
 
             <div className="enforcement-bulk-actions">
@@ -151,7 +200,7 @@ export default function EnforcementSection({ campaignName }) {
                 </button>
             </div>
 
-            <fieldset className="enforcement-flags" disabled={flags.mode !== 'on'}>
+            <fieldset className="enforcement-flags" aria-label="Enforcement flags" disabled={flags.mode !== 'on'}>
                 {FLAGS.map(f => (
                     <label key={f.key} className="enforcement-toggle" title={f.hint}>
                         <input

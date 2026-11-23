@@ -65,7 +65,7 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Alice', bucket: 'action', setPopupHtml: popup }))
             .toEqual({ allowed: true, reason: null });
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Bob', bucket: 'action', setPopupHtml: popup }))
-            .toEqual({ allowed: false, reason: "It is Alice's turn — Bob cannot act now." });
+            .toEqual({ allowed: false, rule: 'turnLock', reason: "It is Alice's turn — Bob cannot act now." });
         expect(popup).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledTimes(1);
         // General enforcement never mutates the economy — charging is charge:true's lane (#2068).
@@ -93,13 +93,14 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
             setPopupHtml: popup,
             source: 'useCharActionsAutomation',
         });
-        expect(r).toEqual({ allowed: false, reason: "It is Goblin's turn — Rakan cannot act now." });
+        expect(r).toEqual({ allowed: false, rule: 'turnLock', reason: "It is Goblin's turn — Rakan cannot act now." });
         expect(popup).toHaveBeenCalledWith(r.reason);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',
             creature: 'Rakan',
             bucket: 'action',
             source: 'useCharActionsAutomation',
+            rule: 'turnLock',
             reason: r.reason,
         });
     });
@@ -151,6 +152,7 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
             creature: 'Rakan',
             bucket: 'action',
             source: 'action',
+            rule: 'condition',
             reason: 'Stunned — you cannot take actions.',
         });
     });
@@ -164,12 +166,13 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         // No setPopupHtml (some call sites have none) — reportDenial must degrade, not throw.
         expect(() => assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'action' })).not.toThrow();
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'action' }))
-            .toEqual({ allowed: false, reason: 'No action left this turn.' });
+            .toEqual({ allowed: false, rule: 'actionEconomy', reason: 'No action left this turn.' });
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',
             creature: 'Rakan',
             bucket: 'action',
             source: 'action',
+            rule: 'actionEconomy',
             reason: 'No action left this turn.',
         });
     });
@@ -184,9 +187,9 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
             'campaign.targetEffects': [blockAB, blockR],
         });
         const ctx = (bucket) => assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket });
-        expect(ctx('action')).toEqual({ allowed: false, reason: blockAB.reason });
-        expect(ctx('bonusAction')).toEqual({ allowed: false, reason: blockAB.reason });
-        expect(ctx('reaction')).toEqual({ allowed: false, reason: blockR.reason });
+        expect(ctx('action')).toEqual({ allowed: false, rule: 'condition', reason: blockAB.reason });
+        expect(ctx('bonusAction')).toEqual({ allowed: false, rule: 'condition', reason: blockAB.reason });
+        expect(ctx('reaction')).toEqual({ allowed: false, rule: 'condition', reason: blockR.reason });
         expect(ctx('free')).toEqual({ allowed: true, reason: null });
 
         // Blocker without a reason ⇒ lane fallback strings.
@@ -197,7 +200,7 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
             'campaign.targetEffects': [{ target: 'Rakan', effect: 'no_action_and_bonus_action' }],
         });
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'bonusAction' }))
-            .toEqual({ allowed: false, reason: "Can't take an Action or Bonus Action" });
+            .toEqual({ allowed: false, rule: 'condition', reason: "Can't take an Action or Bonus Action" });
 
         mockStore({
             'campaign.enforcement': ON,
@@ -206,6 +209,6 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
             'campaign.targetEffects': [{ target: 'Rakan', effect: 'no_reactions' }],
         });
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'reaction' }))
-            .toEqual({ allowed: false, reason: 'A zone effect blocks reactions.' });
+            .toEqual({ allowed: false, rule: 'condition', reason: 'A zone effect blocks reactions.' });
     });
 });

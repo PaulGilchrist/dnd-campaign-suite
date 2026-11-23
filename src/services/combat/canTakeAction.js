@@ -67,6 +67,7 @@ function awayDenial({ isAway, creatureName }) {
     if (!isAway) return null;
     return {
         allowed: false,
+        rule: 'away',
         reason: `${creatureName} is away from the party — the GM must rejoin them to the initiative tracker first.`,
     };
 }
@@ -74,10 +75,10 @@ function awayDenial({ isAway, creatureName }) {
 /** Step 2 — condition gate (existing primitives, unchanged semantics). */
 function conditionDenial({ bucket, cannotAct, cannotActActions, cannotActReason }) {
     if (cannotAct) {
-        return { allowed: false, reason: cannotActReason || CANNOT_ACT_REASON };
+        return { allowed: false, rule: 'condition', reason: cannotActReason || CANNOT_ACT_REASON };
     }
     if (ACTION_BUCKETS.has(bucket) && cannotActActions) {
-        return { allowed: false, reason: cannotActReason || CANNOT_ACT_ACTIONS_REASON };
+        return { allowed: false, rule: 'condition', reason: cannotActReason || CANNOT_ACT_ACTIONS_REASON };
     }
     return null;
 }
@@ -99,6 +100,7 @@ function turnLockDenial({ flags, bucket, creatureName, activeCreatureName, activ
         if (typeof companionOf === 'string' && (companionOf === activeCreatureName || companionOf === activeHolderName)) return null;
         return {
             allowed: false,
+            rule: 'turnLock',
             reason: `It is ${activeCreatureName || 'another creature'}'s turn — ${creatureName} cannot act now.`,
         };
     }
@@ -112,7 +114,7 @@ function economyDenial({ flags, bucket, turnState, creatureName, hasBudget }) {
     if (!flags.actionEconomy || typeof hasBudget !== 'function') return null;
     if (hasBudget(turnState, creatureName, bucket)) return null;
     const label = bucket === 'action' ? 'No action' : bucket === 'bonusAction' ? 'No bonus action' : 'No reaction';
-    return { allowed: false, reason: `${label} left this turn.` };
+    return { allowed: false, rule: 'actionEconomy', reason: `${label} left this turn.` };
 }
 
 /**
@@ -131,7 +133,10 @@ function economyDenial({ flags, bucket, turnState, creatureName, hasBudget }) {
  * @param {string|null} [ctx.cannotActReason] existing condition-gate reason text
  * @param {boolean} [ctx.isAway]              split-party: creature's combatSummary row is `away`
  * @param {Function} [ctx.hasBudget]          injectable budget check (turnState.hasBudget)
- * @returns {{ allowed: boolean, reason: string|null }}
+ * @returns {{ allowed: boolean, reason: string|null, rule?: string }} — `rule`
+ *          names the gate that denied ('away' | 'condition' | 'turnLock' |
+ *          'actionEconomy') so the audit row and the first-denial copilot can
+ *          classify without string-parsing the reason.
  */
 export function canTakeAction(ctx = {}) {
     const {

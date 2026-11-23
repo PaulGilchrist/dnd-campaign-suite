@@ -105,13 +105,14 @@ describe('assertCanAct — active-creature ST-seam read (CLA-360)', () => {
             setPopupHtml: popup,
             source: 'useCharActionsAttackHandlers',
         });
-        expect(r).toEqual({ allowed: false, reason: `It is ${TWIN}'s turn — ElderPaladin cannot act now.` });
+        expect(r).toEqual({ allowed: false, rule: 'turnLock', reason: `It is ${TWIN}'s turn — ElderPaladin cannot act now.` });
         expect(popup).toHaveBeenCalledWith(r.reason);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',
             creature: 'ElderPaladin',
             bucket: 'action',
             source: 'useCharActionsAttackHandlers',
+            rule: 'turnLock',
             reason: r.reason,
         });
     });
@@ -122,7 +123,7 @@ describe('assertCanAct — active-creature ST-seam read (CLA-360)', () => {
         storeMirror.creatures = twinBoard;
 
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: HOLDER, bucket: 'action' }))
-            .toEqual({ allowed: false, reason: `It is ElderPaladin's turn — ${HOLDER} cannot act now.` });
+            .toEqual({ allowed: false, rule: 'turnLock', reason: `It is ElderPaladin's turn — ${HOLDER} cannot act now.` });
     });
 
     it('active row without holderName (malformed twin) ⇒ no invented holder pass', () => {
@@ -131,7 +132,7 @@ describe('assertCanAct — active-creature ST-seam read (CLA-360)', () => {
         storeMirror.creatures = [{ name: TWIN, type: 'player', initiative: '10', secondTurn: true }];
 
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: HOLDER, bucket: 'action' }))
-            .toEqual({ allowed: false, reason: `It is ${TWIN}'s turn — ${HOLDER} cannot act now.` });
+            .toEqual({ allowed: false, rule: 'turnLock', reason: `It is ${TWIN}'s turn — ${HOLDER} cannot act now.` });
     });
 
     it('enforcement OFF ⇒ fast path untouched even with a twin board (no store seam read)', () => {

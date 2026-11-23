@@ -210,6 +210,7 @@ describe('onTokenMoveLanded', () => {
             creature: 'Goblin 1',
             target: 'Hero',
             bucket: 'reaction',
+            rule: 'opportunityAttack',
             source: 'opportunity-attack-trigger',
             reason: "Goblin 1's reaction is already used — no opportunity attack on Hero.",
         });
@@ -232,6 +233,7 @@ describe('onTokenMoveLanded', () => {
             creature: 'Goblin 1',
             target: 'Hero',
             bucket: 'opportunityAttack',
+            rule: 'opportunityAttack',
             source: 'token-move',
             reason: `Hero left Goblin 1's reach — ${blockedNote}`,
         });

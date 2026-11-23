@@ -3,7 +3,8 @@
 // NPCs — token bytes survive identically for network clients, while GM-only
 // affordances (transparent grab hit rect, drag highlight) render on localhost
 // only, per the app's localhost-only GM features rule. Also pins the avatar
-// source consumed here: npcImages cache > item.imageUrl > initial letter
+// source consumed here: per-token item.imagePath (campaign-prefixed, plan D) >
+// npcImages cache > emoji > initial letter
 // (the cache map itself is built in hooks/useNpcImageCache.test.js, #909).
 //
 //   Element                localhost            network
@@ -85,11 +86,12 @@ describe('PlacedItems - NPC localhost gating', () => {
   });
 
   it.each([
-    ['npcImages cache beats item.imageUrl', { npcImages: { Goblin: '/cached.png' }, item: npc({ imageUrl: '/inline.png' }) }, '/cached.png'],
-    ['item.imageUrl used when cache has no entry', { npcImages: {}, item: npc({ imageUrl: '/inline.png' }) }, '/inline.png'],
+    ['item.imagePath beats the npcImages cache', { npcImages: { Goblin: '/cached.png' }, item: npc({ imagePath: 'images/gob.png' }) }, 'campaigns/test-campaign/images/gob.png'],
+    ['npcImages cache used when the row carries no art', { npcImages: { Goblin: '/cached.png' }, item: npc() }, '/cached.png'],
+    ['item.imagePath used when cache has no entry', { npcImages: {}, item: npc({ imagePath: 'images/gob.png' }) }, 'campaigns/test-campaign/images/gob.png'],
     ['initial letter when no image at all', { npcImages: {}, item: npc() }, null],
   ])('avatar source: %s', (_label, { npcImages, item }, expectedHref) => {
-    const { container } = renderNpc({ isLocalhost: true, items: [item], npcImages });
+    const { container } = renderNpc({ isLocalhost: true, items: [item], npcImages, campaignName: 'test-campaign' });
     const image = container.querySelector('image.creature-image');
     if (expectedHref) {
       expect(image).toHaveAttribute('xlink:href', expectedHref);
@@ -102,6 +104,17 @@ describe('PlacedItems - NPC localhost gating', () => {
       expect(image).toBeNull();
       expect(container.querySelector('text.npc-initial')).toHaveTextContent('G');
     }
+  });
+
+  it('emoji fallback rides the initial slot (plan D) — no image, no cache', () => {
+    const { container } = renderNpc({
+      isLocalhost: true,
+      items: [npc({ emoji: '🧙' })],
+      npcImages: {},
+      campaignName: 'test-campaign',
+    });
+    expect(container.querySelector('image.creature-image')).toBeNull();
+    expect(container.querySelector('text.npc-initial')).toHaveTextContent('🧙');
   });
 
   it('census: same-type items keep separate positioned groups; NPCs never join placed-item groups', () => {

@@ -18,6 +18,7 @@ import { projectActorStats } from '../../services/ai/actorStats.js'
 import { applyRuling, isAtomicRuling } from '../../services/ai/applyRuling.js'
 import { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import AiConfigRow, { AiStatusBadge } from './AiConfigRow.jsx'
+import AiReadinessPanel from './AiReadinessPanel.jsx'
 import AiWorldConsole from './AiWorldConsole.jsx'
 import './AiRefereeSection.css'
 
@@ -103,6 +104,17 @@ export default function AiRefereeSection({ campaignName, characters = [] }) {
             <h3><i className="fas fa-robot"></i> AI Referee <AiStatusBadge status={status} /></h3>
             <AiConfigRow aiConfig={aiConfig} onSave={saveConfig} onRemove={removeConfig} />
             {notice && <div className="ai-notice ai-notice--error" role="alert">{notice}</div>}
+            {/* Level 5 without AI (deferred plan B): the §3 promise as one
+                muted discovery line — enforcement is fully playable with the
+                AI off. Copy only, never a gate. */}
+            {!live && (
+                <p className="ai-off-note">
+                    Enforcement works entirely on its own — AI is optional. You can keep playing without a model server.
+                </p>
+            )}
+            {/* Readiness chips (plan B): shown whenever a mode other than off
+                is selected; every check is click-only. */}
+            {live && <AiReadinessPanel campaignName={campaignName} aiConfig={aiConfig} />}
             {live && <AiAskConsole campaignName={campaignName} characters={characters} aiConfig={aiConfig} enforcement={enforcement} />}
             {live && <AiWorldConsole campaignName={campaignName} />}
         </div>

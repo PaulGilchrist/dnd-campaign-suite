@@ -47,11 +47,13 @@ describe('usePlacedItems', () => {
 
   const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem, placedItems)).result;
 
-  it('returns the four mutation handlers plus the named-confirm dialog seam', () => {
+  it('returns the six mutation handlers plus the named-confirm dialog seam', () => {
     expect(Object.keys(getHook().current)).toEqual([
       'handleToggleItemVisibility',
       'handleDeleteItem',
       'handleToggleDoor',
+      'handlePatchItem',
+      'handleCycleItemLight',
       'handleRotate',
       'requestDelete',
       'pendingDelete',

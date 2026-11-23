@@ -51,4 +51,35 @@ export const COPILOT_TIPS = {
     flag: 'Try next',
     body: 'The initiative board is alive — press TV on any screen for the across-the-room view: turn spotlight, up-next strip, big HP bars, and damage floaters.',
   },
+
+  // ---- First-denial explainers (deferred plan A) ----
+  // Fired by DenialExplainer the first time a specific enforcement rule
+  // denies someone in this campaign (watched off the existing
+  // `enforcement_denied` log lane — the `rule` stamp classifies). Same
+  // one-time contract as every tip here: × settles forever via `gmCopilot`.
+  // Copy names the rule, why it exists, and the exact off-switch location.
+  'denial-turnlock': {
+    icon: 'fa-hourglass-half',
+    title: 'That was the turn lock',
+    flag: 'First refusal',
+    body: 'Turn lock refuses Actions and Bonus Actions outside a creature’s own turn — Reactions still fire off-turn, exactly as the rules intend. It keeps the order on screen honest. Want it back off? Admin → Enforcement → uncheck Turn lock (or flip the master switch off for the whole box).',
+  },
+  'denial-economy': {
+    icon: 'fa-coins',
+    title: 'That was the action economy',
+    flag: 'First refusal',
+    body: 'Action economy charges each creature 1 Action, 1 Bonus Action and 1 Reaction per turn — extra attempts are refused with “No action left.” Every tracker card shows the chips draining. It switches off in Admin → Enforcement → Action economy.',
+  },
+  'denial-movement': {
+    icon: 'fa-shoe-prints',
+    title: 'That was the movement budget',
+    flag: 'First refusal',
+    body: 'Movement budget clamps token drags to what the creature has left this turn — an over-reach snaps short and logs the honest partial spend. Difficult terrain costs double. Off-switch: Admin → Enforcement → Movement budget.',
+  },
+  'denial-los': {
+    icon: 'fa-eye-slash',
+    title: 'That was line of sight',
+    flag: 'First refusal',
+    body: 'Line of sight denies ranged attacks and spells whose path crosses a wall or a closed door — refused before the action slot is charged, so nothing is wasted. Off-switch: Admin → Enforcement → Line of sight.',
+  },
 };

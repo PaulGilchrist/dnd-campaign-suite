@@ -103,6 +103,9 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         await waitFor(() => expect(screen.getByText(/not configured/)).toBeInTheDocument());
         expect(screen.queryByPlaceholderText(/Describe what a player does/)).toBeNull();
         expect(screen.queryByRole('button', { name: /Ask AI referee/ })).toBeNull();
+        // Plan B: the off face is the signpost, never the readiness panel.
+        expect(screen.getByText(/Enforcement works entirely on its own — AI is optional/)).toBeInTheDocument();
+        expect(screen.queryByText(/Optional pre-flight checks/)).toBeNull();
         first.unmount();
 
         // configured but off: badge is honest about the mode, console stays hidden
@@ -110,6 +113,7 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         await waitFor(() => expect(screen.getByText(/· off/)).toBeInTheDocument()); // let the status fetch settle
         expect(screen.queryByPlaceholderText(/Describe what a player does/)).toBeNull();
+        expect(screen.getByText(/Enforcement works entirely on its own — AI is optional/)).toBeInTheDocument();
         expect(refereePosts(fetchMock)).toHaveLength(0);
     });
 

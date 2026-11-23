@@ -19,7 +19,11 @@ export function bresenham(x0, y0, x1, y1) {
     return cells;
 }
 
-function lineBlocked(line, walls, closedDoors) {
+// Interior-cell blocking test (endpoints excluded — a wall ON the target cell
+// is what the LOS combat gate adjudicates separately). Exported for the
+// lighting lane (plan C), which raycasts the same wall/closed-door model
+// through a radius instead of the full grid.
+export function lineBlocked(line, walls, closedDoors) {
     for (let i = 1; i < line.length - 1; i++) {
         const cellKey = `${line[i].x},${line[i].y}`;
         if (walls.has(cellKey) || closedDoors.has(cellKey)) return true;

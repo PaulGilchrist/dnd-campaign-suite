@@ -113,6 +113,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
             creature: defender.name,
             target: moverName,
             bucket: 'opportunityAttack',
+            rule: 'opportunityAttack',
             source: 'token-move',
             reason,
         }).catch((e) => { console.error('[opportunityTrigger] block log failed:', e); });
@@ -130,6 +131,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
             creature: defender.name,
             target: moverName,
             bucket: 'reaction',
+            rule: 'opportunityAttack',
             source: 'opportunity-attack-trigger',
             reason,
         }).catch((e) => { console.error('[opportunityTrigger] spent log failed:', e); });

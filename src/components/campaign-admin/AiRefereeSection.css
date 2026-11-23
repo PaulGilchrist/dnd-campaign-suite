@@ -164,3 +164,48 @@
 /* target_effect key pre-filter — repair a model-invented key before confirm. */
 .ai-referee-section .ai-effect-fix { margin-top: 0.35rem; }
 .ai-referee-section .ai-effect-select { min-width: 260px; }
+
+/* ---- Deferred plan B — readiness panel + Level-5-without-AI signpost ---- */
+.ai-referee-section .ai-off-note {
+    margin: 4px 0;
+    opacity: 0.75;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+.ai-referee-section .ai-readiness {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(139, 148, 158, 0.35);
+    border-left: 4px solid #8b949e;
+    border-radius: 6px;
+}
+.ai-referee-section .ai-readiness-intro {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+.ai-referee-section .ai-readiness-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.ai-referee-section .ai-readiness-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    min-width: 220px;
+    flex: 1 1 220px;
+    font-size: 0.85rem;
+}
+.ai-referee-section .ai-readiness-chip .ai-badge { margin-left: 0; }
+.ai-referee-section .ai-readiness-chip-hint {
+    font-style: normal;
+    font-size: 0.75rem;
+    color: #8b949e;
+    overflow-wrap: anywhere;
+}
+.ai-referee-section .ai-readiness-recipes { margin-top: 0.6rem; font-size: 0.85rem; }
+.ai-referee-section .ai-readiness-recipes details { margin-left: 1rem; }
+.ai-referee-section .ai-readiness-recipes summary { cursor: pointer; }
+.ai-referee-section .ai-readiness-recipes p { margin: 0.25rem 0 0.5rem; color: #8b949e; }

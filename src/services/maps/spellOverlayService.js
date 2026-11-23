@@ -4,8 +4,7 @@ import { bresenham } from './lineOfSight.js';
 import { loadMapData } from './mapsService.js';
 import { computeEffectiveWalls } from './effectiveWalls.js';
 import { getCombatSummary } from '../encounters/combatData.js';
-
-const FEET_PER_CELL = 5;
+import { FEET_PER_CELL } from '../../config/mapConfig.js';
 
 export const OVERLAY_TARGET_PREFIX = 'overlay-';
 

@@ -70,8 +70,9 @@ const BOUNDS = { left: 0, top: 0, right: 1200, bottom: 800 };
 
 describe('viewport clamp — menu fully inside the visible board', () => {
     it('token low on the board: panel AND every row baseline stay within the viewport bottom', () => {
-        // npc + found monster → tallest family (height 116). gridY 18 anchors
-        // raw menuY = 18*40+20+10 = 750; 750 + 116 overflows the 800 bottom.
+        // npc + found monster → tallest family (height 138 with the plan-C
+        // Light row). gridY 18 anchors raw menuY = 18*40+20+10 = 750;
+        // 750 + 138 overflows the 800 bottom.
         const { container } = renderMenu({
             selectedItem: { id: 'item-1', gridX: 0, gridY: 18 },
             placedItems: [placedItem({ type: 'npc' })],
@@ -79,14 +80,15 @@ describe('viewport clamp — menu fully inside the visible board', () => {
             viewPortBounds: BOUNDS,
         });
         const rect = attrs(panelRect(container));
-        // Clamped to bottom − height − 4 = 800 − 116 − 4 = 680.
-        expect(rect.y).toBe(680);
+        // Clamped to bottom − height − 4 = 800 − 138 − 4 = 658.
+        expect(rect.y).toBe(658);
         expect(rect.y + rect.height).toBeLessThanOrEqual(BOUNDS.bottom);
         expect(rect.y).toBeGreaterThanOrEqual(BOUNDS.top);
-        // Last entry (View Stats at menuY + 86 — Rotate never renders for
-        // creature tokens) lands fully inside.
+        // Last entry (View Stats at menuY + 108 — one row lower since the
+        // Light row joined; Rotate never renders for creature tokens) lands
+        // fully inside.
         const maxBaseline = Math.max(...rowBaselines(container));
-        expect(maxBaseline).toBe(680 + 86);
+        expect(maxBaseline).toBe(658 + 108);
         expect(maxBaseline).toBeLessThanOrEqual(BOUNDS.bottom);
     });
 

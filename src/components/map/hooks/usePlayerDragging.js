@@ -70,6 +70,7 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
             type: 'enforcement_denied',
             creature: creatureName,
             bucket: 'movement',
+            rule: 'movementBudget',
             source: 'map-drag',
             reason: `Out of movement — snapped to the remaining budget (${clamped.costFeet} ft this move).`,
         }).catch((e) => { console.error('[usePlayerDragging:movement-log]', e); });

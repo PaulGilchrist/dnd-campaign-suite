@@ -51,6 +51,7 @@ function PlacedItems({
     placedItems,
     isLocalhost,
     fog,
+    campaignName,
     gridCenterX,
     gridCenterY,
     setSelectedItem,
@@ -269,7 +270,15 @@ function PlacedItems({
         const cx = gridCenterX(cell.gridX);
         const cy = gridCenterY(cell.gridY);
         const npcOpacity = itemOpacity(item);
-        const npcImage = npcImages[item.name] || item.imageUrl;
+        // Art precedence (deferred plan D): a per-token explicit upload wins —
+        // the GM chose THAT art for THIS token — then the name-keyed portrait
+        // cache, then the emoji/initial fallback. Uploads store a campaign-
+        // relative `imagePath` (POST /token-image lane); map JSON never
+        // ferries inline bytes through the 1 s autosave.
+        const npcImage = item.imagePath
+            ? `campaigns/${campaignName}/${item.imagePath}`
+            : npcImages[item.name];
+        const npcMark = item.emoji || (isMonster ? '☠' : item.name.charAt(0).toUpperCase());
         // Same-cell stacking offset (GA 2026-11-10): undefined for single
         // tokens and stack tops (byte-unchanged), a translate for buried ones.
         // Ghosts skip the fan — the offset belongs to the real (hidden) cell.
@@ -312,7 +321,7 @@ function PlacedItems({
                         className="npc-initial"
                         style={{ opacity: npcOpacity }}
                     >
-                        {isMonster ? '☠' : item.name.charAt(0).toUpperCase()}
+                        {npcMark}
                     </text>
                 )}
                 <text

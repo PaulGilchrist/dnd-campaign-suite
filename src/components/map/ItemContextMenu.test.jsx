@@ -7,9 +7,9 @@
 //   state                        labels
 //   registered prop visible    → ['Hide','Delete','Rotate','✕']
 //   registered prop hidden     → ['Show','Delete','Rotate','✕']
-//   monster token            → ['Hide','Delete','✕']          (no Rotate — rotation-invariant lane)
-//   npc, monster not found   → ['Hide','Delete','Rename','✕'] (no Rotate)
-//   npc, monster found       → ['Hide','Delete','Rename','View Stats','✕'] (no Rotate)
+//   monster token            → ['Hide','Delete','Light: bright','✕']  (no Rotate — rotation-invariant lane; Light row joined with plan C)
+//   npc, monster not found   → ['Hide','Delete','Light: bright','Rename','✕'] (no Rotate)
+//   npc, monster found       → ['Hide','Delete','Light: bright','Rename','View Stats','✕'] (no Rotate)
 //   ghost '?' prop (cauldron)  → ['Hide','Delete','✕']         (no Rotate — generic-prop lane)
 //   rotatable prop (table)   → ['Hide','Delete','Rotate','✕']
 //   door closed              → ['Hide','Delete','Open Door','Rotate','✕']
@@ -53,6 +53,7 @@ const createMocks = () => ({
     handleDeleteItem: vi.fn(),
     handleRotate: vi.fn(),
     handleToggleDoor: vi.fn(),
+    handleCycleItemLight: vi.fn(),
     handleViewStats: vi.fn(),
     onRenameClicked: vi.fn(),
     onClose: vi.fn(),
@@ -112,10 +113,10 @@ describe('menu content census', () => {
     it.each([
         ['registered prop visible', { type: 'barrel', visible: true }, false, ['Hide', 'Delete', 'Rotate', '✕']],
         ['registered prop hidden', { type: 'barrel', visible: false }, false, ['Show', 'Delete', 'Rotate', '✕']],
-        ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Rename', '✕']],
-        ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Rename', 'View Stats', '✕']],
-        ['monster token', { type: 'monster', name: 'Goblin' }, false, ['Hide', 'Delete', '✕']],
-        ['monster token hidden', { type: 'monster', name: 'Goblin', visible: false }, false, ['Show', 'Delete', '✕']],
+        ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Light: bright', 'Rename', '✕']],
+        ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Light: bright', 'Rename', 'View Stats', '✕']],
+        ['monster token', { type: 'monster', name: 'Goblin' }, false, ['Hide', 'Delete', 'Light: bright', '✕']],
+        ['monster token hidden', { type: 'monster', name: 'Goblin', visible: false }, false, ['Show', 'Delete', 'Light: bright', '✕']],
         ['rotatable prop (table)', { type: 'table' }, false, ['Hide', 'Delete', 'Rotate', '✕']],
         ['door closed, monster found', { type: 'door', open: false }, true, ['Hide', 'Delete', 'Open Door', 'Rotate', '✕']],
         ['door open', { type: 'door', open: true }, false, ['Hide', 'Delete', 'Close Door', 'Rotate', '✕']],
@@ -174,9 +175,9 @@ describe('menu panel height', () => {
         Number(container.querySelector('.item-context-menu rect').getAttribute('height'));
 
     it.each([
-        ['monster (Hide/Delete only)', { type: 'monster', name: 'Goblin' }, false, 54],
-        ['npc (Rename, no Rotate)', { type: 'npc' }, false, 98],
-        ['npc + stats (no Rotate)', { type: 'npc' }, true, 116],
+        ['monster (Hide/Delete/Light)', { type: 'monster', name: 'Goblin' }, false, 94],
+        ['npc (Light/Rename, no Rotate)', { type: 'npc' }, false, 120],
+        ['npc + stats (no Rotate)', { type: 'npc' }, true, 138],
         ['rotatable prop keeps Rotate row', { type: 'table' }, false, 76],
         ['door keeps Rotate row', { type: 'door' }, false, 116],
         ['ghost prop drops Rotate row', { type: 'cauldron' }, false, 54],

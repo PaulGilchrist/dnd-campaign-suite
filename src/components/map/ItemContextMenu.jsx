@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import MenuOption from '../common/MenuOption.jsx';
 import { useMenuRoving } from '../../hooks/ui/useMenuRoving';
 import { itemSpriteHref } from '../../services/maps/itemSprites';
+import { normalizeLightSetting } from '../../services/maps/lighting.js';
 
 // Rotation-invariance audit (backlog 2026-11-01 BA): creature tokens (npc +
 // monster, which is what AI-Dress `ai-dress-token-*` rows are) have NO
@@ -27,10 +28,12 @@ function isRotationInvariant(item) {
 
 const MENU_WIDTH = 120;
 
-function menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption) {
+function menuHeightFor(isCreature, isNpc, isDoor, showViewStats, showRotateOption) {
     let height;
     if (isDoor) height = 116;
-    else if (isNpc || showViewStats) height = showViewStats ? 138 : 120;
+    // Creature rows (plan C): a Light cycle row joins the menu (visibility,
+    // delete, light — npc rows additionally rename/stats below it).
+    else if (isCreature) height = isNpc ? (showViewStats ? 160 : 142) : 116;
     else height = 76;
     // Rotate is always the last row (22px pitch); drop its slot when hidden.
     return showRotateOption ? height : height - 22;
@@ -48,15 +51,17 @@ function rotateOffsetFor(showViewStats, showRenameOption, isDoor) {
 function menuFlagsFor(item, monsterFound) {
     const isNpc = item && item.type === 'npc';
     const isDoor = item && item.type === 'door';
+    const isCreature = isNpc || (item && item.type === 'monster');
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
     const showRotateOption = !isRotationInvariant(item);
     return {
         isDoor,
+        isCreature: !!isCreature,
         showRenameOption,
         showViewStats,
         showRotateOption,
-        height: menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption),
+        height: menuHeightFor(!!isCreature, isNpc, isDoor, showViewStats, showRotateOption),
     };
 }
 
@@ -69,11 +74,17 @@ function menuEntriesFor(flags, item, menuY) {
     if (flags.isDoor) {
         entries.push({ id: 'door', y: menuY + 64, label: item?.open ? 'Close Door' : 'Open Door' });
     }
+    // Light cycle row (plan C): presses cycle bright → dim → none; the label
+    // names the CURRENT setting (absent = the canonical bright default).
+    if (flags.isCreature) {
+        const setting = normalizeLightSetting(item?.light);
+        entries.push({ id: 'light', y: menuY + 64, label: `Light: ${setting}` });
+    }
     if (flags.showRenameOption) {
-        entries.push({ id: 'rename', y: menuY + 64, label: 'Rename' });
+        entries.push({ id: 'rename', y: menuY + (flags.isCreature ? 86 : 64), label: 'Rename' });
     }
     if (flags.showViewStats) {
-        entries.push({ id: 'stats', y: menuY + 86, label: 'View Stats' });
+        entries.push({ id: 'stats', y: menuY + (flags.isCreature ? 108 : 86), label: 'View Stats' });
     }
     if (flags.showRotateOption) {
         entries.push({ id: 'rotate', y: menuY + yRotate, label: 'Rotate' });
@@ -100,6 +111,7 @@ function ItemContextMenu({
     onRenameClicked,
     onClose,
     viewPortBounds,
+    handleCycleItemLight,
 }) {
     const menuRef = useRef(null);
     const item = selectedItem ? placedItems.find(i => i.id === selectedItem.id) : undefined;
@@ -160,6 +172,7 @@ function ItemContextMenu({
         visibility: () => handleToggleItemVisibility(selectedItem.id),
         delete: () => handleDeleteItem(selectedItem.id),
         door: () => handleToggleDoor(selectedItem.id),
+        light: () => handleCycleItemLight(selectedItem.id),
         rename: (e) => onRenameClicked(e, selectedItem, item?.name || 'NPC'),
         stats: () => handleViewStats(selectedItem.id),
         rotate: () => handleRotate(selectedItem.id),

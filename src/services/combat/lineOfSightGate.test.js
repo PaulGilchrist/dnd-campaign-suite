@@ -183,7 +183,7 @@ describe('checkLineOfSight', () => {
             .resolves.toEqual({ allowed: false, reason: 'Goblin is behind a wall at (5,1) — no line of sight.' });
         expect(popup).toHaveBeenCalledWith('Goblin is behind a wall at (5,1) — no line of sight.');
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', source: 'attack-row',
+            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', rule: 'lineOfSight', source: 'attack-row',
             reason: 'Goblin is behind a wall at (5,1) — no line of sight.',
         });
 
@@ -193,7 +193,7 @@ describe('checkLineOfSight', () => {
         await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft', fromPos: { gridX: 2, gridY: 4 }, toPos: { gridX: 6, gridY: 4 } }))
             .resolves.toEqual({ allowed: false, reason: 'Goblin is behind a wall at (4,4) — no line of sight.' });
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', source: 'action',
+            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', rule: 'lineOfSight', source: 'action',
             reason: 'Goblin is behind a wall at (4,4) — no line of sight.',
         });
     });

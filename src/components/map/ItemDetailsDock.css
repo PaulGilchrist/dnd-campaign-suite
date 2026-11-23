@@ -1,0 +1,51 @@
+/* Token art controls (deferred plan D) — dock-scoped additions riding the
+   existing .item-details-dock chrome tokens in Map.css. */
+.map .item-details-dock-art {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-basis: 100%;
+}
+
+/* Hidden native input, visible label-as-button (the app's upload idiom). */
+.map .item-details-dock-art-row {
+    position: relative;
+    display: inline-flex;
+}
+
+.map .item-details-dock-art-row input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.map .item-details-dock-emoji {
+    display: grid;
+    grid-template-columns: repeat(8, 1.6rem);
+    gap: 2px;
+}
+
+.map .item-details-dock-emoji-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 3px;
+    cursor: pointer;
+}
+
+.map .item-details-dock-emoji-btn:hover {
+    border-color: var(--color-primary);
+}
+
+.map .item-details-dock-emoji-btn.active {
+    border-color: #d4a017;
+    background: rgba(212, 160, 23, 0.18);
+}
+
+.map .item-details-dock-art-error {
+    color: #f85149;
+    font-size: 0.78rem;
+}

@@ -5,7 +5,12 @@
     margin: 8px 0;
 }
 
-.session-section .session-phase-pill {
+/* Shared admin pill kit: the phase pills here double as the Enforcement
+   preset row (deferred plan A) — one selector list keeps the tokens in ONE
+   place. Both sections always co-mount inside CampaignAdmin, and bundled CSS
+   is global anyway. */
+.session-section .session-phase-pill,
+.enforcement-section .session-phase-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -17,7 +22,8 @@
     cursor: pointer;
 }
 
-.session-section .session-phase-pill.active {
+.session-section .session-phase-pill.active,
+.enforcement-section .session-phase-pill.active {
     border-color: #d4a017;
     background: rgba(212, 160, 23, 0.18);
     font-weight: 600;

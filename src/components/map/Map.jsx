@@ -39,6 +39,7 @@ import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
 import TokenStatusLayer from './TokenStatusLayer.jsx';
 import FogOverlay from './FogOverlay.jsx';
+import LightingOverlay from './LightingOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
 import ItemDetailsDock from './ItemDetailsDock.jsx';
 import DeleteFromMapModal from './DeleteFromMapModal.jsx';
@@ -53,6 +54,7 @@ import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
 import useIndoorPois from './hooks/useIndoorPois';
 import useFogOfWar from './hooks/useFogOfWar';
+import useLighting from './hooks/useLighting';
 import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
@@ -232,6 +234,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         handleToggleItemVisibility,
         handleDeleteItem,
         handleToggleDoor,
+        handlePatchItem,
+        handleCycleItemLight,
         handleRotate,
         requestDelete,
         pendingDelete,
@@ -384,8 +388,19 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     // 2026-10-24 a LAN player tab PUT revealed=400 seconds after a GM fog reset
     // (bug-player-clients-clobber-fog-reset). Players still mirror every map
     // change they DO receive via SSE (useSSESync); they just never author it.
-    const revealed = mapData?.revealed;
-    const { fog, visible } = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize, revealed);
+    // ONE destructure feeds the revealed read and both derived-overlay
+    // hooks — Map sits at its eslint max-statements/complexity ceilings, so
+    // these must share a statement and avoid per-call `?.` (byte-identical
+    // reads either way).
+    const overlaysSource = mapData || {}, revealed = overlaysSource.revealed;
+    const { fog, visible } = useFogOfWar(overlaysSource.players, overlaysSource.walls, placedItems, gridSize, revealed);
+
+    // Dynamic lighting veil (deferred plan C): per-map document flag (same
+    // absent-means-OFF lane as lastKnownMode — the GM press rides the ~1s
+    // autosave PUT, players adopt on the map-data SSE echo). OFF ⇒ the hook
+    // computes nothing and the overlay renders no DOM: today's map, byte-
+    // identical. Read-only spectacle — no rules lane consults light (v1 law).
+    const lighting = useLighting(overlaysSource.lighting, overlaysSource.players, overlaysSource.walls, placedItems, gridSize);
 
     // Last-known-position ghosts (roadmap Item 7): the per-client position
     // memory is HOISTED here from PlacedItems so it survives a 2D→3D→2D view
@@ -670,6 +685,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 // outdoor maps never reach this branch (HexMap above).
                 lastKnownMode={!!mapData.lastKnownMode}
                 onToggleLastKnown={() => setMapData(prev => ({ ...prev, lastKnownMode: !prev.lastKnownMode }))}
+                lightingMode={!!mapData.lighting}
+                onToggleLighting={() => setMapData(prev => ({ ...prev, lighting: !prev.lighting }))}
                 spellOverlayState={{
                     spellMode,
                     setSpellMode,
@@ -771,6 +788,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     placedItems={placedItems}
                     isLocalhost={isLocalhost}
                     fog={fog}
+                    campaignName={campaignName}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     setSelectedItem={setSelectedItem}
@@ -826,6 +844,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     isLocalhost={isLocalhost}
                 />
 
+                {/* Lighting veil (plan C) paints ABOVE fog but BELOW the
+                    selection chrome, context menus and spell overlays — zones
+                    keep reading in the dark. Null off ⇒ zero DOM. */}
+                <LightingOverlay lighting={lighting} gridSize={gridSize} isLocalhost={isLocalhost} />
+
                 <SelectionOutline
                     selectionActive={selectStart.current}
                     moveActive={moveStartGrid.current}
@@ -854,6 +877,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     handleDeleteItem={handleDeleteItem}
                     handleToggleDoor={handleToggleDoor}
                     handleRotate={handleRotate}
+                    handleCycleItemLight={handleCycleItemLight}
                     handleViewStats={handleViewStats}
                     monsterFound={monsterFound}
                     onRenameClicked={handleRenameClicked}
@@ -934,6 +958,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 item={dockItem}
                 handleDeleteItem={handleDeleteItem}
                 onDismiss={handleCloseMenu}
+                campaignName={campaignName}
+                onPatchItem={handlePatchItem}
             />
 
             {/* In-app named-delete confirm for BOTH removal lanes (backlog

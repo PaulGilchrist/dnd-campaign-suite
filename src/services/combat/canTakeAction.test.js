@@ -31,7 +31,7 @@ import { spend, registerCompanion, emptyTurnEntry, hasBudget } from './turnState
 
 const ON = { mode: 'on', turnLock: true, actionEconomy: true };
 const ALLOW = { allowed: true, reason: null };
-const DENY = (reason) => ({ allowed: false, reason });
+const DENY = (reason, rule) => ({ allowed: false, reason, rule });
 
 /** Explicit falsy defaults (#940) — every ctx field named, nothing implicit. */
 const ctx = (over = {}) => ({
@@ -101,39 +101,39 @@ describe('canTakeAction gate decision table (§6.2 order, bucket × state)', () 
         // ---- denials (exact reason bytes) ----
         ['cannotAct denies, surfacing the authored reason verbatim',
             { cannotAct: true, cannotActReason: 'Stunned — you cannot take actions.' },
-            DENY('Stunned — you cannot take actions.')],
+            DENY('Stunned — you cannot take actions.', 'condition')],
         ['cannotAct denies a reaction too — the bucket does not matter',
             { cannotAct: true, bucket: 'reaction' },
-            DENY('You cannot take actions while incapacitated.')],
+            DENY('You cannot take actions while incapacitated.', 'condition')],
         ['cannotActActions denies bonusAction, authored reason verbatim',
             { cannotActActions: true, cannotActReason: 'Stinking Cloud', bucket: 'bonusAction' },
-            DENY('Stinking Cloud')],
+            DENY('Stinking Cloud', 'condition')],
         ['cannotActActions default reason pinned on the action bucket',
             { cannotActActions: true },
-            DENY('Your condition blocks this action.')],
+            DENY('Your condition blocks this action.', 'condition')],
         ['cannotActActions admits a reaction',
             { cannotActActions: true, bucket: 'reaction' }, ALLOW],
         ['turn-lock names both creatures in the denial',
             { creatureName: 'Goblin' },
-            DENY(`It is Rakan's turn — Goblin cannot act now.`)],
+            DENY(`It is Rakan's turn — Goblin cannot act now.`, 'turnLock')],
         ['turn-lock fallback names "another creature" when active name is missing',
             { creatureName: 'Goblin', activeCreatureName: null },
-            DENY(`It is another creature's turn — Goblin cannot act now.`)],
+            DENY(`It is another creature's turn — Goblin cannot act now.`, 'turnLock')],
         ['economy: exhausted action — exact bytes',
             { turnState: spent('Rakan', 'action') },
-            DENY('No action left this turn.')],
+            DENY('No action left this turn.', 'actionEconomy')],
         ['economy: exhausted bonusAction — exact bytes',
             { bucket: 'bonusAction', turnState: spent('Rakan', 'bonusAction') },
-            DENY('No bonus action left this turn.')],
+            DENY('No bonus action left this turn.', 'actionEconomy')],
         ['§18 D1: exhausted reaction at default cap — exact bytes',
             { bucket: 'reaction', turnState: spent('Rakan', 'reaction') },
-            DENY('No reaction left this turn.')],
+            DENY('No reaction left this turn.', 'actionEconomy')],
         ['economy charges by name: exhausted owner denied, same turn as its companion',
             { creatureName: 'FeyRanger', activeCreatureName: 'FeyRanger', turnState: spent('FeyRanger', 'action') },
-            DENY('No action left this turn.')],
+            DENY('No action left this turn.', 'actionEconomy')],
         ['§18 D2: companion denied on a stranger\'s turn',
             { creatureName: 'Wolf 1', activeCreatureName: 'HexWarlock', turnState: registerCompanion({}, 'Wolf 1', 'FeyRanger') },
-            DENY(`It is HexWarlock's turn — Wolf 1 cannot act now.`)],
+            DENY(`It is HexWarlock's turn — Wolf 1 cannot act now.`, 'turnLock')],
     ])('%s', (title, over, expected) => {
         expect(canTakeAction(ctx(over)), title).toEqual(expected);
     });
@@ -141,10 +141,10 @@ describe('canTakeAction gate decision table (§6.2 order, bucket × state)', () 
     it.each([
         ['condition outranks turn-lock and economy',
             { creatureName: 'Goblin', cannotAct: true, cannotActReason: 'Petrified', turnState: spent('Goblin', 'action') },
-            DENY('Petrified')],
+            DENY('Petrified', 'condition')],
         ['turn-lock outranks economy',
             { creatureName: 'Goblin', turnState: spent('Goblin', 'action') },
-            DENY(`It is Rakan's turn — Goblin cannot act now.`)],
+            DENY(`It is Rakan's turn — Goblin cannot act now.`, 'turnLock')],
     ])('short-circuit order: %s', (title, over, expected) => {
         expect(canTakeAction(ctx(over)), title).toEqual(expected);
     });
@@ -155,7 +155,7 @@ describe('canTakeAction gate decision table (§6.2 order, bucket × state)', () 
             return Object.freeze(o);
         };
         const ts = deepFreeze(spent('Rakan', 'action'));
-        expect(canTakeAction(deepFreeze(ctx({ turnState: ts })))).toEqual(DENY('No action left this turn.'));
+        expect(canTakeAction(deepFreeze(ctx({ turnState: ts })))).toEqual(DENY('No action left this turn.', 'actionEconomy'));
         expect(canTakeAction(deepFreeze(ctx({ turnState: ts, bucket: 'bonusAction' })))).toEqual(ALLOW);
         expect(ts).toEqual(spent('Rakan', 'action')); // untouched after both calls
     });

@@ -37,6 +37,7 @@ const createMocks = () => ({
     handleDeleteItem: vi.fn(),
     handleRotate: vi.fn(),
     handleToggleDoor: vi.fn(),
+    handleCycleItemLight: vi.fn(),
     handleViewStats: vi.fn(),
     onRenameClicked: vi.fn(),
     onClose: vi.fn(),
@@ -89,7 +90,7 @@ describe('AX roles', () => {
         });
         expect(container.querySelector('.item-context-menu')).toHaveAttribute('role', 'menu');
         const rows = menuItems(container);
-        expect(rows.map(r => r.textContent)).toEqual(['Hide', 'Delete', 'Rename', '✕']);
+        expect(rows.map(r => r.textContent)).toEqual(['Hide', 'Delete', 'Light: bright', 'Rename', '✕']);
         rows.forEach(row => expect(row).toHaveAttribute('tabindex', '0'));
     });
 });
@@ -289,9 +290,10 @@ describe('arrow-key roving navigation', () => {
         renderMenu(mocks, { placedItems: [placedItem({ type: 'npc', name: 'Marta' })] });
         const rows = menuItems(document.body);
         fireEvent.keyDown(rows[0], { key: 'ArrowDown' }); // Hide → Delete
-        fireEvent.keyDown(rows[1], { key: 'ArrowDown' }); // Delete → Rename
-        expect(document.activeElement).toBe(rows[2]);
-        fireEvent.keyDown(rows[2], { key: 'Enter' });
+        fireEvent.keyDown(rows[1], { key: 'ArrowDown' }); // Delete → Light (plan C row)
+        fireEvent.keyDown(rows[2], { key: 'ArrowDown' }); // Light → Rename
+        expect(document.activeElement).toBe(rows[3]);
+        fireEvent.keyDown(rows[3], { key: 'Enter' });
         expectOnlyCall(mocks, 'onRenameClicked', [undefined, SELECTED, 'Marta']);
     });
 });

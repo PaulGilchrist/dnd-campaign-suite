@@ -3,6 +3,17 @@ export const DEFAULT_GRID_SIZE = 30;
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
 
+// Tactical grid feet per cell — the ONE constant (spell range math, torch
+// radii, everything that converts cells ⇄ feet).
+export const FEET_PER_CELL = 5;
+
+// 2D dynamic lighting (deferred plan C) — torch convention: bright light
+// reaches 20 ft and doubles as dim light for another 20 ft. A token set to
+// 'dim' halves both. The veil is READ-ONLY spectacle: nothing in the rules
+// engine consults light (owner decision — stealth stays a follow-up).
+export const LIGHT_BRIGHT_RADIUS_FT = 20;
+export const LIGHT_DIM_EXTENSION_FT = 20;
+
 export const TOOL_NONE = 'none';
 export const TOOL_PAINT = 'paint';
 export const TOOL_ERASE = 'erase';

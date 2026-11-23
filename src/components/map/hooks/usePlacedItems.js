@@ -1,4 +1,5 @@
 import useDeleteRequest from '../../common/useDeleteRequest.js';
+import { normalizeLightSetting } from '../../../services/maps/lighting.js';
 
 // Human label for a placed token's named-confirm: NPCs carry `name`,
 // furniture does not — its type key is the honest identifier there.
@@ -86,10 +87,35 @@ function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
         setSelectedItem(null);
     };
 
+    // Per-token art patch (deferred plan D, ItemDetailsDock lane): merges a
+    // partial patch onto one creature row. `undefined` values are deliberate
+    // removals — useMapLoader's jsonSafeEntry strips them from the save
+    // payload, so "Remove art" returns the row to its canonical minimal shape.
+    const handlePatchItem = (itemId, patch) => {
+        setPlacedItems(prev =>
+            prev.map(item => (item.id === itemId ? { ...item, ...patch } : item))
+        );
+    };
+
+    // Light cycle (deferred plan C, context-menu lane): creature tokens cycle
+    // bright → dim → none → bright. The press ALWAYS writes an explicit value
+    // (the absent-key bright default stays a READ convention, never a second
+    // stored shape).
+    const handleCycleItemLight = (itemId) => {
+        const cycle = { bright: 'dim', dim: 'none', none: 'bright' };
+        setPlacedItems(prev =>
+            prev.map(item => (item.id === itemId
+                ? { ...item, light: cycle[normalizeLightSetting(item.light)] }
+                : item))
+        );
+    };
+
     return {
         handleToggleItemVisibility,
         handleDeleteItem,
         handleToggleDoor,
+        handlePatchItem,
+        handleCycleItemLight,
         handleRotate,
         requestDelete,
         pendingDelete,

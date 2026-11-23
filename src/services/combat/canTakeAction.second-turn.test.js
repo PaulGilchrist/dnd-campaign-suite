@@ -14,7 +14,7 @@ import { spend, registerCompanion, hasBudget } from './turnState.js';
 
 const ON = { mode: 'on', turnLock: true, actionEconomy: true };
 const ALLOW = { allowed: true, reason: null };
-const DENY = (reason) => ({ allowed: false, reason });
+const DENY = (reason, rule) => ({ allowed: false, reason, rule });
 
 const TWIN = 'EvasiveFighter (Second Turn)';
 const HOLDER = 'EvasiveFighter';
@@ -45,21 +45,21 @@ describe('canTakeAction turn-lock × (Second Turn) seam (CLA-360)', () => {
         ['§18 D2 + ST seam: companion owned by the holder acts while the twin is active',
             { creatureName: 'Wolf 1', turnState: registerCompanion({}, 'Wolf 1', HOLDER) }, ALLOW],
         ['ST seam: holder with a spent action still pays economy, never turn-lock',
-            { turnState: spent(HOLDER, 'action') }, DENY('No action left this turn.')],
+            { turnState: spent(HOLDER, 'action') }, DENY('No action left this turn.', 'actionEconomy')],
         // ---- ST-seam denials (exact reason bytes name the ACTING-ROW twin) ----
         ['a DIFFERENT creature is denied while the twin is active — copy names the twin row',
             { creatureName: 'ElderPaladin' },
-            DENY(`It is ${TWIN}'s turn — ElderPaladin cannot act now.`)],
+            DENY(`It is ${TWIN}'s turn — ElderPaladin cannot act now.`, 'turnLock')],
         ['companion of a DIFFERENT owner is denied while the twin is active',
             { creatureName: 'Wolf 1', turnState: registerCompanion({}, 'Wolf 1', 'FeyRanger') },
-            DENY(`It is ${TWIN}'s turn — Wolf 1 cannot act now.`)],
+            DENY(`It is ${TWIN}'s turn — Wolf 1 cannot act now.`, 'turnLock')],
         ['holder is denied when a DIFFERENT creature is active (holderName not set)',
             { activeCreatureName: 'ElderPaladin', activeHolderName: null },
-            DENY(`It is ElderPaladin's turn — ${HOLDER} cannot act now.`)],
+            DENY(`It is ElderPaladin's turn — ${HOLDER} cannot act now.`, 'turnLock')],
         // ---- non-ST face byte-unchanged (activeHolderName null everywhere) ----
         ['non-ST: normal off-turn denial stands (byte-identical to the pre-fix face)',
             { creatureName: 'Goblin', activeCreatureName: 'Rakan', activeHolderName: null },
-            DENY(`It is Rakan's turn — Goblin cannot act now.`)],
+            DENY(`It is Rakan's turn — Goblin cannot act now.`, 'turnLock')],
         ['non-ST: registered companion still acts while its owner is active',
             { creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', activeHolderName: null, turnState: registerCompanion({}, 'Wolf 1', 'FeyRanger') }, ALLOW],
     ])('%s', (title, over, expected) => {

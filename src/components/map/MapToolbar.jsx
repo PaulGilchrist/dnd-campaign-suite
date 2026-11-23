@@ -65,6 +65,24 @@ const LastKnownModeToggle = ({ isLocalhost, active, onToggle }) =>
         </button>
     ) : null;
 
+// Dynamic lighting veil toggle (deferred plan C): same binary-button idiom and
+// the same document-flag lane as Last Seen — the press flips `lighting` ON THE
+// MAP DOCUMENT (absent = OFF ⇒ today's rendering byte-identical) through the
+// autosave PUT; players adopt on the SSE echo. GM-only control; the veil
+// itself is pure spectacle — no rules lane consults light in v1.
+const LightingToggle = ({ isLocalhost, active, onToggle }) =>
+    (isLocalhost && onToggle) ? (
+        <button
+            className={active ? 'active' : ''}
+            aria-label="Torchlight"
+            aria-pressed={active}
+            title="Dynamic torchlight: unlit areas darken on every board (GMs see through the veil). Tokens carry their own light setting — read-only spectacle, rules stay untouched. Off = the classic flat-lit map."
+            onClick={onToggle}
+        >
+            <i className="fa-solid fa-fire"></i> Torchlight
+        </button>
+    ) : null;
+
 // Coordinate legend toggle (backlog 2026-11-21): binary button in the
 // Spell/Ruler idiom (aria-pressed mirrors the .active class). Hoisted like
 // MapDeactivatedHint for the toolbar's complexity cap. NOT localhost-gated:
@@ -119,6 +137,10 @@ const MapToolbar = ({
     // handler means no button (visitor + outdoor lanes render untouched).
     lastKnownMode,
     onToggleLastKnown,
+    // Dynamic lighting veil (deferred plan C): same document-flag lane as
+    // lastKnownMode — no handler means no button.
+    lightingMode,
+    onToggleLighting,
 }) => {
     const {
         spellMode,
@@ -249,6 +271,7 @@ const MapToolbar = ({
                         </button>
                     )}
                     <LastKnownModeToggle isLocalhost={isLocalhost} active={!!lastKnownMode} onToggle={onToggleLastKnown} />
+                    <LightingToggle isLocalhost={isLocalhost} active={!!lightingMode} onToggle={onToggleLighting} />
                     <button onClick={zoomIn} aria-label="Zoom in">
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>

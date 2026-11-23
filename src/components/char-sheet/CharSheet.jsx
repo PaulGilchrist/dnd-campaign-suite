@@ -26,6 +26,7 @@ import { applyAnimalShapes } from '../../services/automation/handlers/spells/ani
 import { confirmTruePolymorphTransform, applyObjectTransform } from '../../services/automation/handlers/spells/truePolymorphService.js'
 import './CharSheet.css'
 import './CharSheet.shieldOfFaith.css'
+import DenialExplainer from '../GMCopilot/DenialExplainer.jsx'
 
 function findPassive(stats, predicate) {
     return (stats.automation?.passives || []).find(predicate);
@@ -414,7 +415,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }
 
     return (
-        <CharSheetContent
+        <>
+            {/* First-denial explainer (deferred plan A): the character sheet
+                IS the offending screen for wrong-turn/economy button presses.
+                Self-gated: GM tabs only (hostname), players keep the denial
+                popup + log row only. */}
+            <DenialExplainer campaignName={campaignName} />
+            <CharSheetContent
             playerStats={playerStats}
             allAbilityScores={allAbilityScores}
             allClasses={allClasses}
@@ -450,6 +457,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             handleObjectTransformConfirm={handleObjectTransformConfirm}
             handleTogglePreparedSpells={handleTogglePreparedSpells}
         />
+        </>
     );
 }
 

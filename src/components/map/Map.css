@@ -672,6 +672,35 @@
     fill: #3a3a42;
 }
 
+/* Dynamic lighting veil (deferred plan C) — drawn immediately above the fog
+   rects (paint order in Map.jsx). Deliberately WARM indigo-blacks so "dark
+   because no torch" reads differently from fog's neutral grey "unknown".
+   GM tiers stay see-through; player tiers are heavy. pointer-events: none —
+   the veil is pure spectacle, never a click target. */
+.map .light-cell-ring,
+.map .light-cell-dark,
+.map .light-cell-player-ring,
+.map .light-cell-player-dark {
+    pointer-events: none;
+    user-select: none;
+}
+
+.map .light-cell-ring {
+    fill: rgba(18, 16, 44, 0.22);
+}
+
+.map .light-cell-dark {
+    fill: rgba(18, 16, 44, 0.45);
+}
+
+.map .light-cell-player-ring {
+    fill: rgba(12, 10, 30, 0.8);
+}
+
+.map .light-cell-player-dark {
+    fill: rgba(10, 8, 26, 0.93);
+}
+
 /* GM-only explicit-hidden tier (backlog 2026-11-11): a dashed amber ring marks
    hidden (visible === false) markers so "the GM hid this" reads differently
    from a fogged-but-visible item (full-opacity art under the translucent

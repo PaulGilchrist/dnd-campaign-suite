@@ -91,6 +91,7 @@ function denyBlockedShot({ campaignName, attackerName, targetName, blockedAt, se
             creature: attackerName,
             target: targetName,
             bucket: 'lineOfSight',
+            rule: 'lineOfSight',
             source,
             reason,
         }).catch((e) => { console.error('[lineOfSightGate] denial log failed:', e); });
