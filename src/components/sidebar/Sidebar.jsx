@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
 import { addEntry } from '../../services/ui/logService.js';
 import { CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
+import { useSmallScreen } from '../../hooks/ui/useSmallScreen.js';
 import './Sidebar.css';
 
 const VIEW_LABELS = {
@@ -94,7 +95,7 @@ function getActiveInfo(activeView, activeCharacter) {
     return { label: viewInfo?.label || '', icon: viewInfo?.icon || '' };
 }
 
-function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRulesToast }) {
+function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRulesToast, onNavigate }) {
     if (item.localhostOnly && !isLocalhost) return null;
 
     const { label, icon } = VIEW_LABELS[item.view] || item;
@@ -103,7 +104,10 @@ function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRu
     if (item.external) {
         return (
             <>
-                <button className="sidebar-section-header" onClick={() => openRules(showRulesToast)}>
+                {/* onNavigate lets the small-screen drawer close on this pick too —
+                    the Rules popup opens in a new tab, so the drawer would
+                    otherwise linger over the unchanged view. */}
+                <button className="sidebar-section-header" onClick={() => { openRules(showRulesToast); onNavigate(); }}>
                     <i className={`fa-solid ${icon}`}></i> {displayLabel} <i className="fa-solid fa-external-link-alt fa-xs"></i>
                 </button>
                 {/* Popup-blocked feedback rides the app's toast lane (role=status,
@@ -194,6 +198,43 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
 
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onHelpClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
+    // Collapsible small-screen nav (backlog 2026-11-23 collapsible-sidebar):
+    // below SMALL_SCREEN_MAX_PX the fixed sidebar docks off-canvas (Sidebar.css
+    // 768px media block) behind a toggle, and .app-body releases its 180px
+    // gutter to a slim toggle column. `navOpen` is per-client local UI state
+    // (plain useState — never the runtime store), default collapsed; two tabs
+    // collapse independently. Desktop never renders the toggle and keeps the
+    // always-visible sidebar (the drawer classes/attr stay off at ≥ breakpoint).
+    const smallScreen = useSmallScreen();
+    const [navOpen, setNavOpen] = useState(false);
+    const drawerOpen = smallScreen && navOpen;
+    const navRef = useRef(null);
+    const toggleRef = useRef(null);
+    const closeNav = useCallback(() => {
+        setNavOpen(false);
+        // Close-restore twin of the app's modal law (useModalDismiss/Popup
+        // precedent): focus returns to the toggle, which unmounts nothing it
+        // still needs — on desktop the toggle ref is simply null (no-op).
+        toggleRef.current?.focus();
+    }, []);
+    // Escape closes, matching the HelpDrawer/app-wide modal idiom.
+    useEffect(() => {
+        if (!drawerOpen) return undefined;
+        const onKey = (e) => { if (e.key === 'Escape') closeNav(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [drawerOpen, closeNav]);
+    // Opening the drawer focuses the nav (the toggle "opens/focuses
+    // navigation"); tabIndex={-1} makes the container programmable-focusable
+    // so screen readers announce the region and Tab continues into the links.
+    useEffect(() => {
+        if (drawerOpen) navRef.current?.focus();
+    }, [drawerOpen]);
+    // Crossing back to desktop must not leave a latent open flag behind — a
+    // later resize down would otherwise pop the drawer open unbidden.
+    useEffect(() => {
+        if (!smallScreen) setNavOpen(false);
+    }, [smallScreen]);
     // Display-only Rules-launchpad feedback (popup blocked) — mirrors the
     // sessions/encounter/music toast idiom (auto-hide timer is a benign UI
     // category, display only, no game state).
@@ -226,7 +267,18 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onHelpClick };
+    // Every destination pick (nav header, roster link, Add Character, Rules,
+    // Help, Campaigns exit, Admin) also closes the small-screen drawer, so
+    // selecting a view returns the content area to full width. On desktop
+    // closeNav is an observable no-op (no toggle mounted, navOpen already
+    // false), so one wrapper covers both tiers.
+    const selectAndClose = (fn) => (...args) => { fn(...args); closeNav(); };
+    const navHandlers = {
+        onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick,
+        onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick,
+        onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onHelpClick,
+    };
+    for (const key of Object.keys(navHandlers)) navHandlers[key] = selectAndClose(navHandlers[key]);
     const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
     const navItems = campaignType === 'arena'
         ? NAV_ITEMS.filter(item => !item.arenaHidden)
@@ -234,7 +286,32 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
 
     return (
         <>
-            <nav className="sidebar no-print">
+            {/* Small-screen-only toggle (never rendered at desktop widths —
+                the sidebar is permanent there). Doubles as the drawer's close
+                (×) while open: it outranks the backdrop/drawer z-tiers so it
+                stays clickable; keyboard-native (Enter/Space on a button). */}
+            {smallScreen && (
+                <button
+                    ref={toggleRef}
+                    className="sidebar-nav-toggle"
+                    onClick={() => (navOpen ? closeNav() : setNavOpen(true))}
+                    aria-expanded={navOpen}
+                    aria-controls="sidebar-nav"
+                    aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+                >
+                    <i className={`fa-solid ${navOpen ? 'fa-xmark' : 'fa-bars'}`} aria-hidden="true"></i>
+                </button>
+            )}
+            {/* Backdrop mirrors HelpDrawer: pure-click dismiss over the
+                dimmed page while the nav drawer is open. */}
+            {drawerOpen && <div className="sidebar-nav-backdrop" onClick={closeNav}></div>}
+            <nav
+                id="sidebar-nav"
+                ref={navRef}
+                tabIndex={-1}
+                inert={smallScreen && !navOpen}
+                className={`sidebar no-print${drawerOpen ? ' sidebar--drawer-open' : ''}`}
+            >
                 <div className="sidebar-header">
                     <div className="campaign-name">{campaignName}</div>
                     {typeBadge && (
@@ -250,7 +327,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     </div>
                 )}
 
-                <button className="sidebar-section-header" onClick={onBackToCampaigns}>
+                <button className="sidebar-section-header" onClick={selectAndClose(onBackToCampaigns)}>
                     <i className="fa-solid fa-arrow-left"></i> Campaigns
                 </button>
 
@@ -258,8 +335,8 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     characters={characters}
                     activeView={activeView}
                     activeCharacter={activeCharacter}
-                    onAddCharacter={onAddCharacter}
-                    onCharacterClick={onCharacterClick}
+                    onAddCharacter={selectAndClose(onAddCharacter)}
+                    onCharacterClick={selectAndClose(onCharacterClick)}
                     isLocalhost={isLocalhost}
                     deleteErrorName={deleteErrorName}
                     onDismissDeleteError={onDismissDeleteError}
@@ -274,13 +351,14 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         isLocalhost={isLocalhost}
                         rulesToast={rulesToast}
                         showRulesToast={showRulesToast}
+                        onNavigate={closeNav}
                     />
                 ))}
                 {isLocalhost && (
                     <div className="sidebar-footer">
                         <button
                             className={activeClass(activeView, 'campaignRepair')}
-                            onClick={onRepairClick}
+                            onClick={selectAndClose(onRepairClick)}
                         >
                             <i className="fa-solid fa-gears"></i> Admin
                         </button>

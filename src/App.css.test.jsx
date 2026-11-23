@@ -107,6 +107,10 @@ function parseStylesheet(source) {
 
 const { topRules, mediaQueries } = parseStylesheet(css);
 
+/** Sidebar.css keeps its own small-screen @media block; parse it with the
+ *  same block-aware parser so media rules never leak into the base lookup. */
+const { mediaQueries: sidebarMediaQueries } = parseStylesheet(sidebarCss);
+
 /** Sessions lane ships a wider planner modal; its width law lives here. */
 const sessionsCss = parseRules(readCss(join(SRC_DIR, 'components/sessions/Sessions.css')));
 
@@ -348,6 +352,70 @@ describe('App.css', () => {
         styleFor('.encounter-builder .encounter-actions', encounterCss)?.['flex-wrap'],
         'EncounterBuilder.css: .encounter-actions must wrap on overflow'
       ).toBe('wrap');
+    });
+  });
+
+  describe('collapsible small-screen sidebar (2026-11-23 backlog)', () => {
+    const MEDIA = '@media (max-width: 768px)';
+    const sidebarTopRules = parseRules(sidebarCss);
+    const sidebarMediaRules = () => sidebarMediaQueries.get(normalize(MEDIA));
+
+    it('releases the 180px gutter to a ≤40px toggle column at small widths', () => {
+      const desktop = parseFloat(styleFor('.app-body')['padding-left']);
+      const mobile = styleInMedia(MEDIA, '.app-body');
+      expect(mobile, `expected ${MEDIA} to restyle .app-body`).not.toBeNull();
+      const gutter = parseFloat(mobile['padding-left']);
+      expect(gutter, 'small screens must release the sidebar column').toBeLessThan(desktop);
+      expect(
+        gutter,
+        'reserved gutter must stay ≤40px so a 420px viewport keeps ≥380px of content'
+      ).toBeLessThanOrEqual(40);
+      // Tie-hardening: the media rule shares the base rule's 0-1-0
+      // specificity, so document order is load-bearing — the block must come
+      // after the base .app-body rule.
+      expect(css.indexOf(MEDIA), '768px block must parse after the base .app-body rule')
+        .toBeGreaterThan(css.indexOf('.app-body'));
+    });
+
+    it('docks the small-screen sidebar off-canvas until the drawer-open class', () => {
+      const rules = sidebarMediaRules();
+      expect(rules, 'Sidebar.css must ship a 768px media block').toBeDefined();
+      const closed = styleFor('.sidebar', rules);
+      expect(closed, 'the media block must restyle .sidebar').not.toBeNull();
+      expect(closed.transform, 'closed drawer sits fully off-canvas').toBe('translatex(-100%)');
+      // Durable law: the resting sidebar stays fixed page chrome at the
+      // ≤100 tier in EVERY tier.
+      expect(closed.position ?? styleFor('.sidebar', sidebarTopRules).position).toBe('fixed');
+      expect(styleFor('.sidebar', sidebarTopRules)['z-index'], 'base sidebar keeps the ≤100 chrome tier').toBe('100');
+
+      const open = styleFor('.sidebar.sidebar--drawer-open', rules);
+      expect(open, 'an open-drawer rule must exist').not.toBeNull();
+      expect(open.transform, 'the drawer slides back on-screen when open').toBe('translatex(0)');
+      expect(
+        parseInt(open['z-index'], 10),
+        'the open drawer must clear app content (backdrop/modal 1000 tier)'
+      ).toBeGreaterThanOrEqual(1000);
+    });
+
+    it('styles the toggle and backdrop as the drawer furniture (z-order laws)', () => {
+      const toggle = styleFor('.sidebar-nav-toggle', sidebarTopRules);
+      expect(toggle, 'the toggle must be pinned over the viewport').not.toBeNull();
+      expect(toggle.position).toBe('fixed');
+      expect(toggle.cursor).toBe('pointer');
+      const backdrop = styleFor('.sidebar-nav-backdrop', sidebarTopRules);
+      expect(backdrop, 'a dismiss backdrop is part of the drawer idiom').not.toBeNull();
+      expect(backdrop.position).toBe('fixed');
+      expect(
+        backdrop['background-color'],
+        'backdrop must dim (and pointer-block) the page behind the drawer'
+      ).not.toMatch(/^(none|transparent)$/);
+      // Toggle must stay clickable ABOVE the backdrop AND the open drawer
+      // (it doubles as the close (×)); the backdrop must cover the closed
+      // sidebar's chrome tier.
+      expect(parseInt(toggle['z-index'], 10))
+        .toBeGreaterThan(parseInt(backdrop['z-index'], 10));
+      expect(parseInt(backdrop['z-index'], 10))
+        .toBeGreaterThan(parseInt(styleFor('.sidebar', sidebarTopRules)['z-index'], 10));
     });
   });
 

@@ -18,6 +18,18 @@
     padding-left: 0;
 }
 
+/* Collapsible small-screen sidebar (backlog 2026-11-23): below 768px the
+   sidebar docks off-canvas behind the fixed .sidebar-nav-toggle (Sidebar.css),
+   so the 180px gutter releases to just the toggle's column — the content area
+   gets the viewport back. The TV-mode rule above still outranks this one
+   (0-2-0 vs 0-1-0): with no sidebar mounted there is no toggle either, and
+   the gutter is zero. */
+@media (max-width: 768px) {
+  .app-body {
+    padding-left: 36px;
+  }
+}
+
 .half-line {
   height: 0.5em;      /* half of the font-size */
   line-height: 0.5em; /* optional: aligns content if any */
