@@ -57,7 +57,7 @@ function MusicMoodChip({ mood, active, trackCount, onSelect, onDelete }) {
       </button>
       {mood.custom && (
         <button
-          className="music-mood-delete"
+          className="ct-btn ct-btn-danger ct-btn-sm"
           onClick={() => onDelete(mood.key)}
           title={`Delete ${mood.label} category`}
           aria-label={`Delete ${mood.label} category`}
@@ -81,10 +81,10 @@ function MusicTransportControls({ mood, playing, onTogglePlay, onStop }) {
   if (!mood) return null;
   return (
     <>
-      <button className="music-btn" onClick={onTogglePlay} title={playing ? 'Pause' : 'Play'}>
+      <button className="ct-btn ct-btn-sm" onClick={onTogglePlay} title={playing ? 'Pause' : 'Play'}>
         <i className={`fa-solid ${playing ? 'fa-pause' : 'fa-play'}`}></i>
       </button>
-      <button className="music-btn" onClick={onStop} title="Stop">
+      <button className="ct-btn ct-btn-sm" onClick={onStop} title="Stop">
         <i className="fa-solid fa-stop"></i>
       </button>
     </>
@@ -123,8 +123,8 @@ function MusicCategoryForm({ label, icon, error, onLabelChange, onIconChange, on
       </div>
       {error && <div className="music-editor-error">{error}</div>}
       <div className="music-editor-actions">
-        <button className="music-btn" onClick={onSubmit}>Create</button>
-        <button className="music-btn" onClick={onCancel}>Cancel</button>
+        <button className="ct-btn ct-btn-primary" onClick={onSubmit}>Create</button>
+        <button className="ct-btn" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -807,8 +807,13 @@ function MusicPlayer({ campaignName, visible = true }) {
 
   const playing = music.playing;
 
+  // .ct-* kit convergence (tranche 4): the root carried .ct-header/.ct-title
+  // for its whole life with NO .ct-container ancestor — dead kit (every App.css
+  // kit rule is descendant-scoped, playbook §5 law 1). The root now IS the
+  // scope; its former .music-player flex/padding/width twin of the kit
+  // container tier is retired in MusicPlayer.css.
   const panel = (
-    <div className="music-player">
+    <div className="music-player ct-container">
       <div className="ct-header">
         <h2 className="ct-title">
           <i className="fa-solid fa-music" /> Music
@@ -827,7 +832,7 @@ function MusicPlayer({ campaignName, visible = true }) {
             />
           ))}
           <button
-            className="music-btn music-add-category"
+            className="ct-btn ct-btn-sm"
             onClick={() => { setAddingCategory((open) => !open); setCategoryError(null); }}
             title="Add music category"
             aria-label="Add music category"
@@ -877,7 +882,7 @@ function MusicPlayer({ campaignName, visible = true }) {
         {/* aria-label (backlog 2026-11-01, a11y parity with the 7c547abdc mood
             select): icon-only button, so expose its name explicitly; title is
             kept for the hover tooltip and existing getByTitle test locators. */}
-        <button className="music-btn" onClick={openEditor} title="Edit tracks for this mood" aria-label="Edit tracks for this mood">
+        <button className="ct-btn ct-btn-sm" onClick={openEditor} title="Edit tracks for this mood" aria-label="Edit tracks for this mood">
           <i className="fa-solid fa-pen"></i>
         </button>
       </div>
@@ -932,17 +937,17 @@ function MusicPlayer({ campaignName, visible = true }) {
           )}
           {editorError && <div className="music-editor-error">{editorError}</div>}
           <div className="music-editor-actions">
-            <button className="music-btn" onClick={saveTracks}>Save</button>
+            <button className="ct-btn ct-btn-primary" onClick={saveTracks}>Save</button>
             {isCustomMood(editMood) ? (
               // Custom categories have no starter defaults to Reset to —
               // the editor offers Delete (category + tracks) instead.
-              <button className="music-btn" onClick={() => requestDeleteCategory(editMood)} title={`Delete ${moodLabel(editMood)} category`}>
+              <button className="ct-btn ct-btn-danger" onClick={() => requestDeleteCategory(editMood)} title={`Delete ${moodLabel(editMood)} category`}>
                 Delete category
               </button>
             ) : (
-              <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
+              <button className="ct-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
             )}
-            <button className="music-btn" onClick={cancelEdit}>Cancel</button>
+            <button className="ct-btn" onClick={cancelEdit}>Cancel</button>
           </div>
         </div>
       )}

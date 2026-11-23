@@ -1,12 +1,11 @@
 /* Shared background music view (main content area — opened from the sidebar's
-   Music nav item). Root follows the .ct-container layout of the other
-   campaign-tool views; the player itself sits in a .music-panel card. */
-
-.music-player {
-  flex: 1;
-  padding: 20px;
-  width: 100%;
-}
+   Music nav item). .ct-* kit convergence (tranche 4): the root is the kit
+   container itself (JSX adds .ct-container) — its former flex/padding/width
+   rule was a byte-twin of the kit's .ct-container tier and is retired with
+   it (the responsive @600px padding from the kit now applies here too).
+   The .music-player class stays as the scope anchor for the toast lane
+   below and a locator. The track editor itself keeps its bespoke internals
+   (pinned shell); only its action buttons rode the kit tiers. */
 
 .music-panel {
   display: flex;
@@ -57,6 +56,13 @@
   gap: 6px;
 }
 
+/* Bespoke icon-button tier — SURVIVES after the tranche-4 kit convergence as
+   the skin of the PINNED audio-settings controls only: MusicSfxControls' mute
+   toggle (aria-pressed state law) and SoundOwnerControl's speaker button
+   (pinned DOM contract), plus the category form's icon-picker grid (editor
+   internals tier). TvMusicTransport re-anchors this class in Initiative.css
+   too — it must stay a global lane rule. Toolbar/action buttons rode
+   .ct-btn/.ct-btn-sm instead. */
 .music-btn {
   display: flex;
   align-items: center;
@@ -149,11 +155,9 @@
   gap: 4px;
 }
 
-.music-editor-actions .music-btn {
-  width: auto;
-  padding: 0 8px;
-  font-size: 0.8em;
-}
+/* .music-editor-actions .music-btn sizing rule retired with the tranche-4 kit
+   convergence: the editor/form action buttons ride the kit tiers (base /
+   -primary / -danger), which own their own footprint. */
 
 /* Save/Reset confirmation toast — display-only (mirrors .encounter-toast /
    .sessions-toast tokens; survives the editor closing so the mood lingers) */
@@ -188,40 +192,20 @@
   padding: 2px 0;
 }
 
-/* Campaign-specific categories (improve 2026-11-07): a custom mood chip is
-   the play button plus a small × delete affordance. Built-in moods render
-   the button alone (wrapper is layout-inert — flex row, gap matches the
-   mood grid). */
+/* Custom-category × affordance: .ct-* kit convergence (tranche 4) retired its
+   bespoke 20px square skin (plus error-tint hover) — the button now rides
+   .ct-btn .ct-btn-danger .ct-btn-sm, whose disabled/hover canon the kit owns.
+   The chip tier itself (.music-mood-btn) is a PINNED DOM contract — untouched.
+   The wrapper below stays layout-inert beside the kit button. */
 .music-mood-item {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
 
-.music-mood-delete {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 0.75em;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.music-mood-delete:hover {
-  background-color: var(--background-color-error);
-  border-color: var(--color-error-border);
-  color: var(--color-error-light);
-}
-
-.music-add-category {
-  width: 30px;
-}
+/* Add-category (+) button: bespoke square + width override retired with the
+   tranche-4 kit convergence — it rides .ct-btn .ct-btn-sm like the row's
+   other icon actions. */
 
 /* Create-category form — reuses the .music-editor card tokens, adds only
    the icon-picker row layout. */
