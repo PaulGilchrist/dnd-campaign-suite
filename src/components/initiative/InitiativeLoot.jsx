@@ -1,7 +1,19 @@
 import React from 'react'
 import { parseCurrencyFromLootText } from '../../services/items/lootGenerator.js'
 
-export default function InitiativeLoot({
+// TV display tier (owner decision 2026-11-23 — Paul verbatim: "nor
+// generate loot, prev, next, etc. All that is done in initiative tracker
+// only"): Generate/Award/Clear Loot are tracker authoring writes (XP +
+// party-inventory), so the whole panel is absent on the table-mounted TV
+// face. The gate rides a thin wrapper because the panel body sits AT the
+// eslint complexity ceiling (PlayerLocalhostHpRow precedent), and the
+// Initiative call site stays branch-free (AlliesButton self-gate law).
+export default function InitiativeLoot({ tvMode = false, ...panelProps }) {
+    if (tvMode) return null
+    return <LootPanel {...panelProps} />
+}
+
+function LootPanel({
     lootData,
     generatingLoot,
     lootTextValue,

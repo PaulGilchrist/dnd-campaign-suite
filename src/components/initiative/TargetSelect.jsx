@@ -19,7 +19,14 @@ function overlayLabel(o) {
 // combatSummary runtime-store PATCH + SSE echo), so the two surfaces read and
 // write one canonical targetName and stay in sync live without reload.
 // Lifted verbatim out of CreatureCard.jsx — do not fork a second copy.
-export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, localCharacterName, allCreatures, overlays, onTargetChange }) {
+export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, localCharacterName, allCreatures, overlays, onTargetChange, tvMode = false }) {
+    // TV-mode GM card (owner decision 2026-11-23): the table-mounted screen is
+    // shared with players, so a GM tab in TV mode takes the presentation door
+    // wholesale — NO arm select on ANY row, even ones a visitor WOULD arm (the
+    // device-played PC row, delegated monster rows): a GM tab plays no
+    // character, and the card-level TvTargetChip carries the armed-target
+    // readout. Visitor tabs are untouched in both modes.
+    const gmDisplayTier = tvMode && isLocalhost
     // Overlay targets are live ONLY on the PC cast lane (CharSpells
     // getTargetInfo SP-097 fallback → useLoggedDiceRollDamage 'overlay-'
     // branch → handleAoeDamage area adjudication). Monster damage chips
@@ -35,7 +42,7 @@ export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, 
     // editable-looking control that can never be enabled on this device. The
     // predicate is verbatim the old `disabled` gate, so controlled monsters
     // (explicit controller or derived summon/form lanes) keep the live arm lane.
-    if (creature.type !== 'player' && !isLocalhost && !isPlayerSummoned) return null
+    if (creature.type !== 'player' && (gmDisplayTier || (!isLocalhost && !isPlayerSummoned))) return null
     // PC-row ownership gate (bug-visitor-arms-any-pc-target-cross-player-write):
     // a visitor tab arms the target ONLY on the row its device plays. The
     // LAN-trust model (owner decision D2 — no accounts) has exactly one "mine"
@@ -44,8 +51,9 @@ export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, 
     // players' cards render the target as plain read-only text — the same face
     // visitor HP already shows (CreatureHp.jsx plain span) — and the shared
     // write seam (createCreatureHandlers.applyTargetSelection) refuses the same
-    // rows handler-side. The GM sees the live select in every state.
-    if (creature.type === 'player' && !isLocalhost && creature.name !== localCharacterName) {
+    // rows handler-side. The GM sees the live select in every state — except
+    // TV mode, where the whole card is display-only (gmDisplayTier above).
+    if (creature.type === 'player' && (gmDisplayTier || (!isLocalhost && creature.name !== localCharacterName))) {
         return (
             <div className='creature-target'>Target&nbsp;
                 <span className='text-muted' data-testid="target-readonly" aria-label={`${creature.name} target`}>

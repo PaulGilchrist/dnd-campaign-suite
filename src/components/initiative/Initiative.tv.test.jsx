@@ -287,6 +287,45 @@ describe('Initiative TV mode', () => {
         expect(screen.queryByTestId('tv-roll-panel')).not.toBeInTheDocument();
     });
 
+    // TV display-only tier (ZA 2026-11-23 backlog, owner decision 2026-11-23 —
+    // Paul verbatim: "nor generate loot, prev, next, etc. All that is done in
+    // initiative tracker only"): with TV ON the header renders ONLY the TV
+    // toggle (+ the music transport when a mood is armed, which this rig's
+    // default music state never arms). Every tracker control — Clear/+NPC/
+    // +Monster/Split Party/← Prev/Next →/End Turn/AI director/whole Loot
+    // panel — is tracker OPERATION and absent. GmTrackerToolbar + InitiativeLoot
+    // self-gate (hoist = eslint complexity-ceiling precedent). TV-OFF census
+    // byte-unchanged (the toolbar-kit suite re-pins the classes/names).
+    it('TV ON hides the whole GM toolbar cluster + Loot panel; TV OFF restores the full census', async () => {
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+
+        // TV-OFF baseline: the full GM toolbar + the Loot panel are present.
+        const toolbarTexts = [...document.querySelectorAll('.combat-controls button')].map(b => b.textContent.trim());
+        expect(toolbarTexts).toEqual(['Clear', '+ NPC', '+ Monster', 'Split Party', '← Prev', 'Next →']);
+        expect(document.querySelector('.initiative-loot-section')).toBeInTheDocument();
+
+        const button = screen.getByRole('button', { name: /TV/i });
+        fireEvent.click(button);
+
+        // TV-ON: the toolbar cluster and the Loot panel are gone wholesale…
+        expect(document.querySelector('.combat-controls')).toBeNull();
+        expect(document.querySelector('.initiative-loot-section')).toBeNull();
+        // …and every named operation control is absent by accessible name.
+        for (const name of ['Clear Initiative Board', '+ NPC', '+ Monster', 'Split Party', '← Prev', 'Next →', 'End Turn', 'Generate Loot']) {
+            expect(screen.queryByRole('button', { name })).toBeNull();
+        }
+        // Header whitelist face: ONLY the TV toggle (mood unarmed ⇒ no transport).
+        const headerBtns = [...document.querySelectorAll('.combat-header button')];
+        expect(headerBtns).toHaveLength(1);
+        expect(headerBtns[0].className).toContain('tv-toggle-button');
+
+        // Toggle OFF — the toolbar + Loot panel return byte-identical.
+        fireEvent.click(button);
+        expect([...document.querySelectorAll('.combat-controls button')].map(b => b.textContent.trim())).toEqual(toolbarTexts);
+        expect(document.querySelector('.initiative-loot-section')).toBeInTheDocument();
+    });
+
     it('up-next strip lists the following creatures in turn order (wraparound), never the active one', async () => {
         await act(async () => { render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });

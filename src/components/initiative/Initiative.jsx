@@ -347,6 +347,73 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
     )
 }
 
+// GM initiative toolbar (Phase: TV display-only tier, owner decision
+// 2026-11-23): the table-mounted TV screen is the players' face of the board —
+// EVERY toolbar control (Clear/+NPC/+Monster/Split Party advance/rewind/Loot
+// authoring/AI director — Paul verbatim: "nor generate loot, prev, next, etc.
+// All that is done in initiative tracker only") is tracker OPERATION, so the
+// whole cluster is absent on the TV. The hoist mirrors the GmStatBlockModal/
+// InitiativeMonsterTip precedent (the !tvMode branch would push Initiative
+// over the eslint complexity cap); the only TV chrome that stays in the header
+// is the round heading, the TV toggle itself and the TV music transport.
+function GmTrackerToolbar({
+    tvMode,
+    campaignName,
+    mapName,
+    creatures,
+    round,
+    activeCreatureName,
+    enforcementOn,
+    isPrevDisabled,
+    onClear,
+    onAddNpc,
+    onSpawnMonster,
+    onPartyPresenceChange,
+    onPrevious,
+    onNext,
+    onStampTarget,
+}) {
+    if (tvMode) return null
+    const activeCreature = creatures.find(c => c.name === activeCreatureName) || null
+    return (
+        <div className='combat-controls'>
+            {/* .ct-* kit convergence (tranche 1): the toolbar rides the shared
+                button hierarchy (danger / plain / primary) scoped by the root
+                .ct-container, replacing the row's bespoke blanket-button skin
+                and its unstyled/one-off variants. */}
+            <button className='ct-btn ct-btn-danger' onClick={onClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
+            <button className='ct-btn' onClick={onAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster'>+ NPC</button>
+            {/* Quick mob spawn (roadmap Item 4): bestiary picker → N
+                initiative-ready cards with real stats/art via the shared
+                encounter-join lane. The users-guide §20 "+ NPC auto-naming"
+                gotcha promoted to a first-class control; works with NO
+                active map (targets arm through the card's Target select).
+                With an active map the picker additionally offers the
+                opt-in party-relative token stamp (2026-11-20 CCC backlog). */}
+            <QuickMonsterSpawn onSpawn={onSpawnMonster} mapName={mapName} campaignName={campaignName} />
+            <PartyPresenceButton
+                creatures={creatures}
+                onConfirm={onPartyPresenceChange}
+            />
+            <button className='ct-btn' onClick={onPrevious} disabled={isPrevDisabled}>← Prev</button>
+            <button className='ct-btn ct-btn-primary' onClick={onNext}>Next →</button>
+            {/* L5-001: End Turn — the enforced-pace affordance (advance + economy reset
+                happen at the existing turn seam in navigationHandlers). Enforcement off ⇒ hidden. */}
+            {enforcementOn && (
+                <button className='ct-btn ct-btn-primary' onClick={onNext} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
+            )}
+            {/* §9.3 AI director (hidden unless AI configured + localhost + NPC's turn) */}
+            <AiDirectorPanel
+                campaignName={campaignName}
+                activeCreature={activeCreature}
+                isLocalhost={true}
+                onStampTarget={onStampTarget}
+                round={round}
+            />
+        </div>
+    )
+}
+
 // GM Copilot (learnability plan Phase 1): the "running a monster" card on the
 // live board. Non-character rows (joined monsters/NPCs — names absent from the
 // character roster) arm the tip; opening ANY creature stat block (viewingMonster
@@ -1144,46 +1211,32 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   same write lane the fog-write gate in Map.jsx:234 protects on the
                   map). Network clients get the read-only board; their own
                   interaction lanes stay on the cards (target select etc.).
-                  bug-player-clients-can-hijack-initiative. */}
+                  bug-player-clients-can-hijack-initiative. The TV presentation
+                  tier hides the WHOLE cluster (GmTrackerToolbar self-gate):
+                  tracker operation belongs to the non-TV view only. */}
               {isLocalhost && (
-              <div className='combat-controls'>
-                  {/* .ct-* kit convergence (tranche 1): the toolbar rides the shared
-                      button hierarchy (danger / plain / primary) scoped by the root
-                      .ct-container, replacing the row's bespoke blanket-button skin
-                      and its unstyled/one-off variants. */}
-                  <button className='ct-btn ct-btn-danger' onClick={handleClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
-                  <button className='ct-btn' onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster'>+ NPC</button>
-                  {/* Quick mob spawn (roadmap Item 4): bestiary picker → N
-                      initiative-ready cards with real stats/art via the shared
-                      encounter-join lane. The users-guide §20 "+ NPC auto-naming"
-                      gotcha promoted to a first-class control; works with NO
-                      active map (targets arm through the card's Target select).
-                      With an active map the picker additionally offers the
-                      opt-in party-relative token stamp (2026-11-20 CCC backlog). */}
-                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} mapName={mapName} campaignName={campaignName} />
-                  <PartyPresenceButton
-                      creatures={combatSummary.creatures}
-                      onConfirm={handlePartyPresenceChange}
-                  />
-                  <button className='ct-btn' onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
-                  <button className='ct-btn ct-btn-primary' onClick={handleNextCreature}>Next →</button>
-                  {/* L5-001: End Turn — the enforced-pace affordance (advance + economy reset
-                      happen at the existing turn seam in navigationHandlers). Enforcement off ⇒ hidden. */}
-                  {enforcementOn && (
-                      <button className='ct-btn ct-btn-primary' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
-                  )}
-                  {/* §9.3 AI director (hidden unless AI configured + localhost + NPC's turn) */}
-                  <AiDirectorPanel
-                      campaignName={campaignName}
-                      activeCreature={combatSummary.creatures.find(c => c.name === activeCreatureName) || null}
-                      isLocalhost={isLocalhost}
-                      onStampTarget={handleTargetChange}
-                      round={combatSummary.round}
-                  />
-              </div>
+              <GmTrackerToolbar
+                  tvMode={tvMode}
+                  campaignName={campaignName}
+                  mapName={mapName}
+                  creatures={combatSummary.creatures}
+                  round={combatSummary.round}
+                  activeCreatureName={activeCreatureName}
+                  enforcementOn={enforcementOn}
+                  isPrevDisabled={isPrevDisabledValue}
+                  onClear={handleClear}
+                  onAddNpc={handleAddNpc}
+                  onSpawnMonster={handleQuickSpawnMonster}
+                  onPartyPresenceChange={handlePartyPresenceChange}
+                  onPrevious={handlePreviousCreature}
+                  onNext={handleNextCreature}
+                  onStampTarget={handleTargetChange}
+              />
               )}
               {/* Loot generate/award is GM-only (XP + party-inventory writes, and the
-                  panel state never reaches player tabs anyway). */}
+                  panel state never reaches player tabs anyway). TV display tier:
+                  Generate/Award/Clear Loot is tracker authoring — the panel
+                  self-gates its own tvMode prop (AlliesButton precedent). */}
               {isLocalhost && (
               <InitiativeLoot
                 lootData={lootData}
@@ -1197,6 +1250,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 handleAwardLoot={handleAwardLoot}
                 handleClearLoot={handleClearLoot}
                 characters={characters}
+                tvMode={tvMode}
               />
               )}
             {/* GM-private stat block: per-client open state, and never on a TV

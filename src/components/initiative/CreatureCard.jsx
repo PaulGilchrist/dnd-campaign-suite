@@ -61,8 +61,12 @@ function findSanctuaryInfo(allCreatures, creatureName, campaignName) {
     return null;
 }
 
-function NpcRemoveButton({ creature, isLocalhost, onRemoveNpc }) {
-    if (creature.type === 'player' || !isLocalhost) return null
+// TV display tier (owner decision 2026-11-23): a GM tab in TV mode is a table-
+// mounted presentation screen shared with players, so its cards must read
+// EXACTLY like a LAN visitor's — every authoring affordance takes the existing
+// visitor door (hidden), never a new face.
+function NpcRemoveButton({ creature, isLocalhost, onRemoveNpc, tvMode }) {
+    if (creature.type === 'player' || !isLocalhost || tvMode) return null
     return (
         <button
             className="npc-remove-btn"
@@ -80,8 +84,8 @@ function NpcRemoveButton({ creature, isLocalhost, onRemoveNpc }) {
 // or rejoins them at the end-of-round initiative slot. Tracker authorship is
 // localhost-gated like initiative stamping (bug-player-clients-can-hijack-
 // initiative family); the write + audit lane lives in createCreatureHandlers.
-function AwayToggle({ creature, isLocalhost, onToggleAway }) {
-    if (creature.type !== 'player' || !isLocalhost || !onToggleAway) return null
+function AwayToggle({ creature, isLocalhost, onToggleAway, tvMode }) {
+    if (creature.type !== 'player' || !isLocalhost || tvMode || !onToggleAway) return null
     const away = creature.away === true
     // Honest slot copy (FV 2026-11-09 backlog): second-turn twins rejoin by
     // re-anchoring to the holder's second-turn slot (holder initiative − 10 —
@@ -165,17 +169,19 @@ function CardAvatar({ creature, isLocalhost, isPlayerSummoned, npcImage, campaig
     )
 }
 
-function CardName({ creature, campaignNpcs, onNameChange, isLocalhost }) {
+function CardName({ creature, campaignNpcs, onNameChange, isLocalhost, tvMode }) {
     const formName = creature.beastName || creature.formName
     return (
         <div className='creature-name'>
             {creature.polymorphObject ? (
                 <span>{creature.polymorphObject.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-            ) : creature.type === 'npc' && isLocalhost ? (
+            ) : creature.type === 'npc' && isLocalhost && !tvMode ? (
                 // GM-only rename: MonsterNameAutocomplete posts every keystroke through
                 // handleNameChange → renameNpc + full combatSummary writes (the spawn/
                 // rename half of bug-player-clients-can-hijack-initiative). Read-only
-                // tabs render the plain name, mirroring NpcRemoveButton's strip above.
+                // tabs render the plain name, mirroring NpcRemoveButton's strip above —
+                // and TV-mode GM tabs join that read-only door (owner decision
+                // 2026-11-23: the aired screen must read exactly like a visitor's).
                 // aria-label "<Name> name" gives the editable lane the same stable
                 // accessible-name probe as the PC/.creature-name span lane
                 // (backlog 2026-11-08: one census resolves every initiative card).
@@ -205,7 +211,7 @@ function TempHpDisplay({ creature, campaignName }) {
     )
 }
 
-function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }) {
+function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway, tvMode }) {
     // Read-only visitors can NEVER write initiative (GM-only bookkeeping —
     // bug-player-clients-can-hijack-initiative), so don't mount an
     // editable-looking box that is permanently disabled: render the plain
@@ -217,7 +223,9 @@ function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }
     // (bug-away-card-initiative-input-resurrects-slot) — untouched here.
     // Being a rendered (not defaultValue) value, the span also adopts GM
     // initiative edits live via the combatSummary SSE echo.
-    if (!isLocalhost && !isAway) {
+    // TV-mode GM tabs take the SAME read-only span (owner decision
+    // 2026-11-23: the aired card reads exactly like a visitor's).
+    if ((tvMode || !isLocalhost) && !isAway) {
         const initiative = creature.initiative ?? ''
         return (
             <div className='creature-initiative'>Initiative&nbsp;
@@ -363,8 +371,8 @@ function MajestyBadge({ creature, isLocalhost, campaignName }) {
 // stamps `controller` on the roster row; the owning device's card opens and
 // rolls through the exact same monster-action lanes the GM uses. Release
 // falls back to the derived lane (summons stay with their caster).
-function ControlRow({ creature, allCreatures, isLocalhost, controllerName, onControllerChange }) {
-    if (!isLocalhost || creature.type !== 'npc' || !onControllerChange) return null
+function ControlRow({ creature, allCreatures, isLocalhost, controllerName, onControllerChange, tvMode }) {
+    if (!isLocalhost || tvMode || creature.type !== 'npc' || !onControllerChange) return null
     const players = allCreatures.filter(c => c.type === 'player')
     if (!players.length) return null
     const explicit = creature.controller || ''
@@ -811,10 +819,10 @@ function CreatureCard({
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${downedClass} ${isAway ? 'creature-away' : ''}`}>
             <HpFeedback creatureName={creature.name} hpEvent={hpEvent} onDone={onHpFeedbackDone} />
-            <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
-            <AwayToggle creature={creature} isLocalhost={isLocalhost} onToggleAway={onToggleAway} />
+            <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} tvMode={tvMode} />
+            <AwayToggle creature={creature} isLocalhost={isLocalhost} onToggleAway={onToggleAway} tvMode={tvMode} />
             <CardAvatar creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} npcImage={npcImage} campaignName={campaignName} characters={characters} onViewCharacter={onViewCharacter} onNpcClick={onNpcClick} />
-            <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} isLocalhost={isLocalhost} />
+            <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} isLocalhost={isLocalhost} tvMode={tvMode} />
             {isAway && (
                 <CreatureBadge
                     icon='fa-person-walking'
@@ -836,9 +844,9 @@ function CreatureCard({
                 tvMode={tvMode}
             />
             <TempHpDisplay creature={creature} campaignName={campaignName} />
-            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} isAway={isAway} />
-            <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} localCharacterName={localCharacterName} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
-            <ControlRow creature={creature} allCreatures={allCreatures} isLocalhost={isLocalhost} controllerName={controllerName} onControllerChange={onControllerChange} />
+            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} isAway={isAway} tvMode={tvMode} />
+            <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} localCharacterName={localCharacterName} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} tvMode={tvMode} />
+            <ControlRow creature={creature} allCreatures={allCreatures} isLocalhost={isLocalhost} controllerName={controllerName} onControllerChange={onControllerChange} tvMode={tvMode} />
             <AlliesButton creature={creature} isLocalhost={isLocalhost} onEditAllies={onEditAllies} />
             <TvTargetChip tvMode={tvMode} targetName={creature.targetName} />
             <YourTurnCue isActive={isActive} isLocalhost={isLocalhost} controlled={isPlayerSummoned} />
