@@ -7,7 +7,11 @@ import { getExtraAttacks, isExtraAttackEligibleRow } from '../../services/charac
 // _recklessAttack_offeredThisTurn): Extra Attack's bonus swings are granted
 // once per turn by the Attack action. Pressing the weapon row again the same
 // turn never re-grants free extra swings (with enforcement/actionEconomy on,
-// assertCanAct's spent action bucket refuses the re-press outright).
+// assertCanAct's spent action bucket refuses the re-press outright). The one
+// refund seam: cancelling the PRESSED swing's staged hit is a full revert
+// (§7.2 no-consume-on-void), so the latch clears and a same-turn re-press
+// re-grants — same doctrine as the LoS pre-check's no-slot-charge refusal in
+// useCharActionsAttackHandlers.
 const EXTRA_ATTACK_TURN_LATCH_KEY = '_extraAttackGrantedTurn';
 
 /**
@@ -39,7 +43,7 @@ export default function useExtraAttackChain({
     // damage pipeline's component-local resumeRef stash in
     // useAttackDamageResolution) — the durable per-turn fact lives in the
     // runtime-store latch, and every resolved swing logs its own roll row.
-    const chainRef = useRef(null); // { attack, remaining, popupSeen, commitPending, commitPendingSeen }
+    const chainRef = useRef(null); // { attack, extraAttacks, remaining, grantLogged, popupSeen, commitPending, commitPendingSeen }
 
     function readCurrentCreature() {
         // CLA-044: top-level activeCreatureName is truth; cs cache only as fallback.
@@ -68,19 +72,33 @@ export default function useExtraAttackChain({
         const extraAttacks = getExtraAttacks(playerStats);
         if (!(extraAttacks > 0)) return;
         if (!grantAttackActionBudget()) return;
+        // The grant row is NOT written here: a press whose staged hit is
+        // cancelled is fully voided (its attack_cancelled row says "no damage
+        // applied"), and the log must never assert attacks that never resolve.
+        // The row rides the first chain advance instead (logExtraAttackGrant).
         chainRef.current = {
             attack,
+            extraAttacks,
             remaining: extraAttacks,
+            grantLogged: false,
             popupSeen: false,
             commitPending: false,
             commitPendingSeen: false,
         };
+    }
+
+    // One automation/extra_attack row per granted Attack action, written the
+    // first time the chain ADVANCES — i.e. once the pressed swing has resolved
+    // (hit committed or miss drained) and the action is proven to proceed.
+    function logExtraAttackGrant(chain) {
+        if (chain.grantLogged) return;
+        chain.grantLogged = true;
         addEntry(campaignName, {
             type: 'automation',
             characterName: playerName,
             automationType: 'extra_attack',
             name: 'Extra Attack',
-            description: `${playerName} takes the Attack action with Extra Attack — ${extraAttacks + 1} weapon attacks with ${attack.name}.`,
+            description: `${playerName} takes the Attack action with Extra Attack — ${chain.extraAttacks + 1} weapon attacks with ${chain.attack.name}.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[useExtraAttackChain:log-error]', e); });
     }
@@ -106,6 +124,7 @@ export default function useExtraAttackChain({
         // turn-lock being enforcement-gated). The chain belongs to the
         // press that armed it and runs to completion as its popups drain;
         // cancelling staged damage drops it, and a sheet unmount retires it.
+        logExtraAttackGrant(chain);
         stageNextSwing(chain);
     }
 
@@ -141,8 +160,10 @@ export default function useExtraAttackChain({
 
     // Bus listeners: `dice-roll-done` is the popup Done-commit signal the
     // auto-damage lane already rides; `attack-staged-cancelled` is its
-    // sibling Cancel signal (AttackResultPopup) — cancelling the action
-    // leaves the remaining swings unused (its attack_cancelled row logs it).
+    // sibling Cancel signal (AttackResultPopup) — cancelling staged damage
+    // drops the remaining swings, and cancelling the pressed swing also
+    // refunds the turn's grant (its attack_cancelled row declares the action
+    // voided: the log must keep asserting only what resolved).
     useEffect(() => {
         const handleDone = (e) => {
             const chain = chainRef.current;
@@ -150,7 +171,18 @@ export default function useExtraAttackChain({
             if (chain && attacker === playerName) chain.commitPending = true;
         };
         const handleCancelled = (e) => {
-            if (chainRef.current && e.detail?.characterName === playerName) chainRef.current = null;
+            const chain = chainRef.current;
+            if (!chain || e.detail?.characterName !== playerName) return;
+            chainRef.current = null;
+            // Refund the turn's latch only while the action has never ADVANCED
+            // (the pressed swing itself was the cancelled one): the cancel is a
+            // full revert, so the grant stamp goes with it and a same-turn
+            // re-press re-grants. Once an earlier swing resolved, the action
+            // is (partly) spent — the latch stays and the attack_cancelled
+            // row alone logs the voided swing.
+            if (!chain.grantLogged) {
+                setRuntimeValue(playerName, EXTRA_ATTACK_TURN_LATCH_KEY, null, campaignName);
+            }
         };
         window.addEventListener('dice-roll-done', handleDone);
         window.addEventListener('attack-staged-cancelled', handleCancelled);
@@ -158,7 +190,7 @@ export default function useExtraAttackChain({
             window.removeEventListener('dice-roll-done', handleDone);
             window.removeEventListener('attack-staged-cancelled', handleCancelled);
         };
-    }, [playerName]);
+    }, [playerName, campaignName, setRuntimeValue]);
 
     return { beginExtraAttackChain };
 }

@@ -92,29 +92,39 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
         getActiveCreatureName.mockReturnValue(null);
     });
 
-    it('lv6 5e fighter press arms one queued swing, logs the automation row, and stages its roll on popup drain', async () => {
+    it('lv6 5e fighter press arms one queued swing; the grant row lands on the first advance, never at press', async () => {
         const control = makeControl();
         const view = render(<Harness control={control} />);
         begin(control);
 
         expect(control.store._extraAttackGrantedTurn).toEqual({ round: 1, activeCreature: PLAYER });
+        // Regression pin (bug-extra-attack-grant-survives-attack-cancel): the
+        // grant row is NOT press-time — an action cancelled before its first
+        // swing resolved must never assert weapon attacks in the log.
+        expect(logRows('extra_attack')).toHaveLength(0);
+
+        await cycle(view, control); // swing 1 resolves → grant row + queued swing staged
         expect(logRows('extra_attack')).toHaveLength(1);
         expect(logRows('extra_attack')[0].description)
             .toBe(`${PLAYER} takes the Attack action with Extra Attack — 2 weapon attacks with Longsword.`);
-
-        await cycle(view, control);
-        await cycle(view, control); // chain finished — the second drain rolls nothing
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
         expect(control.rollAttack).toHaveBeenCalledWith('Longsword', 6, { hitBonus: 6 });
+
+        await cycle(view, control); // chain finished — the second drain rolls nothing and re-logs nothing
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
+        expect(logRows('extra_attack')).toHaveLength(1);
     });
 
     it('lv18 2024 fighter stages 2 queued swings (3 attacks per press)', async () => {
         const control = makeControl(playerStats(18, fighter2024Levels, '2024'));
         const view = render(<Harness control={control} />);
         begin(control);
+        expect(logRows('extra_attack')).toHaveLength(0);
+
+        await cycle(view, control); // first advance writes the single grant row
+        expect(logRows('extra_attack')).toHaveLength(1);
         expect(logRows('extra_attack')[0].description).toContain('3 weapon attacks');
 
-        await cycle(view, control);
         await cycle(view, control);
         expect(control.rollAttack).toHaveBeenCalledTimes(2);
         expect(control.buildCtx).toHaveBeenCalledTimes(2);
@@ -145,11 +155,14 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
         begin(control);
         await cycle(view, control);
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
+        expect(logRows('extra_attack')).toHaveLength(1);
 
         getCurrentCombatRound.mockReturnValue(2);
         begin(control);
-        expect(logRows('extra_attack')).toHaveLength(2);
+        // The new press asserts nothing until its own first swing resolves.
+        expect(logRows('extra_attack')).toHaveLength(1);
         await cycle(view, control);
+        expect(logRows('extra_attack')).toHaveLength(2);
         expect(control.rollAttack).toHaveBeenCalledTimes(2);
     });
 
@@ -215,7 +228,7 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
         expect(control.rollAttack).toHaveBeenCalledTimes(1);
     });
 
-    it('Cancel of staged damage drops the queued swings without rolling', async () => {
+    it('Cancel of the pressed swing drops the chain, logs no grant row, and refunds the turn latch', async () => {
         const control = makeControl();
         const view = render(<Harness control={control} />);
         begin(control);
@@ -228,6 +241,47 @@ describe('useExtraAttackChain — staged multi-swing popup chain', () => {
             }),
         });
         expect(control.rollAttack).not.toHaveBeenCalled();
+        // Regression pin (bug-extra-attack-grant-survives-attack-cancel): the
+        // voided press never asserts its attacks in the log, and the per-turn
+        // grant is refunded (§7.2 no-consume-on-void) — store-null, so the
+        // same-turn re-press below re-grants the FULL chain.
+        expect(logRows('extra_attack')).toHaveLength(0);
+        expect(control.store._extraAttackGrantedTurn).toBeNull();
+
+        begin(control);
+        expect(control.store._extraAttackGrantedTurn).toEqual({ round: 1, activeCreature: PLAYER });
+        await cycle(view, control); // re-press swing 1 resolves → grant row + fresh queued swing
+        expect(logRows('extra_attack')).toHaveLength(1);
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
+        await cycle(view, control); // queued swing resolves → chain finishes quietly
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cancel of a LATER swing keeps the latch (the action already advanced)', async () => {
+        const control = makeControl();
+        const view = render(<Harness control={control} />);
+        begin(control);
+        await cycle(view, control); // swing 1 MISS resolves: grant row logged, swing 2 staged
+        expect(logRows('extra_attack')).toHaveLength(1);
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
+
+        await cycle(view, control, {
+            dwell: HIT_POPUP,
+            duringDwell: () => act(() => {
+                window.dispatchEvent(new CustomEvent('attack-staged-cancelled', {
+                    detail: { characterName: PLAYER, attackName: 'Longsword' },
+                }));
+            }),
+        });
+        // Swing 2 was the last queued — nothing more stages, and the spent
+        // action keeps its latch (a partially-committed Attack action stays
+        // spent; only the voided swing's own rows tell the story).
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
+        expect(control.store._extraAttackGrantedTurn).toEqual({ round: 1, activeCreature: PLAYER });
+        begin(control);
+        expect(logRows('extra_attack')).toHaveLength(1);
+        await cycle(view, control);
+        expect(control.rollAttack).toHaveBeenCalledTimes(1);
     });
 
     it('the chain belongs to the press, not the active row — it keeps staging off-turn (lenient press model)', async () => {
