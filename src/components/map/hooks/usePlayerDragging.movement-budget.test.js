@@ -54,6 +54,7 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
     const mockEvent = (overrides = {}) => ({
         stopPropagation: vi.fn(),
         preventDefault: vi.fn(),
+        button: 0,
         pointerId: 1,
         clientX: 60,
         clientY: 80,

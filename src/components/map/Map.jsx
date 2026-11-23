@@ -236,12 +236,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         handleToggleDoor,
         handlePatchItem,
         handleCycleItemLight,
+        handleCyclePlayerLight,
         handleRotate,
         requestDelete,
         pendingDelete,
         cancelDelete,
         confirmDelete,
-    } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems);
+    } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems, setMapData);
 
     // Indoor POI lane (marker render + right-click hide/delete) — see
     // hooks/useIndoorPois.js; document edits ride setMapData's autosave.
@@ -901,9 +902,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
 
                 <PlayerContextMenu
                     selectedPlayer={selectedPlayer}
+                    players={mapData.players}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     handleRemovePlayer={handleRemovePlayer}
+                    handleCyclePlayerLight={handleCyclePlayerLight}
                     setSelectedPlayer={setSelectedPlayer}
                 />
 

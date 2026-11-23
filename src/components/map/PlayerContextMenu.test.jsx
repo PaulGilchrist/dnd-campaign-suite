@@ -12,9 +12,11 @@ const defaultPlayer = { id: 'player-1', name: 'FeyRanger', gridX: 1, gridY: 2 };
 
 const defaultProps = (overrides = {}) => ({
     selectedPlayer: defaultPlayer,
+    players: [defaultPlayer],
     gridCenterX,
     gridCenterY,
     handleRemovePlayer: vi.fn(),
+    handleCyclePlayerLight: vi.fn(),
     setSelectedPlayer: vi.fn(),
     ...overrides,
 });

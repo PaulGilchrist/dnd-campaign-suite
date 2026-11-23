@@ -1,6 +1,12 @@
 import useDeleteRequest from '../../common/useDeleteRequest.js';
 import { normalizeLightSetting } from '../../../services/maps/lighting.js';
 
+// THE cycle table for both context-menu Light rows (door-toggle idiom, plan C):
+// bright → dim → none → bright. One table, two lanes (creature placedItems and
+// PC players[] rows) — the PlayerContextMenu row must never grow a parallel
+// implementation (PC light lane, deferred-C backlog).
+const LIGHT_CYCLE = { bright: 'dim', dim: 'none', none: 'bright' };
+
 // Human label for a placed token's named-confirm: NPCs carry `name`,
 // furniture does not — its type key is the honest identifier there.
 // Exported so the click-details dock (ItemDetailsDock.jsx) names the item
@@ -40,7 +46,7 @@ export function placedItemLabel(item) {
 // saveMapData (PUT /maps/:name). `requestDelete` is exported so the player-
 // token lane ("Remove from Map", mapData.players) rides the SAME dialog — the
 // action verb is the only thing that differs.
-function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
+function usePlacedItems(setPlacedItems, setSelectedItem, placedItems, setMapData) {
     // Staging mechanics unified into common/useDeleteRequest (backlog
     // 2026-11-01 BA): the hex-POI and spell-overlay lanes share the exact
     // arm/cancel-inert/confirm-once semantics this hook pioneered.
@@ -102,12 +108,28 @@ function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
     // (the absent-key bright default stays a READ convention, never a second
     // stored shape).
     const handleCycleItemLight = (itemId) => {
-        const cycle = { bright: 'dim', dim: 'none', none: 'bright' };
         setPlacedItems(prev =>
             prev.map(item => (item.id === itemId
-                ? { ...item, light: cycle[normalizeLightSetting(item.light)] }
+                ? { ...item, light: LIGHT_CYCLE[normalizeLightSetting(item.light)] }
                 : item))
         );
+    };
+
+    // PC-token light cycle (deferred-C backlog lane): the SAME veil law already
+    // treats players[] rows as light sources (services/maps/lighting.js
+    // lightSources), so the edit is the identical per-token `light` field on
+    // the map doc — it rides setMapData, the same autosave PUT + SSE echo lane
+    // 'Remove from Map' and the `lighting` document flag use (non-GM tabs drop
+    // the write at flushSave + the server 403s it, exactly like the creature
+    // row). Like the creature cycle, the menu stays open: the label re-reads
+    // the stored row through PlayerContextMenu's players lookup.
+    const handleCyclePlayerLight = (playerId) => {
+        setMapData(prev => ({
+            ...prev,
+            players: (prev.players || []).map(player => (player.id === playerId
+                ? { ...player, light: LIGHT_CYCLE[normalizeLightSetting(player.light)] }
+                : player)),
+        }));
     };
 
     return {
@@ -116,6 +138,7 @@ function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
         handleToggleDoor,
         handlePatchItem,
         handleCycleItemLight,
+        handleCyclePlayerLight,
         handleRotate,
         requestDelete,
         pendingDelete,

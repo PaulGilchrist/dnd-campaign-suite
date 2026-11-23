@@ -57,6 +57,7 @@ describe('usePlayerDragging', () => {
   const mockEvent = (overrides = {}) => ({
     stopPropagation: vi.fn(),
     preventDefault: vi.fn(),
+    button: 0,
     pointerId: 1,
     clientX: 60,
     clientY: 80,
@@ -171,6 +172,17 @@ describe('usePlayerDragging', () => {
       // Open-world census: no walls ⇒ every cell walkable.
       expect(d.reachable).toBeInstanceOf(Set);
       expect(d.reachable.size).toBe(gridSize * gridSize);
+    });
+
+    // House law mirror of useItemDragging.test.js: a right-button press must
+    // NOT capture — an active capture retargets the trusted contextmenu event
+    // to the svg root and kills the token's own context menu (2026-11-22, the
+    // lane that gates the PC Light row).
+    it('does not preventDefault or start a drag for non-left buttons', () => {
+      const { result, ev } = press('p1', { event: { button: 2 } });
+      expect(result.current.dragging).toBeNull();
+      expect(ev.preventDefault).not.toHaveBeenCalled();
+      expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
     });
 
     it.each([

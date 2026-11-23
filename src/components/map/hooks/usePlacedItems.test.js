@@ -47,13 +47,14 @@ describe('usePlacedItems', () => {
 
   const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem, placedItems)).result;
 
-  it('returns the six mutation handlers plus the named-confirm dialog seam', () => {
+  it('returns the seven mutation handlers plus the named-confirm dialog seam', () => {
     expect(Object.keys(getHook().current)).toEqual([
       'handleToggleItemVisibility',
       'handleDeleteItem',
       'handleToggleDoor',
       'handlePatchItem',
       'handleCycleItemLight',
+      'handleCyclePlayerLight',
       'handleRotate',
       'requestDelete',
       'pendingDelete',
@@ -209,6 +210,41 @@ describe('usePlacedItems', () => {
     expect(placedItems).toEqual(before);
     expect(placedItems[0]).toBe(before[0]);
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('the two light cycles share ONE table: bright → dim → none → bright, explicit writes', () => {
+    // Creature rows (placedItems) and PC rows (mapData.players) step through
+    // the identical sequence — the PC lane must never drift from the sibling.
+    let doc = { players: [{ id: 'p1', name: 'Fey', gridX: 1, gridY: 1 }, { id: 'p2', name: 'Bo', gridX: 2, gridY: 2 }] };
+    const setMapData = vi.fn((fn) => { doc = fn(doc); });
+    const result = renderHook(() =>
+      usePlacedItems(setPlacedItems, setSelectedItem, placedItems, setMapData)
+    ).result;
+
+    const itemSpins = [];
+    const playerSpins = [];
+    for (let press = 0; press < 3; press++) {
+      act(() => result.current.handleCycleItemLight('item1'));
+      act(() => result.current.handleCyclePlayerLight('p1'));
+      itemSpins.push(placedItems[0].light);
+      playerSpins.push(doc.players[0].light);
+    }
+    expect(itemSpins).toEqual(['dim', 'none', 'bright']);
+    expect(playerSpins).toEqual(['dim', 'none', 'bright']);
+    // Row spreads: every other field and every sibling row survive untouched;
+    // an unknown id rewrites nothing (identity preserved).
+    expect(doc.players[0]).toEqual({ id: 'p1', name: 'Fey', gridX: 1, gridY: 1, light: 'bright' });
+    expect(doc.players[1]).toEqual({ id: 'p2', name: 'Bo', gridX: 2, gridY: 2 });
+    const before = doc;
+    act(() => result.current.handleCyclePlayerLight('ghost'));
+    expect(doc.players[0]).toBe(before.players[0]);
+    // Players-less document: the honest empty write, no crash.
+    let emptyDoc = null;
+    const bare = renderHook(() =>
+      usePlacedItems(setPlacedItems, setSelectedItem, [], (fn) => { emptyDoc = fn({}); })
+    ).result;
+    act(() => bare.current.handleCyclePlayerLight('p1'));
+    expect(emptyDoc).toEqual({ players: [] });
   });
 });
 

@@ -177,6 +177,14 @@ export default function usePlayerDragging({
     const handlePointerDown = useCallback((e, playerId) => {
         if (rulerMode || spellMode) return;
         e.stopPropagation();
+        // House law (2026-11-16 XC, applied at the source in useSelectMove/
+        // useWallDrawing/useZoomPan/useItemDragging:54): button-0 ONLY. A
+        // right-button press used to start a drag and setPointerCapture, and
+        // the active capture retargets the trusted contextmenu event to the
+        // svg root — away from the token circle's onContextMenu, so the player
+        // context menu (Remove from Map / Light cycle) never opened for a real
+        // right-click (found live 2026-11-22 shipping the PC light row).
+        if (e.button !== 0) return;
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;

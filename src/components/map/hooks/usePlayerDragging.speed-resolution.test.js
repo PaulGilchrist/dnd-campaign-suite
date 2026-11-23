@@ -61,6 +61,7 @@ describe('usePlayerDragging — budget ceiling resolves real sheet speed', () =>
     const mockEvent = (overrides = {}) => ({
         stopPropagation: vi.fn(),
         preventDefault: vi.fn(),
+        button: 0,
         pointerId: 1,
         clientX: 60,
         clientY: 80,
