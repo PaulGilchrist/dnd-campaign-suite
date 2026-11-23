@@ -11,9 +11,13 @@ export function buildVictoryLines(result) {
     else lines.push(`The party survived ${count(rounds, 'round')}!`)
     if (result.foes > 0) {
         const defeated = result.defeated ?? 0
-        const fled = Math.max(0, result.foes - defeated)
-        lines.push(fled > 0
-            ? `${count(defeated, 'foe')} defeated · ${fled} drove off`
+        const standing = Math.max(0, result.foes - defeated)
+        lines.push(standing > 0
+            // Defeat honesty (ZA 2026-11-23): on a party wipe nobody drove the
+            // foes off — the survivors are still standing.
+            ? result.wipe
+                ? `${count(defeated, 'foe')} defeated · ${count(standing, 'foe')} still standing`
+                : `${count(defeated, 'foe')} defeated · ${standing} drove off`
             : result.foes === 1
                 ? `${count(result.foes, 'foe')} defeated`
                 : `All ${count(result.foes, 'foe')} defeated`)

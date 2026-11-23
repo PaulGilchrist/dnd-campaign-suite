@@ -110,7 +110,6 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (ZA 2026-11-23) Defeat-banner honesty: a TPK clear stamps `wipe:true` with any surviving foes and the shared fled line claims `0 foes defeated · N drove off` — on a party wipe nobody drove the foes off; omit the foes/fled line (or say `N still standing`) in the `wipe` branch of `buildVictoryLines` (`src/components/initiative/victoryLines.js`, writer `createCreatureHandlers.js:319-327`).
 - (ZA 2026-11-23) AllySelectionModal has no Escape/pure-backdrop dismissal (Cancel-only; Escape-left-open modals then intercept clicks) — adopt the `useModalDismiss.js` family law like DeleteConfirmModal/create modals; doubles as the escape hatch once the 420px clipped-Cancel bug (`bug-overlay-family-hardcodes-sidebar-carveout`) is fixed.
 - (ZA 2026-11-23) `TvNextUpStrip` children have no stable per-item class/testid (the whole lane reads as container text) — add `.tv-next-up-item[data-name]` so tests/automation can assert the wrap list per creature.
 - (ZA 2026-11-23) Observation, possibly intentional: TV-mode GM tabs keep editable name/initiative/target/control inputs on presentation cards (only HP becomes a span) — if the table-mounted TV screen is meant glanceable, consider a display-only tier there too; owner call.

@@ -1,7 +1,8 @@
 // @maintained-by-ai
 // Number-agreement and line-presence coverage for buildVictoryLines (victory
 // banner copy): singular/plural faces of every count-bearing line, the wipe
-// vs. survived branch, and the foes=0 / partySize=0 / missing-field defaults.
+// vs. survived branch (including defeat-fled honesty: a wipe never claims
+// anyone "drove off"), and the foes=0 / partySize=0 / missing-field defaults.
 
 import { describe, it, expect } from 'vitest'
 import { buildVictoryLines } from './victoryLines.js'
@@ -40,6 +41,40 @@ describe('buildVictoryLines', () => {
         const noDefeated = { ...stamp({ foes: 2 }), defeated: undefined }
         expect(buildVictoryLines(noDefeated))
             .toContain('0 foes defeated · 2 drove off')
+    })
+
+    it('wipe with surviving foes: never claims "drove off", says "still standing" instead', () => {
+        const tpk = buildVictoryLines(stamp({
+            wipe: true, rounds: 4, foes: 3, defeated: 1, survivors: 0, partySize: 5,
+        }))
+        expect(tpk.some(l => l.includes('drove off'))).toBe(false)
+        expect(tpk).toContain('1 foe defeated · 2 foes still standing')
+        expect(tpk).toContain('The party fell after 4 rounds.')
+        expect(tpk).toContain('0 of 5 heroes standing')
+        // Singular surviving foe agrees via the same count helper.
+        expect(buildVictoryLines(stamp({ wipe: true, foes: 2, defeated: 1, survivors: 0, partySize: 3 })))
+            .toContain('1 foe defeated · 1 foe still standing')
+        // Zero kills on the wipe still counts honestly: nothing defeated, all standing.
+        expect(buildVictoryLines(stamp({ wipe: true, foes: 2, defeated: 0, survivors: 0, partySize: 3 })))
+            .toContain('0 foes defeated · 2 foes still standing')
+    })
+
+    it('wipe with no surviving foes: mutual-kill defeated line stays honest and unchanged', () => {
+        const mutual = buildVictoryLines(stamp({ wipe: true, foes: 2, defeated: 2, survivors: 0, partySize: 4 }))
+        expect(mutual.some(l => l.includes('drove off'))).toBe(false)
+        expect(mutual.some(l => l.includes('still standing'))).toBe(false)
+        expect(mutual).toContain('All 2 foes defeated')
+        expect(buildVictoryLines(stamp({ wipe: true, foes: 1, defeated: 1, survivors: 0, partySize: 4 })))
+            .toContain('1 foe defeated')
+    })
+
+    it('victory branch regression: fled leg renders byte-unchanged while a wipe differs only in the leg', () => {
+        expect(buildVictoryLines(stamp({ wipe: false, foes: 4, defeated: 1 })))
+            .toEqual([
+                'The party survived 1 round!',
+                '1 foe defeated · 3 drove off',
+                '13 of 13 heroes standing',
+            ])
     })
 
     it('survived line: singular/plural rounds, defaulting missing rounds to 1', () => {

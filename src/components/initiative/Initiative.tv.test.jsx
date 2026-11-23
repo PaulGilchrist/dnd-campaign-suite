@@ -359,7 +359,8 @@ describe('Initiative TV mode', () => {
 
         await waitFor(() => { expect(screen.getByText('The Party Falls')).toBeInTheDocument(); });
         expect(screen.getByText('The party fell after 2 rounds.')).toBeInTheDocument();
-        expect(screen.getByText('1 foe defeated · 3 drove off')).toBeInTheDocument();
+        expect(screen.getByText('1 foe defeated · 3 foes still standing')).toBeInTheDocument();
+        expect(screen.queryByText(/drove off/)).not.toBeInTheDocument();
         expect(screen.getByText('0 of 3 heroes standing')).toBeInTheDocument();
     });
 
