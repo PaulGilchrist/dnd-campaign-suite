@@ -19,7 +19,7 @@ function overlayLabel(o) {
 // combatSummary runtime-store PATCH + SSE echo), so the two surfaces read and
 // write one canonical targetName and stay in sync live without reload.
 // Lifted verbatim out of CreatureCard.jsx — do not fork a second copy.
-export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, overlays, onTargetChange }) {
+export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, localCharacterName, allCreatures, overlays, onTargetChange }) {
     // Overlay targets are live ONLY on the PC cast lane (CharSpells
     // getTargetInfo SP-097 fallback → useLoggedDiceRollDamage 'overlay-'
     // branch → handleAoeDamage area adjudication). Monster damage chips
@@ -34,9 +34,26 @@ export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, 
     // visitor plain-value law (backlog 2026-11-11 LZ) — don't mount an
     // editable-looking control that can never be enabled on this device. The
     // predicate is verbatim the old `disabled` gate, so controlled monsters
-    // (explicit controller or derived summon/form lanes) keep the live arm lane,
-    // PC rows are untouched, and the GM sees the select in every state.
+    // (explicit controller or derived summon/form lanes) keep the live arm lane.
     if (creature.type !== 'player' && !isLocalhost && !isPlayerSummoned) return null
+    // PC-row ownership gate (bug-visitor-arms-any-pc-target-cross-player-write):
+    // a visitor tab arms the target ONLY on the row its device plays. The
+    // LAN-trust model (owner decision D2 — no accounts) has exactly one "mine"
+    // signal a device genuinely owns: its own sidebar selection, threaded here
+    // as localCharacterName (Players.jsx isTokenOwnedHere precedent). Foreign
+    // players' cards render the target as plain read-only text — the same face
+    // visitor HP already shows (CreatureHp.jsx plain span) — and the shared
+    // write seam (createCreatureHandlers.applyTargetSelection) refuses the same
+    // rows handler-side. The GM sees the live select in every state.
+    if (creature.type === 'player' && !isLocalhost && creature.name !== localCharacterName) {
+        return (
+            <div className='creature-target'>Target&nbsp;
+                <span className='text-muted' data-testid="target-readonly" aria-label={`${creature.name} target`}>
+                    {creature.targetName || '—'}
+                </span>
+            </div>
+        )
+    }
     const showOverlays = creature.type === 'player' && overlays.length > 0
     return (
         <div className='creature-target'>Target&nbsp;

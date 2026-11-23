@@ -337,10 +337,10 @@ describe('handleNameChange', () => {
             expect(setCombatSummary).not.toHaveBeenCalled();
         });
 
-        it('target select — the player interaction lane — still persists', () => {
+        it('target select — the player interaction lane — still persists for the device playing the character', () => {
             const { handlers, combatSummary } = makeHandlers(
                 [{ name: 'Alice', type: 'player', currentHp: 20 }],
-                { isLocalhost: false },
+                { isLocalhost: false, localCharacterName: 'Alice' },
             );
 
             handlers.handleTargetChange('Alice', 'Goblin');
@@ -350,6 +350,18 @@ describe('handleNameChange', () => {
             // creature's targetName rides the wire.
             expect(storage.patch).toHaveBeenCalledWith('combatSummary', { creatures: [{ name: 'Alice', targetName: 'Goblin' }] }, campaignName);
             expect(storage.set).not.toHaveBeenCalled();
+        });
+
+        it('target select — a LAN client arming a row it does not play is refused (bug-visitor-arms-any-pc-target-cross-player-write)', () => {
+            const { handlers } = makeHandlers(
+                [{ name: 'Alice', type: 'player', currentHp: 20 }, { name: 'Bob', type: 'player', currentHp: 15 }],
+                { isLocalhost: false, localCharacterName: 'Bob' },
+            );
+
+            handlers.handleTargetChange('Alice', 'Bob');
+
+            expect(setTarget).not.toHaveBeenCalled();
+            expect(storage.patch).not.toHaveBeenCalled();
         });
     });
 });

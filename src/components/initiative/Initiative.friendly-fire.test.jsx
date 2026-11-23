@@ -284,7 +284,7 @@ describe('Initiative friendly-fire overlay (container wiring)', () => {
         expect(friendlyEntries()).toHaveLength(1);
     });
 
-    it('exempt face: a non-ally target arms silently (zero prompt, zero confirm log)', async () => {
+    it('exempt face: a non-ally target arms with zero prompt — no confirm dialog, no friendlyFire row; the generic arming audit row lands (bug-visitor-arms-any-pc-target-cross-player-write)', async () => {
         await mountInitiative();
         const select = screen.getByTestId('target-select-Grim');
 
@@ -292,7 +292,10 @@ describe('Initiative friendly-fire overlay (container wiring)', () => {
 
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(confirmSpy).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
+        expect(friendlyEntries()).toHaveLength(0);
+        const generic = addEntry.mock.calls.filter(c => c[1]?.abilityName === 'Target Selection');
+        expect(generic).toHaveLength(1);
+        expect(generic[0][1].description).toBe('Grim armed Zombie as a target.');
         expect(select.value).toBe('Zombie');
         expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Grim', 'Zombie');
     });

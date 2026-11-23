@@ -154,10 +154,17 @@ describe('CreatureCard', () => {
                 expectDisabled: false,
             },
             {
-                label: 'player on non-localhost stays enabled',
+                label: 'player on non-localhost stays enabled for the device that plays it (bug-visitor-arms-any-pc-target-cross-player-write)',
                 creature: { ...defaultPlayerCreature, targetName: 'Bob' },
                 isLocalhost: false,
+                localCharacterName: 'Alice',
                 expectDisabled: false,
+            },
+            {
+                label: 'player on non-localhost with NO matching sidebar selection renders read-only text — a bystander never gets the arm (bug-visitor-arms-any-pc-target-cross-player-write)',
+                creature: { ...defaultPlayerCreature, targetName: 'Bob' },
+                isLocalhost: false,
+                expectReadonly: 'Bob',
             },
             {
                 label: 'NPC on localhost stays enabled',
@@ -177,11 +184,16 @@ describe('CreatureCard', () => {
                 isLocalhost: false,
                 expectDisabled: false,
             },
-        ])('target select: $label', ({ creature, isLocalhost, expectDisabled, expectAbsent }) => {
+        ])('target select: $label', ({ creature, isLocalhost, localCharacterName, expectDisabled, expectAbsent, expectReadonly }) => {
             const allCreatures = [defaultPlayerCreature, { name: 'Bob', type: 'player' }];
-            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} allCreatures={allCreatures} />);
+            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} allCreatures={allCreatures} localCharacterName={localCharacterName} />);
             if (expectAbsent) {
                 expect(screen.queryByTestId('target-select')).not.toBeInTheDocument();
+                return;
+            }
+            if (expectReadonly) {
+                expect(screen.queryByTestId('target-select')).not.toBeInTheDocument();
+                expect(screen.getByTestId('target-readonly')).toHaveTextContent(expectReadonly);
                 return;
             }
             const targetSelect = screen.getByTestId('target-select');

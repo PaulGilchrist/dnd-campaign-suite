@@ -172,7 +172,7 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
         expect(setCombatSummary).not.toHaveBeenCalled();
     });
 
-    it('non-ally target arms silently — zero prompt, zero confirm log', () => {
+    it('non-ally target arms with zero prompt — the confirm lane stays quiet, the arming itself logs one generic audit row', () => {
         seedAllies(['Alice', 'Bob']);
         const { handlers, requestFriendlyFireConfirm } = makeHandlers();
 
@@ -180,7 +180,16 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
 
         expect(requestFriendlyFireConfirm).not.toHaveBeenCalled();
         expect(confirmSpy).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
+        // bug-visitor-arms-any-pc-target-cross-player-write: no arm is audit-
+        // silent any more — but the friendly-fire CONFIRM row (friendlyFire)
+        // stays exclusive to the confirmed lane.
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry.mock.calls[0][1]).toMatchObject({
+            type: 'ability_use',
+            abilityName: 'Target Selection',
+            description: 'Alice armed Zombie as a target.',
+        });
+        expect(addEntry.mock.calls[0][1].friendlyFire).toBeUndefined();
         expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Alice', 'Zombie');
     });
 

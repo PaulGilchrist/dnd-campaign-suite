@@ -766,6 +766,7 @@ function CreatureCard({
     onControllerChange,
     onEditAllies,
     onToggleAway,
+    localCharacterName,
 }) {
     const isUnconscious = creature.currentHp <= 0
     const isAway = creature.type === 'player' && creature.away === true
@@ -822,7 +823,7 @@ function CreatureCard({
             />
             <TempHpDisplay creature={creature} campaignName={campaignName} />
             <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} isAway={isAway} />
-            <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
+            <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} localCharacterName={localCharacterName} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
             <ControlRow creature={creature} allCreatures={allCreatures} isLocalhost={isLocalhost} controllerName={controllerName} onControllerChange={onControllerChange} />
             <AlliesButton creature={creature} isLocalhost={isLocalhost} onEditAllies={onEditAllies} />
             <TvTargetChip tvMode={tvMode} targetName={creature.targetName} />

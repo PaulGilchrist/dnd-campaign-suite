@@ -151,6 +151,40 @@ function logManualHpOverride({ campaignName, creature, oldHp, newHp }) {
 }
 
 /**
+ * Audit copy for a shared-board armed-target transition (bug-visitor-arms-any-
+ * pc-target-cross-player-write: no arm may be audit-silent). One row per real
+ * value change; the friendly-fire lane keeps its own dedicated friendlyFire-
+ * flagged row (applyTargetSelection's armAudited flag suppresses this generic
+ * one there) and overlay (AoE) arms ride their per-save careful-spell flow —
+ * mirroring isFriendlyFireTarget's overlay exclusion.
+ */
+function buildTargetArmAuditText(creatureName, targetName, previousTarget) {
+    if (targetName) return `${creatureName} armed ${targetName} as a target.`
+    if (previousTarget && String(previousTarget).startsWith('overlay-')) {
+        return `${creatureName} cleared their armed overlay-zone target.`
+    }
+    return previousTarget
+        ? `${creatureName} cleared their armed target (was ${previousTarget}).`
+        : `${creatureName} cleared their armed target.`
+}
+
+// One audit row per REAL transition on the shared board (hoisted to keep
+// applyTargetSelection under the complexity ceiling — same-family precedent
+// as buildNoTargetRefusalLog). armAudited = the FF lane already logged its
+// dedicated friendlyFire row; overlay arms ride their spell flow.
+function logTargetArmTransition(campaignName, creatureName, targetName, previousTarget, armAudited) {
+    const next = targetName || null
+    if (armAudited || (next && next.startsWith('overlay-')) || previousTarget === next) return
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: creatureName,
+        abilityName: 'Target Selection',
+        description: buildTargetArmAuditText(creatureName, next, previousTarget),
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[applyTargetSelection] target arming log failed:', e) })
+}
+
+/**
  * Creates creature operation handlers for the initiative component.
  */
 export function createCreatureHandlers({
@@ -177,6 +211,12 @@ export function createCreatureHandlers({
     // Replaces the native window.confirm; hosts without the callback fail
     // closed (see handleClear).
     requestClearConfirm = null,
+    // Per-client ownership signal (bug-visitor-arms-any-pc-target-cross-player-
+    // write): the App-level sidebar-selected character name for THIS device
+    // (localCharacterName law, Players.jsx isTokenOwnedHere precedent). Pure
+    // per-client local state, never a server field — consulted only by the
+    // PC-row ownership gate in applyTargetSelection.
+    localCharacterName = null,
 }) {
     // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
     const writeNpcHp = function writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp) {
@@ -408,7 +448,33 @@ export function createCreatureHandlers({
     // adoption is byte-identical to the old full POST and no stale-mirror
     // snapshot can clobber other combatants' fields. Every other board lane
     // (HP, initiative, join, remove) keeps the full-replace storage.set law.
-    const applyTargetSelection = function applyTargetSelection(creatureName, targetName) {
+    // PC-row ownership predicate (bug-visitor-arms-any-pc-target-cross-player-
+    // write): a visitor tab may arm the row its device plays (sidebar
+    // selection — the LAN-trust model's one "mine" signal, Players.jsx
+    // isTokenOwnedHere precedent); the GM arms any row; monster rows answer
+    // only to the delegated-control lane and stay LAN-trusted for their runner
+    // (owner decision D2 — do NOT "fix" the monster law here).
+    const canArmTargetRow = function canArmTargetRow(creatureName) {
+        if (isLocalhost) return true
+        const row = (combatSummary?.creatures || []).find(c => c.name === creatureName)
+        return !(row && row.type === 'player' && creatureName !== localCharacterName)
+    }
+
+    const applyTargetSelection = function applyTargetSelection(creatureName, targetName, armAudited = false) {
+        const armedRow = combatSummary.creatures.find(c => c.name === creatureName)
+        // PC-row ownership gate (bug-visitor-arms-any-pc-target-cross-player-
+        // write, bug-player-clients-can-hijack-initiative family): a bystander
+        // silently re-arming another player's targetName steers every armed-
+        // target adjudication on the shared board. TargetSelect renders the
+        // foreign PC row read-only; this guard closes the write seam
+        // (handleInitiativeChange idiom). The restore re-publish mirrors the
+        // controlled select from the untouched board truth (overlay-miss idiom
+        // below). Unknown rows fall through to the legacy inert lane.
+        if (!canArmTargetRow(creatureName)) {
+            console.error(`[applyTargetSelection] ${creatureName} is not the character played on this device — target not armed`)
+            setCombatSummary(cloneDeep(combatSummary))
+            return
+        }
         if (targetName && targetName.startsWith('overlay-')) {
             const overlayId = targetName.slice('overlay-'.length)
             const overlay = overlays.find(o => o.id === overlayId)
@@ -421,10 +487,10 @@ export function createCreatureHandlers({
                 return
             }
         }
+        const previousTarget = armedRow ? (armedRow.targetName || null) : null
         setTarget(combatSummary, creatureName, targetName)
         // Unknown creatures never arm (setTarget is inert for them too) — the
         // server patch lane would skip such a record with a warning anyway.
-        const armedRow = combatSummary.creatures.find(c => c.name === creatureName)
         if (armedRow) {
             // Race guard (bug-race-arm-patch-beats-swap-clear-post): this scoped
             // PATCH coalesces ~120 ms, so a concurrent control swap/release —
@@ -442,12 +508,24 @@ export function createCreatureHandlers({
             const record = { name: creatureName, targetName: targetName || null }
             if (armedRow.controller) record.seenController = armedRow.controller
             storage.patch('combatSummary', { creatures: [record] }, campaignName)
+            // Audit law (bug-visitor-arms-any-pc-target-cross-player-write):
+            // every armed-target transition on the shared board logs one
+            // "Target Selection" row — arming AND clearing.
+            logTargetArmTransition(campaignName, creatureName, targetName, previousTarget, armAudited)
         }
         setCombatSummary(cloneDeep(combatSummary))
     }
 
     const handleTargetChange = function handleTargetChange(creatureName, targetName) {
         if (!combatSummary) return
+        // Ownership gate BEFORE any confirm routing (bug-visitor-arms-any-pc-
+        // target-cross-player-write): a foreign PC row must not even arm the
+        // friendly-fire prompt on this device — the controlled select restores
+        // its previous value on its own when no state changes.
+        if (!canArmTargetRow(creatureName)) {
+            console.error(`[handleTargetChange] ${creatureName} is not the character played on this device — target not armed`)
+            return
+        }
         // Friendly-fire confirm (Phase 3.2 betrayal, migrated off native
         // window.confirm 2026-11-04 CQ): arming an ally-listed target routes
         // through the host's React overlay (role=dialog, waits indefinitely —
@@ -470,7 +548,9 @@ export function createCreatureHandlers({
 
     // Overlay-confirm seam: Initiative.jsx invokes this after the user accepts
     // the FriendlyFireConfirmModal prompt. Audit row + arm bytes match the
-    // retired native-confirm lane exactly (repo log rule).
+    // retired native-confirm lane exactly (repo log rule). The dedicated
+    // friendlyFire row below IS the arming audit — armAudited keeps the shared
+    // write tail from logging a second generic row for the same transition.
     const confirmFriendlyFireTarget = function confirmFriendlyFireTarget(creatureName, targetName) {
         if (!combatSummary) return
         addEntry(campaignName, {
@@ -481,7 +561,7 @@ export function createCreatureHandlers({
             friendlyFire: true,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[initiative] friendly-fire arming log failed:', e) })
-        applyTargetSelection(creatureName, targetName)
+        applyTargetSelection(creatureName, targetName, true)
     }
 
     // Phase 2 — control delegation. GM hands an NPC/monster to a player (their

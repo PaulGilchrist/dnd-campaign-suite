@@ -403,7 +403,7 @@ function InitiativeLootReveal({ show, lootData, characters, onClose, onAward }) 
     )
 }
 
-function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter, onOpenEncounters, onAddCharacter }) {
+function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter, onOpenEncounters, onAddCharacter, localCharacterName }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
     const [activeCreatureName, setActiveCreatureName] = React.useState(null)
@@ -646,10 +646,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setActiveCreatureName,
         characters,
         isLocalhost,
+        localCharacterName,
         showToast,
         requestFriendlyFireConfirm: setPendingFriendlyFire,
         requestClearConfirm: setPendingClearConfirm,
-    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast, setPendingFriendlyFire, setPendingClearConfirm])
+    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, localCharacterName, characters, showToast, setPendingFriendlyFire, setPendingClearConfirm])
 
     // Overlay-confirm seam: accept arms through the factory (same audit row +
     // board-write bytes the retired native-confirm lane produced); cancel is
@@ -1133,6 +1134,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             onControllerChange={handleControllerChange}
                             onEditAllies={openAllyEditor}
                             onToggleAway={handleToggleAway}
+                            localCharacterName={localCharacterName}
                         />
                     )
                 })}
