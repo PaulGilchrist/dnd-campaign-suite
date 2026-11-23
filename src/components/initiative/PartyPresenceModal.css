@@ -59,14 +59,13 @@
     color: #ffffff;
 }
 
-/* Toolbar button + away-count chip in the GM control row. */
-.initiative .split-party-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.initiative .split-party-button-active {
+/* Toolbar button + away-count chip in the GM control row. The base button
+   skin (inline-flex / align / gap / colors) is now the shared .ct-btn kit tier,
+   so the old `.initiative .split-party-button` inline-flex block was removed.
+   The active face keeps a compound selector so its purple border/label outrank
+   the `.ct-container .ct-btn` base (the away-count marker is a state, not a kit
+   variant). */
+.initiative .split-party-button.split-party-button-active {
     border-color: #9b59b6;
     color: #d2b4de;
 }

@@ -1,6 +1,6 @@
 // @maintained-by-ai
 /* Lane — overlay dismissal for the Save/Load EncounterModal (2026-11-02 BF
- * backlog: the full-screen z-1000 .encounter-modal-overlay swallowed EVERY
+ * backlog: the full-screen z-1000 .ct-modal-overlay swallowed EVERY
  * click incl. sidebar nav and ignored Escape until × was clicked). The modal
  * now follows the house Escape + backdrop pattern (DiceTray.jsx:42-48 keydown
  * listener, :73-80 closest()-guarded overlay click): both are pure onClose —
@@ -51,7 +51,7 @@ function Host({ mode = 'load' }) {
     );
 }
 
-const overlay = () => document.querySelector('.encounter-modal-overlay');
+const overlay = () => document.querySelector('.ct-modal-overlay');
 
 describe('EncounterModal — Escape and backdrop close the overlay (×-parity)', () => {
     beforeEach(() => {
@@ -64,12 +64,12 @@ describe('EncounterModal — Escape and backdrop close the overlay (×-parity)',
 
     it('Escape closes the open Load modal: onClose once, overlay unmounts, zero action dispatch', () => {
         const { container } = render(<Host />);
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
 
         fireEvent.keyDown(document, { key: 'Escape' });
 
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
         expect(mockOnLoad).not.toHaveBeenCalled();
         expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockOnRename).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe('EncounterModal — Escape and backdrop close the overlay (×-parity)',
         fireEvent.click(overlay());
 
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
         expect(mockOnLoad).not.toHaveBeenCalled();
         expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockOnRename).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe('EncounterModal — Escape and backdrop close the overlay (×-parity)',
         fireEvent.keyDown(document, { key: 'Escape' });
 
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
         expect(mockOnRename).not.toHaveBeenCalled();
     });
 

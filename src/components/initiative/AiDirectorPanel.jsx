@@ -82,7 +82,7 @@ export default function AiDirectorPanel({ campaignName, activeCreature, isLocalh
     return (
         <div className='ai-director'>
             {!intent && (
-                <button className='ai-director-ask' onClick={ask} disabled={asking} title="Ask the AI to decide this NPC's turn — it may only pick from the monster's real actions; the engine rolls the dice">
+                <button className='ct-btn ai-director-ask' onClick={ask} disabled={asking} title="Ask the AI to decide this NPC's turn — it may only pick from the monster's real actions; the engine rolls the dice">
                     <i className={`fas ${asking ? 'fa-spinner' : 'fa-brain'}`}></i> {asking ? 'AI deciding…' : `AI director: decide ${creatureName}'s turn`}
                 </button>
             )}

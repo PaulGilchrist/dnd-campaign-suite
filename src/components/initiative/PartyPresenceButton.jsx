@@ -15,7 +15,7 @@ export default function PartyPresenceButton({ creatures, onConfirm }) {
         <>
             <button
                 type="button"
-                className={`split-party-button${awayCount ? ' split-party-button-active' : ''}`}
+                className={`ct-btn split-party-button${awayCount ? ' split-party-button-active' : ''}`}
                 onClick={() => setOpen(true)}
                 title="Split party — choose which heroes are with the encounter"
             >

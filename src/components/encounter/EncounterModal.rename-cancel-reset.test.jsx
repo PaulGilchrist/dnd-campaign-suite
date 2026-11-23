@@ -70,7 +70,7 @@ describe('EncounterModal — cancelled rename resets transient state across clos
     for (const [label, dismiss] of [
         ['Escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
         ['close button', () => fireEvent.click(screen.getByRole('button', { name: 'Close' }))],
-        ['backdrop click', () => fireEvent.click(document.querySelector('.encounter-modal-overlay'))],
+        ['backdrop click', () => fireEvent.click(document.querySelector('.ct-modal-overlay'))],
     ]) {
         it(`pen → ${label} cancel → reopen in load mode renders the list, not the rename form`, () => {
             const { rerender } = render(<EncounterModal {...createProps()} />);

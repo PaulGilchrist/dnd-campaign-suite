@@ -165,7 +165,7 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(h.loadEncounters).toHaveBeenCalledTimes(loadsAtOpen + 1);
     // 2026-10-24 QA backlog: rename success now mirrors the delete lane (d4da4ebc1) —
     // closeModal() unmounts the overlay, so no stale modal intercepts page clicks.
-    expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+    expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
 
     // Re-opening Load lists the encounter under its NEW name with fresh row actions.
     fireEvent.click(screen.getByRole('button', { name: 'Load' }));

@@ -1,11 +1,15 @@
 /* ============ Generate Modal ============ */
+/* Shell kit note (tranche 1): the generator rides the shared .ct-modal-overlay/
+   .ct-modal/.ct-modal-* chrome like EncounterModal; the .gen-modal two-class
+   compound keeps its width override deterministic against the kit .ct-modal
+   declaration. */
 
-.encounter-builder .gen-modal {
+.encounter-builder .ct-modal.gen-modal {
   width: 560px;
   max-width: 90vw;
 }
 
-.encounter-builder .gen-modal-overlay .encounter-modal-body {
+.encounter-builder .gen-modal-overlay .ct-modal-body {
   display: flex;
   flex-direction: column;
   gap: 16px;

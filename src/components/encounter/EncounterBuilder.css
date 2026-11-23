@@ -1,22 +1,12 @@
 /* ============ Layout ============ */
+/* .ct-* kit convergence (tranche 1): the root also carries .ct-container (the
+   App.css kit scope) — its flex/padding/width declarations match the former
+   .encounter-builder values exactly. The header row/title ride the shared
+   .ct-header/.ct-title tiers; the bespoke rules for them were removed. */
 .encounter-builder {
   flex: 1;
   padding: 20px;
   width: 100%;
-}
-
-.encounter-builder .encounter-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-.encounter-builder .encounter-title {
-  margin: 0;
-  color: var(--color-header);
-  font-size: 1.6em;
 }
 
 .encounter-builder .encounter-top-row {
@@ -83,14 +73,9 @@
   cursor: not-allowed;
 }
 
-.encounter-builder .encounter-btn-danger {
-  color: var(--color-error);
-  border-color: var(--color-error);
-}
-
-.encounter-builder .encounter-btn-danger:hover:not(:disabled) {
-  background: var(--background-color-error);
-}
+/* The bespoke danger-tint button variant was removed with the .ct-* kit
+   convergence (tranche 1) — the summary panel's Clear All rides the shared
+   .ct-btn .ct-btn-danger tier. */
 
 .encounter-builder .player-levels {
   display: grid;
@@ -609,78 +594,21 @@
 }
 
 /* ============ Encounter Actions ============ */
+/* The toolbar buttons ride the global .ct-btn kit (.ct-container .ct-btn tiers,
+   convergence tranche 1) — the `.encounter-actions .encounter-btn` inline-flex
+   helper and the secondary/generate/join variants were removed with it. */
 .encounter-builder .encounter-actions {
   display: flex;
   gap: 6px;
   align-items: center;
 }
 
-.encounter-builder .encounter-actions .encounter-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /* ============ Encounter Modal ============ */
-.encounter-builder .encounter-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.encounter-builder .encounter-modal {
-  background: var(--background-color-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  width: 420px;
-  max-width: 90vw;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.encounter-builder .encounter-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.encounter-builder .encounter-modal-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.encounter-builder .encounter-modal-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.encounter-builder .encounter-modal-close:hover {
-  color: var(--color-text);
-}
-
-.encounter-builder .encounter-modal-body {
-  padding: 20px;
-  overflow-y: auto;
-}
-
+/* .ct-* kit convergence (tranche 1): the Save/Load/Rename modal (and the
+   generator twin) ride the shared .ct-modal* chrome tiers (scoped by the root
+   .ct-container) — the bespoke overlay/modal/header/close/body/empty rules and
+   the save/rename form-field rules (.ct-label/.ct-input now own them) were all
+   removed. Kept here: the inline error/feedback banners that have no kit tier. */
 .encounter-builder .encounter-modal-error {
   background: var(--background-color-error);
   color: var(--color-error);
@@ -696,46 +624,15 @@
   color: var(--color-text-muted);
 }
 
-.encounter-builder .encounter-modal-empty {
-  text-align: center;
-  padding: 20px;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* Save form */
-.encounter-builder .encounter-modal-save label,
-.encounter-builder .encounter-modal-rename label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.encounter-builder .encounter-modal-save input,
-.encounter-builder .encounter-modal-rename input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  margin-bottom: 12px;
-  box-sizing: border-box;
-}
-
-.encounter-builder .encounter-modal-save input:focus,
-.encounter-builder .encounter-modal-rename input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb, 0, 123, 255), 0.15);
-}
-
-.encounter-builder .encounter-modal-save button,
-.encounter-builder .encounter-modal-rename button {
-  width: 100%;
+/* Save/rename form fields ride .ct-label/.ct-input inside the flex-column
+   .ct-modal-body (kit); the bespoke field-skin rules were removed. The
+   wrapper keeps only the layout contract (vertical stack with the kit's
+   field spacing, commit button full-width). */
+.encounter-builder .encounter-modal-save,
+.encounter-builder .encounter-modal-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* Load list */
@@ -788,29 +685,28 @@
   margin-left: 8px;
 }
 
-.encounter-builder .encounter-btn-sm {
-  padding: 4px 8px;
-  font-size: 0.78rem;
+/* Row/toolbar action buttons ride the global .ct-btn kit tiers
+   (.ct-btn-sm / -secondary / -generate / -join bespoke variants were removed
+   with the .ct-* convergence, tranche 1). */
+
+/* No-party hint row (kit-converged): the former inline color/fontStyle moved
+   to this scoped tier (no-inline-styles law). */
+.encounter-builder .party-summary-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
-.encounter-builder .encounter-btn-secondary {
-  background: var(--background-color-button-secondary);
-  color: var(--color-text);
-  border-color: var(--border-color);
+/* Party header row in the filter panel (the former inline flex styles,
+   no-inline-styles law). */
+.encounter-builder .player-levels-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
 
-.encounter-builder .encounter-btn-secondary:hover {
-  background: var(--background-color-button-secondary-hover);
-}
-
-.encounter-builder .encounter-btn-generate {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-color: var(--color-primary);
-}
-
-.encounter-builder .encounter-btn-generate:hover {
-  opacity: 0.9;
+.encounter-builder .player-levels-header .encounter-label {
+  margin-bottom: 0;
 }
 
 /* ============ Encounter Description ============ */
@@ -825,22 +721,9 @@
   justify-content: center;
 }
 
-.encounter-builder .encounter-btn-join {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  background: rgba(239, 83, 80, 0.2) !important;
-  color: var(--color-error) !important;
-  border-color: var(--color-error) !important;
-  padding: 6px 14px !important;
-  font-size: 0.85rem !important;
-  white-space: nowrap !important;
-}
-
-.encounter-builder .encounter-btn-join:hover {
-  background: rgba(239, 83, 80, 0.35) !important;
-}
+/* The Join CTA rides the kit .ct-btn ct-btn-primary tier — the bespoke
+   !important-styled join variant was removed with the .ct-* convergence
+   (tranche 1). */
 
 /* Encounter list description preview */
 .encounter-builder .encounter-list-description {

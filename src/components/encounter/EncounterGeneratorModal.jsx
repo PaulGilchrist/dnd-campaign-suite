@@ -134,14 +134,18 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, targetXP,
   };
 
   return (
-    <div className="encounter-modal-overlay gen-modal-overlay">
-      <div className="encounter-modal gen-modal">
-        <div className="encounter-modal-header">
+    <div className="ct-modal-overlay gen-modal-overlay">
+      <div className="ct-modal gen-modal">
+        {/* .ct-* kit convergence (tranche 1): rides the same shared .ct-modal
+            chrome as EncounterModal (the bespoke encounter-modal-* family this
+            shell used to share was retired with it); .gen-modal* keep the
+            width/body-gap modifiers. */}
+        <div className="ct-modal-header">
           <h3><i className="fa-solid fa-wand-magic-sparkles"></i> Generate Encounter</h3>
-          <button className="encounter-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <button className="ct-modal-close" onClick={onClose} aria-label="Close">&times;</button>
         </div>
 
-        <div className="encounter-modal-body">
+        <div className="ct-modal-body">
           <div className="gen-section">
             <label className="gen-section-label">Environments</label>
             <div className="gen-quick-picks">

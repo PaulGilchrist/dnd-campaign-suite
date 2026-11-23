@@ -24,7 +24,7 @@ export default function InitiativeLoot({
                 <i className="fa-solid fa-gem"></i>&nbsp; Loot
                 {hasLoot && (
                   <button
-                    className='initiative-btn initiative-btn-secondary'
+                    className='ct-btn ct-btn-sm ct-btn-danger'
                     onClick={handleClearLoot}
                     title="Clear loot suggestions"
                   >
@@ -33,7 +33,7 @@ export default function InitiativeLoot({
                 )}
             </div>
             <button
-              className='initiative-btn initiative-btn-loot'
+              className='ct-generate-btn'
               onClick={handleGenerateLoot}
               disabled={generatingLoot}
               title="Generate loot from defeated monsters in combat"
@@ -65,7 +65,7 @@ export default function InitiativeLoot({
                           </span>
                         )}
                         <button
-                          className='initiative-btn initiative-btn-complete'
+                          className='ct-btn ct-btn-primary'
                           onClick={handleAwardLoot}
                           disabled={awardingLoot}
                           title="Award loot and XP to party"
@@ -73,7 +73,7 @@ export default function InitiativeLoot({
                           <i className="fa-solid fa-trophy"></i>{awardingLoot ? 'Awarding...' : 'Award Loot'}
                         </button>
                         <button
-                          className='initiative-btn initiative-btn-secondary'
+                          className='ct-btn'
                           onClick={() => setShowAwardLoot(false)}
                           title="Cancel"
                         >
@@ -83,7 +83,7 @@ export default function InitiativeLoot({
                     )}
                     {!showAwardLoot && lootTextValue.length > 0 && (
                       <button
-                        className='initiative-btn initiative-btn-loot'
+                        className='ct-btn ct-btn-primary'
                         onClick={() => setShowAwardLoot(true)}
                         title="Award loot and XP to party"
                       >

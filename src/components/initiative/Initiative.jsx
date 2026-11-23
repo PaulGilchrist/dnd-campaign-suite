@@ -242,8 +242,10 @@ function boardHasSubjects(combatSummary, characters) {
 
 // Empty-state face for the boardHasSubjects false branch (zero characters and
 // an empty-skeleton/absent board): replaces the former bare void with one line
-// of guidance. Re-uses the global .ct-container/.ct-empty-state/.ct-btn tiers
-// (no new CSS). The deep-link into the Encounter Builder is GM-only — the
+// of guidance. Re-uses the global .ct-empty-state/.ct-btn tiers (no new CSS) —
+// the Initiative root carries .ct-container (kit convergence tranche 1), which
+// is the scoping ancestor every .ct-container-prefixed App.css rule needs.
+// The deep-link into the Encounter Builder is GM-only — the
 // Encounters view is not in the visitor sidebar — while the copy itself shows
 // for everyone. The Add Character button (backlog TT 2026-11-22) gives the
 // sentence's first verb its matching control on a ZERO-character campaign: it
@@ -255,21 +257,19 @@ function boardHasSubjects(combatSummary, characters) {
 // at its eslint ceiling.
 function InitiativeEmptyState({ characters, isLocalhost, onOpenEncounters, onAddCharacter }) {
     return (
-        <div className='ct-container'>
-            <div className='ct-empty-state'>
-                <i className='fa-solid fa-dice-d20' aria-hidden='true'></i>
-                <p>No one is on the initiative board yet — add characters, or join monsters via the Encounter Builder to start combat.</p>
-                {isLocalhost && characters.length === 0 && onAddCharacter && (
-                    <button className='ct-btn' onClick={onAddCharacter}>
-                        Add Character
-                    </button>
-                )}
-                {isLocalhost && onOpenEncounters && (
-                    <button className='ct-btn ct-btn-primary' onClick={onOpenEncounters}>
-                        Open Encounter Builder
-                    </button>
-                )}
-            </div>
+        <div className='ct-empty-state'>
+            <i className='fa-solid fa-dice-d20' aria-hidden='true'></i>
+            <p>No one is on the initiative board yet — add characters, or join monsters via the Encounter Builder to start combat.</p>
+            {isLocalhost && characters.length === 0 && onAddCharacter && (
+                <button className='ct-btn' onClick={onAddCharacter}>
+                    Add Character
+                </button>
+            )}
+            {isLocalhost && onOpenEncounters && (
+                <button className='ct-btn ct-btn-primary' onClick={onOpenEncounters}>
+                    Open Encounter Builder
+                </button>
+            )}
         </div>
     )
 }
@@ -997,7 +997,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [campaignName, isLocalhost, characters.length === 0]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <div className={`initiative${tvMode ? ' initiative--tv' : ''}`}>
+        <div className={`initiative ct-container${tvMode ? ' initiative--tv' : ''}`}>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
             {toast && (
                 <div className={`initiative-toast${toast.isError ? ' initiative-toast-error' : ''}`} role='status'>
@@ -1145,8 +1145,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   bug-player-clients-can-hijack-initiative. */}
               {isLocalhost && (
               <div className='combat-controls'>
-                  <button className='clear-button' onClick={handleClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
-                  <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster'>+ NPC</button>
+                  {/* .ct-* kit convergence (tranche 1): the toolbar rides the shared
+                      button hierarchy (danger / plain / primary) scoped by the root
+                      .ct-container, replacing the row's bespoke blanket-button skin
+                      and its unstyled/one-off variants. */}
+                  <button className='ct-btn ct-btn-danger' onClick={handleClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
+                  <button className='ct-btn' onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster'>+ NPC</button>
                   {/* Quick mob spawn (roadmap Item 4): bestiary picker → N
                       initiative-ready cards with real stats/art via the shared
                       encounter-join lane. The users-guide §20 "+ NPC auto-naming"
@@ -1159,12 +1163,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                       creatures={combatSummary.creatures}
                       onConfirm={handlePartyPresenceChange}
                   />
-                  <button onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
-                  <button onClick={handleNextCreature}>Next →</button>
+                  <button className='ct-btn' onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
+                  <button className='ct-btn ct-btn-primary' onClick={handleNextCreature}>Next →</button>
                   {/* L5-001: End Turn — the enforced-pace affordance (advance + economy reset
                       happen at the existing turn seam in navigationHandlers). Enforcement off ⇒ hidden. */}
                   {enforcementOn && (
-                      <button className='end-turn-button' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
+                      <button className='ct-btn ct-btn-primary' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
                   )}
                   {/* §9.3 AI director (hidden unless AI configured + localhost + NPC's turn) */}
                   <AiDirectorPanel

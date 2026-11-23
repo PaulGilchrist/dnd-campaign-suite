@@ -54,11 +54,11 @@ function EncounterFilterPanel({
 
          {/* Player Levels */}
        <div>
-         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-           <span className="encounter-label" style={{ marginBottom: 0 }}>Party</span>
+         <div className="player-levels-header">
+           <span className="encounter-label">Party</span>
            <button
             type="button"
-            className="encounter-btn"
+            className="ct-btn ct-btn-sm"
             onClick={onAddPlayer}
             aria-label="Add player"
            >

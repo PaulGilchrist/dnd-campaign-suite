@@ -16,8 +16,17 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 16px;
     box-sizing: border-box;
+}
+
+/* .ct-* kit convergence (tranche 1): the root carries .ct-container so every
+   App.css kit tier (.ct-btn / .ct-btn-primary / .ct-btn-danger / .ct-btn-sm /
+   .ct-empty-state — all SCOPED under .ct-container) styles this view's
+   toolbar, loot actions and empty state, mirroring the CampaignAdmin
+   `ct-container campaign-admin` idiom. The two-class compound keeps the
+   board's own 16px gutter deterministic against .ct-container's 20px. */
+.initiative.ct-container {
+    padding: 16px;
 }
 
 .initiative .combat-header {
@@ -39,25 +48,9 @@
     gap: 10px;
 }
 
-.initiative .combat-controls button {
-    padding: 10px 16px;
-    font-size: 1em;
-    border-radius: 6px;
-    cursor: pointer;
-    white-space: nowrap;
-    color: var(--color-text);
-    background-color: var(--background-color-button-secondary);
-}
-
-.initiative .combat-controls button:hover {
-    background-color: var(--background-color-button-secondary-hover);
-}
-
-.initiative .combat-controls button.clear-button {
-    margin-right: 4px;
-    color: var(--color-text);
-    background-color: var(--background-color-button-secondary);
-}
+/* Buttons in this row ride the global .ct-btn kit (.ct-container .ct-btn tiers)
+   — the bespoke blanket-button skin and its one-off destructive variant were
+   removed with the .ct-* convergence (tranche 1). */
 
 /* Carousel container */
 .initiative .carousel-container {
@@ -1051,45 +1044,9 @@
     align-items: center;
 }
 
-.initiative .initiative-btn {
-    padding: 6px 14px;
-    font-size: 0.85rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    background: var(--background-color-button-secondary);
-    color: var(--color-text);
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.initiative .initiative-btn:hover {
-    background: var(--background-color-button-secondary-hover);
-}
-
-.initiative .initiative-btn-secondary {
-    background: var(--background-color-button-secondary);
-    color: var(--color-text);
-    border-color: var(--border-color);
-}
-
-.initiative .initiative-btn-secondary:hover {
-    background: var(--background-color-button-secondary-hover);
-}
-
-.initiative .initiative-btn-loot {
-    background: rgba(255, 193, 7, 0.15);
-    color: var(--color-warning);
-    border-color: var(--color-warning);
-}
-
-.initiative .initiative-btn-loot:hover:not(:disabled) {
-    background: rgba(255, 193, 7, 0.25);
-}
-
-.initiative .initiative-btn-loot:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+/* Loot-panel buttons ride the global .ct-btn kit (.ct-btn / .ct-btn-primary /
+   .ct-generate-btn tiers, scoped by the root .ct-container) — the bespoke
+   loot-button family was removed with the .ct-* convergence (tranche 1). */
 
 .initiative .initiative-loot-textarea {
     width: 100%;
@@ -1145,22 +1102,8 @@
     align-items: center;
 }
 
-.initiative .initiative-btn-complete {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
-    background: rgba(255, 193, 7, 0.2) !important;
-    color: var(--color-warning) !important;
-    border-color: var(--color-warning) !important;
-    padding: 6px 14px !important;
-    font-size: 0.85rem !important;
-    white-space: nowrap !important;
-}
-
-.initiative .initiative-btn-complete:hover {
-    background: rgba(255, 193, 7, 0.35) !important;
-}
+/* The !important-bearing bespoke complete-button tier is gone: the
+   Award/Clear loot actions now ride the shared .ct-btn kit above. */
 
 /* Flesh to Stone recurring save prompt */
 .flesh-to-stone-prompt {
@@ -1514,8 +1457,10 @@
 
 /* ---- TV mode layout ---- */
 /* The app shell unmounts the fixed sidebar while TV mode is on (tvModeStore
-   broadcast), so the tracker owns the full viewport width. */
-.initiative--tv {
+   broadcast), so the tracker owns the full viewport width. The compound
+   selector keeps this padding deterministic against the
+   `.initiative.ct-container` kit-guard rule above. */
+.initiative.initiative--tv {
     padding: 24px 28px;
 }
 

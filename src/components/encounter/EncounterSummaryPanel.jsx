@@ -51,7 +51,7 @@ function EncounterSummaryPanel({
         <div className="encounter-summary-actions-centered">
           <button
             type="button"
-            className="encounter-btn encounter-btn-danger"
+            className="ct-btn ct-btn-danger"
             onClick={onClearMonsters}
           >
             <i className="fa-solid fa-trash-can" /> Clear All

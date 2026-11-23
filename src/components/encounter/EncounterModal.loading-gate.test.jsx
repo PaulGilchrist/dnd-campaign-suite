@@ -90,7 +90,7 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         expect(screen.queryByLabelText('New Name')).not.toBeInTheDocument();
         // …and no silent close — the overlay survives every click.
         expect(mockOnClose).not.toHaveBeenCalled();
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
     });
 
     it('the loading placeholder still owns the zero-rows case (no rows to disable)', () => {
@@ -149,6 +149,6 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         });
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
     });
 });

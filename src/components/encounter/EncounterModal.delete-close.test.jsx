@@ -67,10 +67,10 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         vi.restoreAllMocks();
     });
 
-    it('a confirmed SUCCESSFUL delete unmounts .encounter-modal-overlay with no manual Close click', async () => {
+    it('a confirmed SUCCESSFUL delete unmounts .ct-modal-overlay with no manual Close click', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = render(<Host />);
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
@@ -79,7 +79,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
     });
 
     it('REFUSING the named confirm keeps the modal open, the row present, and fires zero DELETE dispatches', () => {
@@ -92,7 +92,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockOnClose).not.toHaveBeenCalled();
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete "goblin-ambush"' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
     });
@@ -109,7 +109,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
 
         expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
         const err = container.querySelector('.encounter-modal-error');
         expect(err).toBeInTheDocument();
         expect(err).toHaveTextContent('Server said no');
@@ -145,7 +145,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(mockOnSave).toHaveBeenCalledWith('New Cave');
         expect(mockOnSave).toHaveBeenCalledTimes(1);
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
     });
 
     it('rename leg now mirrors delete: commit dispatches onRename and CLOSES the modal (unmounts the overlay)', async () => {
@@ -161,7 +161,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         // Close-on-success parity with the delete lane (d4da4ebc1): onClose fires and
         // the controlled host unmounts the overlay — no stale modal intercepting clicks.
         expect(mockOnClose).toHaveBeenCalledTimes(1);
-        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
     });
 
     it('a FAILED rename (onRename rejects) keeps the modal open showing .encounter-modal-error with the form intact, wrapper console SILENT', async () => {
@@ -177,7 +177,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         });
         expect(mockOnRename).toHaveBeenCalledTimes(1);
         expect(mockOnClose).not.toHaveBeenCalled();
-        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
         const err = container.querySelector('.encounter-modal-error');
         expect(err).toBeInTheDocument();
         expect(err).toHaveTextContent('Server said no');

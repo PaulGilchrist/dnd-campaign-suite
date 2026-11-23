@@ -140,7 +140,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
 
   return (
     <div
-      className="encounter-modal-overlay"
+      className="ct-modal-overlay"
       role="presentation"
       onClick={(e) => {
         // Backdrop dismiss mirrors the DiceTray popup-overlay convention
@@ -148,38 +148,45 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
         // inert; a pure backdrop click is onClose only — no dispatch, no
         // state write — while the open (2026-11-02 BF: the z-1000 overlay
         // used to swallow every click, incl. sidebar nav, until ×).
-        if (e.target.closest('.encounter-modal')) return;
+        // .ct-* kit convergence (tranche 1): the shell rides the shared
+        // .ct-modal* chrome (scoped by the EncounterBuilder root's
+        // .ct-container); the in-panel guard follows the renamed kit class.
+        if (e.target.closest('.ct-modal')) return;
         onClose();
       }}
     >
-      <div className="encounter-modal">
-        <div className="encounter-modal-header">
+      <div className="ct-modal">
+        <div className="ct-modal-header">
           <h3>
             {mode === 'save' && 'Save Encounter'}
             {mode === 'load' && !renameTarget && 'Load Encounter'}
             {(mode === 'rename' || renameTarget) && 'Rename Encounter'}
           </h3>
-          <button className="encounter-modal-close" onClick={onClose} aria-label="Close">
+          <button className="ct-modal-close" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
 
-        <div className="encounter-modal-body">
+        <div className="ct-modal-body">
           {error && <div className="encounter-modal-error">{error}</div>}
 
+          {/* .ct-* kit convergence (tranche 1): save/rename fields ride the kit
+              tiers (.ct-label/.ct-input/.ct-btn); the wrapper divs stay as the
+              flex layout container tests anchor the form to. */}
           {mode === 'save' && (
             <div className="encounter-modal-save">
-              <label htmlFor="encounter-name">Encounter Name</label>
+              <label htmlFor="encounter-name" className="ct-label">Encounter Name</label>
               <input
                 id="encounter-name"
                 type="text"
+                className="ct-input"
                 value={name}
                 onChange={editName}
                 placeholder="e.g., Goblin Ambush"
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 autoFocus
               />
-              <button className="encounter-btn encounter-btn-primary" onClick={handleSave} disabled={!name.trim()}>
+              <button className="ct-btn ct-btn-primary" onClick={handleSave} disabled={!name.trim()}>
                 <i className="fa-solid fa-floppy-disk" /> Save
               </button>
             </div>
@@ -189,84 +196,87 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
               mode==='rename' (prop path preserved for renameTargetProp consumers). */}
           {(mode === 'rename' || renameTarget) && (
             <div className="encounter-modal-rename">
-              <label htmlFor="encounter-rename">New Name</label>
+              <label htmlFor="encounter-rename" className="ct-label">New Name</label>
               <input
                 id="encounter-rename"
                 type="text"
+                className="ct-input"
                 value={newName}
                 onChange={editNewName}
                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
                 autoFocus
               />
-              <button className="encounter-btn encounter-btn-primary" onClick={handleRename} disabled={!newName.trim()}>
+              <button className="ct-btn ct-btn-primary" onClick={handleRename} disabled={!newName.trim()}>
                 <i className="fa-solid fa-pen" /> Rename
               </button>
             </div>
           )}
 
           {mode === 'load' && !renameTarget && (
-            <div className="encounter-modal-load">
-              {encounters.length === 0 ? (
-                loading ? (
-                  <div className="encounter-modal-loading">Loading...</div>
-                ) : (
-                  <div className="encounter-modal-empty">No saved encounters yet.</div>
-                )
+            encounters.length === 0 ? (
+              loading ? (
+                <div className="encounter-modal-loading">Loading...</div>
               ) : (
-                // QA 2026-10-24: rows render during a list refresh but every row
-                // action is natively `disabled` while `loading` — a stale-node or
-                // eager click in the reload window is absorbed by the browser
-                // (silent-close flake), mirroring the EB empty-save / Save-gate
-                // disable-until-ready precedent.
-                <ul className="encounter-list">
-                  {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
-                    <li key={enc.name} className="encounter-list-item">
-                      <div className="encounter-list-info">
-                        <span className="encounter-list-name">{formatEncounterName(enc.name)}</span>
-                        {enc.effectiveXP != null && (
-                          <span className="encounter-list-xp">
-                            {enc.effectiveXP.toLocaleString()} effective XP
-                          </span>
-                        )}
-                        {enc.description && (
-                          <div className="encounter-list-description">
-                            <MarkdownPreview text={enc.description} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="encounter-list-actions">
-                        <button
-                          className="encounter-btn encounter-btn-sm encounter-btn-primary"
-                          onClick={() => handleLoad(enc.name)}
-                          aria-label={`Load "${enc.name}"`}
-                          disabled={loading}
-                        >
-                          <i className="fa-solid fa-download" /> Load
-                        </button>
-                        <button
-                          className="encounter-btn encounter-btn-sm encounter-btn-secondary"
-                          onClick={() => setRenameTarget(enc)}
-                          aria-label={`Rename "${enc.name}"`}
-                          title={`Rename "${enc.name}"`}
-                          disabled={loading}
-                        >
-                          <i className="fa-solid fa-pen" />
-                        </button>
-                        <button
-                          className="encounter-btn encounter-btn-sm encounter-btn-danger"
-                          onClick={() => handleDelete(enc.name)}
-                          aria-label={`Delete "${enc.name}"`}
-                          title={`Delete "${enc.name}"`}
-                          disabled={loading}
-                        >
-                          <i className="fa-solid fa-trash-can" />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                <div className="ct-empty-state">No saved encounters yet.</div>
+              )
+            ) : (
+              // QA 2026-10-24: rows render during a list refresh but every row
+              // action is natively `disabled` while `loading` — a stale-node or
+              // eager click in the reload window is absorbed by the browser
+              // (silent-close flake), mirroring the EB empty-save / Save-gate
+              // disable-until-ready precedent.
+              // List rows stay on the bespoke .encounter-list tiers by design:
+              // the kit .ct-list-item carries the clickable-row cursor, while
+              // these rows act ONLY through their (now kit-styled) action
+              // buttons.
+              <ul className="encounter-list">
+                {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
+                  <li key={enc.name} className="encounter-list-item">
+                    <div className="encounter-list-info">
+                      <span className="encounter-list-name">{formatEncounterName(enc.name)}</span>
+                      {enc.effectiveXP != null && (
+                        <span className="encounter-list-xp">
+                          {enc.effectiveXP.toLocaleString()} effective XP
+                        </span>
+                      )}
+                      {enc.description && (
+                        <div className="encounter-list-description">
+                          <MarkdownPreview text={enc.description} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="encounter-list-actions">
+                      <button
+                        className="ct-btn ct-btn-sm ct-btn-primary"
+                        onClick={() => handleLoad(enc.name)}
+                        aria-label={`Load "${enc.name}"`}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-download" /> Load
+                      </button>
+                      <button
+                        className="ct-btn ct-btn-sm"
+                        onClick={() => setRenameTarget(enc)}
+                        aria-label={`Rename "${enc.name}"`}
+                        title={`Rename "${enc.name}"`}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-pen" />
+                      </button>
+                      <button
+                        className="ct-btn ct-btn-sm ct-btn-danger"
+                        onClick={() => handleDelete(enc.name)}
+                        aria-label={`Delete "${enc.name}"`}
+                        title={`Delete "${enc.name}"`}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-trash-can" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
         </div>
       </div>

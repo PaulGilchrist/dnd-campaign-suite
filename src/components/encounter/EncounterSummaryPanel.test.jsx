@@ -57,11 +57,11 @@ describe('EncounterSummaryPanel', () => {
     expect(screen.getByText('Unknown').closest('.summary-item')).toHaveClass(`summary-item-difficulty-${bgName}`);
   });
 
-  it('renders a danger-styled Clear All that dispatches onClearMonsters once per click', () => {
+  it('renders a kit danger-tier Clear All that dispatches onClearMonsters once per click', () => {
     const props = createProps();
     render(<EncounterSummaryPanel {...props} />);
     const button = screen.getByRole('button', { name: 'Clear All' });
-    expect(button).toHaveClass('encounter-btn-danger'); // EncounterBuilder.css:78
+    expect(button).toHaveClass('ct-btn-danger'); // .ct-* kit convergence (tranche 1)
     fireEvent.click(button);
     expect(props.onClearMonsters).toHaveBeenCalledTimes(1);
   });

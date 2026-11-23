@@ -248,6 +248,7 @@ export default function QuickMonsterSpawn({ onSpawn, mapName, campaignName }) {
     return (
         <>
             <button
+                className='ct-btn'
                 onClick={() => setOpen(true)}
                 title='Search the bestiary and spawn N instances with real stats and initiative rolled — works without a map; nothing is written to the NPCs list'
             >+ Monster</button>

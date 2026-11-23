@@ -1,7 +1,7 @@
 // @maintained-by-ai
 /* Lane — Load-row close-on-action (QA backlog 2026-10-28-S: the Load modal
  * stayed OPEN after a `Load "<name>"` row click and intercepted the toolbar Save
- * via .encounter-modal-overlay pointer-events, while the generator Apply lane
+ * via .ct-modal-overlay pointer-events, while the generator Apply lane
  * (bad3f6e86) auto-closed — an asymmetry costing an extra × click).
  * EncounterModal.handleLoad now mirrors the modal's own save leg:
  * `await onLoad(name); onClose()` — the draft arms AND the overlay unmounts in
@@ -89,7 +89,7 @@ const MONSTERS = [
   { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5, type: 'humanoid', environments: ['hill'] },
 ];
 
-const overlay = () => document.querySelector('.encounter-modal-overlay');
+const overlay = () => document.querySelector('.ct-modal-overlay');
 
 function mountBuilder() {
   useMonstersData.mockReturnValue({

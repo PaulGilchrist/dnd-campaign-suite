@@ -597,9 +597,9 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   // --- Loading State ---
   if (loading) {
     return (
-      <div className="encounter-builder">
-        <div className="encounter-header-row">
-          <h2 className="encounter-title">Encounter Builder</h2>
+      <div className="encounter-builder ct-container">
+        <div className="ct-header">
+          <h2 className="ct-title">Encounter Builder</h2>
         </div>
         <div className="encounter-loading">
           <i className="fa-solid fa-spinner fa-spin"></i>&nbsp; Loading monsters...
@@ -609,9 +609,9 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   }
 
   return (
-    <div className="encounter-builder">
-      <div className="encounter-header-row">
-        <h2 className="encounter-title">
+    <div className="encounter-builder ct-container">
+      <div className="ct-header">
+        <h2 className="ct-title">
           <i className="fa-solid fa-dragon"></i>&nbsp; {encounterTitle}
         </h2>
 
@@ -621,9 +621,15 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
               icons + space-free label nodes so the accessible name is exactly
               the visible words (Save/Update, Load, Generate, Reset) — mirroring
               the modal buttons in this family. title carries the longer
-              tooltip; icon↔label spacing rides the .encounter-actions gap. */}
+              tooltip; icon↔label spacing rides the .ct-btn gap.
+              .ct-* kit convergence (tranche 1): the row's bespoke button family
+              (plain / gold-generate / red-join variants) is retired — the toolbar
+              rides the shared kit hierarchy (.ct-btn secondary, .ct-generate-btn,
+              and the Join commit CTA as .ct-btn-primary, matching the Initiative
+              empty state's "Open Encounter Builder" primary), scoped by the root
+              .ct-container. */}
           <button
-            className="encounter-btn encounter-btn-secondary"
+            className="ct-btn"
             onClick={handleSaveEncounter}
             title={currentEncounterName ? 'Update encounter' : 'Save encounter'}
           >
@@ -631,7 +637,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
             {currentEncounterName ? 'Update' : 'Save'}
           </button>
           <button
-            className="encounter-btn encounter-btn-secondary"
+            className="ct-btn"
             onClick={openLoadModal}
             title="Load encounter"
           >
@@ -639,7 +645,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
             Load
           </button>
           <button
-            className="encounter-btn encounter-btn-generate"
+            className="ct-generate-btn"
             onClick={() => setShowGenerator(true)}
             title="Generate encounter from environments"
           >
@@ -648,7 +654,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
           </button>
               {currentEncounterName && (
                <button
-               className="encounter-btn encounter-btn-secondary"
+               className="ct-btn"
                onClick={handleReset}
                title="Reset to blank"
                >
@@ -691,7 +697,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
         </div>
       )}
       {(!characters || characters.length === 0) && (
-        <div className="party-summary" style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+        <div className="party-summary party-summary-empty">
           No characters in this campaign. Add characters to auto-populate party levels.
         </div>
       )}
@@ -712,7 +718,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
       {selectedMonsters.length > 0 && (
         <div className="encounter-join-section">
           <button
-            className="encounter-btn encounter-btn-join"
+            className="ct-btn ct-btn-primary"
             onClick={handleJoinEncounter}
             title="Add monsters to initiative and navigate to combat"
           >
