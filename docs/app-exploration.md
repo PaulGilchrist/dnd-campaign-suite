@@ -143,6 +143,5 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-24 QE] Session-terminating log rows (`session-played`, the closing `session_active` cleared row) stamp `session: null` because the active-session clear runs BEFORE they are written — the row that NAMES a session isn't filterable BY it (roadmap session-filter facet would miss the two lifecycle bookend rows). Stamp the session on those rows while it is still tracked. `server/routes/log.js` stamp seam + sessions mark-played producer.
 - [2026-11-24 improve-run, from notes-sessions-native-dialogs] Remaining native-dialog stragglers after the Notes/Sessions delete+recap migration: `CampaignAdmin.jsx:624/645/663` still uses `window.confirm` for clear-change-data / clear-log / full-reset (Regenerate + delete lanes there are already in-app), and the shared `useReloadGuard` dirty-draft confirm (`Discard changes to "X"?`) is still native app-wide across all six CRUD lanes. Migrate the Admin trio onto `DeleteConfirmModal`; the reload-guard lane is a shared-hook change (needs its own design pass, e.g. an in-app keep/discard dialog riding the modal kit).
 

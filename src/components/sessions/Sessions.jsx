@@ -559,10 +559,11 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // The retired native window.prompt becomes an in-app dialog pair: clicking
   // the footer button stages the row (pendingPlayedSession) and opens the
   // SessionPlayedModal with a live Preview; Cancel/Escape/backdrop close it
-  // zero-write (session stays planned, no log rows); Confirm runs the exact
-  // old OK path — save played, clear the active stamp if it was this session,
-  // post the session-played log row (the Preview and the row share
-  // buildSessionPlayedLogText, so they can never drift).
+  // zero-write (session stays planned, no log rows); Confirm runs the OK path
+  // — save played, post the session-played log row while the session is still
+  // the tracked active one (bookend stamp law, QA backlog 2026-11-24), then
+  // clear the active stamp if it was this session (the Preview and the row
+  // share buildSessionPlayedLogText, so they can never drift).
   const [pendingPlayedSession, setPendingPlayedSession] = useState(null);
   const [playedRecap, setPlayedRecap] = useState('');
 
@@ -590,15 +591,22 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
     };
     try {
       await saveSession(campaignName, updated, target.name);
-      if (activeSession === playedName) {
-        // Playing it ends it: stop stamping log rows with a session that is
-        // now archived (the clear writes its own session_active audit row).
-        await setActiveSession({ campaignName, name: null });
-      }
+      // Bookend stamp law (QA backlog 2026-11-24): the server stamps every log
+      // row from its LIVE sessionState (server/routes/log.js addEntry), so the
+      // recap row is posted while this session is still the tracked active one
+      // and carries session:"<name>" — the row that NAMES the session stays
+      // filterable BY it. The old order (clear first, then log) stamped both
+      // closing rows null.
       await addEntry(campaignName, {
         type: 'session-played',
         text: buildSessionPlayedLogText(playedName, recap),
       });
+      if (activeSession === playedName) {
+        // Playing it ends it: stop stamping future rows with a session that is
+        // now archived (the clear posts its own session_active audit row before
+        // the clear lands, likewise stamped with the outgoing name).
+        await setActiveSession({ campaignName, name: null });
+      }
       showToast(`“${playedName}” archived to the campaign log`);
       await loadItems();
       missedListBroadcast.current = false;

@@ -8,7 +8,12 @@
 //   - move: exact stored bytes + one session_phase audit entry, campaign pinned
 //   - same phase ⇒ zero writes/logs (idempotent); guards ⇒ full-zero, exact refusal
 //   - audit-log failure never aborts the phase move
-import { readSessionPhase, setSessionPhase } from './sessionService.js';
+//   - setActiveSession stamp ORDER (QA backlog 2026-11-24): the server stamps
+//     rows from its LIVE sessionState at write time, so the SET audit row
+//     rides AFTER the write (carries the new name) and the CLEAR audit row
+//     rides BEFORE the write (the closing bookend row still carries the name
+//     it ends); rows posted after a clear stamp null.
+import { readSessionPhase, setActiveSession, setSessionPhase } from './sessionService.js';
 
 // Faithful keyed mock: campaign is part of the key, so a dropped campaignName
 // argument fails loudly instead of silently sharing state.
@@ -18,7 +23,21 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async (who, key, value, campaign) => { store[`${campaign}::${who}::${key}`] = value; }),
 }));
 const logs = [];
-vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(async (c, e) => { logs.push(e); }) }));
+// Faithful SERVER-side stamp sim (server/routes/log.js addEntry): each row is
+// stamped at CALL time with the name the (mocked) runtime cache currently
+// tracks — so producer ordering around a set/clear is observable field-level,
+// exactly how the live stamp behaves.
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(async (campaign, entry) => {
+        const name = store[`${campaign}::campaign::sessionState`]?.name;
+        const row = {
+            ...entry,
+            session: typeof name === 'string' && name.trim() ? name : null,
+        };
+        logs.push(row);
+        return row;
+    }),
+}));
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -115,5 +134,77 @@ describe('setSessionPhase', () => {
             expect(readSessionPhase('test-campaign')).toBe(phase);
             expect(store[KEY].changedBy).toBe('referee');
         }
+    });
+});
+
+// QA backlog 2026-11-24 (session-terminating log rows): the server stamps
+// every row from its LIVE sessionState at write time (server/routes/log.js
+// addEntry — pinned field-level by server/routes/log.test.js), so the row
+// that ENDS a session must be posted before the clear lands to stay
+// filterable BY that session. The stamp sim above mirrors the server's read.
+describe('setActiveSession — active-session stamp ordering', () => {
+    it('SET: sessionState is written first, so the audit row stamps the new name', async () => {
+        const r = await setActiveSession({ campaignName: 'test-campaign', name: 'Session 7' });
+
+        expect(r).toEqual({ set: true, name: 'Session 7' });
+        expect(store[KEY]).toMatchObject({ phase: 'exploration', name: 'Session 7' });
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toMatchObject({
+            type: 'session_active',
+            session: 'Session 7',
+            description: 'Active session: “Session 7” — referee.',
+        });
+    });
+
+    it('CLEAR: the closing audit row rides BEFORE the write — stamped with the session it ends — and the clear still lands', async () => {
+        store[KEY] = { phase: 'exploration', name: 'Session 7' };
+
+        const r = await setActiveSession({ campaignName: 'test-campaign', name: null });
+
+        expect(r).toEqual({ set: true, name: null });
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toMatchObject({
+            type: 'session_active',
+            session: 'Session 7',
+            description: 'Active session cleared — the log stamps rows with no session.',
+        });
+        // No regression to the clear itself: name→null, phase carried.
+        expect(store[KEY]).toEqual({ phase: 'exploration', name: null });
+    });
+
+    it('lifecycle: set → rows stamp the name; clear row carries it too; later rows honestly stamp null', async () => {
+        await setActiveSession({ campaignName: 'test-campaign', name: 'Session 7' });
+        await addEntry('test-campaign', { type: 'note', characterName: 'GM', noteText: 'mid-session' });
+        await setActiveSession({ campaignName: 'test-campaign', name: null });
+        await addEntry('test-campaign', { type: 'note', characterName: 'GM', noteText: 'after the close' });
+
+        expect(logs.map(l => l.session)).toEqual([
+            'Session 7', // the set row
+            'Session 7', // a row DURING the session
+            'Session 7', // the closing bookend row carries the session it ends
+            null,        // rows AFTER the clear honestly stamp null
+        ]);
+        expect(logs.map(l => l.type)).toEqual(['session_active', 'note', 'session_active', 'note']);
+    });
+
+    it('CLEAR with no tracked session stamps the audit row null', async () => {
+        await setActiveSession({ campaignName: 'test-campaign', name: null });
+
+        expect(logs).toHaveLength(1);
+        expect(logs[0].session).toBeNull();
+        expect(store[KEY].name).toBeNull();
+    });
+
+    it('audit-log failure on the clear path never aborts the clear', async () => {
+        store[KEY] = { phase: 'exploration', name: 'Session 7' };
+        vi.mocked(addEntry).mockRejectedValueOnce(new Error('log down'));
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const r = await setActiveSession({ campaignName: 'test-campaign', name: null });
+
+        expect(r).toEqual({ set: true, name: null });
+        expect(store[KEY].name).toBeNull();
+        expect(err).toHaveBeenCalledWith('[sessionService] active-session log failed:', expect.any(Error));
+        err.mockRestore();
     });
 });

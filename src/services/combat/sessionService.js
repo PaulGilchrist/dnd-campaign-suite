@@ -41,20 +41,39 @@ export function readActiveSessionName(campaignName) {
  * server/routes/log.js reads the same `sessionState` key) — the primitive
  * behind per-session memory queries and future recap generation.
  * Audit: one `session_active` log entry naming the change.
+ *
+ * Stamp-order law (QA backlog 2026-11-24): the server stamps every row from
+ * its LIVE sessionState at write time, so the audit row is sequenced around
+ * the write to carry the name it is about — on SET it rides AFTER the write
+ * (stamped with the new name); on CLEAR it rides BEFORE the write, so the
+ * closing bookend row still carries the session it ends (the row that NAMES
+ * a session stays filterable BY it). Rows posted after the clear land
+ * session:null exactly as before — the clear itself is unchanged.
  * @returns {Promise<{set: boolean, name: string|null}>}
  */
 export async function setActiveSession({ campaignName, name, changedBy = 'referee' }) {
     if (!campaignName) return { set: false, name: null };
     const cleaned = typeof name === 'string' && name.trim() ? name.trim() : null;
     const state = getRuntimeValue('campaign', 'sessionState', campaignName) || {};
-    await setRuntimeValue('campaign', 'sessionState', { phase: readSessionPhase(campaignName), ...state, name: cleaned }, campaignName);
-    await addEntry(campaignName, {
+    const auditEntry = {
         type: 'session_active',
         description: cleaned
             ? `Active session: “${cleaned}” — ${changedBy}.`
             : 'Active session cleared — the log stamps rows with no session.',
         timestamp: Date.now(),
-    }).catch((e) => { console.error('[sessionService] active-session log failed:', e); });
+    };
+    // Audit failure never aborts the state change (it only logs) — on the
+    // clear path that means the closing row is append-only durable even if
+    // the state POST itself fails; an accepted trade for honest stamps.
+    const postAudit = () => addEntry(campaignName, auditEntry)
+        .catch((e) => { console.error('[sessionService] active-session log failed:', e); });
+    if (cleaned) {
+        await setRuntimeValue('campaign', 'sessionState', { phase: readSessionPhase(campaignName), ...state, name: cleaned }, campaignName);
+        await postAudit();
+    } else {
+        await postAudit();
+        await setRuntimeValue('campaign', 'sessionState', { phase: readSessionPhase(campaignName), ...state, name: cleaned }, campaignName);
+    }
     return { set: true, name: cleaned };
 }
 
