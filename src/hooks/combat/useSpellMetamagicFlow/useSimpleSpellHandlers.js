@@ -76,7 +76,10 @@ function areaAction(d, pending, type, saveType, metaCtx) {
 }
 
 const areaExecute = (type, saveType) => async (d, pending, result) => {
-  await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null)
+  // d.characters (App roster) threads to the handler's cast-time immunity gate
+  // (executeHandler 5th arg — sleep/spellCastService precedent). Handlers that
+  // don't consult it ignore the extra arg.
+  await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null, d.characters)
 }
 
 async function runSlow(d, pending, result) {
@@ -356,8 +359,8 @@ const SIMPLE_SPELL_SPECS = [
   { name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') },
 ]
 
-export function useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute }) {
-  const deps = { playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute }
+export function useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute, characters }) {
+  const deps = { playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute, characters }
   const handlers = {}
   for (const spec of SIMPLE_SPELL_SPECS) {
     const confirmTargets = spec.confirmTargets || allTargets

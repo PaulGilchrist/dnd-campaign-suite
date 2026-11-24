@@ -321,7 +321,7 @@ const ROWS = [
   { spell: 'Compelled Duel', span: ':307', rulesets: ['5e', '2024'], route: 'service', trigger: triggerCompelledDuel, shape: 'target', consume: 'forward' },
   { spell: 'Globe of Invulnerability', span: ':308', rulesets: ['5e', '2024'], route: 'service', trigger: triggerGlobeOfInvulnerability, shape: 'raw', consume: 'forward' },
   { spell: 'Forcecage', span: ':309', rulesets: ['5e', '2024'], route: 'service', trigger: triggerForcecage, shape: 'raw', consume: 'forward' },
-  { spell: 'Stinking Cloud', span: ':311', rulesets: ['5e', '2024'], route: 'service', trigger: triggerStinkingCloud, shape: 'saveDc', consume: 'swallow' },
+  { spell: 'Stinking Cloud', span: ':311', rulesets: ['5e', '2024'], route: 'service', trigger: triggerStinkingCloud, shape: 'saveDc', consume: 'swallow', chars: true }, // cast-immunity gate: characters roster carried INSIDE metaCtx (charmPerson transport precedent)
   { spell: 'Sleet Storm', span: ':312', rulesets: ['5e', '2024'], route: 'service', trigger: triggerSleetStorm, shape: 'saveDc', consume: 'swallow' },
   { spell: 'Faerie Fire', span: ':313', rulesets: ['5e', '2024'], route: 'service', trigger: triggerFaerieFire, shape: 'saveDc', consume: 'forward' },
   { spell: "Tasha's Hideous Laughter", span: ':314', rulesets: ['5e', '2024'], route: 'service', trigger: triggerTashasHideousLaughter, shape: 'saveDc', consume: 'forward' }, // fix#358: raw-forward quirk retired — host wraps { automationPopup } per faerie template; 5e row migrated to the canonical name (5e spell-data completeness pass), both rulesets route
@@ -435,7 +435,10 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
 
           if (row.route === 'service') {
             expect(row.trigger).toHaveBeenCalledTimes(1)
-            expect(row.trigger).toHaveBeenCalledWith(envelope, metaCtx, playerStats, CAMPAIGN, MAP)
+            // Stinking Cloud additionally carries the roster INSIDE metaCtx
+            // (charmPerson transport precedent) for the cast-time immunity gate.
+            const expectedMetaCtx = row.chars ? { ...metaCtx, characters: services.characters } : metaCtx
+            expect(row.trigger).toHaveBeenCalledWith(envelope, expectedMetaCtx, playerStats, CAMPAIGN, MAP)
             expect(row.trigger.mock.calls[0][0]).toBe(envelope) // envelope identity
             expect(row.trigger.mock.calls[0][1]).not.toBe(callerMetaCtx) // fresh CLA-219-stamped ctx
           } else {

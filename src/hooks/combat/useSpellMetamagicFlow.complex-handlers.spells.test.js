@@ -272,7 +272,10 @@ describe('useSpellMetamagicFlow — area confirm lane', () => {
 // area action at the caster's save DC (useSimpleSpellHandlers.areaExecute).
 
 const SAVE_DC_ROWS = [
-  { spell: 'Stinking Cloud', pending: 'pendingStinkingCloud', handler: 'handleStinkingCloudConfirm', automationType: 'stinking_cloud', saveType: 'CON' },
+  // Stinking Cloud threads the roster (executeHandler 5th arg → cast-time
+  // immunity gate, bug-stinking-cloud-cast-applies-poison-to-immune-creature);
+  // Confusion's runConfusion stays 4-arg.
+  { spell: 'Stinking Cloud', pending: 'pendingStinkingCloud', handler: 'handleStinkingCloudConfirm', automationType: 'stinking_cloud', saveType: 'CON', roster: true },
   { spell: 'Confusion', pending: 'pendingConfusion', handler: 'handleConfusionConfirm', automationType: 'confusion', saveType: 'WIS' },
 ];
 
@@ -292,7 +295,7 @@ describe('useSpellMetamagicFlow — save-DC confirm lane', () => {
         await result.current[row.handler](['Goblin A', 'Goblin B']);
       });
 
-      expect(executeHandler).toHaveBeenCalledWith(
+      const executeArgs = [
         expect.objectContaining({
           automation: {
             type: row.automationType,
@@ -304,7 +307,10 @@ describe('useSpellMetamagicFlow — save-DC confirm lane', () => {
         expect.any(Object),
         CAMPAIGN,
         null,
-      );
+      ];
+      // Stinking Cloud additionally threads the roster (cast-time immunity gate).
+      if (row.roster) executeArgs.push(expect.any(Array));
+      expect(executeHandler).toHaveBeenCalledWith(...executeArgs);
       expect(prepareSpellCast).toHaveBeenCalled();
       expect(result.current[row.pending]).toBeNull();
     });

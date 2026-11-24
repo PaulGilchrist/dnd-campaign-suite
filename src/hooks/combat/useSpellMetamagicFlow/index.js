@@ -18,7 +18,7 @@ export function useSpellMetamagicFlow({ playerStats, campaignName, onExecute, se
   // Create handler factories
   const { handleConfirm, handleSkip } = useMetamagicHandler(playerStats, campaignName, cfClearPending, getPending, onExecute)
   const { handleConfirm: handleMultiTargetConfirm, handleSkip: handleMultiTargetSkip } = useMultiTargetHandler(playerStats, campaignName, cfClearPending, getPending, onExecute)
-  const simpleHandlers = useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute })
+  const simpleHandlers = useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute, characters })
   const twoStageHandlers = useTwoStageHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml })
   const customHandlers = useCustomHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters })
   const areaHandlers = useAreaEffectHandlers({ createSkipHandler, playerStats, campaignName, cfClearPending, getPending, setPopupHtml })

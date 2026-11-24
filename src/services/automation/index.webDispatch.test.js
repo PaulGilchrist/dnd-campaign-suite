@@ -23,9 +23,12 @@
 //     zero hits), so the mock factory carries `handle` alone.
 //   • LIVE caller-shape fidelity: useSimpleSpellHandlers.js:345
 //     { name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') }
-//     → areaExecute L78-80 calls executeHandler 4-ARG (action, playerStats,
-//     campaignName, null) → registry forwards 5-arg at L743 → handler receives
-//     characters===undefined (arity benign; handler consumes 4 params).
+//     → areaExecute L78-84 calls executeHandler 5-ARG (action, playerStats,
+//     campaignName, null, d.characters) — the roster arg joined the call
+//     2026-11-24 for the stinking-cloud cast-time immunity gate and is arity-
+//     benign here (webAreaSaveHandler consumes 4 params) → registry forwards
+//     5-arg at L743 → handler receives the roster (undefined on lanes without
+//     one; the pre-threading shape).
 //     areaAction L69-76 stamps automation as EXACTLY { type, saveDc, saveType }
 //     — the verbatim data row's shape/size/duration/conditionInflicted fields
 //     do NOT cross this seam (handler re-derives them from the `_web_<caster>`
@@ -114,7 +117,7 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
         fetchSpy.mockRestore();
     });
 
-    it('routes the areaExecute-stamped web_area_save action to handleWebAreaSave (live caller shape, 4-arg call → 5-arg forward)', async () => {
+    it('routes the areaExecute-stamped web_area_save action to handleWebAreaSave (live caller shape, 5-arg call → 5-arg forward)', async () => {
         // exact shape of useSimpleSpellHandlers.js areaAction L69-76 output
         const action = {
             name: 'Web',
@@ -122,11 +125,13 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
             automation: { type: 'web_area_save', saveDc: 19, saveType: 'DEX' },
             metaCtx: { targets: ['Zombie 1'] },
         };
-        // areaExecute L79-80 calls executeHandler 4-ARG → characters forwards undefined
-        const result = await executeHandler(action, playerStats, 'test-campaign', null);
+        // areaExecute L84 calls executeHandler 5-ARG with the roster
+        // (stinking-cloud gate threading; web handler ignores the extra param)
+        const roster = [{ name: 'Zombie 1' }];
+        const result = await executeHandler(action, playerStats, 'test-campaign', null, roster);
 
         expect(handleWebAreaSave).toHaveBeenCalledTimes(1);
-        expect(handleWebAreaSave).toHaveBeenCalledWith(action, playerStats, 'test-campaign', null, undefined);
+        expect(handleWebAreaSave).toHaveBeenCalledWith(action, playerStats, 'test-campaign', null, roster);
         // caller stamp is EXACTLY three keys — data-row fields never cross this seam
         expect(handleWebAreaSave.mock.calls[0][0].automation).toEqual({
             type: 'web_area_save',
@@ -194,6 +199,6 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
         );
         expect(src).toContain("{ name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') }");
         expect(src).toContain('automation: { type, saveDc: computeSaveDc(d, pending), saveType },');
-        expect(src).toContain('await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null)');
+        expect(src).toContain('await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null, d.characters)');
     });
 });

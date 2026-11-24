@@ -387,7 +387,7 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
         async () => passThrough(await handleGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => passThrough(await handleForcecage(spell, metaCtx, playerStats, campaignName, mapName)),
         () => passThrough(handleSilence({ spell, metaCtx, playerStats, campaignName, getCombatSummary: (cn) => getCombatSummary(cn) })),
-        async () => swallow(await handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, characters })),
         async () => swallow(await handleSleetStorm({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => passThrough(await handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => passThrough(await handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),

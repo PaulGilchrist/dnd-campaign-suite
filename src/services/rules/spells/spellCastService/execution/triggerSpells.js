@@ -364,9 +364,11 @@ async function handleForcecage(spell, metaCtx, playerStats, campaignName, mapNam
     return { handled: false };
 }
 
-async function handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
+async function handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, characters }) {
     if (spell.name && spell.name.toLowerCase() === 'stinking cloud') {
-        await triggerStinkingCloud(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+        // characters rides metaCtx into the service (charmPerson lane precedent),
+        // which forwards it to the handler's cast-time immunity gate.
+        await triggerStinkingCloud(spell, { ...metaCtx, spellSaveDc, characters }, playerStats, campaignName, mapName);
         return { handled: true };
     }
     return { handled: false };

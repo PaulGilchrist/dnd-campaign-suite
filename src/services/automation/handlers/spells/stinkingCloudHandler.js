@@ -72,7 +72,12 @@ export async function applyStinkingCloudTurnEnd(campaignName, targetName) {
  * Stinking Cloud zone (SP-108 sleetStorm processSleetStormAreaSave mirror).
  * Called from expireStaleEffects Phase 4 at each creature's turn start.
  */
-// Poison immunity (or no need to breathe) = automatic success.
+// Poison immunity (or no need to breathe) = automatic success. SHARED by BOTH
+// lanes: the turn-start sweep below AND the cast-time handle() per-target gate
+// (bug-stinking-cloud-cast-applies-poison-to-immune-creature, 2026-11-24 — the
+// cast lane used to consult ONLY the cs-row weaknessesAndResistivities, a
+// monster-data field absent from the minimal PC stub rows, so the two sibling
+// lanes disagreed about the same immunity).
 async function stinkingCloudTargetImmune(targetCreature, targetName, campaignName, targetStats) {
     const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
     if (Array.isArray(targetImmunities) && targetImmunities.some(imm => String(imm).toLowerCase() === 'poison')) {
@@ -250,7 +255,16 @@ async function clearStinkingCloudPoison(campaignName, casterName, targetName, sa
     }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+// Roster resolution for the cast-time immunity gate: the caller's characters
+// roster (App computedCharacters) per target, `computedStats || character` —
+// the expireStaleEffects.resolveTargetStats / sleepService.playerSleepImmunity
+// idiom (hoisted to module scope: handle() sits at the complexity ceiling).
+function resolveCastTargetStats(targetName, characters) {
+    const targetCharacter = (characters || []).find(ch => ch && ch.name === targetName);
+    return targetCharacter?.computedStats || targetCharacter;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName, characters) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
     const casterName = playerStats.name;
@@ -313,8 +327,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     for (const target of targets) {
         const targetName = target.name;
 
-        // Check for poison immunity on each target individually
-        if (isPoisonImmune(target)) {
+        // Check immunity on each target individually through the SAME gate the
+        // turn-start sweep runs: cs-row Poison damage immunity (monsters) OR,
+        // for players, the immunity registry (playerIsImmuneToCondition) against
+        // the roster-resolved PlayerStats (resolveCastTargetStats, threaded as
+        // handle()'s 5th arg). An immune creature is never put through the save:
+        // honest skip row, no Poisoned condition, no te rows.
+        if (await stinkingCloudTargetImmune(target, targetName, campaignName, resolveCastTargetStats(targetName, characters))) {
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: casterName,
@@ -392,13 +411,6 @@ function buildStinkingCloudSummary(affectedCount, savedCount, immuneCount, resul
         return `Stinking Cloud affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. ${immuneNote} Affected creatures are Poisoned (can't take Actions or Bonus Actions) until the end of their current turn.`;
     }
     return `No creatures affected by Stinking Cloud. ${savedCount} creature(s) saved. ${immuneNote}`;
-}
-
-function isPoisonImmune(target) {
-    const targetImmunities = target.weaknessesAndResistivities?.immunities || [];
-    return Array.isArray(targetImmunities) && targetImmunities.some(
-        imm => String(imm).toLowerCase() === 'poison'
-    );
 }
 
 async function applyCloudPoisonedTarget(campaignName, casterName, targetName, dc, saveResult) {

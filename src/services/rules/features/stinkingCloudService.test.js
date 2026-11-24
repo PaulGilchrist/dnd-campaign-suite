@@ -146,6 +146,27 @@ describe('stinkingCloudService', () => {
         consoleSpy.mockRestore();
     });
 
+    it('threads metaCtx.characters to executeHandler as the 5th arg (cast-time immunity gate roster)', async () => {
+        executeHandler.mockClear();
+        const roster = Object.freeze([{ name: 'FixtureLandDruid', computedStats: { immunities: ['poisoned'] } }]);
+
+        await triggerStinkingCloud({ name: 'Stinking Cloud', level: 3 }, { spellSaveDc: 18, characters: roster }, playerStats, campaignName, mapName);
+
+        expect(executeHandler).toHaveBeenCalledTimes(1);
+        // Same-reference roster transport (the action envelope itself stays key-free).
+        expect(executeHandler.mock.calls[0][4]).toBe(roster);
+        const [action] = executeHandler.mock.calls[0];
+        expect(Object.keys(action)).toEqual(['name', 'automation', 'spell', 'spellSlotLevel']);
+    });
+
+    it('a lane without metaCtx.characters forwards undefined (no fabricated roster)', async () => {
+        executeHandler.mockClear();
+
+        await triggerStinkingCloud({ name: 'Stinking Cloud', level: 3 }, { spellSaveDc: 18 }, playerStats, campaignName, mapName);
+
+        expect(executeHandler.mock.calls[0][4]).toBeUndefined();
+    });
+
     it('golden quirks: unguarded playerStats/spell derefs reject TypeError, executeHandler never reached', async () => {
         // :4 playerStats.spellAbilities and :5 spell.level / :8 spell.name
         // are unguarded — console.error never fires (throw precedes try).
