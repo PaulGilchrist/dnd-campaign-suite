@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readParty, partyLevelRange } from './party.js';
@@ -10,7 +11,12 @@ describe('readParty / partyLevelRange (test-campaign fixtures)', () => {
     const party = readParty('test-campaign', { root: TEST_CAMPAIGN_ROOT });
 
     it('reads every character file with class identity', () => {
-        expect(party.length).toBe(13); // campaign baseline: 13 character files incl. the permanent CelestialWarlock fixture
+        // Campaign baseline: every root *.json is a character file (readParty
+        // skips none). 14 since the permanent FixtureFighter5e fixture landed
+        // (d709198ef) — the pin sat stale at 13 from before that era.
+        const charFiles = fs.readdirSync(TEST_CAMPAIGN_ROOT).filter(f => f.endsWith('.json'));
+        expect(party.length).toBe(charFiles.length);
+        expect(party.length).toBe(14);
         const marta = party.find(p => p.name === 'FeyRanger');
         expect(marta).toMatchObject({ level: 17, class: 'Ranger', subclass: 'Gloom Stalker' });
         expect(party.every(p => typeof p.level === 'number' && p.level >= 1)).toBe(true);

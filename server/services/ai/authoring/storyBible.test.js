@@ -16,7 +16,7 @@ describe('buildStoryBible', () => {
     const bible = buildStoryBible('test-campaign', { root: TEST_CAMPAIGN_ROOT });
 
     it('knows the party from the character files', () => {
-        expect(bible.partyLevels.size).toBe(13);
+        expect(bible.partyLevels.size).toBe(14); // party baseline (see party.test.js): 14 since the permanent FixtureFighter5e fixture landed
         expect(bible.party.every(p => p.class)).toBe(true);
     });
 
