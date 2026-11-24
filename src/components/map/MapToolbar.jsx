@@ -210,11 +210,17 @@ const MapToolbar = ({
                     </label>
                 )}
                 <div className="toolbar no-print">
+                    {/* Paint-family tools (Paint/Erase/Select) — toggle buttons
+                        in the Spell/Ruler idiom: aria-pressed mirrors the
+                        .active class (both driven by the same `tool` prop) so
+                        SRs and harnesses can read WHICH wall tool is armed and
+                        witness the disarm re-click, not just the class. */}
                     {isLocalhost && TOGGLE_TOOLS.map(({ tool: t, icon, label }) => (
                         <button
                             key={t}
                             className={tool === t ? 'active' : ''}
                             aria-label={label}
+                            aria-pressed={tool === t}
                             onClick={() => {
                                 const next = tool === t ? 'none' : t;
                                 setTool(next);

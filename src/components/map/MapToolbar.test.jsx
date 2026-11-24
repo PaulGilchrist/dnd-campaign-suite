@@ -28,27 +28,29 @@ const createMockSpellOverlayState = (overrides = {}) => ({
     ...overrides,
 });
 
-const renderMapToolbar = (props = {}) => {
-    const defaultProps = {
-        mapName: 'dungeon-map.json',
-        isLocalhost: true,
-        tool: 'none',
-        setTool: vi.fn(),
-        gridSize: 5,
-        setGridSize: vi.fn(),
-        setItemsPanelOpen: vi.fn(),
-        zoomIn: vi.fn(),
-        zoomOut: vi.fn(),
-        resetView: vi.fn(),
-        resetFog: vi.fn(),
-        onBack: vi.fn(),
-        rulerMode: false,
-        setRulerMode: vi.fn(),
-        spellOverlayState: createMockSpellOverlayState(),
-        ...props,
-    };
-    return render(<MapToolbar {...defaultProps} />);
-};
+// Shared prop builder: renderMapToolbar renders it; rerender-based tests
+// (paint-family aria-pressed arm/disarm) rebuild the same prop object with
+// one override changed, exactly like the parent's state update would.
+const mapToolbarProps = (props = {}) => ({
+    mapName: 'dungeon-map.json',
+    isLocalhost: true,
+    tool: 'none',
+    setTool: vi.fn(),
+    gridSize: 5,
+    setGridSize: vi.fn(),
+    setItemsPanelOpen: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    resetView: vi.fn(),
+    resetFog: vi.fn(),
+    onBack: vi.fn(),
+    rulerMode: false,
+    setRulerMode: vi.fn(),
+    spellOverlayState: createMockSpellOverlayState(),
+    ...props,
+});
+
+const renderMapToolbar = (props = {}) => render(<MapToolbar {...mapToolbarProps(props)} />);
 
 describe('MapToolbar', () => {
     describe('rendering', () => {
@@ -276,6 +278,48 @@ describe('MapToolbar', () => {
             expect(getActive('button', { name: label })).toHaveClass('active');
             fireEvent.click(getActive('button', { name: label }));
             expect(setTool).toHaveBeenLastCalledWith('none');
+        });
+
+        // Paint-family a11y parity (backlog 2026-11-24 QF): every Paint/Erase/
+        // Select button carries aria-pressed (never absent) mirroring the
+        // .active class — both driven by the same `tool` prop, in the exact
+        // Spell/Ruler idiom. An armed tool reads "true"; the sibling tools
+        // stay "false"; the disarm re-click flips BOTH bytes together.
+        it.each([
+            ['paint', 'Paint'],
+            ['erase', 'Erase'],
+            ['select', 'Select'],
+        ])('%s: aria-pressed mirrors .active across arm/disarm (never null)', (tool, label) => {
+            const setTool = vi.fn();
+
+            // Idle: attribute present and false for every paint-family button.
+            const { rerender, getByRole } = renderMapToolbar({ tool: 'none', setTool });
+            for (const idleLabel of ['Paint', 'Erase', 'Select']) {
+                expect(getByRole('button', { name: idleLabel })).toHaveAttribute('aria-pressed', 'false');
+            }
+
+            // Arm via click: the dispatch carries the tool; the parent re-render
+            // with `tool` set makes it pressed AND active together.
+            fireEvent.click(getByRole('button', { name: label }));
+            expect(setTool).toHaveBeenCalledWith(tool);
+            rerender(<MapToolbar {...mapToolbarProps({ tool, setTool })} />);
+            const armed = getByRole('button', { name: label });
+            expect(armed).toHaveAttribute('aria-pressed', 'true');
+            expect(armed).toHaveClass('active');
+            // The other two paint buttons report false while this one is armed.
+            for (const other of ['Paint', 'Erase', 'Select'].filter(l => l !== label)) {
+                expect(getByRole('button', { name: other })).toHaveAttribute('aria-pressed', 'false');
+                expect(getByRole('button', { name: other })).not.toHaveClass('active');
+            }
+
+            // Disarm re-click: dispatches 'none' and the parent re-render
+            // flips aria-pressed to false in the same action that drops .active.
+            fireEvent.click(armed);
+            expect(setTool).toHaveBeenLastCalledWith('none');
+            rerender(<MapToolbar {...mapToolbarProps({ tool: 'none', setTool })} />);
+            const disarmed = getByRole('button', { name: label });
+            expect(disarmed).toHaveAttribute('aria-pressed', 'false');
+            expect(disarmed).not.toHaveClass('active');
         });
 
         // Spell toggle must announce on/off to screen readers and harnesses.
