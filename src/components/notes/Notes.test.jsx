@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import Notes from './Notes.jsx';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
@@ -69,15 +69,23 @@ const setDescription = (value) =>
 const saveButton = () => screen.getByRole('button', { name: /save/i });
 
 describe('Notes', () => {
-  let confirmMock;
+  let confirmSpy;
+
+  const deleteDialog = () => screen.getByRole('dialog', { name: 'Delete Note' });
 
   beforeEach(() => {
     mockHook();
-    confirmMock = vi.fn(() => false);
-    vi.stubGlobal('confirm', confirmMock);
+    // A native confirm that FIRES on this lane is a regression (QA backlog
+    // 2026-11-24: the delete leg migrated to the shared DeleteConfirmModal) —
+    // make it loud. The discard-draft confirm (useReloadGuard) is a different
+    // lane with its own files.
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the notes delete path');
+    });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -142,19 +150,18 @@ describe('Notes', () => {
       });
     });
 
-    it('row label title and delete confirm title are derived identically', () => {
+    it('row label title and delete dialog title are derived identically', () => {
       mockHook({
         items: [makeNote({
           description: '## Important Plot Hook\nThe **baron** wants revenge on the guildmasters for the raid on the village',
         })],
       });
-      confirmMock.mockReturnValue(false);
       renderNotes();
       const label = screen.getByRole('button', { name: /^Edit note: / }).getAttribute('aria-label');
       const title = label.replace(/^Edit note: /, '');
       openEditNote();
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      expect(confirmMock).toHaveBeenCalledWith(`Delete Note "${title}"?`);
+      expect(deleteDialog()).toHaveTextContent(title);
     });
   });
 
@@ -392,48 +399,80 @@ describe('Notes', () => {
   });
 
   describe('deleting notes', () => {
-    it.each`
-      confirmed | expected
-      ${true}   | ${'deletes the note when confirmed'}
-      ${false}  | ${'keeps the note when the confirmation is cancelled'}
-    `('$expected', async ({ confirmed }) => {
+    // QA backlog 2026-11-24: the native `Delete Note "X"?` confirm is retired —
+    // the footer Delete button opens the shared DeleteConfirmModal tier
+    // (mirrors EncounterModal.delete-confirm-modal.test.jsx).
+    const armDelete = (note) => {
       const deleteItem = vi.fn().mockResolvedValue(undefined);
-      mockHook({ items: [makeNote()], deleteItem });
-      confirmMock.mockReturnValue(confirmed);
+      mockHook({ items: [note], deleteItem });
       renderNotes();
       openEditNote();
-      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
-      // Named-confirm contract (mirrors Settlements/Sessions): the message
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      return deleteItem;
+    };
+
+    it('the Delete button opens the shared dialog naming the note — no native confirm', () => {
+      armDelete(makeNote());
+      const dialog = deleteDialog();
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      // Named-confirm contract (mirrors Settlements/Sessions): the copy
       // carries a meaningful identifier, never the generic "this note".
-      expect(confirmMock).toHaveBeenCalledWith('Delete Note "Test"?');
-      if (confirmed) {
-        expect(deleteItem).toHaveBeenCalledWith('1');
+      expect(dialog).toHaveTextContent('Test');
+      expect(screen.getByRole('button', { name: /Yes, Delete Permanently/i })).toBeInTheDocument();
+      expect(confirmSpy).not.toHaveBeenCalled();
+    });
+
+    it('initial focus lands on Cancel (the non-destructive default)', () => {
+      armDelete(makeNote());
+      expect(within(deleteDialog()).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    });
+
+    it.each`
+      dismiss | label
+      ${'cancel'}  | ${'the Cancel button'}
+      ${'escape'}  | ${'ESCAPE'}
+      ${'backdrop'} | ${'a pure BACKDROP click'}
+    `('$label dismisses the dialog and keeps the note — zero delete, editor intact', ({ dismiss }) => {
+      const deleteItem = armDelete(makeNote());
+      const dialog = deleteDialog();
+      // The editor's own Cancel stays behind the dialog — always answer the
+      // dialog's buttons only.
+      if (dismiss === 'cancel') {
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      } else if (dismiss === 'escape') {
+        fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
       } else {
-        expect(deleteItem).not.toHaveBeenCalled();
+        fireEvent.click(document.querySelector('.modal-shell-overlay'));
       }
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(deleteItem).not.toHaveBeenCalled();
+      // The note editor survives every dismiss lane — the row is still on screen.
+      expect(screen.getByRole('heading', { name: 'Edit Note' })).toBeInTheDocument();
+      expect(confirmSpy).not.toHaveBeenCalled();
+    });
+
+    it('deletes the note when confirmed via Yes, Delete Permanently', async () => {
+      const deleteItem = armDelete(makeNote());
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+      });
+      expect(deleteItem).toHaveBeenCalledWith('1');
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Edit Note' })).not.toBeInTheDocument();
     });
 
     it('names the note by its party location when one is set', () => {
-      mockHook({
-        items: [makeNote({ description: 'Some hidden details', partyLocation: 'Skull Creek Cave' })],
-      });
-      confirmMock.mockReturnValue(false);
-      renderNotes();
-      openEditNote();
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      expect(confirmMock).toHaveBeenCalledWith('Delete Note "Skull Creek Cave"?');
+      armDelete(makeNote({ description: 'Some hidden details', partyLocation: 'Skull Creek Cave' }));
+      expect(deleteDialog()).toHaveTextContent('Skull Creek Cave');
     });
 
     it('derives a plain-text shortened title from a markdown description when party location is empty', () => {
-      mockHook({
-        items: [makeNote({ description: '## The **Baron** wants revenge on the Emerald Enclave guildmasters for the raid' })],
-      });
-      confirmMock.mockReturnValue(false);
-      renderNotes();
-      openEditNote();
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      armDelete(makeNote({
+        description: '## The **Baron** wants revenge on the Emerald Enclave guildmasters for the raid',
+      }));
       // Markdown syntax stripped, newlines collapsed, truncated at 40 chars + ellipsis
-      expect(confirmMock).toHaveBeenCalledWith('Delete Note "The Baron wants revenge on the Emerald E…"?');
+      expect(deleteDialog()).toHaveTextContent('The Baron wants revenge on the Emerald E…');
     });
 
     it('disables delete button while deleting', async () => {
@@ -442,13 +481,14 @@ describe('Notes', () => {
         items: [makeNote()],
         deleteItem: () => new Promise((resolve) => { resolveDelete = resolve; }),
       });
-      confirmMock.mockReturnValue(true);
       renderNotes();
       openEditNote();
-      const deleteBtn = screen.getByRole('button', { name: 'Delete' });
-      fireEvent.click(deleteBtn);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+      });
+      const deleteBtn = screen.getByRole('button', { name: /deleting/i });
       expect(deleteBtn).toBeDisabled();
-      expect(deleteBtn).toHaveTextContent(/deleting/i);
       await act(async () => resolveDelete());
     });
   });

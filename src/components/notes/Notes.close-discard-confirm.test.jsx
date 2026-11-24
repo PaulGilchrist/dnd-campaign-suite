@@ -9,7 +9,7 @@
 // (banner, editor, draft survive — zero network); accept closes via the same
 // handleCloseModal path; internal closes (save/delete/reload) stay single-
 // confirm. Harness mirrors Notes.reload-discard-confirm.test.jsx.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Notes from './Notes';
 
@@ -200,15 +200,18 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('delete keeps its own single named confirm (unchanged path)', async () => {
+  it('delete rides the shared in-app DeleteConfirmModal — no native confirm (QA backlog 2026-11-24)', async () => {
     renderNotes();
     await openEditor();
     fireEvent.change(editor(), { target: { value: 'doomed draft' } });
-    confirmSpy.mockReturnValue(true);
 
     fireEvent.click(screen.getByRole('button', { name: /delete/i }));
-    await waitFor(() => expect(editor()).toBeNull());
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Note "Test Hollow"?');
+    const dialog = screen.getByRole('dialog', { name: 'Delete Note' });
+    expect(dialog).toHaveTextContent('Test Hollow');
+    // Cancel is fully inert: editor and dirty draft survive, nothing deletes.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(editor()).toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });
