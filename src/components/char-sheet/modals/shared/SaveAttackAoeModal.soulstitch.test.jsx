@@ -178,7 +178,7 @@ describe('SaveAttackAoeModal — CLA-321 Soulstitch enforcement', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Soulstitch — automatically succeeds, takes no damage/)).toHaveLength(1);
     });
-    expect(screen.getByText(/Failed — takes 20 Fire damage \(rolled 1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Failed — takes 20 Fire damage \(rolled 1 \+ -1 = 0 vs DC 17\)/)).toBeInTheDocument();
   });
 
   it('PC lane: chosen player auto-resolves at confirm — no save prompt, auto-success log, zero damage written', async () => {

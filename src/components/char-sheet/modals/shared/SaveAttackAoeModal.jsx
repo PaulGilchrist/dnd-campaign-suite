@@ -26,6 +26,7 @@ import { armDurationClockIfEnforced, durationArmNote } from '../../../../service
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { saveEquationText } from './AreaEffectSaveFlow.utils.js';
 import { handleOverchannelSelfDamage } from '../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js';
 import { hasSoulstitchProtection, clearSoulstitchStamp } from '../../../../hooks/combat/loggedDiceRollUtils.js';
 import { setTempHp } from '../../../../services/automation/handlers/buffs/tempHpService.js';
@@ -1240,6 +1241,8 @@ function grantSlowedClauses({ effects, campaignName, targetName, casterName, act
 // staged-petrify rows state the Restrained-until-repeat-save ladder (fix#347).
 // MA-0563: dual-pool results row — "35 Fire + 30 Necrotic" when a secondary
 // rode the row; single-damage rows render the legacy byte-identical text.
+// Save annotation: saveEquationText's full "rolled R + B = T vs DC D" — never
+// the bare raw d20 (its number could sit under the DC beside a Saved verdict).
 function damageTotalsText(r, damageType) {
     if (r.secondaryFinalDamage == null) return `${r.finalDamage ?? 0} ${damageType}`;
     return `${r.finalDamage ?? 0} ${damageType} + ${r.secondaryFinalDamage} ${r.secondaryDamageType}`;
@@ -1255,27 +1258,27 @@ function resultRowText(r, damage, damageType, opts) {
     return saveOutcomeRowText(r, damage, damageType, opts);
 }
 
-function saveOutcomeRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify }) {
+function saveOutcomeRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify, saveDc }) {
     if (r.soulstitchProtected) return 'Soulstitch — automatically succeeds, takes no damage';
     if (r.success) {
         return (r.finalDamage ?? 0) > 0
-            ? `Saved — takes ${damageTotalsText(r, damageType)} damage (rolled ${r.roll ?? 0}, halved)`
-            : `Saved — takes no damage (rolled ${r.roll ?? 0})`;
+            ? `Saved — takes ${damageTotalsText(r, damageType)} damage (${saveEquationText(r, saveDc)}, halved)`
+            : `Saved — takes no damage (${saveEquationText(r, saveDc)})`;
     }
     if (!damage) {
         if (sleepStaging || stagedParalysis) {
-            return `Failed — Incapacitated until the end of its next turn, then repeats the save (rolled ${r.roll ?? 0})`;
+            return `Failed — Incapacitated until the end of its next turn, then repeats the save (${saveEquationText(r, saveDc)})`;
         }
         // fix#347 (#1725-era): staged-petrify rows (MA-0501/MA-0904 ladder)
         // mirror the staged-paralysis branch shape above; fail#1 stage is
         // Restrained (cockatricePetrifyService stage-1 vocabulary), the label
         // is the registry's BY-name — never a generic 'Failed the save'.
         if (stagedPetrify) {
-            return `Failed — Restrained until the end of its next turn, then repeats the save (${getEffectDefinition('petrifying_bite_staged').label}) (rolled ${r.roll ?? 0})`;
+            return `Failed — Restrained until the end of its next turn, then repeats the save (${getEffectDefinition('petrifying_bite_staged').label}) (${saveEquationText(r, saveDc)})`;
         }
-        return `Failed the save (rolled ${r.roll ?? 0})`;
+        return `Failed the save (${saveEquationText(r, saveDc)})`;
     }
-    return `Failed — takes ${damageTotalsText(r, damageType)} damage (rolled ${r.roll ?? 0})`;
+    return `Failed — takes ${damageTotalsText(r, damageType)} damage (${saveEquationText(r, saveDc)})`;
 }
 
 // MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
@@ -2073,7 +2076,7 @@ function SaveAttackAoeModal({
                     <div className="abjure-results-list">
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify })}
+                                <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify, saveDc })}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -2123,7 +2126,7 @@ function SaveAttackAoeModal({
                         <div className="abjure-results-list">
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify })}
+                                    <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify, saveDc })}
                                 </div>
                             ))}
                         </div>

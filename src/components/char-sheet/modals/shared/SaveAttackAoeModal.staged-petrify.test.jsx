@@ -186,7 +186,7 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
     fireEvent.click(getByText('Confirm'));
 
     // Positive leg first: the save resolved and rendered its result row.
-    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20)'));
+    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20 + 2 = 22 vs DC 15)'));
 
     // Then the absences: no condition, no ladder te, no condition log, no damage.
     expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();

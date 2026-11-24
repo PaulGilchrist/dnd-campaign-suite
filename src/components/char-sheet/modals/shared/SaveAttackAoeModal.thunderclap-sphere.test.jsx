@@ -147,8 +147,8 @@ describe('MA-0084 Thunderclap picker — save math + Deafened duration honesty',
     // dc_success none: the failed save pays the full mock total — no halving.
     expect(applyDamageToTarget.mock.calls.filter(c => c[2] === 10).map(c => c[1])).toEqual(['Thug 1']);
     const results = document.querySelector('.abjure-results-list').textContent;
-    expect(results).toMatch(/Thug 1.*Failed — takes .* damage \(rolled 1\)/s);
-    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19\)/s);
+    expect(results).toMatch(/Thug 1.*Failed — takes .* damage \(rolled 1 \+ -1 = 0 vs DC 17\)/s);
+    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19 \+ 7 = 26 vs DC 17\)/s);
     const condLog = conditionLogsFor('Thug 1')[0];
     expect(condLog.description).toMatch(/Deafened until the end of its next turn \(GM-enforced\)/);
     expect(condLog.description).not.toMatch(/1 minute/);
@@ -166,8 +166,8 @@ describe('MA-0084 Thunderclap picker — save math + Deafened duration honesty',
     fireEvent.click(document.querySelector('.sp-roll-btn'));
     await waitFor(() => expect(document.querySelector('.abjure-result-success')).toBeTruthy());
     const results = document.querySelector('.abjure-results-list').textContent;
-    expect(results).toMatch(/Thug 1.*Saved — takes no damage \(rolled 19\)/s);
-    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19\)/s);
+    expect(results).toMatch(/Thug 1.*Saved — takes no damage \(rolled 19 \+ -1 = 18 vs DC 17\)/s);
+    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19 \+ 7 = 26 vs DC 17\)/s);
     expect(results).not.toMatch(/Failed/);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(runtime.store['Thug 1.activeConditions']).toBeUndefined();

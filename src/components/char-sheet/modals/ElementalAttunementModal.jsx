@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { computeDamageAfterSave, computeDamageAfterResistancesWithDetails, applyDamageToTarget, normalizeSaveType } from '../../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
-import { dismissedNoEffectResult } from './shared/AreaEffectSaveFlow.utils.js';
+import { dismissedNoEffectResult, saveEquationText } from './shared/AreaEffectSaveFlow.utils.js';
 import { getAffectedCreatures } from '../../../services/rules/combat/aoeService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -658,9 +658,9 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                                         ? 'Save dismissed — unaffected'
                                         : r.success
                                         ? (r.finalDamage ?? 0) > 0
-                                            ? `Saved — takes ${r.finalDamage} ${r.damageType || ''} damage (rolled ${r.roll ?? 0}, halved)`
-                                            : 'Saved — no effect (rolled ' + (r.roll ?? 0) + ')'
-                                        : 'Failed — ' + (r.effect === 'speed_reduction' ? 'speed reduced by 15 ft.' : 'takes ' + (r.finalDamage ?? 0) + ' ' + (r.damageType ?? '') + ' damage (rolled ' + (r.roll ?? 0) + ')') }
+                                            ? `Saved — takes ${r.finalDamage} ${r.damageType || ''} damage (${saveEquationText(r, saveDc)}, halved)`
+                                            : 'Saved — no effect (' + saveEquationText(r, saveDc) + ')'
+                                        : 'Failed — ' + (r.effect === 'speed_reduction' ? 'speed reduced by 15 ft.' : 'takes ' + (r.finalDamage ?? 0) + ' ' + (r.damageType ?? '') + ' damage (' + saveEquationText(r, saveDc) + ')') }
                                 </div>
                             ))}
                             {pendingPrompts.map(p => (

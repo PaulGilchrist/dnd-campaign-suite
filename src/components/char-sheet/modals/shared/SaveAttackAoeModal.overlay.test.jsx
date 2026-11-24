@@ -171,7 +171,8 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     expect(errorSpy.mock.calls.map(c => String(c[0])).filter(m => m.includes('Cannot update a component'))).toEqual([]);
     errorSpy.mockRestore();
 
-    // Failed save (rolled 1 + 2 vs DC 15) pays the FULL 12 — honest dice.
+    // Failed save pays the FULL 12 — honest dice; the row prints the full
+    // adjudicated equation (rolled 1 + 2 = 3 vs DC 15).
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
       expect.anything(), 'Goblin A', 12, ['Fire'], expect.objectContaining({ attackerName: 'Cleric1' }));
 
@@ -196,7 +197,7 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     await waitFor(() => expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument());
     const summaryRows = [...document.querySelectorAll('.abjure-results-list .abjure-result')];
     expect(summaryRows).toHaveLength(1);
-    expect(summaryRows[0].textContent).toBe('Goblin A: Failed — takes 12 Fire damage (rolled 1)');
+    expect(summaryRows[0].textContent).toBe('Goblin A: Failed — takes 12 Fire damage (rolled 1 + 2 = 3 vs DC 15)');
     expect(document.querySelector('.abjure-result-pending')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);

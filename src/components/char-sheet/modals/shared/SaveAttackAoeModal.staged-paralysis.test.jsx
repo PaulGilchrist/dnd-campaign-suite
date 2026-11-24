@@ -180,7 +180,7 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
     expect(conds[0].description).toContain('auto-succeeds after 1 minute');
 
     // Results row shows the staged copy — no null-damage cosmetics.
-    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save (rolled 2)'));
+    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save (rolled 2 + 2 = 4 vs DC 24)'));
     expect(container.textContent).not.toContain('null null');
   });
 
@@ -202,6 +202,6 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
     expect(stageSleepTargets).not.toHaveBeenCalled();
     expect(conditionLogs()).toHaveLength(0);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20)'));
+    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20 + 2 = 22 vs DC 13)'));
   });
 });

@@ -134,6 +134,20 @@ function npcSaveResultDescription({ targetName, saveType, saveDc, success, roll,
   return `${targetName} ${outcome} ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total})${suffix}`;
 }
 
+// Results-face save annotations must self-reconcile: these per-target rows used
+// to print ONLY the raw d20 ("(rolled 10)"), so a Saved face could show a number
+// below the DC it announced — the engine adjudicates on the HIDDEN total
+// (d20 + save bonus) (live-captured Burning Hands: "Saved — takes 12 Fire damage
+// (rolled 10, halved)" against DC 17). Rows now print the same equation the
+// save_result log rows carry (npcSaveResultDescription above always shows
+// "rolled r + b = t") plus the adjudicated DC, mirroring the standing
+// ClairvoyantCombatantModal/HurlThroughHellModal result copy
+// ("rolled R + B = T vs DC D"). Shared by SaveAttackAoeModal and
+// ElementalAttunementModal result faces.
+export function saveEquationText({ roll, saveBonus, total }, saveDc) {
+  return `rolled ${roll ?? 0} + ${saveBonus ?? 0} = ${total ?? 0} vs DC ${saveDc}`;
+}
+
 export function logNpcSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success, roll, total, saveBonus, logPrefix, suffix = '' }) {
   return addEntry(campaignName, {
     type: 'save_result',
