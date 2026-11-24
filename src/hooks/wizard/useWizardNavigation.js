@@ -74,19 +74,27 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const checkValidation = async () => {
       const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats, existingNames });
-      setIsNextDisabled(Object.keys(stepErrors).length > 0);
+      if (!cancelled) {
+        setIsNextDisabled(Object.keys(stepErrors).length > 0);
+      }
     };
     checkValidation();
+    return () => { cancelled = true; };
   }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats, existingNames]);
 
   useEffect(() => {
+    let cancelled = false;
     const checkStep2 = async () => {
       const step2Errors = await validateStep(2, formData, { racesData, classSubtypes, ruleset, existingNames });
-      setStep2Valid(Object.keys(step2Errors).length === 0);
+      if (!cancelled) {
+        setStep2Valid(Object.keys(step2Errors).length === 0);
+      }
     };
     checkStep2();
+    return () => { cancelled = true; };
   }, [formData, racesData, classSubtypes, ruleset, existingNames]);
 
   const validPrefixes = useMemo(() => {

@@ -26,6 +26,8 @@ import realClasses5e from '../../../public/data/classes.json';
 import realBackgrounds2024 from '../../../public/data/2024/backgrounds.json';
 import realRulesValidation from '../../../public/data/rules-validation.json';
 import realRulesValidation2024 from '../../../public/data/2024/rules-validation.json';
+import realRaces5e from '../../../public/data/races.json';
+import realRaces2024 from '../../../public/data/2024/races.json';
 
 vi.mock('../../hooks/wizard/useWizardData.js', () => {
   const FIXTURE = {
@@ -63,6 +65,10 @@ const REAL_DATA = {
   '/data/2024/backgrounds.json': realBackgrounds2024,
   '/data/rules-validation.json': realRulesValidation,
   '/data/2024/rules-validation.json': realRulesValidation2024,
+  // getFeatLimits' Versatile-race lane (2024 Human Origin-feat slot at
+  // level 1) reads the shipped races too.
+  '/data/races.json': realRaces5e,
+  '/data/2024/races.json': realRaces2024,
   '/data/alignments.json': ['Lawful Good', 'True Neutral', 'Chaotic Evil'],
 };
 

@@ -458,6 +458,7 @@ describe('classification against the REAL rules data', () => {
       targetFeats: realFeats2024,
       targetClasses: realClasses2024,
       targetBackgrounds: realBackgrounds2024,
+      targetFeatAllowed: 1, // canonical 2024 level-4 slot count (getFeatLimits math)
     });
 
     // 'Acid Splash' + 'Alarm' are on the 2024 Wizard list (verified on disk).

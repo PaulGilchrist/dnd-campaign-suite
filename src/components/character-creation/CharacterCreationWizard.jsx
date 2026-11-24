@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import cloneDeep from 'lodash/cloneDeep';
 import isEqual from 'lodash/isEqual';
 import './CharacterCreationWizard.css';
-import { validateStep, validateFinalFormData, validateAbilityTotals, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals, validateSelectionCaps, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
@@ -411,6 +411,33 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
    }, [abilityCapKey]); // eslint-disable-line react-hooks/exhaustive-deps
    const abilitiesWithinCap = Object.keys(abilityCapErrors).length === 0;
 
+   // Cap gate for LOADED selections (FT-002 belt, mirroring the
+   // abilitiesWithinCap audit above): a ruleset switch can leave 2024 feat/
+   // skill rows that are legal row NAMES in the target ruleset but impossible
+   // in the target build, and disk-loaded drafts can carry the same. While
+   // the Feats or Skills step would honestly print "selected > allowed", the
+   // sidebar Save stays disabled — the loaded-state twin of the interactive
+   // checkbox refusals, computed from the same validators the steps gate on.
+   const [selectionCapErrors, setSelectionCapErrors] = useState({});
+   const selectionCapKey = useMemo(() => JSON.stringify({
+     ruleset,
+     level: formData.level,
+     background: formData.background,
+     className: formData.class?.name,
+     feats: (formData.feats || []).map(f => (typeof f === 'string' ? f : f?.name)),
+     skills: formData.skillProficiencies || [],
+   }), [ruleset, formData.level, formData.background, formData.class?.name, formData.feats, formData.skillProficiencies]);
+   useEffect(() => {
+     let cancelled = false;
+     validateSelectionCaps(formData, { allFeats: feats }).then(errs => {
+       if (!cancelled) {
+         setSelectionCapErrors(prev => (JSON.stringify(prev) === JSON.stringify(errs) ? prev : errs));
+       }
+     });
+     return () => { cancelled = true; };
+   }, [selectionCapKey]); // eslint-disable-line react-hooks/exhaustive-deps
+   const selectionsWithinCap = Object.keys(selectionCapErrors).length === 0;
+
    // Handlers
   // Ruleset switch (roadmap Item 2): never wipes silently — in BOTH flows
   // (fresh builds AND the edit lane on saved-character data). Every current
@@ -500,6 +527,14 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     const abilityErrors = await validateAbilityTotals(formData, { allFeats: feats, racesData, ruleset });
     if (Object.keys(abilityErrors).length > 0) {
       setErrors(abilityErrors);
+      return;
+        }
+    // Defense-in-depth: the Save button is already gated by selectionsWithinCap,
+    // but re-check the feat/skill slot caps here too so no write lane can
+    // persist an over-cap build (the exact state this bug shipped).
+    const capErrors = await validateSelectionCaps(formData, { allFeats: feats });
+    if (Object.keys(capErrors).length > 0) {
+      setErrors(capErrors);
       return;
         }
     onComplete(formData);
@@ -662,7 +697,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
               ruleset={ruleset}
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
-              isSaveEnabled={isSaveEnabled && abilitiesWithinCap}
+              isSaveEnabled={isSaveEnabled && abilitiesWithinCap && selectionsWithinCap}
               onSave={handleSubmit}
             />
             <div className="wizard-content">

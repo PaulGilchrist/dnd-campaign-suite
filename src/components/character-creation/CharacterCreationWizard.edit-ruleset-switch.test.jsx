@@ -152,17 +152,22 @@ describe('CharacterCreationWizard — edit-mode ruleset switch (saved characters
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Switch to 5th Edition (5e)?');
-    expect(dialog).toHaveTextContent('4 kept, 3 removed');
+    // The feat SLOTS are part of the ledger now: a 5e level-1 build grants
+    // zero feats, so even the name-legal Alert/Savage Attacker rows are
+    // removed (over-cap) — the switch can no longer persist "1 of 0 allowed".
+    expect(dialog).toHaveTextContent('2 kept, 5 removed');
     // Byte-honest classification over the real shipped 5e data: the two
-    // Wizard-list spells survive; Elementalism is 2024-only; Alert has no 5e
-    // prerequisite; the 2024 boon is retired from 5e; Background is 2024-only.
+    // Wizard-list spells survive; Elementalism is 2024-only; both no-prereq
+    // feats are over-cap; the 2024 boon is retired from 5e; Background is
+    // 2024-only.
     expect(dialog).toHaveTextContent('Spells — 2 kept, 1 removed');
-    expect(dialog).toHaveTextContent('Feats — 2 kept, 1 removed');
+    expect(dialog).toHaveTextContent('Feats — 0 kept, 3 removed');
     expect(dialog).toHaveTextContent('Background — 0 kept, 1 removed');
     const text = dialog.textContent;
     expect(text).toContain('Fire Bolt');
     expect(text).toContain('Magic Missile');
     expect(text).toContain('Alert');
+    expect(text).toContain('the 5th Edition (5e) grants no feats at level 1');
     expect(text).toContain('Savage Attacker');
     expect(text).toContain('Elementalism');
     expect(text).toContain('not in the 5th Edition (5e) spell data');
@@ -220,9 +225,11 @@ describe('CharacterCreationWizard — edit-mode ruleset switch (saved characters
     const payload = onComplete.mock.calls[0][0];
     expect(payload.rules).toBe('5e');
     expect(payload.name).toBe('LedgerRider');
-    // Exactly the ledger's kept rows survive; removal-set rows are gone.
+    // Exactly the ledger's kept rows survive; removal-set rows are gone —
+    // the over-cap fix means a 5e level-1 build keeps NOTHING from the
+    // 2024 feat list (both name-legal rows were removed as over-cap).
     expect(payload.spells).toEqual(['Fire Bolt', 'Magic Missile']);
-    expect(payload.feats).toEqual(['Alert', 'Savage Attacker']);
+    expect(payload.feats).toEqual([]);
     expect(payload.background).toBe('');
   });
 });

@@ -14,7 +14,12 @@
  *    lists the character's class.
  *  - Feat: name found in the target feats.json AND every prerequisite the
  *    target data expresses stays met by the current draft (level, ability
- *    minimums, Fighting Style, Spellcasting/Pact Magic, armor training).
+ *    minimums, Fighting Style, Spellcasting/Pact Magic, armor training) AND
+ *    the row stays inside the target's feat SLOTS at this level
+ *    (`targetFeatAllowed` — the same count WizardStepFeats prints as
+ *    "N of M allowed feat(s)"). A legal name past the cap is dropped as
+ *    OVER_CAP — a 5e level-1 build cannot hold any feat, so a 2024 origin
+ *    feat must never survive the switch as "kept".
  *    A prerequisite the data cannot express as checkable is classified
  *    honestly as UNVERIFIABLE → dropped — we never guess keep.
  *  - Background: step 5 is 2024-only in this app, so switching TO 5e always
@@ -31,6 +36,7 @@ import {
   loadClassData,
   loadBackgroundData,
 } from '../ui/dataLoader.js';
+import { getFeatLimits, normalizeBackgroundFeatName } from './featValidation.js';
 
 export const RULESET_LABELS = {
   '5e': '5th Edition (5e)',
@@ -43,6 +49,7 @@ export const DROP_REASONS = {
   PREREQUISITE: 'prerequisite',
   PREREQUISITE_UNVERIFIABLE: 'prerequisite-unverifiable',
   RULESET_UNSUPPORTED: 'ruleset-unsupported',
+  OVER_CAP: 'over-cap',
 };
 
 // Visible list cap for modal copy — beyond it rows collapse to "(+N more)".
@@ -281,6 +288,15 @@ function classifyFeats(formData, targetRuleset, targetFeats, targetClasses, ctx)
   const rows = (formData?.feats || []).map(entryNameOf).filter(Boolean);
   const kept = [];
   const dropped = [];
+  // Slot cap: legality by NAME is not enough — the target ruleset only
+  // grants a fixed number of feat slots at this level (5e grants none before
+  // level 4; 2024 adds Origin feats only via the background step a 5e switch
+  // drops). Legal rows past that cap are named in the REMOVED list, so the
+  // switch can never persist a build the Feats step would print over-cap
+  // ("selected 1 of 0 allowed feat(s)").
+  const capDetail = ctx.featAllowed === 0
+    ? `the ${label} grants no feats at level ${ctx.charLevel}`
+    : `the ${label} grants only ${ctx.featAllowed} feat(s) at level ${ctx.charLevel}`;
 
   rows.forEach(name => {
     const feat = findByName(targetFeats, name);
@@ -304,6 +320,13 @@ function classifyFeats(formData, targetRuleset, targetFeats, targetClasses, ctx)
       dropped.push({ name, reason: DROP_REASONS.PREREQUISITE_UNVERIFIABLE, detail: unverifiable.detail });
     } else if (unmet) {
       dropped.push({ name, reason: DROP_REASONS.PREREQUISITE, detail: unmet.detail });
+    } else if (name === ctx.preSelectedFeat) {
+      // The kept background's own Origin feat: WizardStepFeats renders it as
+      // "(Pre-selected)" outside the allowed-slot count, so it cannot be an
+      // over-cap removal.
+      kept.push(name);
+    } else if (kept.length >= ctx.featAllowed) {
+      dropped.push({ name, reason: DROP_REASONS.OVER_CAP, detail: capDetail });
     } else {
       kept.push(name);
     }
@@ -336,8 +359,24 @@ function classifyBackground(formData, targetRuleset, targetBackgrounds) {
 /**
  * Pure classification entry point. All target-ruleset data is passed in, so
  * this is testable without any network lane; the callers load it via
- * buildRulesetSwitchPreview.
+ * buildRulesetSwitchPreview. `targetFeatAllowed` is the feat slot count the
+ * TARGET ruleset grants at the draft's level (see getFeatLimits) — legal
+ * feat rows past it are dropped as OVER_CAP. Callers with no slot math pass
+ * NO_FEAT_CAP (Infinity), the documented "cap does not constrain" sentinel.
  */
+export const NO_FEAT_CAP = Infinity;
+
+/**
+ * The Origin feat a KEPT 2024 background grants for free (the row
+ * WizardStepFeats renders as "(Pre-selected)" and excludes from the
+ * allowed-slot count) — it survives a switch without consuming the feat cap.
+ */
+function preSelectedBackgroundFeat(targetBackgrounds, keptBackground) {
+  if (!keptBackground) return '';
+  const feat = findByName(targetBackgrounds, keptBackground)?.feat;
+  return normalizeBackgroundFeatName(feat || '');
+}
+
 export function classifyRulesetSwitch({
   formData,
   targetRuleset,
@@ -345,17 +384,20 @@ export function classifyRulesetSwitch({
   targetFeats = [],
   targetClasses = [],
   targetBackgrounds = [],
+  targetFeatAllowed = NO_FEAT_CAP,
 }) {
+  const background = classifyBackground(formData, targetRuleset, targetBackgrounds);
   const ctx = {
     charLevel: characterLevelOf(formData),
     className: formData?.class?.name || '',
     subclassName: subclassNameOf(formData),
     selectedFeatNames: (formData?.feats || []).map(entryNameOf).filter(Boolean),
+    featAllowed: targetFeatAllowed,
+    preSelectedFeat: preSelectedBackgroundFeat(targetBackgrounds, background.kept),
   };
 
   const spells = classifySpells(formData, targetRuleset, targetSpells);
   const feats = classifyFeats(formData, targetRuleset, targetFeats, targetClasses, ctx);
-  const background = classifyBackground(formData, targetRuleset, targetBackgrounds);
 
   const droppedRows = [...spells.dropped, ...feats.dropped, ...background.dropped];
   const keptCount = spells.kept.length + feats.kept.length + (background.kept ? 1 : 0);
@@ -380,11 +422,15 @@ export function classifyRulesetSwitch({
  * classifyRulesetSwitch.
  */
 export async function buildRulesetSwitchPreview(formData, targetRuleset) {
-  const [targetSpells, targetFeats, targetClasses, targetBackgrounds] = await Promise.all([
+  const [targetSpells, targetFeats, targetClasses, targetBackgrounds, targetFeatLimits] = await Promise.all([
     loadSpells(targetRuleset),
     loadFeatData(targetRuleset),
     loadClassData(targetRuleset),
     loadBackgroundData(targetRuleset),
+    // The TARGET ruleset's own slot math — the same source WizardStepFeats
+    // uses for its "N of M allowed feat(s)" counter, evaluated with the
+    // target rules applied to this draft.
+    getFeatLimits({ ...formData, rules: targetRuleset }),
   ]);
   return classifyRulesetSwitch({
     formData,
@@ -393,6 +439,7 @@ export async function buildRulesetSwitchPreview(formData, targetRuleset) {
     targetFeats,
     targetClasses,
     targetBackgrounds,
+    targetFeatAllowed: targetFeatLimits.allowed,
   });
 }
 

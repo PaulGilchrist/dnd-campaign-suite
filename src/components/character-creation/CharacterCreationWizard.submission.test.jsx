@@ -258,6 +258,7 @@ vi.mock('../../config/utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
   validateFinalFormData: vi.fn(() => ({})),
   validateAbilityTotals: vi.fn(() => Promise.resolve({})),
+  validateSelectionCaps: vi.fn(() => Promise.resolve({})),
   hasDuplicateCharacterName: vi.fn(() => false),
   DUPLICATE_CHARACTER_NAME_ERROR: 'A character with that name already exists',
   CHARACTER_NAME_REQUIRED_ERROR: 'Character name is required',

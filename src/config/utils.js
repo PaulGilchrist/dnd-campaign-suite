@@ -3,6 +3,7 @@ import { REQUIRED_FIELDS } from './constants.js';
 import { loadValidationRules, getCachedPointBuyCosts } from '../services/ui/dataLoader.js';
 import { computeRaceBuffs } from '../services/character/raceBuffService.js';
 import { getSkillLimits } from '../services/character/skillValidation/index.js';
+import { getFeatLimits, getPreSelectedFeats } from '../services/character/featValidation.js';
 
 /**
  * Get point buy costs synchronously from the cached JSON data.
@@ -253,6 +254,37 @@ const validateSkillsStep = async (formData, context) => {
   return newErrors;
 };
 
+// Feats step (FT-002 twin): block Next/Save while the USER feat count (the
+// same count WizardStepFeats prints as "You have selected N of M allowed")
+// exceeds what the ruleset grants at this level. Background-granted
+// pre-selections ride outside the count, matching validateFeats' warning.
+const validateFeatsStep = async (formData) => {
+  const newErrors = {};
+  const limits = await getFeatLimits(formData);
+  const preSelected = await getPreSelectedFeats(formData);
+  const selected = (formData.feats || []).filter(f => !preSelected.includes(f));
+  if (selected.length > limits.allowed) {
+    newErrors.feats = `Rules allow ${limits.allowed} feat(s) at level ${formData.level}. You have selected ${selected.length}. Deselect ${selected.length - limits.allowed} to continue.`;
+  }
+  return newErrors;
+};
+
+/**
+ * Whole-form audit of the two slot-capped lanes (feats + skills), used as the
+ * Save-gate belt in CharacterCreationWizard: the sidebar ladder only knows
+ * the valid step PREFIX, so a draft LOADED from disk (or left over-cap by a
+ * ruleset switch) must be re-checked on every draft change — the same
+ * condition the interactive lanes refuse at the checkbox (FT-002) and the
+ * step counters print honestly as "selected N of M allowed".
+ */
+export async function validateSelectionCaps(formData, context = {}) {
+  const [featErrors, skillErrors] = await Promise.all([
+    validateFeatsStep(formData, context),
+    validateSkillsStep(formData, context),
+  ]);
+  return { ...featErrors, ...skillErrors };
+}
+
 const stepValidators = {
   1: validateRulesetStep,
   2: validateBasicsStep,
@@ -261,6 +293,7 @@ const stepValidators = {
   5: validateBackgroundStep,
   6: validateClassStep,
   7: validateSubclassStep,
+  8: validateFeatsStep,
   9: validateAbilitiesStep,
   10: validateSkillsStep,
 };
