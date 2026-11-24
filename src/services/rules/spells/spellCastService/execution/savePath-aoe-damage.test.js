@@ -15,7 +15,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /*  its only import rangeCheck was already loaded transitively via     */
 /*  spellOverlayService → mapsService; the old mock re-implemented     */
 /*  rangeToFeet's regex — duplicate-logic over-mock removed),          */
-/*  damageUtils.getCombatContext (stubbed), ../../maps/spellOverlayService */
+/*  damageUtils.getCombatContext (stubbed ASYNC — the production export   */
+/*  is async and savePath.js:180 AWAITS it; every mock return below is a  */
+/*  PROMISE (mockResolvedValue/async factory) so the awaited contract is  */
+/*  exercised — a sync shape here once masked the missing-await bug),     */
+/*  ../../maps/spellOverlayService                                        */
 /*  (REAL leaf — overlay/fetch lanes OWNED HERE per #1489 deferral;    */
 /*  savePath-aoe-condition.test.js:12 delegates overlay targeting to    */
 /*  this file). fetch is stubbed global per test — the service's exact  */
@@ -51,7 +55,7 @@ vi.mock('../../postCastRiderService.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 const { handleSavePath } = await import('./savePath.js');
@@ -203,7 +207,7 @@ describe('savePath.js — damageful AoE save path → saveAttackAoe payload + ov
   beforeEach(() => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    getCombatContext.mockReturnValue(null);
+    getCombatContext.mockResolvedValue(null);
     triggerSoulstitchSpells.mockImplementation(() => Promise.resolve());
     fetchSpy.mockImplementation(() => Promise.resolve({
       ok: false,
@@ -308,12 +312,14 @@ describe('savePath.js — damageful AoE save path → saveAttackAoe payload + ov
   /*  spellOverlayService; the fetch endpoint is stubbed at the seam.  */
   /* ---------------------------------------------------------------- */
 
-  it('overlay-hit: fetches /spell-overlay?campaign=<name> once, in order after getCombatContext, and ships the matched overlay by reference', async () => {
+  it('overlay-hit: fetches /spell-overlay?campaign=<name> once, in order after the awaited getCombatContext Promise settles, and ships the matched overlay by reference', async () => {
     const args = makeSavePathArgs({
       fullSpell: { ...DISK_FIREBALL_5E, area_of_effect: { type: 'cone', size: 60 } },
     });
     const matched = { id: 'abc123', name: 'Test Overlay' };
-    getCombatContext.mockReturnValue({
+    // PROMISE return mirrors production's async getCombatContext — the
+    // awaited shape (savePath.js:180) must resolve the attacker row.
+    getCombatContext.mockResolvedValue({
       creatures: [{ name: 'TestWizard', targetName: 'overlay-abc123' }],
     });
     fetchSpy.mockImplementation(() => Promise.resolve({
@@ -339,7 +345,7 @@ describe('savePath.js — damageful AoE save path → saveAttackAoe payload + ov
     ];
 
     for (const row of rows) {
-      getCombatContext.mockReturnValue(row.ctx);
+      getCombatContext.mockResolvedValue(row.ctx);
       fetchSpy.mockImplementation(() => Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ overlays: [{ id: 'abc123', name: 'Test Overlay' }] }),
@@ -355,7 +361,7 @@ describe('savePath.js — damageful AoE save path → saveAttackAoe payload + ov
   });
 
   it('fetch-failure containment: rejection yields activeOverlay:null WITH the service console.error byte; ok:false yields null WITHOUT logging (distinct early-return)', async () => {
-    getCombatContext.mockReturnValue({
+    getCombatContext.mockResolvedValue({
       creatures: [{ name: 'TestWizard', targetName: 'overlay-abc123' }],
     });
 

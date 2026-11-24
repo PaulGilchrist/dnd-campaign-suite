@@ -122,7 +122,7 @@ vi.mock('../../postCastRiderService.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 const { handleSavePath } = await import('./savePath.js');
@@ -220,7 +220,7 @@ describe('savePath AoE payload — CLA-120 Empowered Evocation one-roll-per-cast
   beforeEach(() => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    getCombatContext.mockReturnValue(null);
+    getCombatContext.mockResolvedValue(null);
     vi.stubGlobal('fetch', fetchSpy);
     // disk-drift alarms — every byte pinned below must still match disk.
     expect(FIREBALL_5E.damage.damage_at_slot_level['3']).toBe('8d6');

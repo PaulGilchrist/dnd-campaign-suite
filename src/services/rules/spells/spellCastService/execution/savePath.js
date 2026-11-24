@@ -177,7 +177,7 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
     innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, hasInvisible,
     overchannelActive, overchannelUseCount }) {
 
-    const cs = getCombatContext(campaignName);
+    const cs = await getCombatContext(campaignName);
     const attackerTargetName = cs ? cs.creatures?.find(c => c.name === playerStats.name)?.targetName : null;
     const activeOverlay = await resolveActiveOverlay(attackerTargetName, campaignName);
 

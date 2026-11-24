@@ -8,8 +8,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 /*  computeEmpoweredEvocation is in-memory, returns 0 without the     */
 /*  empowered passives, zero network),                                 */
 /*  ../../maps/spellOverlayService (REAL leaf — getCombatContext is   */
-/*  stubbed null here, so overlayTargetId(null) returns null and no   */
-/*  fetch ever fires; overlay lanes owned by savePath-aoe-damage).    */
+/*  stubbed to an async null here (production export is async and     */
+/*  savePath.js:180 awaits it), so overlayTargetId(null) returns null   */
+/*  and no fetch ever fires; overlay lanes owned by savePath-aoe-damage).*/
 /*  useRuntimeState is mocked for transitive load-safety only          */
 /*  (damageCalculation → setRuntimeValue, spellOverlayService/combat  */
 /*  Data → getRuntimeValue).                                           */
@@ -42,7 +43,7 @@ vi.mock('../../../combat/rangeValidation.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 const { handleSavePath } = await import('./savePath.js');

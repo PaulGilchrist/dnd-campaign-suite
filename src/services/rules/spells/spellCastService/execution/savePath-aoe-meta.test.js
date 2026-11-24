@@ -64,7 +64,7 @@ vi.mock('../../postCastRiderService.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 const { handleSavePath } = await import('./savePath.js');

@@ -111,7 +111,7 @@ vi.mock('../../postCastRiderService.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 const { handleSavePath } = await import('./savePath.js');
@@ -203,7 +203,7 @@ describe('savePath AoE overchannel — [Overchannel Maximize] suffix bytes + fla
   beforeEach(() => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    getCombatContext.mockReturnValue(null);
+    getCombatContext.mockResolvedValue(null);
     vi.stubGlobal('fetch', fetchSpy);
     // disk-drift alarms — every pinned byte must still match disk.
     expect(OVERCHANNEL_5E.level).toBe(14);
