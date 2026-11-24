@@ -247,14 +247,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
 // async getCombatContext MUST be awaited (greaseAreaSaveHandler twin, :139-141):
 // an un-awaited Promise has no .creatures, so the player-immunity leg was
-// structurally unreachable in production (bug 2026-11-23). The target's
-// computedStats bucket IS the stats object playerIsImmuneToCondition reads
-// (immunities/allFeatures/name — automationImmunities.js) — pass it directly,
-// never re-wrapped under a `computedStats` key the rule source would not read.
-async function webTargetIsImmune(targetName, campaignName) {
+// structurally unreachable in production (bug 2026-11-23). The targetStats param
+// IS the stats object playerIsImmuneToCondition reads (immunities/allFeatures/
+// name — automationImmunities.js): the rules-derived computedStats threaded by
+// the expireStaleEffects sweep from the caller's roster (`characters.find(...) →
+// computedStats || character`, the applyTurnStartGate sibling idiom). The old
+// runtime `computedStats` bucket read had NO producer, so the gate was
+// data-starved for every real PC (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23).
+async function webTargetIsImmune(targetName, campaignName, targetStats) {
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type !== 'player') return false;
-    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
     return playerIsImmuneToCondition({
         conditionKey: 'restrained',
         playerStats: targetStats,
@@ -311,7 +313,7 @@ async function recordWebAreaSaveSuccess(campaignName, casterName, targetName, dc
     }).catch((e) => { console.error("[webAreaSave] Error:", e); });
 }
 
-export async function processWebAreaSave(casterName, targetName, campaignName, mapName) {
+export async function processWebAreaSave(casterName, targetName, campaignName, mapName, targetStats) {
     const trackingKey = `_web_${casterName.replace(/\s+/g, '_')}`;
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
 
@@ -333,7 +335,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const isAlreadyRestrained = existingConditions.some(c => String(c).toLowerCase() === 'restrained');
     if (isAlreadyRestrained) return null;
 
-    if (await webTargetIsImmune(targetName, campaignName)) return null;
+    if (await webTargetIsImmune(targetName, campaignName, targetStats)) return null;
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,

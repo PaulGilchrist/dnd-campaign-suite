@@ -100,11 +100,13 @@ function makeGreaseTracking(overrides = {}) {
 
 // Exact-key router over the mocked runtime store. Fresh objects per read so
 // addTargetResult's spread of `existing` can't leak across assertions.
-function setupRuntime({ tracking = makeGreaseTracking(), conditions = [], computedStats = null, lastAttack = null } = {}) {
+// NOTE (Option A landing): there is NO `computedStats` bucket key any more —
+// the immunity gates receive the roster-resolved stats as the processXxxAreaSave
+// targetStats PARAMETER (bug-zone-save-computedstats-bucket-has-no-producer).
+function setupRuntime({ tracking = makeGreaseTracking(), conditions = [], lastAttack = null } = {}) {
   useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
     if (key === TRACKING_KEY) return tracking;
     if (key === 'activeConditions') return conditions;
-    if (key === 'computedStats') return computedStats;
     if (key === 'lastAttack') return lastAttack ?? { rollType: null };
     return null;
   });
@@ -193,42 +195,48 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
     });
 
-    it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the raw computedStats bucket', async () => {
-      // LIVE PIN (limb-B defect fixed 2026-11-23 — sleet/web mirror): the
-      // awaited ASYNC combat context resolves the PLAYER row so the immunity
-      // branch is reachable exactly as in production, and the bucket is passed
-      // AS the stats object — a re-introduced {computedStats} wrapper (read by
-      // no playerIsImmuneToCondition rule leg) fails the call-shape pin below.
-      setupRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
+    it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the PASSED roster stats verbatim', async () => {
+      // LIVE PIN (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
+      // the awaited ASYNC combat context resolves the PLAYER row so the immunity
+      // branch is reachable exactly as in production, and the stats object is the
+      // targetStats PARAMETER the expireStaleEffects sweep threads from the caller's
+      // roster (`characters.find(...) → computedStats || character`) — never a
+      // runtime `computedStats` bucket (which has NO producer). A re-introduced
+      // bucket read fails the no-computedStats-key read census below; a
+      // {computedStats}-wrapped argument fails the call-shape pin.
+      const rosterStats = { name: 'Goblin', immunities: ['prone'] };
+      setupRuntime();
       setPlayerContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
 
-      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
+      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats)).toBeNull();
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: { name: 'Goblin', immunities: ['prone'] },
+        playerStats: rosterStats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
+      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('non-immune player resolves normally (immunity false → save proceeds, prone applies on fail)', async () => {
-      setupRuntime({ computedStats: { name: 'Goblin', immunities: [] } });
+      const rosterStats = { name: 'Goblin', immunities: [] };
+      setupRuntime();
       setPlayerContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
       mockSaveOutcome(false);
 
-      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
 
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: { name: 'Goblin', immunities: [] },
+        playerStats: rosterStats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
@@ -240,8 +248,8 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       );
     });
 
-    it('player with NO computedStats bucket still resolves normally (null bucket passed through)', async () => {
-      setupRuntime({ computedStats: null });
+    it('target absent from the roster (no targetStats threaded) still resolves normally (undefined stats → rule guard false)', async () => {
+      setupRuntime();
       setPlayerContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
@@ -250,26 +258,26 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      // null stats → playerIsImmuneToCondition's own guard answers false; the
-      // handler still hands it the (null) bucket so the call contract stays uniform.
+      // undefined stats → playerIsImmuneToCondition's own guard answers false; the
+      // handler still hands it the (undefined) param so the call contract stays uniform.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: null,
+        playerStats: undefined,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
       expect(savePrompt.createSaveListener).toHaveBeenCalled();
     });
 
-    it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
+    it('immunity leg is player-only: monster row with an immunity-carrying stats arg still saves', async () => {
       // monster → immunity check skipped entirely, save proceeds
-      setupRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
+      setupRuntime();
       setMonsterContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
       mockSaveOutcome(true);
 
-      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, { name: 'Goblin', immunities: ['prone'] });
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
     });

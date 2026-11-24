@@ -226,7 +226,27 @@ describe('expireStaleEffects — Sleet Storm recurring saves', () => {
     await expireStaleEffects(CAMPAIGN, 'Caster');
 
     expect(processSleetStormAreaSave).toHaveBeenCalledTimes(1);
-    expect(processSleetStormAreaSave).toHaveBeenCalledWith('Caster', 'Orc', CAMPAIGN, 'Cave');
+    // 5-arg dispatch (Option A, bug-zone-save-computedstats-bucket-has-no-
+    // producer): caster, target, campaign, tracking mapName, roster-resolved
+    // targetStats — undefined here (no characters threaded).
+    expect(processSleetStormAreaSave).toHaveBeenCalledWith('Caster', 'Orc', CAMPAIGN, 'Cave', undefined);
+  });
+
+  it('threads the roster-resolved targetStats (computedStats || character) per sleet target', async () => {
+    // LIVE PIN: the immunity gate's ONLY stats source is this threaded param
+    // (the runtime `computedStats` bucket has no producer and its read is
+    // deleted). A dropped thread fails the 5th-arg pin.
+    seedStore({
+      'Caster._sleetStorm_Caster': { saveDc: 14, mapName: 'Cave' },
+      'campaign.targetEffects': [{ effect: 'sleet_storm', source: 'Caster', target: 'Orc' }],
+      'Orc.activeConditions': [],
+    });
+    const orcStats = { name: 'Orc', immunities: ['prone'] };
+
+    await expireStaleEffects(CAMPAIGN, 'Caster', [{ name: 'Orc', computedStats: orcStats }]);
+
+    expect(processSleetStormAreaSave).toHaveBeenCalledTimes(1);
+    expect(processSleetStormAreaSave).toHaveBeenCalledWith('Caster', 'Orc', CAMPAIGN, 'Cave', orcStats);
   });
 
   it('skips a target that is already prone (no re-save)', async () => {

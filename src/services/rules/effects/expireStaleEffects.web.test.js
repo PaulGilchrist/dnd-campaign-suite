@@ -99,9 +99,29 @@ describe('expireStaleEffects — Phase 5 web turn-start recurring save (SP-126)'
 
     // the web-specific tracking key is read on the caster
     expect(getRuntimeValue).toHaveBeenCalledWith('TestCaster', '_web_TestCaster', campaignName);
-    // 4-arg dispatch: caster, carrier, campaign, tracking mapName
+    // 5-arg dispatch (Option A, bug-zone-save-computedstats-bucket-has-no-
+    // producer): caster, carrier, campaign, tracking mapName, roster-resolved
+    // targetStats — undefined here (no characters threaded; monster carrier).
     expect(processWebAreaSave).toHaveBeenCalledTimes(1);
-    expect(processWebAreaSave).toHaveBeenCalledWith('TestCaster', 'Zombie 1', campaignName, 'Spider Nest');
+    expect(processWebAreaSave).toHaveBeenCalledWith('TestCaster', 'Zombie 1', campaignName, 'Spider Nest', undefined);
+  });
+
+  it('threads the roster-resolved targetStats (computedStats || character) into the recurring save', async () => {
+    // LIVE PIN: the immunity gate's ONLY stats source is this threaded param
+    // (the runtime `computedStats` bucket has no producer and its read is
+    // deleted). A dropped thread fails the 5th-arg pin.
+    getActiveCreatureName.mockReturnValue('Hero');
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCaster' }, { name: 'Hero' }] });
+    seedStore({
+      'campaign.targetEffects': [{ target: 'Hero', effect: 'web', source: 'TestCaster', dc: 19, duration: 'concentration' }],
+      'TestCaster._web_TestCaster': ZONE_TRACKING,
+    });
+    const heroStats = { name: 'Hero', immunities: ['restrained'] };
+
+    await expireStaleEffects(campaignName, 'Hero', [{ name: 'Hero', computedStats: heroStats }]);
+
+    expect(processWebAreaSave).toHaveBeenCalledTimes(1);
+    expect(processWebAreaSave).toHaveBeenCalledWith('TestCaster', 'Hero', campaignName, 'Spider Nest', heroStats);
   });
 
   it.each([

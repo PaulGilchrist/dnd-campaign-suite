@@ -268,8 +268,8 @@ async function applySleetStormProneTarget(campaignName, casterName, targetName, 
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 }
 
-async function shouldSkipSleetAreaSave(casterName, targetName, campaignName, _mapName, tracking) {
-    if (_mapName) {
+async function shouldSkipSleetAreaSave({ casterName, targetName, campaignName, mapName, tracking, targetStats }) {
+    if (mapName) {
         try {
             const inArea = await isWithinRange(casterName, targetName, tracking.radius);
             if (!inArea) return true;
@@ -290,10 +290,12 @@ async function shouldSkipSleetAreaSave(casterName, targetName, campaignName, _ma
     if (targetCharacter?.type === 'player') {
         // playerIsImmuneToCondition's contract reads the stats object it is
         // handed (immunities/allFeatures/name — see automationImmunities.js);
-        // the target's computedStats bucket IS that stats object — pass it
-        // directly (never re-wrap it under a `computedStats` key the rule
-        // source would not read).
-        const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
+        // the targetStats param IS that stats object — the rules-derived
+        // computedStats threaded by the expireStaleEffects sweep from the
+        // caller's roster (`characters.find(...) → computedStats || character`,
+        // the applyTurnStartGate sibling idiom). The old runtime `computedStats`
+        // bucket read had NO producer, so the gate was data-starved for every
+        // real PC (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23).
         if (playerIsImmuneToCondition({
             conditionKey: 'prone',
             playerStats: targetStats,
@@ -364,7 +366,7 @@ async function recordSleetAreaSaveSuccess(campaignName, casterName, targetName, 
     }).catch((e) => { console.error("[sleetStormAreaSave] Error:", e); });
 }
 
-export async function processSleetStormAreaSave(casterName, targetName, campaignName, _mapName) {
+export async function processSleetStormAreaSave(casterName, targetName, campaignName, _mapName, targetStats) {
     const trackingKey = `_sleetStorm_${casterName.replace(/\s+/g, '_')}`;
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
 
@@ -372,7 +374,7 @@ export async function processSleetStormAreaSave(casterName, targetName, campaign
         return null;
     }
 
-    if (await shouldSkipSleetAreaSave(casterName, targetName, campaignName, _mapName, tracking)) {
+    if (await shouldSkipSleetAreaSave({ casterName, targetName, campaignName, mapName: _mapName, tracking, targetStats })) {
         return null;
     }
 

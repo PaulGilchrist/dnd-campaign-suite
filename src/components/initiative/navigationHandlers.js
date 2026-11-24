@@ -356,7 +356,7 @@ export function createNextCreatureHandler({
         // applyTurnStartPass gate below).
         if (!isSecondTurnEntry(newActiveEntry)) {
             lastExpirySweepCreatureRef.current = gateKey
-            expireStaleEffects(campaignName, newActiveName)
+            expireStaleEffects(campaignName, newActiveName, characters)
         }
         // BUG CLA-198: turn-start effects must run for EVERY newly active creature, not just
         // the round-wrap creature at index 0 — owner-centric auras (Inner Radiance) tick on the
@@ -448,7 +448,7 @@ export function createPreviousCreatureHandler({
         const secondTurnTarget = isSecondTurnEntry(cs.creatures.find(c => c.name === newActiveName))
         if (!secondTurnTarget) {
             lastExpirySweepCreatureRef.current = gateKey
-            expireStaleEffects(campaignName, newActiveName)
+            expireStaleEffects(campaignName, newActiveName, characters)
         }
         // BUG CLA-307: no turn-END pass here — rewinding is not a real turn end.
         // The owner's Self-Restoration removal already fired on the forward Next step

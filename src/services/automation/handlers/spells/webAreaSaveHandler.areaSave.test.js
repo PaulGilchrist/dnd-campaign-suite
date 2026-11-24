@@ -48,7 +48,9 @@
 //   'web_area_save' → handle (grep-verified); fired by
 //   useSimpleSpellHandlers.js:345 areaExecute('web_area_save','DEX').
 // Arity class: every getRuntimeValue call reachable from this lane is 3-arg
-//   (tracking read :312, activeConditions :328/:263, computedStats :252);
+//   (tracking read :312, activeConditions :328/:263); the immunity gate reads
+//   NO runtime key for stats — it consumes the threaded targetStats PARAMETER
+//   (Option A landing);
 //   the 2-arg getRuntimeValue('campaign','targetEffects') :55 is handle-lane
 //   only (pinned in #1993). setRuntimeValue writes are 4-arg, campaignName last.
 // No timers (guard:no-timers compliant): this lane has zero setTimeout/
@@ -68,10 +70,13 @@
 //     the recurring zone save (live-witnessed pre-fix: seeded restrained-
 //     immunity EvasiveFighter landed Restrained via processWebAreaSave). The
 //     predicate is now async + awaited at the single caller, mirroring the
-//     grease twin (greaseAreaSaveHandler.js:139-141/:221), AND the target's
-//     computedStats bucket is passed to playerIsImmuneToCondition AS the stats
-//     object (the old {computedStats} wrapper was read by no rule leg — the
-//     gate was inert even post-await). Pins below exercise the async contract.
+//     grease twin (greaseAreaSaveHandler.js:139-141/:221), AND — per the
+//     Option A landing (bug-zone-save-computedstats-bucket-has-no-producer,
+//     2026-11-23, which RETIRES the same-day bucket-read canonicalization) —
+//     the roster-resolved targetStats PARAMETER is passed to
+//     playerIsImmuneToCondition AS the stats object (the runtime
+//     `computedStats` bucket had NO producer; its read is deleted). Pins below
+//     exercise the async contract.
 //   • accepted source gaps (no consumers in this engine, header :27-29):
 //     Difficult Terrain / Lightly Obscured prose, STR (Athletics) break-free
 //     modal, anchoring/collapse, flammability / 2d4 fire / burn-away.
@@ -324,20 +329,23 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
   });
 
   describe('immunity gates', () => {
-    // LIVE PINS (defect flag retired 2026-11-23): getCombatContext rides the
-    // ASYNC contract (production shape). A dropped await in webTargetIsImmune
-    // leaves ?.creatures undefined → the immunity call never happens → the
-    // immune-skip pins fail; the NPC pin stays honest because the resolved
-    // MONSTER row gates the check on type under the awaited contract.
-    const runtimeWithStats = (computedStats) => (name, key) => {
+    // LIVE PINS (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
+    // getCombatContext rides the ASYNC contract (production shape). A dropped await
+    // in webTargetIsImmune leaves ?.creatures undefined → the immunity call never
+    // happens → the immune-skip pins fail; the NPC pin stays honest because the
+    // resolved MONSTER row gates the check on type under the awaited contract.
+    // The stats object is now the targetStats PARAMETER threaded by the
+    // expireStaleEffects sweep from the caller's roster (`characters.find(...) →
+    // computedStats || character`) — the runtime `computedStats` bucket these pins
+    // used to seed had NO producer and its read is DELETED (no bucket key below).
+    const runtimeBase = () => (name, key) => {
       if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'STR' };
       if (key === 'activeConditions') return [];
-      if (key === 'computedStats') return computedStats;
       return null;
     };
 
-    it('immune player is SKIPPED: no save prompt, gate receives the raw computedStats bucket', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: ['restrained'] }));
+    it('immune player is SKIPPED: no save prompt, gate receives the PASSED roster stats verbatim', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeBase());
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -345,22 +353,23 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
 
-      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
+      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map', { name: 'Goblin', immunities: ['restrained'] });
 
       expect(result).toBeNull();
-      // The bucket IS the stats object playerIsImmuneToCondition reads —
-      // passed directly, never re-wrapped under a computedStats key.
+      // The param IS the stats object playerIsImmuneToCondition reads — passed
+      // directly, never re-wrapped under a computedStats key, never bucket-read.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
         conditionKey: 'restrained',
         playerStats: { name: 'Goblin', immunities: ['restrained'] },
         campaignName,
       }));
+      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('non-immune player resolves normally (immunity false → STR save proceeds)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: [] }));
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeBase());
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -372,7 +381,7 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
         promise: Promise.resolve({ success: false, roll: 8, total: 8 }),
       });
 
-      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
+      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map', { name: 'Goblin', immunities: [] });
 
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
@@ -388,8 +397,8 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       );
     });
 
-    it('player with no computedStats bucket still resolves (null stats → rule guard false)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats(null));
+    it('target absent from the roster (no targetStats threaded) still resolves (undefined stats → rule guard false)', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeBase());
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -405,13 +414,13 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
         conditionKey: 'restrained',
-        playerStats: null,
+        playerStats: undefined,
         campaignName,
       }));
     });
 
-    it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: ['restrained'] }));
+    it('immunity leg is player-only: monster row with an immunity-carrying targetStats arg still saves', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeBase());
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -423,7 +432,7 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
         promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
       });
 
-      await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
+      await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map', { name: 'Goblin', immunities: ['restrained'] });
 
       expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
       expect(savePrompt.createSaveListener).toHaveBeenCalled();

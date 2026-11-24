@@ -165,7 +165,7 @@ describe('turn-seam zone-save expiry sweep dedupe (double-arm bug)', () => {
         await makeNext()();
 
         expect(expirations.expireStaleEffects).toHaveBeenCalledTimes(1);
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(refs.lastExpirySweepCreatureRef.current).toBe('1:Bob');
     });
 
@@ -174,7 +174,7 @@ describe('turn-seam zone-save expiry sweep dedupe (double-arm bug)', () => {
 
         await makePrevious()();
 
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(refs.lastExpirySweepCreatureRef.current).toBe('1:Bob');
     });
 
@@ -195,7 +195,7 @@ describe('turn-seam zone-save expiry sweep dedupe (double-arm bug)', () => {
 
         await makeSseHandler()(activeEvent('Bob'));
 
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(refs.lastExpirySweepCreatureRef.current).toBe('1:Bob');
     });
 
@@ -206,7 +206,7 @@ describe('turn-seam zone-save expiry sweep dedupe (double-arm bug)', () => {
 
         await makeSseHandler()(activeEvent('Bob'));
 
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(refs.lastExpirySweepCreatureRef.current).toBe('2:Bob');
     });
 
@@ -246,7 +246,7 @@ describe('turn-seam zone-save expiry sweep dedupe (double-arm bug)', () => {
         await handler(activeEvent('Bob'));
 
         // Expiry mirror untouched (this is what keeps visitors seeing the same board).
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(refs.lastExpirySweepCreatureRef.current).toBe('1:Bob');
         // Turn-start pass stays GM-authority: zero effects, zero __initiative__ stamps.
         expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();

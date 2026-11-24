@@ -25,9 +25,20 @@ function getCampaignTargetEffects(campaignName) {
     return Array.isArray(allTargetEffects) ? allTargetEffects : [];
 }
 
+// Roster resolution for the recurring zone-save immunity gates: the caller's
+// characters array (App.jsx computedCharacters — the SAME rules-derived PlayerStats
+// every sibling turn-seam automation reads, navigationHandlers.js applyTurnStartGate
+// idiom) resolved per target: computedStats || character. There is NO runtime
+// `computedStats` bucket producer — the old bucket read data-starved these gates
+// (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23).
+function resolveTargetStats(targetName, characters) {
+    const character = (characters || []).find(ch => ch && ch.name === targetName);
+    return character?.computedStats || character;
+}
+
 // Phase 3: Check for recurring Sleet Storm area saves
 // When a creature starts its turn in the sleet storm area, it must make a DEX save
-async function processSleetStormSaves(activeName, campaignName) {
+async function processSleetStormSaves(activeName, campaignName, characters) {
     const sleetStormTrackingKey = `_sleetStorm_${activeName.replace(/\s+/g, '_')}`;
     const sleetStormTracking = getRuntimeValue(activeName, sleetStormTrackingKey, campaignName);
     if (!sleetStormTracking || !sleetStormTracking.saveDc) return;
@@ -43,7 +54,7 @@ async function processSleetStormSaves(activeName, campaignName) {
         if (isAlreadyProne) continue;
         // Trigger recurring save
         try {
-            await processSleetStormAreaSave(activeName, teTargetName, campaignName, sleetStormTracking.mapName);
+            await processSleetStormAreaSave(activeName, teTargetName, campaignName, sleetStormTracking.mapName, resolveTargetStats(teTargetName, characters));
         } catch (_e) { console.error(`[expireStaleEffects] Sleet Storm area save failed for ${teTargetName}:`, _e); }
     }
 }
@@ -53,7 +64,7 @@ async function processSleetStormSaves(activeName, campaignName) {
 // (swept by the concentration break) re-saves at the DC stored on the caster's
 // `_<prefix>_<caster>` zone tracking. The zone's turn-end block/condition is shed
 // by the handler at that creature's turn end.
-async function processZoneTurnStartSaves({ activeName, campaignName, effectKey, trackingPrefix, processSave, logLabel }) {
+async function processZoneTurnStartSaves({ activeName, campaignName, characters, effectKey, trackingPrefix, processSave, logLabel }) {
     const zoneEffects = getCampaignTargetEffects(campaignName)
         .filter(te => te && te.effect === effectKey && te.target === activeName);
     for (const te of zoneEffects) {
@@ -61,15 +72,20 @@ async function processZoneTurnStartSaves({ activeName, campaignName, effectKey, 
         const zoneTracking = getRuntimeValue(te.source, casterTrackingKey, campaignName);
         if (!zoneTracking || !zoneTracking.saveDc) continue;
         try {
-            await processSave(te.source, activeName, campaignName, zoneTracking.mapName);
+            await processSave(te.source, activeName, campaignName, zoneTracking.mapName, resolveTargetStats(activeName, characters));
         } catch (_e) { console.error(`[expireStaleEffects] ${logLabel} failed for ${activeName}:`, _e); }
     }
 }
 
 /**
  * Expire stale pendingExpirations at the start of each creature's turn.
+ * @param characters the caller's roster (App.jsx computedCharacters, each row
+ *   carrying rules-derived `computedStats`) — threaded into the recurring zone-save
+ *   immunity gates per target (resolved `computedStats || character`, the
+ *   applyTurnStartGate sibling idiom); the zone handlers have NO other lane to
+ *   real player stats (no runtime bucket producer exists).
  */
-export async function expireStaleEffects(campaignName, overrideActiveName) {
+export async function expireStaleEffects(campaignName, overrideActiveName, characters) {
     const currentRound = getCurrentCombatRound(campaignName);
     const activeName = overrideActiveName || getActiveCreatureName(campaignName);
     if (!activeName) return;
@@ -99,21 +115,21 @@ export async function expireStaleEffects(campaignName, overrideActiveName) {
         if (!activeCreature) return;
 
         // Phase 3: Sleet Storm recurring DEX saves (caster-side tracking).
-        await processSleetStormSaves(activeName, campaignName);
+        await processSleetStormSaves(activeName, campaignName, characters);
 
         // Phase 4: SP-111 Stinking Cloud recurring turn-start CON saves.
         // Poisoned on a failed save; the action/bonus-action block and Poisoned
         // are shed at that creature's turn end by applyStinkingCloudTurnEnd.
-        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'stinking_cloud', trackingPrefix: 'stinkingCloud', processSave: processStinkingCloudAreaSave, logLabel: 'Stinking Cloud turn-start save' });
+        await processZoneTurnStartSaves({ activeName, campaignName, characters, effectKey: 'stinking_cloud', trackingPrefix: 'stinkingCloud', processSave: processStinkingCloudAreaSave, logLabel: 'Stinking Cloud turn-start save' });
 
         // Phase 5: SP-126 Web recurring turn-start STR saves. Restrained on a
         // failed save; already-Restrained creatures skip — breaking free via a
         // STR (Athletics) action is a GM-adjudicated residual with no modal
         // consumer in this engine.
-        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'web', trackingPrefix: 'web', processSave: processWebAreaSave, logLabel: 'Web turn-start save' });
+        await processZoneTurnStartSaves({ activeName, campaignName, characters, effectKey: 'web', trackingPrefix: 'web', processSave: processWebAreaSave, logLabel: 'Web turn-start save' });
 
         // Phase 6: Grease recurring turn-start DEX saves. Prone on a failed
         // save; already-Prone creatures skip (standing is a movement action).
-        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'grease', trackingPrefix: 'grease', processSave: processGreaseAreaSave, logLabel: 'Grease turn-start save' });
+        await processZoneTurnStartSaves({ activeName, campaignName, characters, effectKey: 'grease', trackingPrefix: 'grease', processSave: processGreaseAreaSave, logLabel: 'Grease turn-start save' });
     } catch (_e) { console.error('[expireStaleEffects] Zone save expiration processing failed:', _e); }
 }

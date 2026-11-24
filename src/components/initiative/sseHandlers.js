@@ -209,7 +209,7 @@ export function createSseEventHandler({
         const gateKey = `${gateRound}:${newActive}`
         if (!secondTurnEcho && lastExpirySweepCreatureRef.current !== gateKey) {
             lastExpirySweepCreatureRef.current = gateKey
-            expireStaleEffects(campaignName, newActive)
+            expireStaleEffects(campaignName, newActive, characters)
         }
         if (prevActive !== newActive && !secondTurnEcho && lastAppliedTurnStartCreatureRef.current !== gateKey) {
             await applyTurnStartPass(newActive, gateKey)

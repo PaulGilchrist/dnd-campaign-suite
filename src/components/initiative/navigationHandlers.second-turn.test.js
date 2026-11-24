@@ -183,14 +183,18 @@ describe('navigationHandlers second-turn economy seam', () => {
             roundIncrement: false,
         });
         await createNextCreatureHandler(nextArgs(HOLDER))();
-        expect(expirations.expireStaleEffects).not.toHaveBeenCalledWith(CAMPAIGN, ST_ROW);
+        // Shape-proof: no sweep call may target the twin under ANY arg shape.
+        expect(expirations.expireStaleEffects.mock.calls.some(call => call[1] === ST_ROW)).toBe(false);
 
         initiativeService.getNextCreatureName.mockReturnValue({
             newActiveName: OTHER,
             roundIncrement: false,
         });
         await createNextCreatureHandler(nextArgs(ST_ROW))();
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(CAMPAIGN, OTHER);
+        // Option A thread: the sweep now receives the roster as its 3rd arg.
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(CAMPAIGN, OTHER, expect.arrayContaining([
+            expect.objectContaining({ name: OTHER }),
+        ]));
     });
 
     it('rewind INTO a twin row re-opens the HOLDER economy — openTurn never keys the synthetic label, expiry skipped', async () => {
@@ -211,6 +215,6 @@ describe('navigationHandlers second-turn economy seam', () => {
         expect(persistedTurnState()).toEqual({
             [HOLDER]: { ...SPENT_HOLDER, turnActive: true },
         });
-        expect(expirations.expireStaleEffects).not.toHaveBeenCalledWith(CAMPAIGN, ST_ROW);
+        expect(expirations.expireStaleEffects.mock.calls.some(call => call[1] === ST_ROW)).toBe(false);
     });
 });

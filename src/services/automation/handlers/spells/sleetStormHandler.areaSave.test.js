@@ -40,11 +40,15 @@
 //     the playerIsImmuneToCondition branch was UNREACHABLE — immune PCs took
 //     Prone from the recurring area save (live-witnessed pre-fix: seeded
 //     prone/restrained-immunity EvasiveFighter landed Restrained+Prone via the
-//     web/sleet area lanes). Now awaited (grease twin :140) AND the target's
-//     computedStats bucket is passed to playerIsImmuneToCondition AS the stats
-//     object (the old {computedStats} wrapper was never read by any rule leg
-//     — the gate was inert even post-await). Pins below exercise the async
-//     contract: immunity-skips / non-immune-resolves / NPC-unaffected.
+//     web/sleet area lanes). Now awaited (grease twin :140) AND, per the
+//     Option A landing (bug-zone-save-computedstats-bucket-has-no-producer,
+//     2026-11-23), the roster-resolved targetStats PARAMETER (sweep-side
+//     `characters.find(...) → computedStats || character`) is passed to
+//     playerIsImmuneToCondition AS the stats object — the runtime
+//     `computedStats` BUCKET those buckets era's pins seeded had NO producer
+//     (data-starved gate) and its read is DELETED (one canonical shape).
+//     Pins below exercise the async contract: immunity-skips /
+//     non-immune-resolves / NPC-unaffected.
 //   • WIRED 2026-11-19 (owner "WIRE IT"): remove_sleet_storm_area expiration
 //     effect (rounds:10) is PRODUCED at sleetStormHandler.js:73-76 (handle
 //     lane) and consumed by clearExpirationEffects.js EXPIRATION_HANDLERS —
@@ -148,12 +152,14 @@ function makeTracking(overrides = {}) {
 
 // getRuntimeValue router: tracking key vs concentration key vs conditions.
 // Concentration key is checked FIRST — it also startsWith('_sleetStorm_').
-function routeRuntime({ activeConditions = [], concentration = [], tracking = makeTracking(), computedStats = null } = {}) {
+// NOTE (Option A landing): there is NO `computedStats` bucket key any more —
+// the immunity gate receives the roster-resolved stats as the processXxxAreaSave
+// targetStats PARAMETER (bug-zone-save-computedstats-bucket-has-no-producer).
+function routeRuntime({ activeConditions = [], concentration = [], tracking = makeTracking() } = {}) {
   useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
     if (key === CONCENTRATION_KEY) return concentration;
     if (key === TRACKING_KEY) return tracking;
     if (key === 'activeConditions') return activeConditions;
-    if (key === 'computedStats') return computedStats;
     return null;
   });
 }
@@ -289,34 +295,39 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
       consoleWarn.mockRestore();
     });
 
-    it('immune player is SKIPPED: no save prompt, no condition writes, gate receives the raw computedStats bucket', async () => {
-      // LIVE PIN (defect-flag retired 2026-11-23): the awaited ASYNC combat
-      // context resolves the PLAYER row, so the immunity branch is reachable
-      // exactly as in production; a dropped await leaves ?.creatures undefined,
-      // the branch never runs, and this test fails.
-      routeRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
+    it('immune player is SKIPPED: no save prompt, no condition writes, gate receives the PASSED roster stats verbatim', async () => {
+      // LIVE PIN (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
+      // the awaited ASYNC combat context resolves the PLAYER row, so the immunity
+      // branch is reachable exactly as in production, and the stats object is the
+      // targetStats PARAMETER the expireStaleEffects sweep threads from the caller's
+      // roster (`characters.find(...) → computedStats || character`) — never a
+      // runtime `computedStats` bucket (which has NO producer).
+      const rosterStats = { name: 'Goblin', immunities: ['prone'] };
+      routeRuntime();
       playerContext();
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
       rangeCheck.isWithinRange.mockResolvedValue(true);
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
 
       expect(result).toBeNull();
-      // The bucket IS the stats object playerIsImmuneToCondition reads —
-      // passed directly, never re-wrapped under a computedStats key.
+      // The param IS the stats object playerIsImmuneToCondition reads — passed
+      // directly, never re-wrapped under a computedStats key.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: { name: 'Goblin', immunities: ['prone'] },
+        playerStats: rosterStats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
+      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('non-immune player resolves normally (immunity false → save proceeds, prone applies on fail)', async () => {
-      routeRuntime({ computedStats: { name: 'Goblin', immunities: [] } });
+      const rosterStats = { name: 'Goblin', immunities: [] };
+      routeRuntime();
       playerContext();
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
       rangeCheck.isWithinRange.mockResolvedValue(true);
@@ -325,12 +336,12 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
         promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
       });
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
 
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: { name: 'Goblin', immunities: [] },
+        playerStats: rosterStats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
@@ -342,8 +353,8 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
       );
     });
 
-    it('player with NO computedStats bucket skips the immunity call and resolves normally', async () => {
-      routeRuntime({ computedStats: null });
+    it('target absent from the roster (no targetStats threaded) still resolves normally', async () => {
+      routeRuntime();
       playerContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       savePrompt.createSaveListener.mockReturnValue({
@@ -354,21 +365,22 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
       const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      // null stats → playerIsImmuneToCondition's own guard answers false; the
-      // handler still hands it the (null) bucket so the call contract stays uniform.
+      // undefined stats → playerIsImmuneToCondition's own guard answers false; the
+      // handler still hands it the (undefined) param so the call contract stays uniform.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: null,
+        playerStats: undefined,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
       expect(savePrompt.createSaveListener).toHaveBeenCalled();
     });
 
-    it('immunity leg is player-only: NPC row with an immunity-carrying bucket still saves (awaited context gates on type)', async () => {
+    it('immunity leg is player-only: NPC row with an immunity-carrying targetStats arg still saves (awaited context gates on type)', async () => {
       // Awaited contract + defect-incompatible: the resolved MONSTER row keeps
-      // the immunity check out even when a computedStats bucket exists.
-      routeRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
+      // the immunity check out even when an immunity-carrying roster arg is
+      // threaded (roster lookup by cs-row TYPE, not by the passed stats).
+      routeRuntime();
       monsterContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       savePrompt.createSaveListener.mockReturnValue({
@@ -376,7 +388,7 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
         promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
       });
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, { name: 'Goblin', immunities: ['prone'] });
 
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();

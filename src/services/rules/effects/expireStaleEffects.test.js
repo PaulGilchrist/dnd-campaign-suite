@@ -307,7 +307,28 @@ describe('expireStaleEffects — SP-111 Stinking Cloud turn-start saves', () => 
     await expireStaleEffects('test-campaign');
 
     expect(processStinkingCloudAreaSave).toHaveBeenCalledTimes(1);
-    expect(processStinkingCloudAreaSave).toHaveBeenCalledWith('TestWizard', 'Thug 1', 'test-campaign', 'Cave');
+    // 5-arg dispatch (Option A, bug-zone-save-computedstats-bucket-has-no-
+    // producer): caster, carrier, campaign, tracking mapName, roster-resolved
+    // targetStats — undefined here because no characters array was threaded
+    // (monster carrier: the handler's monster leg needs no stats).
+    expect(processStinkingCloudAreaSave).toHaveBeenCalledWith('TestWizard', 'Thug 1', 'test-campaign', 'Cave', undefined);
+  });
+
+  it('threads the roster-resolved targetStats (computedStats || character) into the recurring save', async () => {
+    // LIVE PIN: the immunity gate's ONLY stats source is this threaded param
+    // (the runtime `computedStats` bucket has no producer and its read is
+    // deleted). A dropped thread or a bucket re-read fails the 5th-arg pin.
+    seedActiveCombat('Hero', 2, [{ name: 'Hero' }]);
+    seedStore({
+      'campaign.targetEffects': [{ target: 'Hero', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }],
+      'TestWizard._stinkingCloud_TestWizard': { saveDc: 18, saveType: 'CON', radius: 20, mapName: 'Cave' },
+    });
+    const heroStats = { name: 'Hero', immunities: ['poisoned'] };
+
+    await expireStaleEffects('test-campaign', 'Hero', [{ name: 'Hero', computedStats: heroStats }]);
+
+    expect(processStinkingCloudAreaSave).toHaveBeenCalledTimes(1);
+    expect(processStinkingCloudAreaSave).toHaveBeenCalledWith('TestWizard', 'Hero', 'test-campaign', 'Cave', heroStats);
   });
 
   it('skips the save when the caster zone tracking is gone (cloud ended)', async () => {

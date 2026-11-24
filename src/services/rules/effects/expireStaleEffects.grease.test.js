@@ -101,9 +101,29 @@ describe('expireStaleEffects — Phase 6 grease turn-start recurring save', () =
 
     // the grease-specific tracking key is read on the caster
     expect(getRuntimeValue).toHaveBeenCalledWith('TestCaster', '_grease_TestCaster', campaignName);
-    // 4-arg dispatch: caster, carrier, campaign, tracking mapName
+    // 5-arg dispatch (Option A, bug-zone-save-computedstats-bucket-has-no-
+    // producer): caster, carrier, campaign, tracking mapName, roster-resolved
+    // targetStats — undefined here (no characters threaded; monster carrier).
     expect(processGreaseAreaSave).toHaveBeenCalledTimes(1);
-    expect(processGreaseAreaSave).toHaveBeenCalledWith('TestCaster', 'Zombie 1', campaignName, 'Battle Map');
+    expect(processGreaseAreaSave).toHaveBeenCalledWith('TestCaster', 'Zombie 1', campaignName, 'Battle Map', undefined);
+  });
+
+  it('threads the roster-resolved targetStats (computedStats || character) into the recurring save', async () => {
+    // LIVE PIN: the immunity gate's ONLY stats source is this threaded param
+    // (the runtime `computedStats` bucket has no producer and its read is
+    // deleted). A dropped thread fails the 5th-arg pin.
+    getActiveCreatureName.mockReturnValue('Hero');
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCaster' }, { name: 'Hero' }] });
+    seedStore({
+      'campaign.targetEffects': [{ target: 'Hero', effect: 'grease', source: 'TestCaster', dc: 13, duration: '1 minute' }],
+      'TestCaster._grease_TestCaster': ZONE_TRACKING,
+    });
+    const heroStats = { name: 'Hero', immunities: ['prone'] };
+
+    await expireStaleEffects(campaignName, 'Hero', [{ name: 'Hero', computedStats: heroStats }]);
+
+    expect(processGreaseAreaSave).toHaveBeenCalledTimes(1);
+    expect(processGreaseAreaSave).toHaveBeenCalledWith('TestCaster', 'Hero', campaignName, 'Battle Map', heroStats);
   });
 
   it.each([

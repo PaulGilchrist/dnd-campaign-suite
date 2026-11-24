@@ -205,15 +205,18 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
     expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
   });
 
-  it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the raw computedStats bucket', async () => {
-    // LIVE PIN (limb-B defect fixed 2026-11-23 — sleet/web mirror): the
-    // awaited ASYNC combat context resolves the PLAYER row so the immunity
-    // branch is reachable exactly as in production, and the bucket is passed
-    // AS the stats object — a re-introduced {computedStats} wrapper (read by
-    // no playerIsImmuneToCondition rule leg) fails the call-shape pin below.
+  it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the PASSED roster stats verbatim', async () => {
+    // LIVE PIN (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
+    // the awaited ASYNC combat context resolves the PLAYER row so the immunity
+    // branch is reachable exactly as in production, and the stats object is the
+    // targetStats PARAMETER the expireStaleEffects sweep threads from the caller's
+    // roster (`characters.find(...) → computedStats || character`) — never a
+    // runtime `computedStats` bucket (which has NO producer). A re-introduced
+    // bucket read fails the read census below; a {computedStats}-wrapped arg
+    // fails the call-shape pin.
+    const rosterStats = { name: 'Hero', immunities: ['poisoned'] };
     const store = createStore({
       [`${casterName}.${trackingKey}`]: baseTracking,
-      'Hero.computedStats': { name: 'Hero', immunities: ['poisoned'] },
     });
     installStore(store);
     damageUtils.getCombatContext.mockResolvedValue({
@@ -221,27 +224,28 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
     });
     automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
 
-    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
+    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName, rosterStats);
 
     expect(result).toBeNull();
     expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
       conditionKey: 'poisoned',
-      playerStats: { name: 'Hero', immunities: ['poisoned'] },
+      playerStats: rosterStats,
       getRuntimeValue: expect.any(Function),
       campaignName,
     });
+    expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
     expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();
     expect(store.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('non-immune player resolves normally (immunity false → save proceeds, Poisoned applies on fail)', async () => {
+    const rosterStats = { name: 'Hero', immunities: [] };
     const store = createStore({
       [`${casterName}.${trackingKey}`]: baseTracking,
       'campaign.targetEffects': [],
       'Hero.activeConditions': [],
       'Hero.activeConditionMeta': {},
-      'Hero.computedStats': { name: 'Hero', immunities: [] },
     });
     installStore(store);
     damageUtils.getCombatContext.mockResolvedValue({
@@ -252,19 +256,19 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
       promise: Promise.resolve({ success: false, roll: 2, total: 4 }),
     });
 
-    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
+    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName, rosterStats);
 
     expect(result.type).toBe('popup');
     expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
       conditionKey: 'poisoned',
-      playerStats: { name: 'Hero', immunities: [] },
+      playerStats: rosterStats,
       getRuntimeValue: expect.any(Function),
       campaignName,
     });
     expect(store.store['Hero.activeConditions']).toEqual(['poisoned']);
   });
 
-  it('player with NO computedStats bucket still resolves normally (null bucket passed through)', async () => {
+  it('target absent from the roster (no targetStats threaded) still resolves normally (undefined stats → rule guard false)', async () => {
     const store = createStore({
       [`${casterName}.${trackingKey}`]: baseTracking,
       'campaign.targetEffects': [],
@@ -282,23 +286,22 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
     const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
 
     expect(result.type).toBe('popup');
-    // null stats → playerIsImmuneToCondition's own guard answers false; the
-    // handler still hands it the (null) bucket so the call contract stays uniform.
+    // undefined stats → playerIsImmuneToCondition's own guard answers false; the
+    // handler still hands it the (undefined) param so the call contract stays uniform.
     expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
       conditionKey: 'poisoned',
-      playerStats: null,
+      playerStats: undefined,
       getRuntimeValue: expect.any(Function),
       campaignName,
     });
     expect(savePrompt.createSaveListener).toHaveBeenCalled();
   });
 
-  it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
+  it('immunity leg is player-only: monster row with an immunity-carrying targetStats arg still saves', async () => {
     const store = createStore({
       [`${casterName}.${trackingKey}`]: baseTracking,
       'campaign.targetEffects': [],
       'Thug 1.activeConditions': [],
-      'Thug 1.computedStats': { name: 'Thug 1', immunities: ['poisoned'] },
     });
     installStore(store);
     damageUtils.getCombatContext.mockResolvedValue({
@@ -309,7 +312,7 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
       promise: Promise.resolve({ success: true, roll: 19, total: 21 }),
     });
 
-    const result = await processStinkingCloudAreaSave(casterName, 'Thug 1', campaignName, mapName);
+    const result = await processStinkingCloudAreaSave(casterName, 'Thug 1', campaignName, mapName, { name: 'Thug 1', immunities: ['poisoned'] });
 
     expect(result.type).toBe('popup');
     expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();

@@ -99,7 +99,7 @@ describe('turn-start SSE pass — GM-ownership guard', () => {
             expect(combatData.setCombatSummaryCache).toHaveBeenCalledWith(
                 { round: 1, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Bob' }, campaignName,
             );
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
             expect(expirations.applyTurnEndConditionRemoval).toHaveBeenCalledWith('Alice', { hitPoints: 20 }, campaignName, true);
             expect(combatSuperiority.applyCommanderStrikeTurnEnd).toHaveBeenCalledWith(campaignName, 'Alice', true);
         });

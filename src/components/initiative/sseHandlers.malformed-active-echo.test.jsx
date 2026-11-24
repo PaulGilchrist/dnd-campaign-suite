@@ -98,7 +98,7 @@ describe('handleActiveCreatureNameChange malformed echo guard', () => {
         await handler(activeEvent('Bob'));
         expect(refs.activeCreatureNameRef.current).toBe('Bob');
         expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Bob');
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
     });
 
     it('nullish echoes stay dropped at the dispatch door (null = legitimate sentinel)', async () => {

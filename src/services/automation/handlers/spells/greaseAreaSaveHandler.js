@@ -136,15 +136,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-async function greaseTargetIsImmune(targetName, tracking, campaignName) {
+async function greaseTargetIsImmune(targetName, tracking, campaignName, targetStats) {
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type !== 'player') return false;
-    // The target's computedStats bucket IS the stats object
-    // playerIsImmuneToCondition reads (top-level immunities/allFeatures/name —
-    // automationImmunities.js) — pass it directly, never re-wrapped under a
-    // `computedStats` key no rule leg reads (limb B of the resolved sleet/web
-    // class made this gate structurally false for every player, bug 2026-11-23).
-    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
+    // The targetStats param IS the stats object playerIsImmuneToCondition reads
+    // (top-level immunities/allFeatures/name — automationImmunities.js): the
+    // rules-derived computedStats threaded by the expireStaleEffects sweep from
+    // the caller's roster (`characters.find(...) → computedStats || character`,
+    // the applyTurnStartGate sibling idiom). The old runtime `computedStats`
+    // bucket read had NO producer, so the gate was data-starved for every real
+    // PC (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23).
     return playerIsImmuneToCondition({
         conditionKey: tracking.condition.toLowerCase(),
         playerStats: targetStats,
@@ -205,7 +206,7 @@ async function recordGreaseSuccess(campaignName, casterName, targetName, trackin
     }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
 }
 
-export async function processGreaseAreaSave(casterName, targetName, campaignName, _mapName) {
+export async function processGreaseAreaSave(casterName, targetName, campaignName, _mapName, targetStats) {
     const trackingKey = getGreaseTrackingKey(casterName);
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
 
@@ -221,7 +222,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
 
         if (!inArea) return null;
 
-        if (await greaseTargetIsImmune(targetName, tracking, campaignName)) {
+        if (await greaseTargetIsImmune(targetName, tracking, campaignName, targetStats)) {
             return null;
         }
 

@@ -239,7 +239,7 @@ describe('createSseEventHandler', () => {
         await handler(activeEvent('Bob'));
         expect(refs.activeCreatureNameRef.current).toBe('Bob');
         expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Bob');
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', CHARACTERS);
         expect(combatData.setCombatSummaryCache).toHaveBeenCalledWith(
             { round: 1, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Bob' }, campaignName,
         );
@@ -314,7 +314,7 @@ describe('createSseEventHandler', () => {
         await handler(activeEvent('Zed'));
         expect(refs.activeCreatureNameRef.current).toBe('Zed');
         expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Zed');
-        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Zed');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Zed', CHARACTERS);
         expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
         expect(mocks.setCombatSummary).not.toHaveBeenCalled();
         expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Zed', undefined, campaignName, CHARACTERS);

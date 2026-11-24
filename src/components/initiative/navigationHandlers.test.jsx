@@ -168,7 +168,7 @@ describe('navigationHandlers.js', () => {
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).not.toHaveBeenCalled();
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('Bob', '_cunningStrikeCostUsed', 0, campaignName);
             // Turn-start effects DO fire for the newly active creature within the same round
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', baseCharacters);
             expect(lastAppliedTurnStartCreatureRef.current).toBe('1:Bob');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Bob', campaignName);
             // Single-home law (2026-11-19 RF sweep): NO loose top-level lastAppliedTurnStartCreature write — the __initiative__ bucket above is the ONLY persisted gate.
@@ -206,7 +206,7 @@ describe('navigationHandlers.js', () => {
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName, 2);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Alice', '_cunningStrikeCostUsed', 0, campaignName);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Alice', 'surgeUsedRound', null, campaignName);
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice', baseCharacters);
         });
 
         it('should apply turn start effects and skip when round-scoped lastApplied already matches new active', async () => {
@@ -219,7 +219,7 @@ describe('navigationHandlers.js', () => {
 
             await makeNext({ activeCreatureName: 'Charlie' })();
 
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob', baseCharacters);
             expect(lastAppliedTurnStartCreatureRef.current).toBe('2:Bob');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '2:Bob', campaignName);
             // Single-home law: the loose-key writer is deleted (2026-11-19 RF sweep) — round-wrap seams never POST a top-level lastAppliedTurnStartCreature.
@@ -239,7 +239,7 @@ describe('navigationHandlers.js', () => {
 
             await makeNext({ activeCreatureName: 'Charlie' })();
 
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice', baseCharacters);
             expect(lastAppliedTurnStartCreatureRef.current).toBe('2:Alice');
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '2:Alice', campaignName);
             expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
@@ -338,7 +338,7 @@ describe('navigationHandlers.js', () => {
             // Round does NOT decrement on a non-wrap step
             expect(storage.set).not.toHaveBeenCalledWith('combatSummary', expect.objectContaining({ round: 0 }), campaignName);
             // Turn-start effects fire for the newly active creature (round-scoped gate)
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice', baseCharacters);
             expect(lastAppliedTurnStartCreatureRef.current).toBe('1:Alice');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Alice', campaignName);
             // Single-home law (Prev seam): bucket write only — never the deleted loose top-level key.
@@ -381,7 +381,7 @@ describe('navigationHandlers.js', () => {
             expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({ round: 2 }));
             expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Charlie', campaignName);
             expect(setActiveCreatureName).toHaveBeenCalledWith('Charlie');
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Charlie');
+            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Charlie', baseCharacters);
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName, 2);
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Bob', campaignName, 2);
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName, 2);

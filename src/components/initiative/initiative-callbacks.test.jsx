@@ -310,7 +310,9 @@ describe('Initiative window-event listeners', () => {
             await pressKey('ArrowRight');
 
             expect(getNextCreatureName).toHaveBeenCalledWith(expect.objectContaining({ round: 1 }), 'Alice');
-            expect(expireStaleEffects).toHaveBeenCalledWith('test-campaign', 'Bob');
+            expect(expireStaleEffects).toHaveBeenCalledWith('test-campaign', 'Bob', expect.arrayContaining([
+                expect.objectContaining({ name: 'Bob' }),
+            ]));
             expect(activeNameWrites().slice(before)).toEqual([['activeCreatureName', 'Bob', 'test-campaign']]);
             expect(latestStoredSummary().activeCreatureName).toBe('Bob');
         });

@@ -73,18 +73,19 @@ export async function applyStinkingCloudTurnEnd(campaignName, targetName) {
  * Called from expireStaleEffects Phase 4 at each creature's turn start.
  */
 // Poison immunity (or no need to breathe) = automatic success.
-async function stinkingCloudTargetImmune(targetCreature, targetName, campaignName) {
+async function stinkingCloudTargetImmune(targetCreature, targetName, campaignName, targetStats) {
     const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
     if (Array.isArray(targetImmunities) && targetImmunities.some(imm => String(imm).toLowerCase() === 'poison')) {
         return true;
     }
     if (targetCreature?.type !== 'player') return false;
-    // The target's computedStats bucket IS the stats object
-    // playerIsImmuneToCondition reads (top-level immunities/allFeatures/name —
-    // automationImmunities.js) — pass it directly, never re-wrapped under a
-    // `computedStats` key no rule leg reads (limb B of the resolved sleet/web
-    // class made this gate structurally false for every player, bug 2026-11-23).
-    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
+    // The targetStats param IS the stats object playerIsImmuneToCondition reads
+    // (top-level immunities/allFeatures/name — automationImmunities.js): the
+    // rules-derived computedStats threaded by the expireStaleEffects sweep from
+    // the caller's roster (`characters.find(...) → computedStats || character`,
+    // the applyTurnStartGate sibling idiom). The old runtime `computedStats`
+    // bucket read had NO producer, so the gate was data-starved for every real
+    // PC (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23).
     return playerIsImmuneToCondition({
         conditionKey: 'poisoned',
         playerStats: targetStats,
@@ -93,7 +94,7 @@ async function stinkingCloudTargetImmune(targetCreature, targetName, campaignNam
     });
 }
 
-export async function processStinkingCloudAreaSave(casterName, targetName, campaignName, _mapName) {
+export async function processStinkingCloudAreaSave(casterName, targetName, campaignName, _mapName, targetStats) {
     const trackingKey = `_stinkingCloud_${casterName.replace(/\s+/g, '_')}`;
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
 
@@ -113,7 +114,7 @@ export async function processStinkingCloudAreaSave(casterName, targetName, campa
 
     const targetCreature = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
 
-    if (await stinkingCloudTargetImmune(targetCreature, targetName, campaignName)) {
+    if (await stinkingCloudTargetImmune(targetCreature, targetName, campaignName, targetStats)) {
         return null;
     }
 

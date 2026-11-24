@@ -12,11 +12,13 @@ describe('readParty / partyLevelRange (test-campaign fixtures)', () => {
 
     it('reads every character file with class identity', () => {
         // Campaign baseline: every root *.json is a character file (readParty
-        // skips none). 14 since the permanent FixtureFighter5e fixture landed
-        // (d709198ef) — the pin sat stale at 13 from before that era.
+        // skips none). 15 since the permanent FixtureLandDruid zone-immunity
+        // fixture landed (bug-zone-save-computedstats-bucket-has-no-producer
+        // fix-run, 2026-11-23) — was 14 from the FixtureFighter5e era
+        // (d709198ef); the pin sits here, re-run it when the roster moves.
         const charFiles = fs.readdirSync(TEST_CAMPAIGN_ROOT).filter(f => f.endsWith('.json'));
         expect(party.length).toBe(charFiles.length);
-        expect(party.length).toBe(14);
+        expect(party.length).toBe(15);
         const marta = party.find(p => p.name === 'FeyRanger');
         expect(marta).toMatchObject({ level: 17, class: 'Ranger', subclass: 'Gloom Stalker' });
         expect(party.every(p => typeof p.level === 'number' && p.level >= 1)).toBe(true);
