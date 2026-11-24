@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import Sessions from './Sessions.jsx';
 import { emptyLinks } from '../../services/campaign/sessionPlannerUtils.js';
 
@@ -294,41 +294,99 @@ describe('Sessions — linked-resource automations', () => {
     expect(saveSession.mock.calls[1][1].links.maps).toEqual(['Cave']);
   });
 
-  it('deletes the edited session after confirm naming the session', () => {
-    sessionMockStore.items = [makeSession('Session 7')];
-    const confirmSpy = vi.fn(() => true);
-    vi.stubGlobal('confirm', confirmSpy);
+  // QA backlog 2026-11-24: the native `Delete Session Plan "X"?` confirm is
+  // retired — the planner footer Delete opens the shared DeleteConfirmModal
+  // tier (mirrors EncounterModal.delete-confirm-modal.test.jsx). A native
+  // confirm firing anywhere on these lanes throws.
+  const forbidNativeDialogs = () => {
+    const spy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the sessions delete path');
+    });
+    const promptSpy = vi.spyOn(window, 'prompt').mockImplementation(() => {
+      throw new Error('native window.prompt fired on the sessions played path');
+    });
+    return { spy, promptSpy };
+  };
+
+  const openDeleteDialog = () => {
     renderSessions();
     openEditor('Session 7');
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Session Plan "Session 7"?');
+    return screen.getByRole('dialog', { name: 'Delete Session Plan' });
+  };
+
+  it('deletes the edited session through the shared in-app confirm dialog', async () => {
+    const { spy, promptSpy } = forbidNativeDialogs();
+    sessionMockStore.items = [makeSession('Session 7')];
+    const dialog = openDeleteDialog();
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveTextContent('Session 7');
+    expect(within(dialog).getByRole('button', { name: 'Cancel', exact: true })).toHaveFocus();
+    await waitFor(() => expect(sessionMockStore.deleteItem).not.toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+    });
     expect(sessionMockStore.deleteItem).toHaveBeenCalledWith('Session 7');
+    expect(spy).not.toHaveBeenCalled();
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('keeps the session when the delete confirmation is cancelled', () => {
+  it.each`
+    dismiss | label
+    ${'cancel'}   | ${'the Cancel button'}
+    ${'escape'}   | ${'ESCAPE'}
+    ${'backdrop'} | ${'a pure BACKDROP click'}
+  `('$label dismisses the delete dialog zero-write (planner intact, no native confirm)', ({ dismiss }) => {
+    const { spy, promptSpy } = forbidNativeDialogs();
     sessionMockStore.items = [makeSession('Session 7')];
-    const confirmSpy = vi.fn(() => false);
-    vi.stubGlobal('confirm', confirmSpy);
-    renderSessions();
-    openEditor('Session 7');
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Session Plan "Session 7"?');
+    const dialog = openDeleteDialog();
+    if (dismiss === 'cancel') {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel', exact: true }));
+    } else if (dismiss === 'escape') {
+      fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Cancel', exact: true }), { key: 'Escape' });
+    } else {
+      fireEvent.click(document.querySelector('.modal-shell-overlay'));
+    }
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(sessionMockStore.deleteItem).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: /plan session/i })).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+    expect(promptSpy).not.toHaveBeenCalled();
   });
 
-  it('marks a session as played and logs the recap to the campaign log', async () => {
+  it('marks a session as played through the in-app recap modal and logs the recap', async () => {
+    const { spy, promptSpy } = forbidNativeDialogs();
     sessionMockStore.items = [makeSession('Session 7')];
-    vi.stubGlobal('prompt', () => 'Great session recap');
     renderSessions();
     openEditor('Session 7');
     fireEvent.click(screen.getByRole('button', { name: /mark as played/i }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Mark Session as Played' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const recapInput = within(dialog).getByRole('textbox');
+    // Prompt focus law: the dialog's first focusable element is the recap
+    // textarea, so typing starts immediately (native-prompt parity).
+    expect(recapInput).toHaveFocus();
+    // Preview reflects the exact log row the Confirm writes — live per keystroke.
+    expect(dialog).toHaveTextContent('Session “Session 7” marked as played');
+    fireEvent.change(recapInput, { target: { value: 'Great session recap' } });
+    expect(dialog).toHaveTextContent('Session “Session 7” marked as played — Great session recap');
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm', exact: true }));
+    });
     await waitFor(() => expect(addEntry).toHaveBeenCalledWith(
       'test-campaign',
       expect.objectContaining({ type: 'session-played' })
     ));
-    expect(addEntry.mock.calls[0][1].text).toContain('Great session recap');
+    expect(addEntry.mock.calls[0][1].text)
+      .toBe('Session “Session 7” marked as played — Great session recap');
     const saved = saveSession.mock.calls.at(-1)[1];
     expect(saved.status).toBe('played');
     expect(saved.summary).toBe('Great session recap');
+    expect(spy).not.toHaveBeenCalled();
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

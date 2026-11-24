@@ -333,6 +333,53 @@
   border-color: #4a8c3f;
 }
 
+/* --- Mark-as-Played recap prompt (SessionPlayedModal, QA backlog 2026-11-24) ---
+   Layout for the prompt content riding inside the shared .modal-shell chrome.
+   The heading is scoped back to the lane's success green (the shell's default
+   red is delete-family copy; marking a session played is an archival action,
+   not a destruction). Scoped via the dialog's aria-labelledby so no other
+   modal-shell consumer is touched. */
+.ct-container .modal-shell[aria-labelledby="sessions-played-title"] h3 {
+  color: var(--color-success);
+}
+
+.sessions-played-recap-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.sessions-played-recap-input {
+  display: block;
+  width: 100%;
+}
+
+.sessions-played-preview {
+  display: block;
+  margin-top: 12px;
+}
+
+.sessions-played-preview-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.sessions-played-preview-row {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .sessions-toast {
   position: sticky;
   top: 0;

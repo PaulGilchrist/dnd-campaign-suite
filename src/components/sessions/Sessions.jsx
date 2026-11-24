@@ -8,6 +8,7 @@ import {
   getDefaultSessionData,
   mergeChecklist,
   newContingency,
+  buildSessionPlayedLogText,
 } from '../../services/campaign/sessionPlannerUtils.js';
 import { loadMaps } from '../../services/maps/mapsService.js';
 import { loadEncounters } from '../../services/encounters/encountersService.js';
@@ -23,7 +24,10 @@ import { setActiveSession } from '../../services/combat/sessionService.js';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
+import SessionPlayedModal from './SessionPlayedModal.jsx';
 import NpcUnarmedConfirmModal from '../npcs/NpcUnarmedConfirmModal.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import useDeleteRequest from '../common/useDeleteRequest.js';
 import './Sessions.css';
 
 // The six entity lists whose changes must invalidate the picker cache below
@@ -77,6 +81,27 @@ function activeSessionHandlerFor(isLocalhost, handler) {
   return isLocalhost ? handler : undefined;
 }
 
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (QA backlog 2026-11-24: retires the native `Delete Session Plan "X"?`
+// window.confirm and mirrors the Settlements/EB-pool row-delete chrome).
+// Renders null while idle so the destructive copy never lingers behind the
+// planner.
+function DeleteSessionModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="sessions-delete-title"
+      title="Delete Session Plan"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the session plan &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
+}
+
 function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative }) {
   const { items: sessions, loading, loadItems, deleteItem: deleteSessionAction } =
     useEntityManagement(campaignName, { load: loadSessions, save: saveSessions, delete: deleteSession }, { responseKey: 'sessions', loadOnMount: false });
@@ -89,6 +114,10 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   } = useCrudList(sessions, ['name', 'summary', 'notes']);
 
   const [deleting, setDeleting] = useState(false);
+  // Shared pendingDelete staging for the role="dialog" delete tier (QA backlog
+  // 2026-11-24, mirrors Settlements.jsx): the DeleteConfirmModal's confirm is
+  // the ONLY writer, so Cancel/Escape/backdrop fire zero requests.
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   // The planner modal's ONE inline banner region as a single state concept:
   // { message, kind, conflict } or null. `kind` carries the tone — 'error' is
   // refusal/failure copy (red), 'success' is an action's persistent in-modal
@@ -302,20 +331,27 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
     }
   };
 
-  const handleDelete = async () => {
+  // Delete session — the footer button arms the shared DeleteConfirmModal tier
+  // (role="dialog", focus lands Cancel, Escape/backdrop zero-write); the
+  // staged descriptor's confirm is the only writer (Settlements precedent).
+  const handleDelete = () => {
     if (!editingSession) return;
-    if (!window.confirm(`Delete Session Plan "${editingSession.name}"?`)) return;
-    setDeleting(true);
-    try {
-      await deleteSessionAction(editingSession.name);
-      missedListBroadcast.current = false;
-      handleCloseModal();
-    } catch (err) {
-      console.error('Failed to delete session:', err);
-      showError(err.message || 'Failed to delete session');
-    } finally {
-      setDeleting(false);
-    }
+    requestDelete({
+      label: editingSession.name,
+      confirm: async () => {
+        setDeleting(true);
+        try {
+          await deleteSessionAction(editingSession.name);
+          missedListBroadcast.current = false;
+          handleCloseModal();
+        } catch (err) {
+          console.error('Failed to delete session:', err);
+          showError(err.message || 'Failed to delete session');
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   const handleFormChange = (field, value) => {
@@ -519,21 +555,41 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
     }
   };
 
-  const handleMarkPlayed = async () => {
+  // ── Mark as Played (recap prompt, QA backlog 2026-11-24) ──
+  // The retired native window.prompt becomes an in-app dialog pair: clicking
+  // the footer button stages the row (pendingPlayedSession) and opens the
+  // SessionPlayedModal with a live Preview; Cancel/Escape/backdrop close it
+  // zero-write (session stays planned, no log rows); Confirm runs the exact
+  // old OK path — save played, clear the active stamp if it was this session,
+  // post the session-played log row (the Preview and the row share
+  // buildSessionPlayedLogText, so they can never drift).
+  const [pendingPlayedSession, setPendingPlayedSession] = useState(null);
+  const [playedRecap, setPlayedRecap] = useState('');
+
+  const handleMarkPlayed = () => {
     if (!editingSession || !formData) return;
-    const recap = prompt('Session recap (optional) — added to the campaign log:');
-    if (recap === null) return;
+    setPlayedRecap('');
+    setPendingPlayedSession(editingSession);
+  };
+
+  const handleCancelMarkPlayed = () => setPendingPlayedSession(null);
+
+  const handleConfirmMarkPlayed = async () => {
+    const target = pendingPlayedSession;
+    if (!target || !formData) return;
+    setPendingPlayedSession(null);
+    const recap = playedRecap.trim();
     const playedAt = new Date().toISOString();
-    const playedName = formData.name.trim() || editingSession.name;
+    const playedName = formData.name.trim() || target.name;
     const updated = {
       ...formData,
       name: playedName,
-      summary: recap.trim() || formData.summary,
+      summary: recap || formData.summary,
       status: 'played',
       playedAt,
     };
     try {
-      await saveSession(campaignName, updated, editingSession.name);
+      await saveSession(campaignName, updated, target.name);
       if (activeSession === playedName) {
         // Playing it ends it: stop stamping log rows with a session that is
         // now archived (the clear writes its own session_active audit row).
@@ -541,7 +597,7 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
       }
       await addEntry(campaignName, {
         type: 'session-played',
-        text: `Session “${playedName}” marked as played${recap.trim() ? ` — ${recap.trim()}` : ''}`,
+        text: buildSessionPlayedLogText(playedName, recap),
       });
       showToast(`“${playedName}” archived to the campaign log`);
       await loadItems();
@@ -666,6 +722,23 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
         pending={pendingUnarmedNpc}
         onCancel={handleUnarmedCancel}
         onConfirm={handleUnarmedAddAnyway}
+      />
+
+      {/* Delete Confirm — shared role="dialog" tier riding ABOVE the planner as
+          a fragment sibling (EB/MapsManager law: its own backdrop never
+          touches the modal underneath). */}
+      <DeleteSessionModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+      {/* Mark-as-Played recap prompt (in-app, live Preview) — same sibling law.
+          The component derives the displayed name, so no branch is added to
+          the Sessions body (complexity ceiling). */}
+      <SessionPlayedModal
+        pendingSession={pendingPlayedSession}
+        formData={formData}
+        recap={playedRecap}
+        onRecapChange={setPlayedRecap}
+        onCancel={handleCancelMarkPlayed}
+        onConfirm={handleConfirmMarkPlayed}
       />
     </div>
   );

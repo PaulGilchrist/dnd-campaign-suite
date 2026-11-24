@@ -7,6 +7,8 @@ import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import Subscriber from '../common/Subscriber.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import useDeleteRequest from '../common/useDeleteRequest.js';
 import './Notes.css';
 
 // Format date for display
@@ -47,6 +49,28 @@ function noteDisplayName(note) {
   const location = (note.partyLocation || '').trim();
   if (location) return location;
   return truncateDescription(stripMarkdownSymbols(note.description || ''), 40);
+}
+
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (QA backlog 2026-11-24: retires the native `Delete Note "X"?` window.confirm
+// and mirrors the Settlements/EB-pool row-delete chrome). The label is the
+// SAME noteDisplayName derivation the row aria-label uses (the shared-title
+// law pinned by Notes.test.jsx). Renders null while idle so the destructive
+// copy never lingers behind the editor.
+function DeleteNoteModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="notes-delete-title"
+      title="Delete Note"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the note &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign notes. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
 }
 
 function NoteListItem({ note, onEdit }) {
@@ -242,6 +266,10 @@ function Notes({ campaignName, characters, isLocalhost }) {
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(notes, NOTE_SEARCH_FIELDS);
   const [deleting, setDeleting] = useState(false);
+  // Shared pendingDelete staging for the role="dialog" delete tier (QA backlog
+  // 2026-11-24, mirrors Settlements.jsx): the DeleteConfirmModal's confirm is
+  // the ONLY writer, so Cancel/Escape/backdrop fire zero requests.
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   // Server-surfaced save/delete errors (e.g. 409 concurrent-edit conflict) —
   // mirrors the error state in NPCs.jsx / Factions.jsx.
   const [error, setError] = useState(null);
@@ -417,24 +445,28 @@ function Notes({ campaignName, characters, isLocalhost }) {
     }
   };
 
-  // Delete note
-  const handleDelete = async () => {
+  // Delete note — the footer button arms the shared DeleteConfirmModal tier
+  // (role="dialog", focus lands Cancel, Escape/backdrop zero-write); the
+  // staged descriptor's confirm is the only writer (Settlements precedent).
+  const handleDelete = () => {
     if (!editingNote) return;
-
-    if (!window.confirm(`Delete Note "${noteDisplayName(editingNote)}"?`)) return;
-
-    setDeleting(true);
-    try {
-      await deleteNoteAction(editingNote.id);
-      missedListBroadcast.current = false;
-      showError(null);
-      handleCloseModal();
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-      showError(error.message || 'Failed to delete note');
-    } finally {
-      setDeleting(false);
-    }
+    requestDelete({
+      label: noteDisplayName(editingNote),
+      confirm: async () => {
+        setDeleting(true);
+        try {
+          await deleteNoteAction(editingNote.id);
+          missedListBroadcast.current = false;
+          showError(null);
+          handleCloseModal();
+        } catch (error) {
+          console.error('Failed to delete note:', error);
+          showError(error.message || 'Failed to delete note');
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   const hasNotes = filteredNotes.length > 0;
@@ -522,6 +554,10 @@ function Notes({ campaignName, characters, isLocalhost }) {
           onDelete={handleDelete}
         />
       )}
+      {/* Delete Confirm — shared role="dialog" tier riding ABOVE the editor as
+          a fragment sibling (EB/MapsManager law: its own backdrop never
+          touches the modal underneath). */}
+      <DeleteNoteModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
     </div>
   );
 }

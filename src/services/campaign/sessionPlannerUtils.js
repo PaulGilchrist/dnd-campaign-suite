@@ -137,6 +137,18 @@ export function projectSessionForRefine(data) {
   return projected;
 }
 
+/**
+ * Single derivation of the `session-played` campaign-log row the Mark-as-Played
+ * lane writes (Sessions.jsx) — the SessionPlayedModal's live Preview and the
+ * addEntry payload both call this, so preview and stored row can never drift.
+ * A blank recap produces the plain row (the retired native prompt's
+ * OK-with-empty path).
+ */
+export function buildSessionPlayedLogText(sessionName, recap) {
+  const trimmed = (recap || '').trim();
+  return `Session “${sessionName}” marked as played${trimmed ? ` — ${trimmed}` : ''}`;
+}
+
 export function buildXpBudgetPrompt(session, characters = []) {
   const levels = characters.map(c => c.level).filter(l => Number.isFinite(l));
   const partySize = levels.length || characters.length;
