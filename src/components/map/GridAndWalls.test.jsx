@@ -101,6 +101,20 @@ describe('GridAndWalls', () => {
         expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
     });
 
+    // bug-map-walls-unvalidated-nonstring-row-bricks-map-view: a document
+    // poisoned before the server walls guard can carry foreign rows (the
+    // repro persisted a numeric 5; the split below threw
+    // `key.split is not a function` and the ErrorBoundary bricked the view on
+    // EVERY mount). The render seam skips non-strings — survival, not
+    // validation (authoring shape is enforced server-side).
+    it('skips foreign non-string wall rows and renders the rest', () => {
+        const walls = new Set(['1,1', 5, null, { a: 1 }]);
+        const { container } = renderComponent({ gridSize: 4, walls });
+
+        expect(wallFacts(container)).toEqual([{ x: 40, y: 40, width: 40, height: 40 }]);
+        expect(container.querySelectorAll('line.grid-line')).toHaveLength(10);
+    });
+
     it.each([
         { isLocalhost: true, fog: ['0,0'], expected: ['0,0', '80,0'] },
         { isLocalhost: false, fog: ['0,0'], expected: ['80,0'] },

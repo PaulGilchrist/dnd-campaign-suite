@@ -17,3 +17,14 @@ export function computeEffectiveWalls(walls, placedItems) {
     }
     return effective;
 }
+
+// The only wall row a client seam may adopt: a string (documents poisoned
+// before the server walls guard shipped can still carry foreign rows on
+// disk — bug-map-walls-unvalidated-nonstring-row-bricks-map-view). Every
+// seam that pulls rows from a document filters through this predicate (
+// useMapLoader load, useSSESync echo, GridAndWalls render) so one bad row
+// can never brick a view; the render sites key.split(',') their rows and a
+// non-string row threw TypeError on every mount. Shape/bounds AUTHORING is
+// the server's job (maps.js indoorWallsBoundsError) — this is survival,
+// not validation.
+export const isWallRow = (row) => typeof row === 'string';

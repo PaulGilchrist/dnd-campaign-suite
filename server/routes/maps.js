@@ -102,6 +102,38 @@ function refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, doc) {
   return true;
 }
 
+// Indoor walls gate for the whole-doc PUT — sibling of the terrain helper
+// above, checked against the EFFECTIVE (post-clamp) grid. No origin condition
+// is needed: the indoor whole-doc PUT is already GM-gated at the handler head
+// (refuseUnlessGm), so there is no visitor echo lane here to protect. Outdoor
+// docs skip the check — the hex builder never stores walls, and their
+// party-travel echo lane must not gain a refusal the editor never asked for
+// (the terrain doctrine).
+function refuseIndoorWallsBounds(req, res, isOutdoor, doc) {
+  if (isOutdoor) return false;
+  const error = indoorWallsBoundsError(doc);
+  if (!error) return false;
+  console.log(`[maps] BLOCKED PUT ${req.originalUrl} — ${error}`);
+  res.status(400).json({ error });
+  return true;
+}
+
+// Create-lane bounds gates in one seam — both builders take the authored
+// field verbatim, so a malformed row was just as plantable through POST as
+// through PUT: outdoor docs police terrain keys (QD backlog 2026-11-24),
+// indoor docs police walls rows (bug-map-walls-unvalidated-nonstring-row-
+// bricks-map-view). No origin condition — the whole POST lane is already
+// GM-only (refuseUnlessGm at the head). A refusal writes no file.
+function refuseCreateBoundsError(res, campaign, name, doc, isOutdoorCreate) {
+  const error = isOutdoorCreate
+    ? outdoorTerrainBoundsError(doc)
+    : indoorWallsBoundsError(doc);
+  if (!error) return false;
+  console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${error}`);
+  res.status(400).json({ error });
+  return true;
+}
+
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.
 function stampActiveMapContext(campaign, mapKey) {
@@ -479,6 +511,54 @@ export function outdoorTerrainBoundsError(mapData) {
     + `${listed}${more} ${offending.length === 1 ? 'is' : 'are'} outside the grid.`;
 }
 
+// Walls-bounds guard (bug-map-walls-unvalidated-nonstring-row-bricks-map-view):
+// indoor `walls` are "gx,gy" grid-cell STRINGS — GridAndWalls.jsx and the 3D
+// _buildWalls lane both `key.split(',')` them. The whole-doc PUT and the create
+// builder stored any row verbatim, so one accepted numeric row crashed every
+// later mount of that map (persisted poison, ErrorBoundary, no in-app
+// recovery). Mirrors the outdoor terrain convention (outdoorTerrainBoundsError
+// above) exactly: refuse BEFORE any write with the canonical "Map save
+// rejected: …" 400 naming EVERY offending row (capped, with the rest counted)
+// and the expected bounds — parse failures and out-of-range rows share the one
+// list, and rows are echoed JSON-stringified so a numeric 5 never reads as the
+// string "5". Unlike terrain (object keys, always strings), a walls row can be
+// any JSON value, so a non-array `walls` refuses in the rivers/roads register
+// (rowKind names the bad container), and the shape check still runs when the
+// grid is untrusted; the BOUNDS arm follows the pruneRevealedToGrid asymmetry
+// — absent/null/non-integer gridSize (the sanctioned clear) skips it rather
+// than inventing bounds. Absent/null `walls` passes: the guard never
+// over-validates documents that carry neither key. Duplicate rows are
+// shape-legal (the client keys its wall layer on a Set, which dedupes them)
+// and stay unpoliced.
+const WALL_CELL_ROW = /^\d+,\d+$/;
+const isWallCellRow = (row) => typeof row === 'string' && WALL_CELL_ROW.test(row);
+
+export function indoorWallsBoundsError(mapData) {
+  const walls = mapData?.walls;
+  if (walls === undefined || walls === null) return null;
+  if (!Array.isArray(walls)) {
+    return 'Map save rejected: "walls" must be a list of "gx,gy" cell strings like "7,2" — got '
+      + rowKind(walls) + '.';
+  }
+  const gridSize = mapData.gridSize;
+  const hasGrid = Number.isInteger(gridSize) && gridSize > 0;
+  const offending = walls.filter((row) => {
+    if (!isWallCellRow(row)) return true;
+    if (!hasGrid) return false;
+    const [gx, gy] = row.split(',').map(Number);
+    return gx >= gridSize || gy >= gridSize;
+  });
+  if (offending.length === 0) return null;
+  const listed = offending.slice(0, 5).map((row) => JSON.stringify(row)).join(', ');
+  const more = offending.length > 5 ? ` (+${offending.length - 5} more)` : '';
+  const boundsCopy = hasGrid
+    ? ` inside the map's ${gridSize}×${gridSize} grid (x 0..${gridSize - 1}, y 0..${gridSize - 1})`
+    : '';
+  const reason = hasGrid ? 'malformed or outside the grid' : 'malformed';
+  return 'Map save rejected: every wall must be a "gx,gy" cell address like "7,2"'
+    + `${boundsCopy} — ${listed}${more} ${offending.length === 1 ? 'is' : 'are'} ${reason}.`;
+}
+
 // Authored label for a freshly created map (FZ backlog 2026-11-09): the list
 // route already prefers `mapContent.displayName` (:126) and the rename lane
 // writes `newName.trim()`, but the create builders used to overwrite any
@@ -621,7 +701,8 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return res.status(400).json({ error: createRowsError });
   }
 
-  const defaultMapData = (body.type ?? 'indoor') === 'outdoor'
+  const isOutdoorCreate = (body.type ?? 'indoor') === 'outdoor';
+  const defaultMapData = isOutdoorCreate
     ? buildOutdoorMapData(name, body)
     : buildIndoorMapData(name, body);
 
@@ -635,16 +716,11 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return res.status(400).json({ error: normalizedCreate.error });
   }
 
-  // Terrain-bounds guard on the create lane too (QD backlog 2026-11-24): the
-  // outdoor builder takes body.terrain verbatim, so an out-of-range key was
-  // just as plantable through POST as through PUT. No origin condition here —
-  // the whole POST lane is already GM-only (refuseUnlessGm at the head).
-  if ((body.type ?? 'indoor') === 'outdoor') {
-    const createTerrainError = outdoorTerrainBoundsError(normalizedCreate.mapData);
-    if (createTerrainError) {
-      console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${createTerrainError}`);
-      return res.status(400).json({ error: createTerrainError });
-    }
+  // Bounds guard on the create lane (terrain keys for outdoor docs, walls
+  // rows for indoor docs — see refuseCreateBoundsError). No file is written
+  // on refusal.
+  if (refuseCreateBoundsError(res, campaign, name, normalizedCreate.mapData, isOutdoorCreate)) {
+    return;
   }
 
   fs.writeFileSync(filePath, JSON.stringify(normalizedCreate.mapData, null, 2));
@@ -900,8 +976,10 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
 
   // Terrain bounds checked against the EFFECTIVE (post-clamp) grid the write
   // is about to store — same seam pruneRevealedToGrid validates against, so a
-  // body can never persist terrain the stored grid cannot render.
+  // body can never persist terrain the stored grid cannot render. Walls ride
+  // the sibling gate (refuseIndoorWallsBounds), the indoor twin.
   if (refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, clampedDoc)) return;
+  if (refuseIndoorWallsBounds(req, res, isOutdoor, clampedDoc)) return;
 
   const mapData = preserveAuthoredNames(
     storedData,

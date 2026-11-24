@@ -132,6 +132,30 @@ describe('useMapLoader', () => {
     expect(saveMapDataSpy).not.toHaveBeenCalled();
   });
 
+  // bug-map-walls-unvalidated-nonstring-row-bricks-map-view: docs poisoned
+  // before the server walls guard can still carry foreign rows on disk (a
+  // numeric 5 crashed GridAndWalls' key.split on EVERY mount — persisted
+  // ErrorBoundary). The load seam drops non-string rows, so client state is
+  // clean for every consumer (2D/3D/fog/save payload) and the baseline seeds
+  // from the FILTERED document — a zero-edit open still writes nothing, and
+  // the next real edit's save PUT removes the poison from disk.
+  it('drops foreign non-string wall rows at load without dirtying the document', async () => {
+    loadMapDataSpy.mockResolvedValue({
+      players: [{ name: 'Thorin' }],
+      walls: ['1,1', 5, null, '2,2', { a: 1 }],
+      placedItems: [],
+      gridSize: 40,
+      revealed: [],
+    });
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    expect(Array.from(result.current.mapData.walls)).toEqual(['1,1', '2,2']);
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+  });
+
   it('does not re-PUT when a byte-identical state churn (SSE echo shape) lands after load', async () => {
     const existing = {
       players: [{ name: 'Thorin' }],

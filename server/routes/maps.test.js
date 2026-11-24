@@ -616,10 +616,9 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
-        const walls = [
-            { x1: 0, y1: 0, x2: 10, y2: 0 },
-            { x1: 10, y1: 0, x2: 10, y2: 10 },
-        ];
+        // Canonical wall rows: "gx,gy" cell strings (GridAndWalls.jsx splits
+        // them; the create lane's indoorWallsBoundsError polices the shape).
+        const walls = ['0,0', '10,0', '10,10'];
 
         const app = createTestApp();
         await request(app)
@@ -789,7 +788,7 @@ describe('maps - GET /api/campaigns/:campaign/maps/:mapname', () => {
             name: 'test-map',
             type: 'indoor',
             gridSize: 10,
-            walls: [{ x1: 0, y1: 0, x2: 10, y2: 0 }],
+            walls: ['0,0', '10,0'],
             zoom: 1.5,
         };
 

@@ -1,5 +1,6 @@
 
 import { CELL_SIZE } from '../../config/mapConfig';
+import { isWallRow } from '../../services/maps/effectiveWalls.js';
 
 const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
     const SVG_SIZE = gridSize * CELL_SIZE;
@@ -53,7 +54,12 @@ const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
             ))}
 
             {/* Walls */}
-            {Array.from(walls).filter(key => isLocalhost || !fog?.has(key)).map((key) => {
+            {/* Walls — isWallRow guard (survival, not validation): a foreign
+                row can only come from a document poisoned before the server
+                walls guard shipped; skipping it keeps one bad row from
+                bricking the whole view through the ErrorBoundary (the split
+                below throws on anything non-string). */}
+            {Array.from(walls).filter(key => isWallRow(key) && (isLocalhost || !fog?.has(key))).map((key) => {
                 const [gx, gy] = key.split(',').map(Number);
                 return (
                     <rect

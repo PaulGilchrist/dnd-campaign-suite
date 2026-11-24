@@ -243,6 +243,18 @@ describe('useSSESync', () => {
         expect(args.setMapData.mock.calls[0][0](prev)).toEqual(expected);
     });
 
+    // bug-map-walls-unvalidated-nonstring-row-bricks-map-view: the echo seam
+    // is the twin of the useMapLoader load seam — a snapshot carrying foreign
+    // rows (a historically poisoned doc re-broadcast, e.g. by the description
+    // lane) must never enter client state, so a mounted view adopts cleanly
+    // instead of crashing through the ErrorBoundary.
+    it('drops foreign non-string wall rows from the snapshot', () => {
+        const { args, result } = renderSync();
+        act(() => { result.current.handleSSEEvent(mapEvent({ walls: ['1,1', 5, null] })); });
+        expect(args.setMapData.mock.calls[0][0]({ players: [], walls: new Set(['old']), revealed: [] }))
+            .toEqual({ players: [], walls: new Set(['1,1']), revealed: [] });
+    });
+
     it('suppresses SSE echoes identical to current state but dispatches changed values', () => {
         const { args, result } = renderSync();
         const echo = mapEvent({ gridSize: 10, placedItems: [{ id: 'i1' }], players: [{ id: 'p1' }], walls: ['w1'] });

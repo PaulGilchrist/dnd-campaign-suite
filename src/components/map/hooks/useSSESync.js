@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard';
+import { isWallRow } from '../../../services/maps/effectiveWalls.js';
 
 // map-data-* payloads are FULL map-document snapshots published verbatim by the
 // server (server/routes/maps.js:170 PUT /maps/:mapname body, :303 description
@@ -39,7 +40,13 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
         setMapDataGuarded((prev) => ({
              ...prev,
             players: mergedField(data.players, prev?.players).map(({ ...rest }) => rest),
-            walls: new Set(mergedField(data.walls, prev?.walls)),
+            // isWallRow skip on the echo seam — the twin of the useMapLoader
+            // load-seam guard: a snapshot carrying a foreign row (historically
+            // poisoned disk, re-broadcast by the description lane) never enters
+            // client state, so the mounted view adopts cleanly instead of
+            // crashing through the ErrorBoundary. Spread first so a
+            // non-iterable value keeps the same throw the Set had before.
+            walls: new Set([...mergedField(data.walls, prev?.walls)].filter(isWallRow)),
             revealed: mergedField(data.revealed, prev?.revealed),
             // items (legacy creature-token lane — AI-Dress tokens now land in
             // the rendered placedItems lane instead, but generator-era docs

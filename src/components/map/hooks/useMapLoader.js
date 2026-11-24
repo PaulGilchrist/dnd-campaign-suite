@@ -3,6 +3,7 @@ import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService';
 import { buildMapLoadRejectedNotice, buildTokenEvictionNotice } from '../../../services/maps/mapLoadNotice';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
+import { isWallRow } from '../../../services/maps/effectiveWalls.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
@@ -42,6 +43,17 @@ function reconcilePlayersWithRoster(existingPlayers, characters, notify) {
     console.info('Indoor map editor evicted player tokens with no matching character:', evictedNames);
     if (notify) notify(buildTokenEvictionNotice(evictedNames.length));
     return reconciled;
+}
+
+// isWallRow skip (survival, not validation): a document poisoned before the
+// server walls guard can carry foreign rows on disk; dropping them at the
+// seam where the document enters client state keeps every consumer (2D walls,
+// fog, lighting, 3D, save payload) clean — and the next real edit's save PUT
+// removes the poison from disk (in-app recovery). Non-array shapes keep the
+// old Set-constructor throw → loud rejected-load notice.
+function wallSetFromDoc(rows) {
+    const kept = Array.isArray(rows) ? rows.filter(isWallRow) : rows;
+    return kept ? new Set(kept) : new Set();
 }
 
 function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost = true, onLoadRejected, onTokensEvicted }) {
@@ -111,7 +123,7 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
             try {
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
-                    const walls = existing.walls ? new Set(existing.walls) : new Set();
+                    const walls = wallSetFromDoc(existing.walls);
                     const loadedData = { ...existing, walls, revealed: existing.revealed || [] };
                     const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
                     const loadedPlacedItems = existing.placedItems || [];
