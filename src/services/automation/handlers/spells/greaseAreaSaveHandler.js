@@ -139,9 +139,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 async function greaseTargetIsImmune(targetName, tracking, campaignName) {
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type !== 'player') return false;
-    const targetStats = {
-        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-    };
+    // The target's computedStats bucket IS the stats object
+    // playerIsImmuneToCondition reads (top-level immunities/allFeatures/name —
+    // automationImmunities.js) — pass it directly, never re-wrapped under a
+    // `computedStats` key no rule leg reads (limb B of the resolved sleet/web
+    // class made this gate structurally false for every player, bug 2026-11-23).
+    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
     return playerIsImmuneToCondition({
         conditionKey: tracking.condition.toLowerCase(),
         playerStats: targetStats,

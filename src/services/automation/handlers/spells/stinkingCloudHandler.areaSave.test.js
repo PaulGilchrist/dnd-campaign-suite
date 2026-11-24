@@ -205,8 +205,16 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
     expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
   });
 
-  it('skips the save for players immune to the Poisoned condition', async () => {
-    const store = createStore({ [`${casterName}.${trackingKey}`]: baseTracking });
+  it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the raw computedStats bucket', async () => {
+    // LIVE PIN (limb-B defect fixed 2026-11-23 — sleet/web mirror): the
+    // awaited ASYNC combat context resolves the PLAYER row so the immunity
+    // branch is reachable exactly as in production, and the bucket is passed
+    // AS the stats object — a re-introduced {computedStats} wrapper (read by
+    // no playerIsImmuneToCondition rule leg) fails the call-shape pin below.
+    const store = createStore({
+      [`${casterName}.${trackingKey}`]: baseTracking,
+      'Hero.computedStats': { name: 'Hero', immunities: ['poisoned'] },
+    });
     installStore(store);
     damageUtils.getCombatContext.mockResolvedValue({
       creatures: [{ name: 'Hero', type: 'player' }],
@@ -216,10 +224,95 @@ describe('stinkingCloudHandler.processStinkingCloudAreaSave', () => {
     const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
 
     expect(result).toBeNull();
-    expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(
-      expect.objectContaining({ conditionKey: 'poisoned' }),
-    );
+    expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
+      conditionKey: 'poisoned',
+      playerStats: { name: 'Hero', immunities: ['poisoned'] },
+      getRuntimeValue: expect.any(Function),
+      campaignName,
+    });
     expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
+    expect(store.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('non-immune player resolves normally (immunity false → save proceeds, Poisoned applies on fail)', async () => {
+    const store = createStore({
+      [`${casterName}.${trackingKey}`]: baseTracking,
+      'campaign.targetEffects': [],
+      'Hero.activeConditions': [],
+      'Hero.activeConditionMeta': {},
+      'Hero.computedStats': { name: 'Hero', immunities: [] },
+    });
+    installStore(store);
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Hero', type: 'player' }],
+    });
+    savePrompt.createSaveListener.mockReturnValue({
+      promptId: 'p-hero',
+      promise: Promise.resolve({ success: false, roll: 2, total: 4 }),
+    });
+
+    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
+      conditionKey: 'poisoned',
+      playerStats: { name: 'Hero', immunities: [] },
+      getRuntimeValue: expect.any(Function),
+      campaignName,
+    });
+    expect(store.store['Hero.activeConditions']).toEqual(['poisoned']);
+  });
+
+  it('player with NO computedStats bucket still resolves normally (null bucket passed through)', async () => {
+    const store = createStore({
+      [`${casterName}.${trackingKey}`]: baseTracking,
+      'campaign.targetEffects': [],
+      'Hero.activeConditions': [],
+    });
+    installStore(store);
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Hero', type: 'player' }],
+    });
+    savePrompt.createSaveListener.mockReturnValue({
+      promptId: 'p-hero-no-stats',
+      promise: Promise.resolve({ success: true, roll: 19, total: 21 }),
+    });
+
+    const result = await processStinkingCloudAreaSave(casterName, 'Hero', campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    // null stats → playerIsImmuneToCondition's own guard answers false; the
+    // handler still hands it the (null) bucket so the call contract stays uniform.
+    expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
+      conditionKey: 'poisoned',
+      playerStats: null,
+      getRuntimeValue: expect.any(Function),
+      campaignName,
+    });
+    expect(savePrompt.createSaveListener).toHaveBeenCalled();
+  });
+
+  it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
+    const store = createStore({
+      [`${casterName}.${trackingKey}`]: baseTracking,
+      'campaign.targetEffects': [],
+      'Thug 1.activeConditions': [],
+      'Thug 1.computedStats': { name: 'Thug 1', immunities: ['poisoned'] },
+    });
+    installStore(store);
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Thug 1', type: 'monster' }],
+    });
+    savePrompt.createSaveListener.mockReturnValue({
+      promptId: 'p-mob',
+      promise: Promise.resolve({ success: true, roll: 19, total: 21 }),
+    });
+
+    const result = await processStinkingCloudAreaSave(casterName, 'Thug 1', campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
   });
 
   it('forces a CON save at turn start and applies Poisoned + block te on failure', async () => {

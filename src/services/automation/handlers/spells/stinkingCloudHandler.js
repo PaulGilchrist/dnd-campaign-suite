@@ -79,9 +79,12 @@ async function stinkingCloudTargetImmune(targetCreature, targetName, campaignNam
         return true;
     }
     if (targetCreature?.type !== 'player') return false;
-    const targetStats = {
-        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-    };
+    // The target's computedStats bucket IS the stats object
+    // playerIsImmuneToCondition reads (top-level immunities/allFeatures/name —
+    // automationImmunities.js) — pass it directly, never re-wrapped under a
+    // `computedStats` key no rule leg reads (limb B of the resolved sleet/web
+    // class made this gate structurally false for every player, bug 2026-11-23).
+    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
     return playerIsImmuneToCondition({
         conditionKey: 'poisoned',
         playerStats: targetStats,

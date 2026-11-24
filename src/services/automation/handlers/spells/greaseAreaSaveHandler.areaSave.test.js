@@ -193,9 +193,13 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
     });
 
-    it('returns null for immune players and skips the immunity check for monsters', async () => {
-      // immune player → null, no save prompt
-      setupRuntime({ computedStats: { immunities: ['prone'] } });
+    it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the raw computedStats bucket', async () => {
+      // LIVE PIN (limb-B defect fixed 2026-11-23 — sleet/web mirror): the
+      // awaited ASYNC combat context resolves the PLAYER row so the immunity
+      // branch is reachable exactly as in production, and the bucket is passed
+      // AS the stats object — a re-introduced {computedStats} wrapper (read by
+      // no playerIsImmuneToCondition rule leg) fails the call-shape pin below.
+      setupRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
       setPlayerContext();
       rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
@@ -203,16 +207,66 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: { computedStats: { immunities: ['prone'] } },
+        playerStats: { name: 'Goblin', immunities: ['prone'] },
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
 
+    it('non-immune player resolves normally (immunity false → save proceeds, prone applies on fail)', async () => {
+      setupRuntime({ computedStats: { name: 'Goblin', immunities: [] } });
+      setPlayerContext();
+      rangeCheck.isWithinRange.mockResolvedValue(true);
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
+      mockSaveOutcome(false);
+
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
+        conditionKey: 'prone',
+        playerStats: { name: 'Goblin', immunities: [] },
+        getRuntimeValue: expect.any(Function),
+        campaignName,
+      });
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        ['prone'],
+        campaignName,
+      );
+    });
+
+    it('player with NO computedStats bucket still resolves normally (null bucket passed through)', async () => {
+      setupRuntime({ computedStats: null });
+      setPlayerContext();
+      rangeCheck.isWithinRange.mockResolvedValue(true);
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
+      mockSaveOutcome(true);
+
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      // null stats → playerIsImmuneToCondition's own guard answers false; the
+      // handler still hands it the (null) bucket so the call contract stays uniform.
+      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
+        conditionKey: 'prone',
+        playerStats: null,
+        getRuntimeValue: expect.any(Function),
+        campaignName,
+      });
+      expect(savePrompt.createSaveListener).toHaveBeenCalled();
+    });
+
+    it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
       // monster → immunity check skipped entirely, save proceeds
-      setupRuntime();
+      setupRuntime({ computedStats: { name: 'Goblin', immunities: ['prone'] } });
       setMonsterContext();
-      automationImmunities.playerIsImmuneToCondition.mockClear();
+      rangeCheck.isWithinRange.mockResolvedValue(true);
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
       mockSaveOutcome(true);
 
       const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
