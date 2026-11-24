@@ -245,12 +245,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return spellNoticePopup(action.name, summary);
 }
 
-function webTargetIsImmune(targetName, campaignName) {
-    const targetCharacter = getCombatContext(campaignName)?.creatures?.find(c => c.name === targetName);
+// async getCombatContext MUST be awaited (greaseAreaSaveHandler twin, :139-141):
+// an un-awaited Promise has no .creatures, so the player-immunity leg was
+// structurally unreachable in production (bug 2026-11-23). The target's
+// computedStats bucket IS the stats object playerIsImmuneToCondition reads
+// (immunities/allFeatures/name — automationImmunities.js) — pass it directly,
+// never re-wrapped under a `computedStats` key the rule source would not read.
+async function webTargetIsImmune(targetName, campaignName) {
+    const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type !== 'player') return false;
-    const targetStats = {
-        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-    };
+    const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
     return playerIsImmuneToCondition({
         conditionKey: 'restrained',
         playerStats: targetStats,
@@ -329,7 +333,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const isAlreadyRestrained = existingConditions.some(c => String(c).toLowerCase() === 'restrained');
     if (isAlreadyRestrained) return null;
 
-    if (webTargetIsImmune(targetName, campaignName)) return null;
+    if (await webTargetIsImmune(targetName, campaignName)) return null;
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,

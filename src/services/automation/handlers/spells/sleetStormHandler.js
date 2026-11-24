@@ -283,11 +283,17 @@ async function shouldSkipSleetAreaSave(casterName, targetName, campaignName, _ma
     const isAlreadyProne = existingConditions.some(c => String(c).toLowerCase() === 'prone');
     if (isAlreadyProne) return true;
 
-    const targetCharacter = getCombatContext(campaignName)?.creatures?.find(c => c.name === targetName);
+    // async getCombatContext MUST be awaited (greaseAreaSaveHandler twin, :140) —
+    // an un-awaited Promise has no .creatures, so the player-immunity leg below
+    // was structurally unreachable in production (bug 2026-11-23).
+    const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type === 'player') {
-        const targetStats = {
-            computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-        };
+        // playerIsImmuneToCondition's contract reads the stats object it is
+        // handed (immunities/allFeatures/name — see automationImmunities.js);
+        // the target's computedStats bucket IS that stats object — pass it
+        // directly (never re-wrap it under a `computedStats` key the rule
+        // source would not read).
+        const targetStats = getRuntimeValue(targetName, 'computedStats', campaignName);
         if (playerIsImmuneToCondition({
             conditionKey: 'prone',
             playerStats: targetStats,

@@ -61,13 +61,17 @@
 //   registerSpellConcentration/buildSaveDc, never writes activeConditionMeta
 //   (restrainRecurringWebTarget omits it; cast lane :96-104 owns it).
 // Flags (reported, not silently kept):
-//   • PRODUCTION DEFECT (pre-existing, same class as sleetStorm :286):
-//     webTargetIsImmune.js:249 calls async getCombatContext (damageUtils.js:40)
-//     WITHOUT await → ?.creatures is undefined in prod → the player-immunity
-//     branch is UNREACHABLE in prod. The immunity test below pins branch logic
-//     via the sync-mock shape (what the un-awaited read expects) — documents
-//     reachable intent, not current prod behavior. The non-player skip test
-//     passes under both shapes (defect-compatible).
+//   • PRODUCTION DEFECT FIXED 2026-11-23 (await census finale, same class as
+//     sleetStorm :286): webTargetIsImmune (:249) called async getCombatContext
+//     (damageUtils.js:41) WITHOUT await → ?.creatures undefined in prod → the
+//     player-immunity branch was UNREACHABLE — immune PCs took Restrained from
+//     the recurring zone save (live-witnessed pre-fix: seeded restrained-
+//     immunity EvasiveFighter landed Restrained via processWebAreaSave). The
+//     predicate is now async + awaited at the single caller, mirroring the
+//     grease twin (greaseAreaSaveHandler.js:139-141/:221), AND the target's
+//     computedStats bucket is passed to playerIsImmuneToCondition AS the stats
+//     object (the old {computedStats} wrapper was read by no rule leg — the
+//     gate was inert even post-await). Pins below exercise the async contract.
 //   • accepted source gaps (no consumers in this engine, header :27-29):
 //     Difficult Terrain / Lightly Obscured prose, STR (Athletics) break-free
 //     modal, anchoring/collapse, flammability / 2d4 fire / burn-away.
@@ -320,12 +324,21 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
   });
 
   describe('immunity gates', () => {
-    // Pins branch logic via SYNC-mock getCombatContext shape — prod defect
-    // (missing await at webAreaSaveHandler.js:249) makes this branch
-    // unreachable until fixed; see seam map flag.
-    it('returns null when player is immune to restrained condition', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(trackingImpl({ computedStats: { immunities: ['restrained'] } }));
-      damageUtils.getCombatContext.mockReturnValue({
+    // LIVE PINS (defect flag retired 2026-11-23): getCombatContext rides the
+    // ASYNC contract (production shape). A dropped await in webTargetIsImmune
+    // leaves ?.creatures undefined → the immunity call never happens → the
+    // immune-skip pins fail; the NPC pin stays honest because the resolved
+    // MONSTER row gates the check on type under the awaited contract.
+    const runtimeWithStats = (computedStats) => (name, key) => {
+      if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'STR' };
+      if (key === 'activeConditions') return [];
+      if (key === 'computedStats') return computedStats;
+      return null;
+    };
+
+    it('immune player is SKIPPED: no save prompt, gate receives the raw computedStats bucket', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: ['restrained'] }));
+      damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
       });
@@ -335,15 +348,70 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
 
       expect(result).toBeNull();
+      // The bucket IS the stats object playerIsImmuneToCondition reads —
+      // passed directly, never re-wrapped under a computedStats key.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
         conditionKey: 'restrained',
+        playerStats: { name: 'Goblin', immunities: ['restrained'] },
         campaignName,
       }));
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('skips immunity check for non-player targets', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation(trackingImpl());
+    it('non-immune player resolves normally (immunity false → STR save proceeds)', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: [] }));
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
+        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
+      });
+      rangeCheck.isWithinRange.mockResolvedValue(true);
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'web-pws-not-immune',
+        promise: Promise.resolve({ success: false, roll: 8, total: 8 }),
+      });
+
+      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
+        conditionKey: 'restrained',
+        playerStats: { name: 'Goblin', immunities: [] },
+        campaignName,
+      }));
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        ['restrained'],
+        campaignName,
+      );
+    });
+
+    it('player with no computedStats bucket still resolves (null stats → rule guard false)', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats(null));
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'player', gridX: 6, gridY: 10 }],
+        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
+      });
+      rangeCheck.isWithinRange.mockResolvedValue(true);
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'web-pws-null-stats',
+        promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
+      });
+
+      const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(expect.objectContaining({
+        conditionKey: 'restrained',
+        playerStats: null,
+        campaignName,
+      }));
+    });
+
+    it('immunity leg is player-only: monster row with an immunity-carrying bucket still saves', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation(runtimeWithStats({ name: 'Goblin', immunities: ['restrained'] }));
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster', gridX: 6, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],

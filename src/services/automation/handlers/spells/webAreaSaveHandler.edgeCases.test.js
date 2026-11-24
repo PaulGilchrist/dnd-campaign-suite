@@ -14,8 +14,8 @@
 //   default, full cast-ledger shapes, activeConditionMeta (#1992 .main);
 //   [web] console.error catch legs (#1991 .errors — zero console pins in
 //   this file); `_web_<caster>` zone store + 600-round merged expiration
-//   (#1993 .zone); recurring STR-save internals + webTargetIsImmune :249
-//   un-awaited prod-defect flag (#1989 / .areaSave map flag — cross-ref).
+//   (#1993 .zone); recurring STR-save internals + webTargetIsImmune (await
+//   FIXED 2026-11-23 — see #1989 / .areaSave map flag, cross-ref).
 // Note: no-metaCtx defaults to ALL creatures incl caster (areaSpellUtils.js:20)
 //   — the missing-automation leg constrains metaCtx to one target so only the
 //   :145 guard is exercised; selection mechanics stay in #1992.
