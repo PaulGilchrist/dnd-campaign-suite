@@ -8,7 +8,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
-import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
+import { logSaveDismissed, registerLiveSaveListener, unregisterLiveSaveListener } from '../../../../services/automation/common/savePrompt.js';
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive, getEffectDefinition } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { isZonesEnforced } from '../../../../services/rules/features/zoneRepeatTurnEndService.js';
@@ -1772,10 +1772,20 @@ function SaveAttackAoeModal({
         // SP-023: adopt SavePromptModal's dispatch fidelity — distinct raw dice
         // and the mode marker instead of the old [detailRoll, detailRoll] dup.
         const { rawRolls, mode } = promptRollFidelity(detail);
+        // The save-adjudication row belongs to the TARGET that rolled (mirrors
+        // the verified quick-roll lane buildSaveRollLogData,
+        // useLoggedDiceRollEventHandlers.js:415): rollType 'save', characterName
+        // = target, attackerName = caster. This row used to carry rollType
+        // 'save-damage' with the SAVE equation (total/formula `1d20+<bonus>`)
+        // under the CASTER's name, so it rendered and read as
+        // "<caster> rolls <spell> damage: 21 (1d20+8)" — the target's saving
+        // throw relabelled as a spell damage roll (bug-aoe-live-save-stamped-
+        // reload-lapse). The actual damage roll is the save-damage row logged
+        // below (buildPlayerSaveDamageLog).
         addEntry(campaignName, {
             type: 'roll',
-            characterName: playerStats.name,
-            rollType: 'save-damage',
+            characterName: targetName,
+            rollType: 'save',
             name: actionName,
             targetName,
             saveDc: saveDc,
@@ -1786,7 +1796,7 @@ function SaveAttackAoeModal({
             saveRawRolls: rawRolls,
             mode,
             bonus: saveBonus,
-            formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
+            attackerName: playerStats.name,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
@@ -1946,6 +1956,19 @@ function SaveAttackAoeModal({
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
+        // Live-consumer registration (bug-aoe-live-save-stamped-reload-lapse):
+        // the picker lane arms prompts into pendingSaveListenerPrompts but its
+        // consumer is THIS listener, not a createSaveListener promise. While
+        // it is mounted, the SavePromptModal Done/Dismiss seam's
+        // resolveConsumerlessSavePrompt must no-op for these ids — otherwise a
+        // fully-live same-page resolution stamps a phantom "resolved after a
+        // page reload — effect not applied" save_lapsed pair beside the damage
+        // this handler applies. Registering here (not at the arm site) marks
+        // the chain live for exactly as long as the listener exists: a reload
+        // or an unmount-with-pending leaves no registration, so the honest
+        // lapse pair still writes for a genuinely dead chain.
+        const promptIds = pendingPrompts.map(p => p.promptId).filter(Boolean);
+        promptIds.forEach(registerLiveSaveListener);
         const handleSaveEvent = (event) => {
             handleSaveResult(event, null);
         };
@@ -1955,10 +1978,11 @@ function SaveAttackAoeModal({
         window.addEventListener('save-result', handleSaveEvent);
         window.addEventListener('save-dismissed', handleDismissedEvent);
         return () => {
+            promptIds.forEach(unregisterLiveSaveListener);
             window.removeEventListener('save-result', handleSaveEvent);
             window.removeEventListener('save-dismissed', handleDismissedEvent);
         };
-    }, [pendingPrompts.length, handleSaveResult, handleSaveDismissed]);
+    }, [pendingPrompts, handleSaveResult, handleSaveDismissed]);
 
     const handleApply = useCallback(async (ctx) => {
         if (!summary) {

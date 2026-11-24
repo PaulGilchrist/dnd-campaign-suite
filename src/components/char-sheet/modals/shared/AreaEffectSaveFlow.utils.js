@@ -5,6 +5,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
+import { registerLiveSaveListener, unregisterLiveSaveListener } from '../../../../services/automation/common/savePrompt.js';
 import { logConditionApplied } from './saveResultLogging.js';
 
 // Shared save-flow building blocks for the condition AoE modals
@@ -31,12 +32,25 @@ export function usePendingPromptsCleanup(setPendingPrompts) {
 export function useSaveResultListener(pendingPrompts, handleSaveResult) {
   useEffect(() => {
     if (pendingPrompts.length === 0) return;
+    // Live-consumer registration (bug-aoe-live-save-stamped-reload-lapse):
+    // while THIS listener is mounted the queue's prompts have a same-page
+    // consumer, so the SavePromptModal Done seam's resolveConsumerlessSavePrompt
+    // check must no-op instead of stamping a phantom save_lapsed pair beside
+    // the damage this very listener applies. Deps key on the array (not just
+    // its length) so a drain/unmount cleans the settled ids and a re-render
+    // re-marks the survivors — the createSaveListener registry discipline,
+    // scoped to the listener lifetime.
+    const promptIds = pendingPrompts.map(p => p.promptId).filter(Boolean);
+    promptIds.forEach(registerLiveSaveListener);
     const handleSaveEvent = (event) => {
       handleSaveResult(event);
     };
     window.addEventListener('save-result', handleSaveEvent);
-    return () => window.removeEventListener('save-result', handleSaveEvent);
-  }, [pendingPrompts.length, handleSaveResult]);
+    return () => {
+      promptIds.forEach(unregisterLiveSaveListener);
+      window.removeEventListener('save-result', handleSaveEvent);
+    };
+  }, [pendingPrompts, handleSaveResult]);
 }
 
 // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): mirrors
@@ -49,12 +63,20 @@ export function useSaveResultListener(pendingPrompts, handleSaveResult) {
 export function useSaveDismissedListener(pendingPrompts, handleSaveDismissed) {
   useEffect(() => {
     if (pendingPrompts.length === 0) return;
+    // Same live-consumer registration as useSaveResultListener above — the
+    // un-rolled Dismiss seam consults resolveConsumerlessSavePrompt too, so
+    // the registry must stay marked while either listener owns the queue.
+    const promptIds = pendingPrompts.map(p => p.promptId).filter(Boolean);
+    promptIds.forEach(registerLiveSaveListener);
     const handleDismissedEvent = (event) => {
       handleSaveDismissed(event);
     };
     window.addEventListener('save-dismissed', handleDismissedEvent);
-    return () => window.removeEventListener('save-dismissed', handleDismissedEvent);
-  }, [pendingPrompts.length, handleSaveDismissed]);
+    return () => {
+      promptIds.forEach(unregisterLiveSaveListener);
+      window.removeEventListener('save-dismissed', handleDismissedEvent);
+    };
+  }, [pendingPrompts, handleSaveDismissed]);
 }
 
 // Neutral result row for a dismissed prompt: renders as an honest

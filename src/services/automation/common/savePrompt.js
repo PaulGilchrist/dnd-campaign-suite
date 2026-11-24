@@ -157,6 +157,30 @@ function logSaveOutcome(campaignName, config, detail) {
 // the previous page — write honest rows here".
 const liveSaveListenerIds = new Set();
 
+// Modal-family arms (the AoE save-picker chains: SaveAttackAoeModal's PC
+// prompts and the condition modals consuming issuePlayerSavePrompt) stamp
+// their promptIds into the campaign's pendingSaveListenerPrompts book but do
+// NOT run createSaveListener — their live consumer is a page-local
+// `save-result`/`save-dismissed` React listener. Without registry membership
+// the SavePromptModal Done/Dismiss seam could not see that chain and stamped
+// a phantom "resolved after a page reload" save_lapsed pair beside the real
+// damage application (bug-aoe-live-save-stamped-reload-lapse). These two
+// exports let the listener-owning effects mark the prompts live for exactly
+// as long as their listener is mounted — the same register-on-arm /
+// clear-on-detach discipline as the registry maintenance inside
+// createSaveListener, so resolveConsumerlessSavePrompt no-ops on a same-page
+// live chain and keeps writing the honest lapse pair only after a reload
+// (fresh page, empty registry) or a genuinely detached consumer.
+export function registerLiveSaveListener(promptId) {
+    if (!promptId) return;
+    liveSaveListenerIds.add(promptId);
+}
+
+export function unregisterLiveSaveListener(promptId) {
+    if (!promptId) return;
+    liveSaveListenerIds.delete(promptId);
+}
+
 // Cross-tab liveness signal for the lapsed-copy branch (backlog 2026-11-18
 // NB: the two-tab answer face must not claim "after a page reload" when
 // nothing reloaded). liveSaveListenerIds above is PAGE-LOCAL — the resolving
