@@ -517,6 +517,26 @@ function playerItemMoveCopy(entry, characterName) {
   return `Move ${entry.quantity} × ${entry.name} from ${characterName} to party inventory`;
 }
 
+// Item-row action copy builders (QA backlog 2026-11-24): the row's Edit/Move/Delete
+// buttons shared the generic names "Edit item"/"Move to player"/"Delete item" across
+// EVERY row (icon-led buttons whose title-only accessible name rides the title
+// fallback), so an aria-keyed locator could not address one row's control. Each now
+// carries intent + the row's live item name as title AND mirrored aria-label — the
+// same idiom as the row steppers (`Increase quantity of <name>`), the currency chips
+// (`Add 10 gp`) and the Maps-manager row controls (`Delete "X"`). The Delete confirm
+// reuses its builder so button label and dialog copy can never drift apart.
+function itemEditCopy(item) {
+  return `Edit "${item.name}"`;
+}
+
+function itemMoveToPlayerCopy(item) {
+  return `Move "${item.name}" to player`;
+}
+
+function itemDeleteCopy(item) {
+  return `Delete "${item.name}" from party inventory`;
+}
+
 function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer, requestConfirm, onActionError }) {
   const [selected, setSelected] = useState(null);
   const [moving, setMoving] = useState(null);
@@ -1105,7 +1125,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     requestDelete({
       title: 'Delete Party Item',
       confirmLabel: 'Yes, Delete',
-      message: `Delete "${item.name}" from party inventory?`,
+      message: `${itemDeleteCopy(item)}?`,
       confirm: () => {
         flushCurrencyPersist();
         const inv = inventoryRef.current;
@@ -1311,8 +1331,8 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                       <button
                         type="button"
                         className="ct-btn"
-                        title="Edit item"
-                        aria-label="Edit item"
+                        title={itemEditCopy(item)}
+                        aria-label={itemEditCopy(item)}
                         onClick={() => openEditForm({ ...item })}
                       >
                         <i className="fa-solid fa-pen" />
@@ -1320,8 +1340,8 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                       <button
                         type="button"
                         className="ct-btn ct-btn-primary"
-                        title="Move to player"
-                        aria-label="Move to player"
+                        title={itemMoveToPlayerCopy(item)}
+                        aria-label={itemMoveToPlayerCopy(item)}
                         disabled={characters.length === 0}
                         onClick={() => openMoveModal(item)}
                       >
@@ -1330,8 +1350,8 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                       <button
                         type="button"
                         className="ct-btn ct-btn-danger"
-                        title="Delete item"
-                        aria-label="Delete item"
+                        title={itemDeleteCopy(item)}
+                        aria-label={itemDeleteCopy(item)}
                         onClick={() => handleDeleteItem(item)}
                       >
                         <i className="fa-solid fa-trash-can" />

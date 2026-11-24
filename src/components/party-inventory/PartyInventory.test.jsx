@@ -126,19 +126,24 @@ describe('PartyInventory', () => {
     expect(screen.getByTitle('Remove 10 sp').disabled).toBe(false);
   });
 
-  it('gives item-row action buttons aria-labels matching their titles', async () => {
+  it('gives item-row action buttons item-named aria-labels matching their titles', async () => {
     await renderReady();
     const row = screen.getByText('Antitoxin').closest('tr');
-    // Multiple rows → multiple matches page-wide is expected; within(row) resolves one.
-    const edit = within(row).getByRole('button', { name: 'Edit item' });
-    const move = within(row).getByRole('button', { name: 'Move to player' });
-    const del = within(row).getByRole('button', { name: 'Delete item' });
-    for (const [btn, label] of [[edit, 'Edit item'], [move, 'Move to player'], [del, 'Delete item']]) {
+    // QA backlog 2026-11-24: labels name the row item, so an exact-name query
+    // resolves ONE row's control page-wide (the old generic copies duplicated).
+    const edit = within(row).getByRole('button', { name: 'Edit "Antitoxin"', exact: true });
+    const move = within(row).getByRole('button', { name: 'Move "Antitoxin" to player', exact: true });
+    const del = within(row).getByRole('button', { name: 'Delete "Antitoxin" from party inventory', exact: true });
+    for (const [btn, label] of [
+      [edit, 'Edit "Antitoxin"'],
+      [move, 'Move "Antitoxin" to player'],
+      [del, 'Delete "Antitoxin" from party inventory'],
+    ]) {
       expect(btn).toHaveAttribute('aria-label', label);
       expect(btn).toHaveAttribute('title', label);
     }
-    expect(screen.getAllByRole('button', { name: 'Edit item' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'Delete item' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Edit "Antitoxin"', exact: true })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete "Antitoxin" from party inventory', exact: true })).toHaveLength(1);
     // Icon-only Edit/Delete carry no visible text; accessible name comes from aria-label.
     expect(edit.textContent).toBe('');
     expect(del.textContent).toBe('');
@@ -158,7 +163,7 @@ describe('PartyInventory', () => {
       throw new Error('native window.confirm fired on the move-modal path');
     });
     const row = screen.getByText('Torch').closest('tr');
-    fireEvent.click(within(row).getByTitle('Move to player'));
+    fireEvent.click(within(row).getByTitle('Move "Torch" to player'));
     fireEvent.click(await screen.findByRole('button', { name: /Move to Player/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Move to Player' });
     expect(dialog).toHaveTextContent('Move 5 × Torch to War Cleric?');
@@ -240,7 +245,7 @@ describe('PartyInventory', () => {
       throw new Error('native window.confirm fired on the delete path');
     });
     const row = screen.getByText('Antitoxin').closest('tr');
-    fireEvent.click(within(row).getByTitle('Delete item'));
+    fireEvent.click(within(row).getByTitle('Delete "Antitoxin" from party inventory'));
     const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
     expect(confirmSpy).not.toHaveBeenCalled();

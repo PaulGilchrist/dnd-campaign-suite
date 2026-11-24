@@ -96,7 +96,7 @@ async function renderReady() {
 }
 
 function openMoveModal(itemName = 'Hempen Rope') {
-  fireEvent.click(screen.getByTitle('Move to player'));
+  fireEvent.click(screen.getByTitle(`Move "${itemName}" to player`));
   return screen.getByText(`Move “${itemName}” to Player`).closest('.pi-modal');
 }
 

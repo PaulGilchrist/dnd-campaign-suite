@@ -79,7 +79,7 @@ async function openAddEditor() {
 }
 
 async function openEditEditor() {
-  fireEvent.click(within(screen.getByText('QA Lantern').closest('tr')).getByRole('button', { name: 'Edit item' }));
+  fireEvent.click(within(screen.getByText('QA Lantern').closest('tr')).getByRole('button', { name: 'Edit "QA Lantern"', exact: true }));
   return openEditor('Edit QA Lantern');
 }
 

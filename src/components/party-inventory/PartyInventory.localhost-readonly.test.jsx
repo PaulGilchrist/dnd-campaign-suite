@@ -91,9 +91,9 @@ describe('PartyInventory — non-localhost (player) view is read-only for party 
     expect(screen.queryByText('Actions')).toBeNull();
     expect(screen.queryByLabelText(/Increase quantity of/)).toBeNull();
     expect(screen.queryByLabelText(/Decrease quantity of/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move to player' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit "Antitoxin"' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move "Antitoxin" to player' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete "Torch" from party inventory' })).toBeNull();
     expect(screen.queryByText('Quantity')).toBeNull();
 
     // Items themselves stay visible for the players to read.
@@ -125,9 +125,9 @@ describe('PartyInventory — localhost GM view unchanged', () => {
     expect(screen.getByTitle('Remove 100 gp')).toBeTruthy();
     expect(screen.getByText('Add Item')).toBeTruthy();
     expect(screen.getAllByText('Give').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Edit item' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Move to player' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Delete item' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Edit "Antitoxin"', exact: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Move "Antitoxin" to player', exact: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete "Torch" from party inventory', exact: true })).toBeTruthy();
   });
 
   it('fails closed: missing isLocalhost prop never renders write affordances', async () => {
@@ -135,6 +135,6 @@ describe('PartyInventory — localhost GM view unchanged', () => {
 
     expect(screen.queryByText('Add Item')).toBeNull();
     expect(screen.queryByTitle('Add 100 gp')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete "Torch" from party inventory' })).toBeNull();
   });
 });

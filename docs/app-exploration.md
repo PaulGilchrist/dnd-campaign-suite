@@ -154,5 +154,4 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-24 (QF): PartyInventory row-action buttons are title-only (`Delete item`, `Edit item`, `Move to player`, steppers) — `getAttribute('aria-label')` is null, so accessible name rides the title fallback and any harness/AT selector keyed on aria misses them; every comparable family (Maps-manager pen/trash `Rename "X"`/`Delete "X"`, Steppers `Add 10 gp`) carries intent + item name in aria. Fix: mirror the title into `aria-label` including the item name (`Delete QF Qty Gate Rock from party inventory`) so row actions are individually addressable, matching the intent-copy law the currency chips already follow. `src/components/party-inventory/PartyInventory.jsx`.
 

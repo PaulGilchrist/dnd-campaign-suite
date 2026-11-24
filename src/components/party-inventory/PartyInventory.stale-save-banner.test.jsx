@@ -83,7 +83,7 @@ describe('PartyInventory stale-save 409 → in-modal banner (Quests-planner idio
   });
 
   const openEditorAndSave = async () => {
-    fireEvent.click(screen.getByLabelText('Edit item'));
+    fireEvent.click(screen.getByLabelText('Edit "QA Lantern"'));
     const modal = (await screen.findByText('Edit QA Lantern')).closest('.pi-modal');
     fireEvent.change(within(modal).getByLabelText(/Name/), { target: { value: 'QA Ghost Lantern' } });
     fireEvent.click(within(modal).getByRole('button', { name: /Save/ }));

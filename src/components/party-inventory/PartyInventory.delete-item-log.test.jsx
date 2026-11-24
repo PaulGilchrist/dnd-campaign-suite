@@ -75,7 +75,7 @@ async function renderReady() {
 // the root .pi-action-error strip (role="alert") with byte-identical copy.
 function clickDelete(name) {
   const row = screen.getByText(name).closest('tr');
-  fireEvent.click(within(row).getByTitle('Delete item'));
+  fireEvent.click(within(row).getByTitle(`Delete "${name}" from party inventory`));
   const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
   expect(dialog).toHaveTextContent(`Delete "${name}" from party inventory?`);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
@@ -251,7 +251,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
   it('dialog Cancel/Escape: zero mutation, zero row', async () => {
     await renderReady();
     const row = screen.getByText('Antitoxin').closest('tr');
-    fireEvent.click(within(row).getByTitle('Delete item'));
+    fireEvent.click(within(row).getByTitle('Delete "Antitoxin" from party inventory'));
     const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -261,7 +261,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     expect(addEntry).not.toHaveBeenCalled();
 
     // Escape answers the same inert lane.
-    fireEvent.click(within(row).getByTitle('Delete item'));
+    fireEvent.click(within(row).getByTitle('Delete "Antitoxin" from party inventory'));
     const dialog2 = screen.getByRole('dialog', { name: 'Delete Party Item' });
     fireEvent.keyDown(within(dialog2).getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

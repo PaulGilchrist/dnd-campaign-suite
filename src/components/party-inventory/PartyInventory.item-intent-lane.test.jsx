@@ -169,7 +169,7 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
 
   it('a modal edit posts ONE update intent keyed by the row id', async () => {
     await renderReady();
-    fireEvent.click(rowOf('QA Lantern').getByRole('button', { name: 'Edit item' }));
+    fireEvent.click(rowOf('QA Lantern').getByRole('button', { name: 'Edit "QA Lantern"', exact: true }));
     const modal = (await screen.findByText('Edit QA Lantern')).closest('.pi-modal');
     fireEvent.change(within(modal).getByLabelText('Description'), { target: { value: 'cap is off' } });
     fireEvent.click(within(modal).getByRole('button', { name: /Save/ }));
@@ -202,7 +202,7 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
     serverItems.push({ id: 'coin1', name: 'QA Concurrent Coin', quantity: 1, description: '' });
 
     // The row button arms the shared in-app confirm; Yes, Delete is the only writer.
-    fireEvent.click(rowOf('QA Lantern').getByTitle('Delete item'));
+    fireEvent.click(rowOf('QA Lantern').getByTitle('Delete "QA Lantern" from party inventory'));
     const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
     expect(confirmSpy).not.toHaveBeenCalled();

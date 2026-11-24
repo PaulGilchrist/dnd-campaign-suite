@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai: 2026-11-24
 // Improve (backlog 2026-11-17 CD): every From Players `To Party` button was an
 // undifferentiated `.pi-move-btn` (row identified only by ancestor text) and the item
 // stepper pair was UNTITLED while sharing its class with the currency chips, so
@@ -168,9 +168,68 @@ describe('PartyInventory row-scoped accessible names', () => {
   it('the Move-to-Player modal stepper is labelled with its item name too', async () => {
     await renderReady();
     const row = screen.getByText('Goblin Idol').closest('tr');
-    fireEvent.click(within(row).getByTitle('Move to player'));
+    fireEvent.click(within(row).getByTitle('Move "Goblin Idol" to player'));
     const modal = (await screen.findByText('Move “Goblin Idol” to Player')).closest('.pi-modal');
     expect(within(modal).getByRole('button', { name: 'Increase quantity of Goblin Idol', exact: true })).toBeTruthy();
     expect(within(modal).getByRole('button', { name: 'Decrease quantity of Goblin Idol', exact: true })).toBeTruthy();
+  });
+
+  // QA backlog 2026-11-24 (QF): the row Edit/Move/Delete buttons used the generic
+  // "Edit item"/"Move to player"/"Delete item" names on EVERY row, so an aria-keyed
+  // locator could not address one row's control. Every row action button (Edit,
+  // Move-to-player, Delete, Increase/Decrease steppers) now mirrors its title as an
+  // item-named aria-label, delete's copy IS the confirm sentence minus "?" — and a
+  // rename re-derives every label from the row's current name.
+  it('every row action button carries intent + its item name in aria-label, mirroring title', async () => {
+    await renderReady();
+    for (const name of ['QA Lantern', 'Goblin Idol']) {
+      const row = screen.getByText(name).closest('tr');
+      for (const copy of [
+        `Edit "${name}"`,
+        `Move "${name}" to player`,
+        `Delete "${name}" from party inventory`,
+        `Increase quantity of ${name}`,
+        `Decrease quantity of ${name}`,
+      ]) {
+        const button = within(row).getByRole('button', { name: copy, exact: true });
+        expect(button).toHaveAttribute('aria-label', copy);
+        expect(button).toHaveAttribute('title', copy);
+      }
+    }
+    // Distinct per row: the generic page-wide names no longer resolve anywhere.
+    for (const generic of ['Edit item', 'Move to player', 'Delete item']) {
+      expect(screen.queryAllByRole('button', { name: generic, exact: true })).toHaveLength(0);
+    }
+    // The Delete label never drifts from its dialog: confirm copy = label + "?".
+    fireEvent.click(within(screen.getByText('QA Lantern').closest('tr'))
+      .getByRole('button', { name: 'Delete "QA Lantern" from party inventory', exact: true }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    expect(dialog).toHaveTextContent('Delete "QA Lantern" from party inventory?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  });
+
+  it('labels follow the row’s current name after a rename', async () => {
+    // Update intents ack the renamed doc so the row's live name drives the labels.
+    mockApplyItemIntent.mockImplementation(async (_c, intent) => {
+      const doc = baseInventory();
+      if (intent.action === 'update') {
+        doc.items = doc.items.map(i => (i.id === intent.item.id ? { ...i, ...intent.item } : i));
+      }
+      return doc;
+    });
+    await renderReady();
+    fireEvent.click(within(screen.getByText('Goblin Idol').closest('tr'))
+      .getByRole('button', { name: 'Edit "Goblin Idol"', exact: true }));
+    const modal = (await screen.findByText('Edit Goblin Idol')).closest('.pi-modal');
+    fireEvent.change(within(modal).getByLabelText(/Name/), { target: { value: 'Idol of Zar' } });
+    fireEvent.click(within(modal).getByRole('button', { name: /Save/ }));
+
+    // The renamed row's actions re-derive from the new name; the old names are gone.
+    const renamed = await screen.findByRole('button', { name: 'Delete "Idol of Zar" from party inventory', exact: true });
+    const row = renamed.closest('tr');
+    for (const copy of ['Edit "Idol of Zar"', 'Move "Idol of Zar" to player', 'Increase quantity of Idol of Zar']) {
+      expect(within(row).getByRole('button', { name: copy, exact: true })).toHaveAttribute('aria-label', copy);
+    }
+    expect(screen.queryAllByRole('button', { name: 'Delete "Goblin Idol" from party inventory', exact: true })).toHaveLength(0);
   });
 });
