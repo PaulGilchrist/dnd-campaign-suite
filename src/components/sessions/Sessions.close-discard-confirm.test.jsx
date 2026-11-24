@@ -7,10 +7,12 @@
 // draft → the wizard's generic new-draft copy). A clean draft keeps closing
 // silently, and clean-Cancel-after-a-rejected-save still performs the stale
 // refresh side effect. Dismiss is fully inert (editor, draft — zero network);
-// accept closes via the same handleCloseModal path; save success stays
-// confirm-free. Harness mirrors Sessions.reload-discard-confirm.test.jsx
+// Discard closes via the same handleCloseModal path; save success stays
+// toll-free. QA backlog 2026-11-24: the toll rides the SHARED in-app
+// keep/discard dialog (role="dialog", Cancel = Keep) — a native window.confirm
+// firing on this path is a regression. Harness mirrors Sessions.reload-discard-confirm.test.jsx
 // (drafts driven via onFormChange(field, value) — no setFormData prop).
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Sessions from './Sessions';
 
@@ -114,7 +116,17 @@ const renderSessions = () =>
   );
 
 const editor = () => screen.queryByTestId('session-planner-modal');
-const cancelButton = () => screen.getByRole('button', { name: 'Cancel' });
+// The mock editor's own Cancel (scoped: the open toll adds a second one).
+const cancelButton = () => within(editor()).getByRole('button', { name: 'Cancel' });
+
+// The shared in-app keep/discard toll (useReloadGuard → DiscardDraftDialog).
+const openToll = async (copy) => {
+  const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+  expect(toll).toHaveTextContent(copy);
+  return toll;
+};
+const keepToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Cancel' }));
+const discardToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
 
 describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
   let confirmSpy;
@@ -123,7 +135,10 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
     saveCallCount = 0;
     saveSessionImpl = async () => ({ success: true });
     sessionsFixture = [{ name: 'Session 7', date: '2026-10-27', summary: '', links: {}, updatedAt: 1 }];
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    // A native confirm that FIRES on this path is a regression — make it loud.
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the close-discard path');
+    });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -131,7 +146,7 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
     vi.restoreAllMocks();
   });
 
-  it('dirty draft + Cancel: exactly ONE named confirm; dismiss is fully inert (zero network)', async () => {
+  it('dirty draft + Cancel: the in-app toll names the discard; Keep is fully inert (zero network)', async () => {
     renderSessions();
     await screen.findByText(/2026-10-27/);
 
@@ -140,8 +155,9 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
 
     fireEvent.click(cancelButton());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Session 7"?');
+    const toll = await openToll('Discard changes to "Session 7"?');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    keepToll(toll);
     // Nothing happened: editor open, draft intact, no fetch.
     expect(editor()).toBeInTheDocument();
     expect(screen.getByTestId('session-date-input').value).toBe('2026-12-25');
@@ -155,13 +171,13 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
 
     fireEvent.click(screen.getByText('Edit'));
     fireEvent.change(screen.getByTestId('session-name-input'), { target: { value: 'Session 7b' } });
-    confirmSpy.mockReturnValue(true);
 
     fireEvent.click(cancelButton());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    // The typed name is what the editor shows → it names the confirm.
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Session 7b"?');
+    // The typed name is what the editor shows → it names the toll.
+    const toll = await openToll('Discard changes to "Session 7b"?');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    discardToll(toll);
     await waitFor(() => expect(editor()).not.toBeInTheDocument());
     expect(loadCallCount).toBe(1);
     expect(screen.queryByText(/NOT saved/)).not.toBeInTheDocument();
@@ -194,7 +210,7 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
     expect(loadCallCount).toBe(1);
   });
 
-  it('unnamed new draft: wizard generic new-draft copy', async () => {
+  it('unnamed new draft: toll rides the wizard generic new-draft copy', async () => {
     renderSessions();
     await screen.findByText(/2026-10-27/);
     fireEvent.click(screen.getByRole('button', { name: /new session/i }));
@@ -202,8 +218,9 @@ describe('Sessions ×/Cancel close: dirty draft names the discard', () => {
 
     fireEvent.click(cancelButton());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard this new session draft?');
+    const toll = await openToll('Discard this new session draft?');
+    keepToll(toll);
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(editor()).toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@
 // reopened editor never re-seeds a stale row. Mirrors NPCs.sse-sync.test.jsx.
 // Connects through the ONE shared SSE client (subscribeToSSE), never a raw
 // EventSource.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Quests from './Quests';
 
@@ -120,10 +120,10 @@ describe('Quests live SSE sync', () => {
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     // The draft is dirty, so × now NAMES the discard (improve 2026-10-29-V):
     // accept it to exercise the close path.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Draft Quest"?');
-    confirmSpy.mockRestore();
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent('Discard changes to "Draft Quest"?');
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await findByText('The Sunken Shrine');
     expect(loadCallCount).toBe(2);
 

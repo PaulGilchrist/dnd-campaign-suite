@@ -138,7 +138,7 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // the unsaved-edits check in handleReloadList via the shared useReloadGuard
   // so all six .ct-* CRUD lanes share the guard (improve 2026-10-29-V backlog;
   // mirrors NPCs.jsx ba51c25ee).
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the session list and discard your unsaved edits?',
@@ -275,8 +275,8 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // throws away the open draft, so with unsaved edits the shared
   // useReloadGuard states the loss up front and Cancel keeps the banner,
   // editor, and draft fully inert (mirrors NPCs.jsx handleReloadList).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -288,9 +288,9 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // new-draft copy. A clean draft closes silently exactly as before. Kept
   // OUT of handleCloseModal so internal closes (save/delete/mark-played/
   // reload) never double-confirm; dismiss is fully inert.
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = (formData?.name || '').trim() || editingSession?.name;
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new session draft?'
     )) return;
     handleCloseModal();
@@ -748,6 +748,10 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
         onCancel={handleCancelMarkPlayed}
         onConfirm={handleConfirmMarkPlayed}
       />
+
+      {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
+          planner — its backdrop/Escape answer only the toll. */}
+      {discardDialog}
     </div>
   );
 }

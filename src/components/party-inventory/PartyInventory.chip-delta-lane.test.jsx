@@ -156,13 +156,19 @@ describe('PartyInventory chip delta lane (cross-tab clobber regression)', () => 
     expect(mockAdjustCurrency.mock.calls[0][1]).toEqual({ pp: 0, gp: 100, sp: 0, cp: 0 });
   });
 
-  it('a rejected flush fails loudly (console.error + alert) and writes no audit row', async () => {
+  it('a rejected flush fails loudly (console.error + in-app strip) and writes no audit row', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // QA backlog 2026-11-24: the native alert is retired — the honest sentence
+    // rides the root role="alert" strip byte-identical. A native alert firing
+    // here is a regression.
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {
+      throw new Error('native window.alert fired on the currency-flush path');
+    });
     mockAdjustCurrency.mockRejectedValueOnce(new Error('adjust down'));
     await renderReady();
     fireEvent.click(screen.getByTitle('Add 1 gp'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Currency save failed: adjust down'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Currency save failed: adjust down'));
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
     const appLines = consoleSpy.mock.calls.filter(args => String(args[0]).startsWith('[PartyInventory]'));
     expect(appLines).toHaveLength(1);

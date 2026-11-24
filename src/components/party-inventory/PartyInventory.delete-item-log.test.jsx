@@ -69,9 +69,16 @@ async function renderReady() {
   await screen.findByText('Party Inventory');
 }
 
+// QA backlog 2026-11-24: the row button arms the shared in-app confirm
+// (role="dialog"); this helper clicks Delete AND answers `Yes, Delete` — the
+// staged confirm is the only writer. Alerts are retired: failures surface on
+// the root .pi-action-error strip (role="alert") with byte-identical copy.
 function clickDelete(name) {
   const row = screen.getByText(name).closest('tr');
   fireEvent.click(within(row).getByTitle('Delete item'));
+  const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+  expect(dialog).toHaveTextContent(`Delete "${name}" from party inventory?`);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
 }
 
 function increaseQuantity(name) {
@@ -92,8 +99,12 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     });
     mockTransferInventory.mockReset().mockResolvedValue({});
     addEntry.mockClear();
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the delete path');
+    });
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {
+      throw new Error('native window.alert fired on the delete path');
+    });
   });
 
   afterEach(() => {
@@ -104,7 +115,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
   it('success leg: exactly ONE post-await Removed row after the delete intent acks', async () => {
     await renderReady();
     clickDelete('Antitoxin');
-    expect(confirmSpy).toHaveBeenCalledWith('Delete "Antitoxin" from party inventory?');
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       // A single row-delete intent — no item list ever leaves this window.
       expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -136,7 +147,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     });
     // Let the rejection chain settle.
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Delete failed: disk on fire');
+      expect(screen.getByRole('alert')).toHaveTextContent('Delete failed: disk on fire');
     });
     expect(addEntry).not.toHaveBeenCalled();
     // Single-layer console canon: exactly ONE app line on the failure leg.
@@ -161,7 +172,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     });
     // …and re-appears in the SAME mounted view once the intent rejects.
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Delete failed: disk on fire');
+      expect(screen.getByRole('alert')).toHaveTextContent('Delete failed: disk on fire');
     });
     expect(screen.getByText('Antitoxin')).toBeTruthy();
     expect(screen.getByText('Torch')).toBeTruthy();
@@ -181,13 +192,13 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     await renderReady();
     clickDelete('Antitoxin');
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
+      expect(screen.getByRole('alert')).toHaveTextContent(
         'Party item "Antitoxin" was already deleted elsewhere — this window now shows the current list.'
       );
     });
     // Trimmed 409 copy: no dead "reload the list" advice, no misleading "Delete failed:"
     // prefix (the item IS gone — the row was never this window's to delete).
-    const copy = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][0];
+    const copy = screen.getByRole('alert').textContent;
     expect(copy).not.toMatch(/reload the list/i);
     expect(copy).not.toMatch(/^Delete failed:/);
     // The rollback must NOT resurrect the row the other window deleted.
@@ -219,7 +230,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     });
     rejectDelete(new Error('disk on fire'));
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Delete failed: disk on fire');
+      expect(screen.getByRole('alert')).toHaveTextContent('Delete failed: disk on fire');
     });
     // Rollback skipped (newer edit owns the display), and the queued setQty ack carries
     // the SERVER truth: the delete was refused, so Antitoxin converges back — the qty
@@ -237,11 +248,23 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     consoleSpy.mockRestore();
   });
 
-  it('confirm cancel: zero mutation, zero row', async () => {
-    confirmSpy.mockReturnValue(false);
+  it('dialog Cancel/Escape: zero mutation, zero row', async () => {
     await renderReady();
-    clickDelete('Antitoxin');
-    await waitFor(() => expect(screen.getByText('Antitoxin')).toBeTruthy());
+    const row = screen.getByText('Antitoxin').closest('tr');
+    fireEvent.click(within(row).getByTitle('Delete item'));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.getByText('Antitoxin')).toBeTruthy();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+
+    // Escape answers the same inert lane.
+    fireEvent.click(within(row).getByTitle('Delete item'));
+    const dialog2 = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    fireEvent.keyDown(within(dialog2).getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(mockApplyItemIntent).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
   });

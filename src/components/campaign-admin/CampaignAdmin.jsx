@@ -362,6 +362,30 @@ function RegenerateAdventureModal({ campaignName, onCancel, onConfirm }) {
     );
 }
 
+// Destructive data-wipe gate for the Clear Change Data / Clear Campaign Log /
+// Full Reset lanes (QA backlog 2026-11-24: retires the trio's native
+// window.confirm gates onto the SAME shared DeleteConfirmModal role="dialog"
+// tier the Regenerate/Delete lanes already ride). The retired native copy
+// lives VERBATIM in the staged `message` (minus the "Continue?" tail the
+// explicit buttons now answer); the confirm label differs from the trigger
+// button so role queries stay unique. Cancel/Escape/backdrop are fully inert:
+// the staged descriptor's `confirm` is the only writer, so a dismiss fires no
+// status, no request.
+function AdminDataWipeModal({ pending, onCancel, onConfirm }) {
+    if (!pending) return null;
+    return (
+        <DeleteConfirmModal
+            titleId={pending.titleId}
+            title={pending.title}
+            confirmLabel={pending.confirmLabel}
+            onCancel={onCancel}
+            onConfirm={onConfirm}
+        >
+            {pending.message}
+        </DeleteConfirmModal>
+    );
+}
+
 function ConfirmModal({ modal, onClose }) {
     return (
         <div className="ct-modal-overlay">
@@ -512,6 +536,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     // ephemeral modal-open flag only — the mutation itself stays in
     // confirmRegenerateAdventure, mirroring the old confirm→work shape.
     const [regenModalOpen, setRegenModalOpen] = useState(false);
+    // Destructive data-wipe trio (QA backlog 2026-11-24): staged descriptor
+    // {titleId, title, confirmLabel, message, confirm} for the shared
+    // AdminDataWipeModal — the confirm is the ONLY writer.
+    const [pendingWipe, setPendingWipe] = useState(null);
     // The upload file input, so a dismissed (cancelled) Upload confirm can
     // reset it — otherwise the cancelled file stays selected and re-choosing
     // the SAME file fires no change event (silent no-op).
@@ -620,10 +648,20 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         }
     };
 
-    const handleClearChangeData = async () => {
-        if (!window.confirm(`This will clear all runtime state for "${campaignName}" including HP, conditions, spell slots, death saves, and target effects. You will need to re-establish combat state. Continue?`)) {
-            return;
-        }
+    // Clear Change Data: the old native window.confirm gate now arms the
+    // shared AdminDataWipeModal (role=dialog tier); the mutation runs
+    // UNCHANGED from the dialog's Confirm, and the success strip + census
+    // refresh behave exactly as before. Cancel is fully inert.
+    const armClearChangeData = () => setPendingWipe({
+        titleId: 'clear-change-data-title',
+        title: 'Clear Change Data',
+        confirmLabel: 'Yes, Clear Change Data',
+        message: `This will clear all runtime state for "${campaignName}" including HP, conditions, spell slots, death saves, and target effects. You will need to re-establish combat state.`,
+        confirm: runClearChangeData,
+    });
+
+    async function runClearChangeData() {
+        setPendingWipe(null);
         setStatus('clearing-change-data');
         try {
             const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/clear-change-data`, { method: 'POST' });
@@ -641,10 +679,18 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         }
     };
 
-    const handleClearLog = async () => {
-        if (!window.confirm(`This will permanently delete the campaign log for "${campaignName}". Roll history will be lost. Continue?`)) {
-            return;
-        }
+    // Clear Campaign Log: native confirm retired onto the shared
+    // AdminDataWipeModal tier — same arm/confirm-only-writer law.
+    const armClearLog = () => setPendingWipe({
+        titleId: 'clear-log-title',
+        title: 'Clear Campaign Log',
+        confirmLabel: 'Yes, Clear Log',
+        message: `This will permanently delete the campaign log for "${campaignName}". Roll history will be lost.`,
+        confirm: runClearLog,
+    });
+
+    async function runClearLog() {
+        setPendingWipe(null);
         setStatus('clearing-log');
         try {
             const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/clear-log`, { method: 'POST' });
@@ -657,12 +703,21 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         } catch (err) {
             setStatus({ error: err.message });
         }
-    };
+    }
 
-    const handleFullReset = async () => {
-        if (!window.confirm(`FULL RESET: This will delete both the campaign log AND all change data for "${campaignName}". All runtime state will be lost. This cannot be undone. Continue?`)) {
-            return;
-        }
+    // Full Reset: native confirm retired onto the shared AdminDataWipeModal
+    // tier. The FULL RESET: prefix is kept VERBATIM from the retired native
+    // copy (minus the "Continue?" tail) so the worst-case ask reads the same.
+    const armFullReset = () => setPendingWipe({
+        titleId: 'full-reset-title',
+        title: 'Full Reset',
+        confirmLabel: 'Yes, Full Reset',
+        message: `FULL RESET: This will delete both the campaign log AND all change data for "${campaignName}". All runtime state will be lost. This cannot be undone.`,
+        confirm: runFullReset,
+    });
+
+    async function runFullReset() {
+        setPendingWipe(null);
         setStatus('resetting');
         try {
             const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/full-reset`, { method: 'POST' });
@@ -891,22 +946,23 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                         setStatus({ success: data.message });
                         window.location.reload();
                     } else {
+                        // One honest status strip (QA backlog 2026-11-24: the
+                        // former native alert face folds INTO the strip — same
+                        // cause-naming copy, zero native dialogs). Only the route
+                        // body reports failures as HTTP 500 JSON, and only it runs
+                        // after the safety snapshot (so those failures genuinely
+                        // self-restore). Pre-route rejections (413 oversize,
+                        // 400/403/404, non-JSON error pages) never touched
+                        // campaign data — claiming a rollback there is false.
                         const details = data.details ? `: ${data.details}` : '';
-                        setStatus({ error: `${data.error}${details}` });
-                        // Only the route body reports failures as HTTP 500 JSON,
-                        // and only it runs after the safety snapshot (so those
-                        // failures genuinely self-restore). Pre-route rejections
-                        // (413 oversize, 400/403/404, non-JSON error pages) never
-                        // touched campaign data — claiming a rollback there is false.
-                        if (res.status === 500 && isJson) {
-                            alert(`Upload failed. Campaign has been rolled back to the previous state.\n\nError: ${data.error}${data.details ? '\nDetails: ' + data.details : ''}`);
-                        } else {
-                            alert(`Upload failed before any campaign data was replaced.\n\nError: ${data.error}${data.details ? '\nDetails: ' + data.details : ''}`);
-                        }
+                        setStatus({
+                            error: res.status === 500 && isJson
+                                ? `Upload failed. Campaign has been rolled back to the previous state. Error: ${data.error}${details}`
+                                : `Upload failed before any campaign data was replaced. Error: ${data.error}${details}`
+                        });
                     }
                 } catch (err) {
-                    setStatus({ error: err.message });
-                    alert(`Upload failed. The request did not complete, so no changes were confirmed.\n\nError: ${err.message}`);
+                    setStatus({ error: `Upload failed. The request did not complete, so no changes were confirmed. Error: ${err.message}` });
                 }
                 clearFileInput(input);
             }
@@ -1011,21 +1067,21 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     <div className="admin-action">
                         <h3>Clear Change Data</h3>
                         <p>Removes all runtime state (HP, conditions, spell slots, death saves, target effects, active buffs, and position data).</p>
-                        <button className="ct-btn ct-btn-primary" onClick={handleClearChangeData} disabled={isBusy}>
+                        <button className="ct-btn ct-btn-primary" onClick={armClearChangeData} disabled={isBusy}>
                             <i className="fas fa-eraser"></i> Clear Change Data
                         </button>
                     </div>
                     <div className="admin-action">
                         <h3>Clear Campaign Log</h3>
                         <p>Deletes all entries from the campaign log. Roll history, combat events, and ability use records will be permanently lost.</p>
-                        <button className="ct-btn ct-btn-primary" onClick={handleClearLog} disabled={isBusy}>
+                        <button className="ct-btn ct-btn-primary" onClick={armClearLog} disabled={isBusy}>
                             <i className="fas fa-trash"></i> Clear Campaign Log
                         </button>
                     </div>
                     <div className="admin-action admin-action--danger">
                         <h3>Full Reset</h3>
                         <p>Clears both the campaign log and change data in one action. Use to fix corrupted campaign state.</p>
-                        <button className="ct-btn ct-btn-danger" onClick={handleFullReset} disabled={isBusy}>
+                        <button className="ct-btn ct-btn-danger" onClick={armFullReset} disabled={isBusy}>
                             <i className="fas fa-exclamation-triangle"></i> Full Reset
                         </button>
                     </div>
@@ -1132,6 +1188,15 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     onClose={() => setRollbackModal(false)}
                 />
             )}
+
+            {/* Destructive-wipe trio (QA backlog 2026-11-24): shared
+                role="dialog" tier mounted after every editor so it stacks on
+                top; Cancel/Escape/backdrop fire zero requests. */}
+            <AdminDataWipeModal
+                pending={pendingWipe}
+                onCancel={() => setPendingWipe(null)}
+                onConfirm={() => pendingWipe.confirm()}
+            />
         </div>
     );
 }

@@ -150,13 +150,20 @@ describe('PartyInventory', () => {
     expect(screen.queryByText('Edit Antitoxin')).not.toBeInTheDocument();
   });
 
-  it('moves an item to a player through the move modal', async () => {
+  it('moves an item to a player through the move modal + shared in-app confirm', async () => {
     await renderReady();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // QA backlog 2026-11-24: native confirm retired onto the role="dialog"
+    // tier; a native confirm firing here is a regression.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the move-modal path');
+    });
     const row = screen.getByText('Torch').closest('tr');
     fireEvent.click(within(row).getByTitle('Move to player'));
     fireEvent.click(await screen.findByRole('button', { name: /Move to Player/ }));
-    expect(confirmSpy).toHaveBeenCalledWith('Move 5 × Torch to War Cleric?');
+    const dialog = await screen.findByRole('dialog', { name: 'Move to Player' });
+    expect(dialog).toHaveTextContent('Move 5 × Torch to War Cleric?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'party-to-player',
@@ -180,7 +187,14 @@ describe('PartyInventory', () => {
     fireEvent.click(screen.getByRole('button', {
       name: 'Move 3 × Rope, Hempen from War Cleric to party inventory', exact: true,
     }));
-    expect(confirmSpy).toHaveBeenCalledWith('Move 3 × Rope, Hempen from War Cleric to party inventory?');
+    // In-app confirm armed by the row-scoped button (native retired 2026-11-24).
+    const confirmSpyOn = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the To Party path');
+    });
+    const dialog = await screen.findByRole('dialog', { name: 'Move to Party' });
+    expect(dialog).toHaveTextContent('Move 3 × Rope, Hempen from War Cleric to party inventory?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
+    expect(confirmSpyOn).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'player-to-party',
@@ -220,11 +234,16 @@ describe('PartyInventory', () => {
     });
   });
 
-  it('deletes an item after confirmation', async () => {
+  it('deletes an item after the shared in-app confirm', async () => {
     await renderReady();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the delete path');
+    });
     const row = screen.getByText('Antitoxin').closest('tr');
     fireEvent.click(within(row).getByTitle('Delete item'));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       // One atomic row-delete intent — siblings stay on the server ledger untouched.
       expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -233,7 +252,6 @@ describe('PartyInventory', () => {
       }));
       expect(serverItems.map(i => i.id)).toEqual(['i2']);
     });
-    window.confirm.mockRestore();
   });
 
   it('live-updates from SSE inventory events', async () => {

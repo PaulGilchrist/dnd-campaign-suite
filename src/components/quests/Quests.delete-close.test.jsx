@@ -3,7 +3,7 @@
 // an accepted delete that resolves MUST unmount the Edit Quest modal
 // (mirroring NPCs/Notes/Factions/Sessions handleDelete close-on-success).
 // A declined confirm must leave both the row and the modal intact.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {  render, screen, fireEvent, waitFor , within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Quests from './Quests.jsx';
 
@@ -74,7 +74,7 @@ describe('Quests delete modal close', () => {
   });
 
   it('unmounts the edit modal and removes the row after an accepted delete resolves', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'confirm').mockImplementation(() => { throw new Error('native confirm on delete-close'); });
     const items = [
       quest({ id: 'quest-1', name: 'QA Quest Two' }),
       quest({ id: 'quest-2', name: 'The Lost Artifact' }),
@@ -85,7 +85,8 @@ describe('Quests delete modal close', () => {
     expect(overlay()).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(window.confirm).toHaveBeenCalledWith('Delete quest "QA Quest Two"?');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Quest' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
     expect(deleteItem).toHaveBeenCalledWith('quest-1');
 
     await waitFor(() => expect(overlay()).toBeNull());
@@ -94,21 +95,24 @@ describe('Quests delete modal close', () => {
     expect(screen.getByRole('button', { name: 'Edit quest: The Lost Artifact' })).toBeInTheDocument();
   });
 
-  it('keeps the row and the open modal when the confirm is declined', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('keeps the row and the open modal when the dialog is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockImplementation(() => { throw new Error('native confirm on delete-close'); });
     const items = [quest({ id: 'quest-1', name: 'QA Quest Two' })];
     const { deleteItem } = renderWithLiveList(items);
 
     openEditModal('QA Quest Two');
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Quest' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(deleteItem).not.toHaveBeenCalled();
     expect(overlay()).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Edit quest: QA Quest Two' })).toBeInTheDocument();
   });
 
   it('keeps the modal open with an inline error when the delete request fails', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'confirm').mockImplementation(() => { throw new Error('native confirm on delete-close'); });
     const errorSpy = vi.spyOn(console, 'error');
     const items = [quest({ id: 'quest-1', name: 'QA Quest Two' })];
     mockUseQuestsManagement.mockReturnValue({
@@ -122,6 +126,8 @@ describe('Quests delete modal close', () => {
 
     openEditModal('QA Quest Two');
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Quest' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
 
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('Failed to delete quest:', expect.any(Error)));
     expect(overlay()).not.toBeNull();

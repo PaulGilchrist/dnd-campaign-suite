@@ -8,7 +8,7 @@
 // so a reopened planner never re-seeds a stale row. Mirrors
 // Notes.sse-sync.test.jsx / NPCs.sse-sync.test.jsx. Connects through the ONE
 // shared SSE client (subscribeToSSE), never a raw EventSource.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Sessions from './Sessions';
 
@@ -162,10 +162,10 @@ describe('Sessions live SSE sync', () => {
     // stay stale so a reopened planner re-seeds a fresh row (409 recovery).
     // The draft is dirty, so Cancel now NAMES the discard (improve
     // 2026-10-29-V): accept it to exercise the close path.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Draft session"?');
-    confirmSpy.mockRestore();
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent('Discard changes to "Draft session"?');
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await findByText('2026-12-25');
     expect(loadCallCount).toBe(2);
 

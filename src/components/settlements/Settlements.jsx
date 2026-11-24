@@ -62,6 +62,26 @@ function DeleteSettlementModal({ pending, onCancel, onConfirm }) {
   );
 }
 
+// Dirty-form Generate guard over the same shared role="dialog" tier (QA
+// backlog 2026-11-24): retires the native `Generate will replace your entered
+// settlement details?` window.confirm, states the loss up front, and keeps
+// Cancel/Escape/backdrop fully inert (the entered draft survives untouched).
+function GenerateReplaceModal({ open, onCancel, onConfirm }) {
+  if (!open) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="settlements-generate-replace-title"
+      title="Generate Settlement"
+      confirmLabel="Yes, Generate"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      Generate will replace your entered settlement details? The typed draft
+      is <strong>discarded</strong> and a freshly generated settlement fills the form.
+    </DeleteConfirmModal>
+  );
+}
+
 const SERVICE_TYPE_LABELS = {
   inn: 'Inn',
   tavern: 'Tavern',
@@ -462,6 +482,10 @@ function Settlements({ campaignName }) {
   // AND the form footer button arm the same dialog; cancel is fully inert).
   const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   const [generating, setGenerating] = useState(false);
+  // Dirty-form guard for the Generate lane riding the shared role="dialog"
+  // tier (QA backlog 2026-11-24: retires the native `Generate will replace
+  // your entered settlement details?` window.confirm).
+  const [pendingGenerate, setPendingGenerate] = useState(false);
   const [error, setError] = useState(null);
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
@@ -475,7 +499,7 @@ function Settlements({ campaignName }) {
   const descDataRef = useRef(null);
   // Draft snapshot powering the reload-discard guard — shared with the NPC
   // lane (useReloadGuard, improve 2026-10-28-T backlog).
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the settlement list and discard your unsaved edits?',
@@ -556,8 +580,22 @@ function Settlements({ campaignName }) {
       (formData.rumors || []).length > 0;
   };
 
-  const handleGenerateSettlement = async () => {
-    if (settlementFormHasUserInput() && !window.confirm('Generate will replace your entered settlement details?')) return;
+  const handleGenerateSettlement = () => {
+    // Dirty-form guard (QA backlog 2026-11-24: retired the native
+    // `Generate will replace your entered settlement details?` window.confirm;
+    // the ask now rides the shared role="dialog" tier). The generator replaces
+    // every form field, so with typed content the loss is named up front and
+    // Cancel/Escape/backdrop keep the draft fully inert; a clean form
+    // generates with zero friction, exactly as before.
+    if (settlementFormHasUserInput()) {
+      setPendingGenerate(true);
+      return;
+    }
+    runGenerateSettlement();
+  };
+
+  const runGenerateSettlement = async () => {
+    setPendingGenerate(false);
     setGenerating(true);
     try {
       const generated = await generateSettlement(settlements);
@@ -599,8 +637,8 @@ function Settlements({ campaignName }) {
   // throws away the open draft, so with unsaved edits the loss is NAMED up
   // front and Cancel keeps the banner, editor, and draft fully inert
   // (mirrors NPCs.jsx via shared useReloadGuard).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -612,9 +650,9 @@ function Settlements({ campaignName }) {
   // new-draft copy. A clean draft closes silently exactly as before. Kept
   // OUT of handleCloseModal so internal closes (save/delete/reload) never
   // double-confirm; dismiss is fully inert (banner, editor, draft).
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = (formData?.name || '').trim() || editingSettlement?.name;
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new settlement draft?'
     )) return;
     handleCloseModal();
@@ -882,6 +920,16 @@ function Settlements({ campaignName }) {
       {/* Rendered after the editor so the dialog stacks over the ct-modal
           overlay (same z-index tier, later sibling wins). */}
       <DeleteSettlementModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+      <GenerateReplaceModal
+        open={pendingGenerate}
+        onCancel={() => setPendingGenerate(false)}
+        onConfirm={runGenerateSettlement}
+      />
+
+      {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
+          editor — its backdrop/Escape answer only the toll. */}
+      {discardDialog}
     </div>
   );
 }

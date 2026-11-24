@@ -126,9 +126,13 @@ const postCount = (fetchMock, url) =>
     fetchMock.mock.calls.filter(([u, opts]) => u === url && opts?.method === 'POST').length;
 
 beforeEach(() => {
-    // Rollback/upload failures surface via alert(); reload is stubbed so a
-    // "successful" test can still inspect post-success state.
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // Upload failures surface on the status strip (QA backlog 2026-11-24:
+    // the native alert face folded INTO the strip — a native alert firing is
+    // a regression). Reload is stubbed so a "successful" test can still
+    // inspect post-success state.
+    vi.spyOn(window, 'alert').mockImplementation(() => {
+        throw new Error('native window.alert fired on the upload path');
+    });
     vi.stubGlobal('location', { href: 'http://localhost/', reload: vi.fn() });
     sessionStorage.clear();
 });
@@ -341,7 +345,7 @@ describe('CampaignAdmin - Upload', () => {
         // route itself reports (HTTP 500 JSON, raised after the safety
         // snapshot) may claim a rollback. Pre-route rejections (413 oversize
         // JSON, non-JSON server error pages) and transport errors never
-        // touched campaign data, so their alert copy must not claim a restore.
+        // touched campaign data, so their strip copy must not claim a restore.
         const OUTCOMES = [
             {
                 name: 'succeeds',
@@ -349,25 +353,20 @@ describe('CampaignAdmin - Upload', () => {
                 statusText: 'Upload complete',
                 kind: 'success',
                 reloads: true,
-                alertText: null,
             },
             {
                 name: 'is rejected by the server',
                 handler: jsonResponse({ error: 'Upload failed', details: 'corrupt archive' }, false, { status: 500 }),
-                statusText: 'Upload failed: corrupt archive',
+                statusText: 'Upload failed. Campaign has been rolled back to the previous state. Error: Upload failed: corrupt archive',
                 kind: 'error',
                 reloads: false,
-                alertText:
-                    'Upload failed. Campaign has been rolled back to the previous state.\n\nError: Upload failed\nDetails: corrupt archive',
             },
             {
                 name: 'is rejected as oversized (server JSON 413)',
                 handler: jsonResponse({ error: 'File too large (limit 100 MB)' }, false, { status: 413 }),
-                statusText: 'File too large (limit 100 MB)',
+                statusText: 'Upload failed before any campaign data was replaced. Error: File too large (limit 100 MB)',
                 kind: 'error',
                 reloads: false,
-                alertText:
-                    'Upload failed before any campaign data was replaced.\n\nError: File too large (limit 100 MB)',
             },
             {
                 name: 'draws a non-JSON server error page',
@@ -377,26 +376,22 @@ describe('CampaignAdmin - Upload', () => {
                     headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null) },
                     json: () => Promise.reject(new SyntaxError('Unexpected token \'<\', "<!DOCTYPE "... is not valid JSON')),
                 },
-                statusText: 'Server returned a non-JSON error response (HTTP 500)',
+                statusText: 'Upload failed before any campaign data was replaced. Error: Server returned a non-JSON error response (HTTP 500)',
                 kind: 'error',
                 reloads: false,
-                alertText:
-                    'Upload failed before any campaign data was replaced.\n\nError: Server returned a non-JSON error response (HTTP 500)',
             },
             {
                 name: 'never reaches the server',
                 handler: new Error('Network failed'),
-                statusText: 'Network failed',
+                statusText: 'Upload failed. The request did not complete, so no changes were confirmed. Error: Network failed',
                 kind: 'error',
                 reloads: false,
-                alertText:
-                    'Upload failed. The request did not complete, so no changes were confirmed.\n\nError: Network failed',
             },
         ];
 
         it.each(OUTCOMES)(
             'when upload $name: posts the file once to the encoded URL, shows the $kind status, clears the input, and reloads=$reloads',
-            async ({ handler, statusText, kind, reloads, alertText }) => {
+            async ({ handler, statusText, kind, reloads }) => {
                 const fetchMock = stubFetch({ upload: handler });
                 renderAdmin({ campaignName: TRICKY });
 
@@ -415,11 +410,9 @@ describe('CampaignAdmin - Upload', () => {
                 // The input is reset whatever happens, so re-picking the same
                 // file still fires change next time.
                 expect(fileInput().value).toBe('');
-                if (alertText) {
-                    expect(window.alert).toHaveBeenCalledWith(alertText);
-                } else {
-                    expect(window.alert).not.toHaveBeenCalled();
-                }
+                // Zero native dialogs on every outcome (the strip carries the
+                // full honest sentence now).
+                expect(window.alert).not.toHaveBeenCalled();
                 await waitFor(() =>
                     expect(window.location.reload).toHaveBeenCalledTimes(reloads ? 1 : 0)
                 );

@@ -108,7 +108,7 @@ describe('Factions', () => {
   });
 
   describe('modal lifecycle', () => {
-    it('opens on New Faction with Save disabled until a real name is typed, no Delete button, closes via X and Cancel', () => {
+    it('opens on New Faction with Save disabled until a real name is typed, no Delete button, closes via X and Cancel (dirty toll)', async () => {
       render(<Factions {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
       expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
@@ -118,14 +118,26 @@ describe('Factions', () => {
       fireEvent.change(nameInput(), { target: { value: '   ' } });
       expect(saveButton()).toBeDisabled();
       expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      // Whitespace-only draft is DIRTY vs the '' seed → the close pays the
+      // shared in-app keep/discard toll (QA backlog 2026-11-24: no native
+      // confirm); Discard closes via handleRequestClose's await seam.
       fireEvent.click(screen.getByLabelText('Close'));
-      expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
+      const tollX = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+      fireEvent.click(within(tollX).getByRole('button', { name: 'Yes, Discard' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument()
+      );
 
       fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
       fireEvent.change(nameInput(), { target: { value: 'Test' } });
       expect(saveButton()).not.toBeDisabled();
       fireEvent.click(screen.getByText('Cancel'));
-      expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
+      const tollCancel = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+      expect(tollCancel).toHaveTextContent('Discard changes to "Test"?');
+      fireEvent.click(within(tollCancel).getByRole('button', { name: 'Yes, Discard' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument()
+      );
     });
 
     it('opens a prefilled Edit modal via keyboard with Save enabled and Delete present', () => {

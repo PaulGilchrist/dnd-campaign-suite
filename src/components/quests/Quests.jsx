@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
+import useDeleteRequest from '../common/useDeleteRequest.js';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
 import { QUEST_STATUSES, questStatusLabel } from '../../services/campaign/questStatusDisplay.js';
 import utils from '../../services/ui/utils.js';
@@ -192,6 +194,26 @@ function QuestFormModal({ editingQuest, formData, setFormData, campaignName, sav
   );
 }
 
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (QA backlog 2026-11-24: retires the native `Delete quest "X"?` window.confirm
+// and mirrors the Sessions/Notes/Settlements row-delete chrome). Renders null
+// while idle so the destructive copy never lingers behind the planner.
+function DeleteQuestModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="quests-delete-title"
+      title="Delete Quest"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the quest &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
+}
+
 function Quests({ campaignName, isLocalhost }) {
   const { items: quests, loading, loadItems: loadQuestsList, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
   const {
@@ -202,6 +224,10 @@ function Quests({ campaignName, isLocalhost }) {
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
+  // Shared pendingDelete staging for the role="dialog" delete tier (QA backlog
+  // 2026-11-24, mirrors Notes/Sessions.jsx): the DeleteConfirmModal's confirm
+  // is the ONLY writer, so Cancel/Escape/backdrop fire zero requests.
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
   const [errorIsConflict, setErrorIsConflict] = useState(false);
@@ -211,7 +237,7 @@ function Quests({ campaignName, isLocalhost }) {
   const missedListBroadcast = useRef(false);
   // Draft snapshot powering the reload-discard guard — shared with the NPC
   // lane (useReloadGuard, improve 2026-10-28-T backlog).
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the quest list and discard your unsaved edits?',
@@ -271,8 +297,8 @@ function Quests({ campaignName, isLocalhost }) {
   // throws away the open draft, so with unsaved edits the loss is NAMED up
   // front and Cancel keeps the banner, editor, and draft fully inert
   // (mirrors NPCs.jsx via shared useReloadGuard).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -284,9 +310,9 @@ function Quests({ campaignName, isLocalhost }) {
   // A clean draft closes silently exactly as before. Kept OUT of
   // handleCloseModal so internal closes (save/delete/reload) never double-
   // confirm; dismiss is fully inert (banner, editor, draft, zero network).
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = (formData?.name || '').trim() || editingQuest?.name;
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new quest draft?'
     )) return;
     handleCloseModal();
@@ -337,8 +363,19 @@ function Quests({ campaignName, isLocalhost }) {
     }
   };
 
-  const handleDelete = async (quest) => {
-    if (!window.confirm(`Delete quest "${quest.name}"?`)) return;
+  // Delete quest — the footer button arms the shared DeleteConfirmModal tier
+  // (role="dialog", focus lands Cancel, Escape/backdrop zero-write); the
+  // staged descriptor's confirm is the only writer (Notes/Sessions precedent),
+  // so the SSE fan-out and success-close ladder run exactly as before.
+  const handleDelete = (quest) => {
+    if (!quest) return;
+    requestDelete({
+      label: quest.name,
+      confirm: () => runDelete(quest),
+    });
+  };
+
+  const runDelete = async (quest) => {
     setDeleting(quest.id);
     try {
       await deleteQuestAction(quest.id);
@@ -452,6 +489,12 @@ function Quests({ campaignName, isLocalhost }) {
           onDelete={handleDelete}
         />
       )}
+
+      {/* SIBLING mounts (EncounterModal.delete-confirm-modal law): the delete
+          tier and the dirty-draft toll ride .modal-shell-overlay above the
+          editor; their backdrops dismiss only themselves. */}
+      <DeleteQuestModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+      {discardDialog}
     </div>
   );
 }

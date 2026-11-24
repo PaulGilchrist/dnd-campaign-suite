@@ -282,7 +282,7 @@ function Notes({ campaignName, characters, isLocalhost }) {
   const missedListBroadcast = useRef(false);
   // Draft snapshot powering the reload-discard guard — shared with the NPC
   // lane (useReloadGuard, improve 2026-10-28-T backlog).
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the note list and discard your unsaved edits?',
@@ -366,10 +366,10 @@ function Notes({ campaignName, characters, isLocalhost }) {
   // A clean draft closes silently exactly as before. Kept OUT of
   // handleCloseModal so internal closes (save/delete/reload) never double-
   // confirm; dismiss is fully inert (banner, editor, draft, zero network).
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = noteDisplayName(formData || {}) ||
       (editingNote ? noteDisplayName(editingNote) : '');
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new note draft?'
     )) return;
     handleCloseModal();
@@ -381,8 +381,8 @@ function Notes({ campaignName, characters, isLocalhost }) {
   // throws away the open draft, so with unsaved edits the loss is NAMED up
   // front and Cancel keeps the banner, editor, and draft fully inert
   // (mirrors NPCs.jsx via shared useReloadGuard).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -558,6 +558,10 @@ function Notes({ campaignName, characters, isLocalhost }) {
           a fragment sibling (EB/MapsManager law: its own backdrop never
           touches the modal underneath). */}
       <DeleteNoteModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+      {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
+          editor — its backdrop/Escape answer only the toll. */}
+      {discardDialog}
     </div>
   );
 }

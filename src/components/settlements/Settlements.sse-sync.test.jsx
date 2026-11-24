@@ -8,7 +8,7 @@
 // applied on close so a reopened editor never re-seeds a stale row. Mirrors
 // Notes.sse-sync.test.jsx / NPCs.sse-sync.test.jsx. Connects through the ONE
 // shared SSE client (subscribeToSSE), never a raw EventSource.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Settlements from './Settlements';
 
@@ -132,10 +132,10 @@ describe('Settlements live SSE sync', () => {
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     // The draft is dirty, so × now NAMES the discard (improve 2026-10-29-V):
     // accept it to exercise the close path.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Ironhaven"?');
-    confirmSpy.mockRestore();
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent('Discard changes to "Ironhaven"?');
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await findByText('city');
     expect(loadCallCount).toBe(2);
 

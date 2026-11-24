@@ -4,7 +4,7 @@
 // instead of silently swallowing the failed save like before. Mirrors the
 // mocked useEntityManagement harness of Notes.test.jsx.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import Notes from './Notes.jsx';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
@@ -98,14 +98,19 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     openEditorWithStaleEdit(screen);
     await waitFor(() => expect(document.querySelector('.notes-form-error')).not.toBeNull());
 
-    // Cancel on a dirty draft first NAMES the discard (improve 2026-10-29-V)
-    // — accept it; the close still clears the banner. The NAMED entity is the
-    // typed party location (noteDisplayName law).
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Cancel on a dirty draft first opens the shared in-app keep/discard toll
+    // naming the loss (improve 2026-10-29-V; native confirm retired
+    // 2026-11-24) — Discard it; the close still clears the banner. The NAMED
+    // entity is the typed party location (noteDisplayName law).
+    const nativeSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the close-discard path');
+    });
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Stale Hollow"?');
-    confirmSpy.mockRestore();
-    expect(document.querySelector('.notes-form-error')).toBeNull();
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent('Discard changes to "Stale Hollow"?');
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
+    await waitFor(() => expect(document.querySelector('.notes-form-error')).toBeNull());
+    expect(nativeSpy).not.toHaveBeenCalled();
   });
 
   it('successful saves still close the modal with no error shown', async () => {
@@ -149,12 +154,15 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     expect(errorSpy).not.toHaveBeenCalled();
 
     // improve 2026-10-28-T: the typed 'A stale edit' makes the draft dirty,
-    // so Reload now NAMES the discard — accept it to run the recovery.
-    globalThis.confirm.mockReturnValue(true);
+    // so Reload now opens the in-app toll naming the discard (native confirm
+    // retired 2026-11-24) — Discard it to run the recovery.
     fireEvent.click(button);
-    expect(globalThis.confirm).toHaveBeenCalledWith(
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent(
       'Reload the note list and discard your unsaved edits?'
     );
+    expect(globalThis.confirm).not.toHaveBeenCalled();
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     // One click = the sanctioned stale close: editor gone + one more refresh,
     // so the next reopen seeds a fresh row (mirrors NPCs recovery machinery).
     await waitFor(() => expect(hook.loadItems).toHaveBeenCalledTimes(2));

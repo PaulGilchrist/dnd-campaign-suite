@@ -2,8 +2,10 @@
 // Improve (.pi-modal Give default 0 + confirm sum): the Give modal prefilled the focused
 // currency from the party balance (1 in source, full balance observed live) and submitted
 // with no confirmation — one accidental Enter moved money. Now every amount input defaults
-// to 0, the submit control is disabled until any amount > 0, and a native window.confirm
-// names the player + exact sums BEFORE the /inventory/transfer POST. Cancel = no POST.
+// to 0, the submit control is disabled until any amount > 0, and the shared in-app
+// DeleteConfirmModal tier names the player + exact sums BEFORE the /inventory/transfer
+// POST (QA backlog 2026-11-24: the native window.confirm retired with the lane sweep;
+// a native confirm firing here is a regression). Cancel = no POST.
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
@@ -55,7 +57,10 @@ beforeEach(() => {
     inventory: baseInventory(),
     character: { name: 'War Cleric', inventory: {} },
   });
-  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  // A native confirm that FIRES on this lane is a regression — make it loud.
+  confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+    throw new Error('native window.confirm fired on the give path');
+  });
 });
 
 afterEach(() => {
@@ -79,6 +84,17 @@ function giveInputs(modal) {
 function submitButton(modal) {
   return within(modal).getByRole('button', { name: /Give/ });
 }
+
+// The shared in-app confirm the Give submit now arms (QA backlog 2026-11-24).
+// Distinct accessible name from the Give modal itself ('Give Currency' vs
+// 'Give Currency to Player') so the two dialogs never collide in queries.
+function openGiveConfirm(copy) {
+  const dialog = screen.getByRole('dialog', { name: 'Give Currency' });
+  if (copy) expect(dialog).toHaveTextContent(copy);
+  return dialog;
+}
+const confirmYes = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Give' }));
+const confirmCancel = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
 describe('PartyInventory Give modal default-0 + confirm', () => {
   it('opens with every currency input at 0 — never the party balance', async () => {
@@ -108,15 +124,16 @@ describe('PartyInventory Give modal default-0 + confirm', () => {
 
   it('confirms naming player and exact sum BEFORE the POST; cancel means no POST', async () => {
     await renderReady();
-    confirmSpy.mockReturnValue(false);
     const modal = openGiveModal();
     fireEvent.change(giveInputs(modal)[1], { target: { value: '50' } });
     fireEvent.click(submitButton(modal));
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Give 50 gp to War Cleric?');
+    const dialog = openGiveConfirm('Give 50 gp to War Cleric?');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmCancel(dialog);
     expect(mockTransferInventory).not.toHaveBeenCalled();
-    // modal stays open with the amount intact — the GM can fix or Cancel explicitly
-    expect(screen.getByText('Give Currency to Player')).toBeTruthy();
+    // Keep returns to the Give modal with the amount intact — the GM can fix
+    // or Cancel explicitly; the confirm unmounts.
+    expect(screen.queryByRole('dialog', { name: 'Give Currency' })).toBeNull();
     expect(giveInputs(screen.getByText('Give Currency to Player').closest('.pi-modal'))[1].value).toBe('50');
   });
 
@@ -125,7 +142,8 @@ describe('PartyInventory Give modal default-0 + confirm', () => {
     const modal = openGiveModal();
     fireEvent.change(giveInputs(modal)[1], { target: { value: '50' } });
     fireEvent.click(submitButton(modal));
-    expect(confirmSpy).toHaveBeenCalledWith('Give 50 gp to War Cleric?');
+    const dialog = openGiveConfirm('Give 50 gp to War Cleric?');
+    confirmYes(dialog);
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'party-to-player',
@@ -138,13 +156,13 @@ describe('PartyInventory Give modal default-0 + confirm', () => {
 
   it('names every non-zero currency in CURRENCIES order in the confirm message', async () => {
     await renderReady();
-    confirmSpy.mockReturnValue(false);
     const modal = openGiveModal();
     const inputs = giveInputs(modal);
     fireEvent.change(inputs[2], { target: { value: '20' } });
     fireEvent.change(inputs[1], { target: { value: '50' } });
     fireEvent.click(submitButton(modal));
-    expect(confirmSpy).toHaveBeenCalledWith('Give 50 gp, 20 sp to War Cleric?');
+    openGiveConfirm('Give 50 gp, 20 sp to War Cleric?');
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
   });
 });

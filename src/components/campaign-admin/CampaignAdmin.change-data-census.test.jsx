@@ -21,6 +21,13 @@ const CENSUS_URL = `/api/campaigns/${encodeURIComponent(CAMPAIGN)}/admin/change-
 
 const jsonResponse = (body, ok = true) => ({ ok, json: () => Promise.resolve(body) });
 
+// Confirm-button labels of the shared wipe dialog per toolbar trigger.
+const WIPE_YES = {
+    'Clear Change Data': 'Yes, Clear Change Data',
+    'Clear Campaign Log': 'Yes, Clear Log',
+    'Full Reset': 'Yes, Full Reset',
+};
+
 function stubFetchWithCensus(census) {
     const fetchMock = vi.fn((url) => {
         let result;
@@ -48,7 +55,11 @@ const createDefaultProps = (overrides = {}) => ({
 });
 
 beforeEach(() => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // QA backlog 2026-11-24: the wipe trio rides the shared role="dialog"
+    // tier — a native confirm firing here is a regression.
+    vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on an admin data-wipe path');
+    });
     vi.stubGlobal('location', { href: 'http://localhost/', reload: vi.fn() });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -132,6 +143,8 @@ describe('CampaignAdmin - change-data census', () => {
         await screen.findByText('inventory');
 
         fireEvent.click(screen.getByRole('button', { name: 'Clear Change Data' }));
+        const wipeDialog = screen.getByRole('dialog', { name: 'Clear Change Data' });
+        fireEvent.click(within(wipeDialog).getByRole('button', { name: WIPE_YES['Clear Change Data'] }));
         await screen.findByText('Change data cleared');
 
         expect(await screen.findByText('No unknown top-level keys — change data is empty.')).toBeInTheDocument();

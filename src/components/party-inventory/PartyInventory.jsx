@@ -6,6 +6,8 @@ import { loadEquipment } from '../../services/ui/dataLoader.js';
 import { loadInventory, applyItemIntent, adjustCurrency, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
 import { characterCurrency } from '../../services/campaign/characterCurrency.js';
 import Popup from '../common/Popup.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import useDeleteRequest from '../common/useDeleteRequest.js';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import './PartyInventory.css';
 
@@ -38,6 +40,57 @@ function conflictItemLabel(intent) {
   const name = intent.name || intent.item?.name;
   const label = typeof name === 'string' && name.trim() ? name.trim() : (intent.id || intent.item?.id);
   return `"${label}"`;
+}
+
+// Intent-failure copy (QA backlog 2026-11-24 native-dialog sweep): the
+// module-sentence builder stays byte-identical to the retired alert copy —
+// 409s speak the trimmed "deleted elsewhere… current list" sentences (no dead
+// "reload the list" advice, adoption is live), non-409s quote the server.
+function intentFailureCopy(intent, merged, error) {
+  if (intent.action === 'delete') {
+    return merged
+      ? `Party item ${conflictItemLabel(intent)} was already deleted elsewhere — this window now shows the current list.`
+      : `Delete failed: ${error.message}`;
+  }
+  return merged
+    ? `Party item ${conflictItemLabel(intent)} was deleted elsewhere — this window now shows the current list; your edit was NOT saved.`
+    : `Save failed: ${error.message}`;
+}
+
+// Stale-save (409) intents against a modal-carried row reopen the EDITOR with
+// the honest copy in-modal (Quests-planner banner idiom); everything else —
+// setQty/add drift, delete races, currency/transfer/move failures — rides the
+// root action-error strip. Extracted so flushPersist's catch stays inside the
+// complexity cap (one options param keeps max-params honest too).
+function routeIntentFailure({ copy, intent, merged, editFormOpen, openEditWith, showActionError }) {
+  if (merged && intent.item && !editFormOpen) {
+    openEditWith({ ...intent.item }, copy);
+    return;
+  }
+  showActionError(copy);
+}
+
+// Named destructive/transfer confirm over the shared DeleteConfirmModal
+// role="dialog" tier (QA backlog 2026-11-24: retires the lane's five native
+// window.confirms — Give, party→player Move, From-Players item/currency
+// To Party, Delete item — onto the same chrome the Notes/Sessions/EB rows ride).
+// The staged descriptor carries the retired native copy VERBATIM as the
+// question body; Cancel/Escape/backdrop are fully inert (zero POST), and
+// `confirm` is the ONLY writer, executing the SAME single /adjust|/transfer|
+// /inventory/item POST and the same exactly-one log row as before.
+function PartyInventoryConfirmModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="pi-confirm-title"
+      title={pending.title}
+      confirmLabel={pending.confirmLabel}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      {pending.message}
+    </DeleteConfirmModal>
+  );
 }
 
 const sortByName = (items) => [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -255,10 +308,12 @@ function GiveCurrencyModal({ currency, characters, giveState, onChange, onClose,
 
   const applyGive = () => {
     if (giveEntries.length === 0) return;
-    const parts = giveEntries.map(([k, v]) => `${v} ${k}`).join(', ');
-    if (!window.confirm(`Give ${parts} to ${giveState.playerName}?`)) return;
+    // The retired native confirm is now staged by the host as the in-app
+    // PartyInventoryConfirmModal (QA backlog 2026-11-24): this click only
+    // asks, Cancel/Escape/backdrop keep the Give draft and this modal fully
+    // open and inert, and `Yes, Give` runs the SAME atomic /transfer POST
+    // and then closes this modal.
     onTransfer(giveState.playerName, Object.fromEntries(giveEntries));
-    onClose();
   };
 
   return (
@@ -319,7 +374,7 @@ function GiveCurrencyModal({ currency, characters, giveState, onChange, onClose,
   );
 }
 
-function ItemEditModal({ form, equipmentData, isNew, saving, onChange, onClose, onSave }) {
+function ItemEditModal({ form, equipmentData, isNew, saving, error, onChange, onClose, onSave }) {
   const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
     useModalDismiss(onClose, { disabled: saving, panelSelector: '.pi-modal' });
   return (
@@ -336,6 +391,14 @@ function ItemEditModal({ form, equipmentData, isNew, saving, onChange, onClose, 
           <button className="ct-modal-close" onClick={onClose} disabled={saving} aria-label="Close">&times;</button>
         </div>
         <div className="ct-modal-body">
+          {/* Stale-save (409) face riding the Quests-planner banner idiom
+              (QA backlog 2026-11-24, retires the native alert): the row this
+              editor was saved against vanished in another window — the copy
+              says the edit was NOT saved and the list below ALREADY shows the
+              current truth (merged-doc adoption), so no "reload" button. */}
+          {error && (
+            <div className="pi-form-error" role="alert">{error}</div>
+          )}
           <label className="ct-label" htmlFor="pi-item-name">Name <span className="ct-required">*</span></label>
           <EquipmentNameInput
             id="pi-item-name"
@@ -439,7 +502,7 @@ function playerItemMoveCopy(entry, characterName) {
   return `Move ${entry.quantity} × ${entry.name} from ${characterName} to party inventory`;
 }
 
-function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
+function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer, requestConfirm, onActionError }) {
   const [selected, setSelected] = useState(null);
   const [moving, setMoving] = useState(null);
 
@@ -472,11 +535,23 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
       .filter(row => row.amount > 0);
   }, [character]);
 
-  const handleMove = async (entry) => {
+  // From Players `To Party` lanes (QA backlog 2026-11-24): the native confirms
+  // are retired — the button arms the shared in-app PartyInventoryConfirmModal
+  // via the host's requestConfirm, naming qty + item + source player + party
+  // destination (the exact retired copy). Cancel = zero writes; the staged
+  // confirm executes the SAME single atomic /transfer POST and one log row.
+  const handleMove = (entry) => {
     if (!character) return;
-    // Native confirm naming qty + item + source player + party destination, mirroring
-    // the currency Give / Delete idioms (backlog 2026-10-24). Refuse = zero writes.
-    if (!window.confirm(`${playerItemMoveCopy(entry, character.name)}?`)) return;
+    requestConfirm({
+      title: 'Move to Party',
+      confirmLabel: 'Yes, Move',
+      message: `${playerItemMoveCopy(entry, character.name)}?`,
+      confirm: () => runPlayerItemMove(entry),
+    });
+  };
+
+  const runPlayerItemMove = async (entry) => {
+    if (!character) return;
     // Drain any debounced currency-chip deltas first (handleConfirmMove idiom) so the
     // pool credits in click order and the transfer lands on top of the pending batch.
     if (beforeTransfer) beforeTransfer();
@@ -494,21 +569,30 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
       await onMoved();
     } catch (error) {
       console.error('[PartyInventory] player-to-party move failed:', error);
-      alert(`Move failed: ${error.message}`);
+      onActionError(`Move failed: ${error.message}`);
     } finally {
       setMoving(null);
     }
   };
 
   // Currency return lane — the exact reverse of GiveCurrencyModal's party-to-player
-  // transfer: same native-confirm idiom naming coin + source player + party
-  // destination, same atomic player-to-party POST (the server debits the character
-  // file and credits the pool, 409 when short); the server writes the directional
-  // audit row for every accepted transfer.
-  const handleCurrencyMove = async (coin) => {
+  // transfer: same in-app confirm naming coin + source player + party destination
+  // (QA backlog 2026-11-24), same atomic player-to-party POST (the server debits the
+  // character file and credits the pool, 409 when short); the server writes the
+  // directional audit row for every accepted transfer.
+  const handleCurrencyMove = (coin) => {
+    if (!character) return;
+    requestConfirm({
+      title: 'Move to Party',
+      confirmLabel: 'Yes, Move',
+      message: `${currencyMoveCopy(coin, character.name)}?`,
+      confirm: () => runCurrencyMove(coin),
+    });
+  };
+
+  const runCurrencyMove = async (coin) => {
     if (!character) return;
     const stateKey = `currency:${coin.key}`;
-    if (!window.confirm(`${currencyMoveCopy(coin, character.name)}?`)) return;
     if (beforeTransfer) beforeTransfer();
     setMoving(stateKey);
     try {
@@ -520,7 +604,7 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
       await onMoved();
     } catch (error) {
       console.error('[PartyInventory] player-to-party currency move failed:', error);
-      alert(`Move failed: ${error.message}`);
+      onActionError(`Move failed: ${error.message}`);
     } finally {
       setMoving(null);
     }
@@ -595,6 +679,23 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   // `disabled` on the currency chips and the `inert` veil on every background section,
   // making the open modal obvious instead of silently swallowing clicks.
   const [giveState, setGiveState] = useState(null);
+  // Shared pendingDelete staging for the five in-app confirms (Give, Move to
+  // player, To Party item/currency, Delete item) — QA backlog 2026-11-24
+  // retires the lane's native window.confirms onto the shared
+  // DeleteConfirmModal tier (Notes/Sessions/EB precedent). The staged
+  // descriptor's confirm is the ONLY writer.
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
+  // Failure face pair (QA backlog 2026-11-24: every native alert retired):
+  // the root strip quotes lane failures verbatim; a stale-save (409) on an
+  // item-carried intent instead REOPENS the editor with the honest sentence
+  // in-modal (the Quests-planner banner idiom) while the merged list converges
+  // underneath (serverSnapshotRef adoption, unchanged).
+  const [actionError, setActionError] = useState(null);
+  const [editConflict, setEditConflict] = useState(null);
+  // Mirror of "the item editor is mounted" readable from the async intent
+  // queue's catch (stale closures) — guards the 409 re-open against stomping
+  // a form the GM already opened meanwhile.
+  const editFormRef = useRef(null);
 
   // Serialize the ITEM lane as atomic per-row intents (bug-inventory-item-save-concurrent-
   // snapshot-last-writer-wins): writes used to POST the tab's whole item list, so a second
@@ -674,6 +775,34 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     applyInventory({ ...inv, items });
   }, [applyInventory]);
 
+  // Item-editor open/close funnel: keeps editFormRef (the async intent queue's
+  // 409 re-open guard) and the in-modal conflict banner in lockstep with the
+  // form state, and clears any previous root failure on every open.
+  // useCallback([]) — they only touch refs and stable state setters, so the
+  // long-lived flushPersist closure can hold them safely.
+  const openEditForm = useCallback((form) => {
+    editFormRef.current = form;
+    setEditConflict(null);
+    setActionError(null);
+    setEditForm(form);
+  }, []);
+
+  const closeEditForm = useCallback(() => {
+    editFormRef.current = null;
+    setEditForm(null);
+    setEditConflict(null);
+  }, []);
+
+  // Stale-save 409 face: re-seed the editor with the submitted row and show
+  // the honest sentence in-modal (Quests-planner idiom, minus its Reload
+  // button — merged-doc adoption here means this window ALREADY shows the
+  // current list; the copy says so).
+  const reopenEditWithConflict = useCallback((form, message) => {
+    editFormRef.current = form;
+    setEditForm(form);
+    setEditConflict(message);
+  }, []);
+
   // Items lane: one intent POST in flight at a time, FIFO; each POST carries a single
   // add/update/setQty/delete the server applies onto ITS re-read ledger (currency is
   // server-owned — see flushCurrencyDelta). The delete audit row is written ONLY after
@@ -718,31 +847,37 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
         }
         if (intent.action === 'delete') {
           console.error('[PartyInventory] delete failed:', error);
-          alert(merged
-            ? `Party item ${conflictItemLabel(intent)} was already deleted elsewhere — this window now shows the current list.`
-            : `Delete failed: ${error.message}`);
           // Roll the optimistic delete back so the row re-appears in the open view
           // (server kept the item). The stale guard mirrors the ack above: a newer
           // local edit made while this write was in flight owns the display.
           if (!merged && localRevRef.current === rev) applyInventory(intent.previous);
         } else {
           console.error('[PartyInventory] save failed:', error);
-          alert(merged
-            ? `Party item ${conflictItemLabel(intent)} was deleted elsewhere — this window now shows the current list; your edit was NOT saved.`
-            : `Save failed: ${error.message}`);
           // Non-409: the server never absorbed the write, so the optimistic row is
           // pure drift — converge it back to the snapshot (same stale guard as the
           // delete rollback). Without this the row shows the uncommitted value until
           // reload, and the next absolute setQty adopts the drift as new truth.
           if (!merged && localRevRef.current === rev) reconcileIntentRow(intent);
         }
+        // Failure face (QA backlog 2026-11-24: native alerts retired, copy
+        // byte-identical): an item-carried stale-save (update/add 409) reopens
+        // the editor with the honest sentence in-modal; everything else rides
+        // the root action-error strip.
+        routeIntentFailure({
+          copy: intentFailureCopy(intent, merged, error),
+          intent,
+          merged,
+          editFormOpen: Boolean(editFormRef.current),
+          openEditWith: reopenEditWithConflict,
+          showActionError: setActionError,
+        });
       })
       .finally(() => {
         queue.saving = false;
         setSaving(false);
         flushPersistQueue();
       });
-  }, [campaignName, applyInventory, reconcileIntentRow]);
+  }, [campaignName, applyInventory, reconcileIntentRow, reopenEditWithConflict]);
 
   // Currency lane: the burst's summed signed per-coin delta goes to the atomic
   // server adjust lane, which clamps-and-adds onto ITS ledger — concurrent presses
@@ -779,7 +914,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       })
       .catch(error => {
         console.error('[PartyInventory] currency adjustment failed:', error);
-        alert(`Currency save failed: ${error.message}`);
+        setActionError(`Currency save failed: ${error.message}`);
       })
       .finally(() => {
         queue.saving = false;
@@ -853,12 +988,37 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       })
       .catch(error => {
         console.error('[PartyInventory] currency transfer failed:', error);
-        alert(`Transfer failed: ${error.message}`);
+        setActionError(`Transfer failed: ${error.message}`);
       })
       .finally(() => setSaving(false));
   };
 
-  const handleAddItem = () => setEditForm({ ...EMPTY_FORM });
+  // Give to player (QA backlog 2026-11-24): the Give modal's submit click now
+  // ARMS the shared in-app PartyInventoryConfirmModal with the exact retired
+  // native copy (parts named in CURRENCIES order, same as before). Cancel =
+  // zero POST and the Give draft stays open behind the dialog; `Yes, Give`
+  // executes the SAME atomic party-to-player /transfer and closes the modal.
+  const requestGiveConfirm = (playerName, amounts) => {
+    const parts = CURRENCIES
+      .map(({ key }) => [key, Math.floor(Number(amounts[key]))])
+      .filter(([, n]) => Number.isFinite(n) && n > 0)
+      .map(([key, n]) => `${n} ${key}`)
+      .join(', ');
+    if (!parts) return;
+    requestDelete({
+      // Title differs from the Give modal's own dialog name ('Give Currency
+      // to Player') so role queries never match two dialogs at once.
+      title: 'Give Currency',
+      confirmLabel: 'Yes, Give',
+      message: `Give ${parts} to ${playerName}?`,
+      confirm: () => {
+        handleCurrencyTransfer(playerName, amounts);
+        setGiveState(null);
+      },
+    });
+  };
+
+  const handleAddItem = () => openEditForm({ ...EMPTY_FORM });
 
   const handleNameChange = (form, name) => {
     const match = findEquipmentByName(equipmentData, name);
@@ -891,7 +1051,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     } else {
       items[existingIndex] = { ...items[existingIndex], ...row };
     }
-    setEditForm(null);
+    closeEditForm();
     applyInventory({ ...inv, items });
     queueItemIntent(targetId
       ? { action: 'update', item: { id: targetId, ...row } }
@@ -914,25 +1074,48 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   };
 
   // Delete is an atomic destructive lane on the serialized intent queue (handleConfirmMove
-  // idiom): drain the debounced currency deltas, queue the single-row delete, and write
-  // the `Removed "X" from party inventory` row ONLY after the server acked it (pre-await
-  // audit law, backlog 2026-10-29-AB) — a rejected or conflicted delete writes zero rows.
-  // Rejection = console.error + lane-convention alert + optimistic-delete rollback
-  // (2026-10-29 AC backlog), and a 409 adopts the server's merged truth instead.
+  // idiom): the row button now ARMS the shared in-app PartyInventoryConfirmModal (QA
+  // backlog 2026-11-24: retired the native `Delete "X" from party inventory?`
+  // window.confirm; Cancel/Escape/backdrop = zero writes, zero mutation). The staged
+  // confirm drains the debounced currency deltas, queues the single-row delete, and
+  // writes the `Removed "X" from party inventory` row ONLY after the server acked it
+  // (pre-await audit law, backlog 2026-10-29-AB) — a rejected or conflicted delete
+  // writes zero rows. Rejection = console.error + the root action-error strip
+  // (alert retired, copy byte-identical) + optimistic-delete rollback, and a 409
+  // adopts the server's merged truth instead.
   const handleDeleteItem = (item) => {
-    if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
-    flushCurrencyPersist();
-    const inv = inventoryRef.current;
-    applyInventory({ ...inv, items: inv.items.filter(i => i.id !== item.id) });
-    queueItemIntent({ action: 'delete', id: item.id, name: item.name, previous: inv });
+    requestDelete({
+      title: 'Delete Party Item',
+      confirmLabel: 'Yes, Delete',
+      message: `Delete "${item.name}" from party inventory?`,
+      confirm: () => {
+        flushCurrencyPersist();
+        const inv = inventoryRef.current;
+        applyInventory({ ...inv, items: inv.items.filter(i => i.id !== item.id) });
+        queueItemIntent({ action: 'delete', id: item.id, name: item.name, previous: inv });
+      },
+    });
   };
 
+  // Move to player (QA backlog 2026-11-24): the Move modal's final click now
+  // ARMS the shared in-app PartyInventoryConfirmModal with the exact retired
+  // native copy ("Move 2 × Hempen Rope to War Cleric?"), composed from the
+  // modal's live qty/item/player state — it fires only on this final click,
+  // never on modal open or input changes. Cancel/Escape/backdrop = zero
+  // writes (the move modal stays open behind, draft intact); the staged
+  // confirm runs the SAME single atomic /transfer POST.
   const handleConfirmMove = () => {
     if (!moveTarget || !movePlayer) return;
-    // Native confirm composed from the modal's live qty/item/player state, mirroring
-    // the currency Give confirm ("Give 50 gp to War Cleric?"). Fires only on this
-    // final click — never on modal open or input changes. Refuse = zero writes.
-    if (!window.confirm(`Move ${moveQuantity} × ${moveTarget.name} to ${movePlayer}?`)) return;
+    requestDelete({
+      title: 'Move to Player',
+      confirmLabel: 'Yes, Move',
+      message: `Move ${moveQuantity} × ${moveTarget.name} to ${movePlayer}?`,
+      confirm: runMoveTransfer,
+    });
+  };
+
+  const runMoveTransfer = () => {
+    if (!moveTarget || !movePlayer) return;
     flushCurrencyPersist();
     setSaving(true);
     transferInventory(campaignName, {
@@ -949,7 +1132,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       })
       .catch(error => {
         console.error('[PartyInventory] move failed:', error);
-        alert(`Move failed: ${error.message}`);
+        setActionError(`Move failed: ${error.message}`);
       })
       .finally(() => {
         setSaving(false);
@@ -995,8 +1178,9 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   if (loading) return <div className="ct-container pi-container"><p>Loading party inventory…</p></div>;
 
   // One flag owns "a Party-Inventory modal is open" (branch-free to stay inside the
-  // complexity cap): drives the `inert` veil on every background section.
-  const modalOpen = [giveState, editForm, moveTarget].some(Boolean);
+  // complexity cap): drives the `inert` veil on every background section. The
+  // shared confirm dialog (QA backlog 2026-11-24) counts as one too.
+  const modalOpen = [giveState, editForm, moveTarget, pendingDelete].some(Boolean);
 
   return (
     <div className="ct-container pi-container">
@@ -1010,6 +1194,28 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           </button>
         )}
       </div>
+
+      {/* Root failure strip (QA backlog 2026-11-24: retires the lane's native
+          alerts verbatim — "Save failed: …", "Delete failed: …", the
+          already-deleted 409 sentence, "Currency save failed: …",
+          "Transfer failed: …", "Move failed: …"). Persistent until an
+          explicit dismiss or replaced by the next failure — a queued
+          success behind a rejected intent must NOT silently erase the
+          honest report (a wipe-then-reconcile already converged the data;
+          the sentence stays true of what happened). */}
+      {actionError && (
+        <div className="pi-action-error" role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className="pi-action-error-dismiss"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss error"
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+      )}
 
       <CurrencyCard
         currency={inventory.currency}
@@ -1089,7 +1295,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                         className="ct-btn"
                         title="Edit item"
                         aria-label="Edit item"
-                        onClick={() => setEditForm({ ...item })}
+                        onClick={() => openEditForm({ ...item })}
                       >
                         <i className="fa-solid fa-pen" />
                       </button>
@@ -1126,6 +1332,8 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           campaignName={campaignName}
           onMoved={refresh}
           beforeTransfer={flushCurrencyPersist}
+          requestConfirm={requestDelete}
+          onActionError={setActionError}
         />
       </div>
 
@@ -1138,7 +1346,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           giveState={giveState}
           onChange={setGiveState}
           onClose={() => setGiveState(null)}
-          onTransfer={handleCurrencyTransfer}
+          onTransfer={requestGiveConfirm}
         />
       )}
 
@@ -1148,8 +1356,9 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           isNew={!editForm.id}
           equipmentData={equipmentData}
           saving={saving}
+          error={editConflict}
           onChange={(form) => setEditForm(handleNameChange(form, form.name))}
-          onClose={() => setEditForm(null)}
+          onClose={closeEditForm}
           onSave={handleSaveItem}
         />
       )}
@@ -1167,6 +1376,16 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           onConfirm={handleConfirmMove}
         />
       )}
+
+      {/* Shared role="dialog" confirm tier (five migrated lanes) mounted as a
+          SIBLING after every .pi-modal-overlay: its own backdrop dismisses only
+          the confirm, never the Give/Move editor underneath (EncounterModal
+          fragment-sibling law). */}
+      <PartyInventoryConfirmModal
+        pending={pendingDelete}
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
+import useDeleteRequest from '../common/useDeleteRequest.js';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
@@ -12,6 +14,27 @@ import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { generateNPC } from '../../services/npcs/npcGenerator.js';
 import { loadBestiaryMonsterNames, isBestiaryMonsterName, bestiaryNameError } from '../../services/npcs/bestiaryNameGuard.js';
 import './NPCs.css';
+
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (QA backlog 2026-11-24 sweep: the native `Delete NPC "X"?` window.confirm
+// retired alongside the Quests/Party-Inventory lanes so every useReloadGuard
+// CRUD lane is native-dialog-free; mirrors the Notes/Sessions row-delete
+// chrome). Renders null while idle so the destructive copy never lingers.
+function DeleteNpcModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="npcs-delete-title"
+      title="Delete NPC"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the NPC &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
+}
 
 function NPCs({ campaignName, onViewInitiative }) {
   const { items: npcs, loading, loadItems: loadNPCsList, deleteItem: deleteNPCAction } =
@@ -28,6 +51,10 @@ function NPCs({ campaignName, onViewInitiative }) {
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
   const [errorIsConflict, setErrorIsConflict] = useState(false);
+  // Shared pendingDelete staging for the role="dialog" delete tier (QA backlog
+  // 2026-11-24 sweep, mirrors Notes/Sessions.jsx): the DeleteConfirmModal's
+  // confirm is the ONLY writer, so Cancel/Escape/backdrop fire zero requests.
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   const [modalInitialTab, setModalInitialTab] = useState('roleplay');
   const [modalKey, setModalKey] = useState(0);
   // Attack-less join refusal staged for the in-app NpcUnarmedConfirmModal
@@ -59,7 +86,7 @@ function NPCs({ campaignName, onViewInitiative }) {
   // Powers the unsaved-edits check in handleReloadList — lifted into the
   // shared useReloadGuard so all five .ct-* CRUD lanes share the guard
   // (improve 2026-10-28-T backlog); behavior unchanged from ba51c25ee.
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the NPC list and discard your unsaved edits?',
@@ -138,8 +165,8 @@ function NPCs({ campaignName, onViewInitiative }) {
   // the seed snapshot, house NAMED-confirm pattern) the loss is stated up
   // front and Cancel keeps the banner, editor, and draft fully inert. The
   // dirty-check now lives in the shared useReloadGuard (all five lanes).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -151,9 +178,9 @@ function NPCs({ campaignName, onViewInitiative }) {
   // A clean draft closes silently exactly as before. Kept OUT of
   // handleCloseModal so internal closes (save/save-and-add/delete/reload)
   // never double-confirm; dismiss is fully inert (banner, editor, draft).
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = (formData?.name || '').trim() || editingNPC?.name;
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new NPC draft?'
     )) return;
     handleCloseModal();
@@ -216,19 +243,23 @@ function NPCs({ campaignName, onViewInitiative }) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!editingNPC) return;
-    if (!window.confirm(`Delete NPC "${editingNPC.name}"?`)) return;
-    setDeleting(true);
-    try {
-      await deleteNPCAction(editingNPC.name);
-      missedListBroadcast.current = false;
-      handleCloseModal();
-    } catch (error) {
-      console.error('Failed to delete NPC:', error);
-    } finally {
-      setDeleting(false);
-    }
+    requestDelete({
+      label: editingNPC.name,
+      confirm: async () => {
+        setDeleting(true);
+        try {
+          await deleteNPCAction(editingNPC.name);
+          missedListBroadcast.current = false;
+          handleCloseModal();
+        } catch (error) {
+          console.error('Failed to delete NPC:', error);
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   const handleAddToInitiative = async (npc) => {
@@ -431,6 +462,12 @@ function NPCs({ campaignName, onViewInitiative }) {
         onCancel={handleUnarmedCancel}
         onConfirm={handleUnarmedAddAnyway}
       />
+
+      {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
+          editor modal — its backdrop/Escape answer only the toll. */}
+      {discardDialog}
+
+      <DeleteNpcModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
     </div>
   );
 }

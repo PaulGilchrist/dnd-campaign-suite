@@ -1,5 +1,5 @@
 // @maintained-by-ai: 2026-10-14
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Quests from './Quests.jsx';
 
@@ -141,18 +141,25 @@ describe('Quests', () => {
   });
 
   describe('new quest modal', () => {
-    it('opens and closes via Cancel or Close (X), but not via overlay click', () => {
+    it('opens and closes via Cancel or Close (X), but not via overlay click', async () => {
       renderWithQuests([]);
 
       openNewModal();
       expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
 
+      // Clean draft: the toll is skipped (resolves silently true); the close
+      // settles through the shared hook's await seam → waitFor, not sync.
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument()
+      );
+      expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
 
       openNewModal();
       fireEvent.click(screen.getByLabelText('Close'));
-      expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument()
+      );
 
       openNewModal();
       fireEvent.click(document.querySelector('.ct-modal-overlay'));
@@ -389,6 +396,10 @@ describe('Quests', () => {
       openEditModal('Delete Test Quest');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
+      // The footer arm opens the shared in-app dialog; the write happens ONLY
+      // after `Yes, Delete Permanently` (QA backlog 2026-11-24).
+      const dialog = await screen.findByRole('dialog', { name: 'Delete Quest' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
       await waitFor(() => expect(screen.getByRole('button', { name: /Deleting/ })).toHaveAttribute('disabled'));
 
       await act(async () => deleteResolve());
@@ -466,30 +477,42 @@ describe('Quests', () => {
   });
 
   describe('delete quest', () => {
-    it('deletes a quest when the confirmation is accepted', () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('deletes a quest via the shared in-app dialog — no native confirm', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on the quest-delete path');
+      });
       const { mockDelete } = renderWithQuests([quest()]);
 
       openEditModal('Find the Lost Sword');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      expect(window.confirm).toHaveBeenCalledWith('Delete quest "Find the Lost Sword"?');
+      const dialog = await screen.findByRole('dialog', { name: 'Delete Quest' });
+      expect(dialog).toHaveTextContent('Find the Lost Sword');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
+
+      expect(confirmSpy).not.toHaveBeenCalled();
       expect(mockDelete).toHaveBeenCalledWith('quest-1');
     });
 
-    it('does not delete when the confirmation is cancelled', () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('does not delete when the dialog is cancelled', () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on the quest-delete path');
+      });
       const { mockDelete } = renderWithQuests([quest()]);
 
       openEditModal('Find the Lost Sword');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      expect(window.confirm).toHaveBeenCalledWith('Delete quest "Find the Lost Sword"?');
+      const dialog = screen.getByRole('dialog', { name: 'Delete Quest' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(confirmSpy).not.toHaveBeenCalled();
       expect(mockDelete).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
     });
 
     it('logs the error and re-enables the delete button when deletion fails', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       const errorSpy = vi.spyOn(console, 'error');
       renderWithQuests([quest({ name: 'Error Delete Quest' })], {
         deleteItem: vi.fn().mockRejectedValue(new Error('Delete failed')),
@@ -497,6 +520,8 @@ describe('Quests', () => {
 
       openEditModal('Error Delete Quest');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      const dialog = screen.getByRole('dialog', { name: 'Delete Quest' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
 
       await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('Failed to delete quest:', expect.any(Error)));
       expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveAttribute('disabled');

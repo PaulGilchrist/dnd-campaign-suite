@@ -82,8 +82,21 @@ beforeEach(() => {
     character: { name: 'War Cleric', inventory: {} },
   });
   addEntry.mockClear();
-  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  // QA backlog 2026-11-24: the `To Party` native confirm is retired onto the
+  // shared role="dialog" tier; a native confirm firing here is a regression.
+  confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+    throw new Error('native window.confirm fired on the To Party path');
+  });
 });
+
+// The in-app confirm the `To Party` button now arms.
+function openPartyConfirm(copy) {
+  const dialog = screen.getByRole('dialog', { name: 'Move to Party' });
+  if (copy) expect(dialog).toHaveTextContent(copy);
+  return dialog;
+}
+const yes = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
+const no = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
 afterEach(() => {
   confirmSpy.mockRestore();
@@ -145,9 +158,9 @@ describe('PartyInventory currency `To Party` return lane', () => {
 
   it('confirms naming coin, amount, source player and party destination before any write', async () => {
     await selectPlayer('War Cleric');
-    confirmSpy.mockReturnValue(false);
     fireEvent.click(copperToParty());
-    expect(confirmSpy).toHaveBeenCalledWith('Move 1 cp from War Cleric to party inventory?');
+    no(openPartyConfirm('Move 1 cp from War Cleric to party inventory?'));
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
     expect(mockApplyItemIntent).not.toHaveBeenCalled();
   });
@@ -155,6 +168,8 @@ describe('PartyInventory currency `To Party` return lane', () => {
   it('accepting transfers via the atomic player-to-party lane with a cp-only currency payload', async () => {
     await selectPlayer('War Cleric');
     fireEvent.click(copperToParty());
+    yes(openPartyConfirm('Move 1 cp from War Cleric to party inventory?'));
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'player-to-party',
@@ -168,6 +183,7 @@ describe('PartyInventory currency `To Party` return lane', () => {
     await selectPlayer('War Cleric');
     mockLoadInventory.mockResolvedValueOnce(poolAfterCopperReturn());
     fireEvent.click(copperToParty());
+    yes(openPartyConfirm());
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalled();
     });

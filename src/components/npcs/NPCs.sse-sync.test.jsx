@@ -6,7 +6,7 @@
 // is never disturbed — but the missed broadcast is applied on close so a
 // reopened editor never re-seeds a stale row. Connects through the ONE shared
 // SSE client (subscribeToSSE), never a raw EventSource.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCs from './NPCs';
 
@@ -138,10 +138,10 @@ describe('NPCs live SSE sync', () => {
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     // The draft is dirty, so ×/Cancel first NAMES the discard (improve
     // 2026-10-29-V): accept it to exercise the close path.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByText('Cancel'));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Draft Name Mid-Edit"?');
-    confirmSpy.mockRestore();
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent('Discard changes to "Draft Name Mid-Edit"?');
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await screen.findByLabelText('Edit NPC: QA Sync NPC A');
     expect(loadCallCount).toBe(2);
     expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();

@@ -103,12 +103,19 @@ describe('PartyInventory row-scoped accessible names', () => {
   });
 
   it('confirm copy is unchanged (label + "?") and the scoped click still moves only that coin row', async () => {
-    confirmSpy.mockReturnValue(true);
+    // QA backlog 2026-11-24: the native confirm retired — the exact same copy
+    // now rides the shared role="dialog" tier before the single POST.
+    confirmSpy.mockImplementation(() => {
+      throw new Error('native window.confirm fired on the To Party path');
+    });
     await selectPlayer('War Cleric');
     fireEvent.click(screen.getByRole('button', {
       name: 'Move 1 cp from War Cleric to party inventory', exact: true,
     }));
-    expect(confirmSpy).toHaveBeenCalledWith('Move 1 cp from War Cleric to party inventory?');
+    const dialog = await screen.findByRole('dialog', { name: 'Move to Party' });
+    expect(dialog).toHaveTextContent('Move 1 cp from War Cleric to party inventory?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'player-to-party',

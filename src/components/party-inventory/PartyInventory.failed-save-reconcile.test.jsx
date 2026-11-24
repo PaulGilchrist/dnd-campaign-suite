@@ -93,7 +93,12 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
   let consoleSpy = null;
 
   beforeEach(() => {
-    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // QA backlog 2026-11-24: alerts are retired on this lane — failures land on
+    // the root role="alert" strip with byte-identical copy. A native alert or
+    // confirm firing here is a regression.
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {
+      throw new Error('native window.alert fired on the reconcile path');
+    });
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => {
@@ -101,12 +106,12 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     consoleSpy.mockRestore();
   });
 
-  it('a failed stepper press still alerts verbatim AND reconciles the row back to the server qty', async () => {
+  it('a failed stepper press still reports verbatim (in-app strip) AND reconciles the row back to the server qty', async () => {
     mockApplyItemIntent.mockRejectedValueOnce(serverError());
     await renderReady();
 
     fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Save failed: disk on fire'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save failed: disk on fire'));
     // No reload: the row converges to the last known server snapshot (1), not the
     // optimistic 2 — and the fake ledger was never touched (no POST applied).
     await waitFor(() => expect(qtyOf('QA Lantern')).toBe('1'));
@@ -120,7 +125,7 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     await renderReady();
 
     fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save failed: disk on fire'));
     await waitFor(() => expect(qtyOf('QA Lantern')).toBe('1'));
 
     // Re-press: absolute setQty derived from the RECONCILED qty (1 + 1 = 2), not the
@@ -144,7 +149,7 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     await waitFor(() => expect(qtyOf('QA Lantern')).toBe('2')); // acked, snapshot now qty 2
 
     fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Save failed: disk on fire'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save failed: disk on fire'));
     // Rolls back to 2 (server truth after the first success), not to 1 (load-time doc).
     await waitFor(() => expect(qtyOf('QA Lantern')).toBe('2'));
     expect(serverItems[0].quantity).toBe(2);
@@ -160,7 +165,7 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     fireEvent.change(within(modal).getByLabelText('Quantity'), { target: { value: '7' } });
     fireEvent.click(within(modal).getByRole('button', { name: /Save/ }));
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Save failed: disk on fire'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save failed: disk on fire'));
     // The drifted row is gone and the server row is back, name AND quantity intact.
     await waitFor(() => expect(screen.getByText('QA Lantern')).toBeTruthy());
     expect(screen.queryByText('QA Ghost Lantern')).toBeNull();
@@ -172,13 +177,18 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     expect(serverItems[0]).toEqual({ ...lantern });
   });
 
-  it('failed delete keeps its intent.previous rollback — row re-appears, Delete failed alert', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('failed delete keeps its intent.previous rollback — row re-appears, Delete failed on the strip', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the reconcile path');
+    });
     mockApplyItemIntent.mockRejectedValueOnce(serverError('vault locked'));
     await renderReady();
 
     fireEvent.click(rowOf('QA Lantern').getByTitle('Delete item'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Delete failed: vault locked'));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Delete failed: vault locked'));
     await waitFor(() => expect(screen.getByText('QA Lantern')).toBeTruthy());
     expect(serverItems.map(i => i.name)).toEqual(['QA Lantern']);
     confirmSpy.mockRestore();
@@ -194,7 +204,7 @@ describe('PartyInventory failed-save reconcile (drift-convergence backlog)', () 
     const modal = nameInput.closest('.pi-modal');
     fireEvent.click(within(modal).getByRole('button', { name: /Save/ }));
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Save failed: disk on fire'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Save failed: disk on fire'));
     await waitFor(() => expect(screen.queryByText('QA Ghost Censer')).toBeNull());
     // The pre-existing server row is untouched by the phantom drop.
     expect(screen.getByText('QA Lantern')).toBeTruthy();

@@ -102,9 +102,15 @@ const renderSessions = (campaignName = 'test-campaign') =>
 const openPlanner = () =>
   fireEvent.click(screen.getByRole('button', { name: /new session/i }));
 
-// Clean new-draft Cancel closes silently (no named confirm).
-const closePlanner = () =>
+// Clean new-draft Cancel closes silently (no toll) — but the close settles
+// through the shared useReloadGuard's await seam (QA backlog 2026-11-24), so
+// callers must AWAIT the planner leaving the DOM before reopening.
+const closePlanner = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  );
+};
 
 const totalPickerCalls = () =>
   Object.values(PICKER_LOADERS).reduce((sum, fn) => sum + fn.mock.calls.length, 0);
@@ -141,7 +147,7 @@ describe('Sessions link-picker list cache', () => {
     renderSessions();
     openPlanner();
     await expectAllPickersPopulated();
-    closePlanner();
+    await closePlanner();
     await waitFor(() => expect(screen.queryByLabelText('Link Maps')).not.toBeInTheDocument());
 
     openPlanner();
@@ -156,7 +162,7 @@ describe('Sessions link-picker list cache', () => {
     const { unmount } = renderSessions();
     openPlanner();
     await expectAllPickersPopulated();
-    closePlanner();
+    await closePlanner();
     unmount();
 
     renderSessions();
@@ -171,7 +177,7 @@ describe('Sessions link-picker list cache', () => {
     renderSessions();
     openPlanner();
     await expectAllPickersPopulated();
-    closePlanner();
+    await closePlanner();
 
     capturedHandler({ key: 'quests-list-test-campaign', data: { action: 'created' } });
 
@@ -190,7 +196,7 @@ describe('Sessions link-picker list cache', () => {
     expect(screen.getByRole('button', { name: /new session/i })).toBeInTheDocument();
     expect(totalPickerCalls()).toBe(6);
 
-    closePlanner();
+    await closePlanner();
     openPlanner();
     await expectAllPickersPopulated();
     expect(totalPickerCalls()).toBe(12);
@@ -200,7 +206,7 @@ describe('Sessions link-picker list cache', () => {
     renderSessions();
     openPlanner();
     await expectAllPickersPopulated();
-    closePlanner();
+    await closePlanner();
 
     capturedHandler({ key: 'sessions-list-test-campaign', data: { action: 'created' } });
     capturedHandler({ key: 'factions-list-test-campaign', data: { action: 'created' } });
@@ -226,7 +232,7 @@ describe('Sessions link-picker list cache', () => {
     const hints = await screen.findAllByText(/picker lists failed to load/);
     expect(hints).toHaveLength(1);
     expect(await screen.findByLabelText('Link Maps')).toBeInTheDocument();
-    closePlanner();
+    await closePlanner();
     expect(consoleSpy).not.toHaveBeenCalled();
 
     // Close clears the hint; the failed batch never cached, so this reopen
@@ -244,7 +250,7 @@ describe('Sessions link-picker list cache', () => {
     const { rerender } = renderSessions();
     openPlanner();
     await expectAllPickersPopulated();
-    closePlanner();
+    await closePlanner();
 
     rerender(
       <Sessions

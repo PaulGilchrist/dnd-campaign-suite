@@ -90,7 +90,7 @@ describe('Settlements - modal actions', () => {
   });
 
   describe('New settlement modal', () => {
-    it('opens on "New Settlement", hides Delete, and closes on Cancel', () => {
+    it('opens on "New Settlement", hides Delete, and closes on Cancel', async () => {
       renderSettlements();
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
       expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
@@ -98,7 +98,12 @@ describe('Settlements - modal actions', () => {
       expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-      expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
+      // Clean draft: the guard resolves silently (no toll); the close settles
+      // through the shared hook's await seam → waitFor, not a sync assert.
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument()
+      );
+      expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
     });
   });
 

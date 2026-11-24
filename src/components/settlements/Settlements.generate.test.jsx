@@ -7,7 +7,7 @@
 //     delete-button visibility -> Settlements.modalActions.test.jsx
 //   - generic save/delete error logging -> Settlements.saveDelete.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 
@@ -141,14 +141,22 @@ describe('Settlements - generate settlement', () => {
       });
     };
 
-    it('asks for confirmation before replacing a half-typed form, and Cancel keeps every value byte-exact with zero POSTs', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('arms the shared in-app dialog before replacing a half-typed form, and Cancel keeps every value byte-exact with zero POSTs', async () => {
+      // QA backlog 2026-11-24: the native confirm is retired — the Generate
+      // button opens the shared role="dialog" tier (name preserved verbatim).
+      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on the generate path');
+      });
       render(<Settlements campaignName="test" />);
       typeCustomDetails();
 
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
-      expect(confirmSpy).toHaveBeenCalledWith('Generate will replace your entered settlement details?');
+      const dialog = await screen.findByRole('dialog', { name: 'Generate Settlement' });
+      expect(dialog).toHaveTextContent('Generate will replace your entered settlement details?');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(confirmSpy).not.toHaveBeenCalled();
       // The generator never runs, so its output cannot touch any field.
       expect(generateSettlement).not.toHaveBeenCalled();
       expect(screen.getByLabelText('Name *')).toHaveValue('Violetfield');
@@ -163,14 +171,18 @@ describe('Settlements - generate settlement', () => {
       });
     });
 
-    it('fills the form with generator output when the confirmation is accepted', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('fills the form with generator output when the dialog is confirmed', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on the generate path');
+      });
       render(<Settlements campaignName="test" />);
       typeCustomDetails();
 
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      const dialog = await screen.findByRole('dialog', { name: 'Generate Settlement' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Generate' }));
+      expect(confirmSpy).not.toHaveBeenCalled();
       await waitFor(() => {
         expect(generateSettlement).toHaveBeenCalled();
       });
@@ -182,15 +194,19 @@ describe('Settlements - generate settlement', () => {
       expect(mockSaveSettlement).not.toHaveBeenCalled();
     });
 
-    it('also prompts when the only entered content is an added service, NPC, or rumor row', () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('also prompts when the only entered content is an added service, NPC, or rumor row', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+        throw new Error('native window.confirm fired on the generate path');
+      });
       render(<Settlements campaignName="test" />);
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
       fireEvent.click(screen.getByRole('button', { name: /add service/i }));
 
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      const dialog = await screen.findByRole('dialog', { name: 'Generate Settlement' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(confirmSpy).not.toHaveBeenCalled();
       expect(generateSettlement).not.toHaveBeenCalled();
     });
 
@@ -211,6 +227,7 @@ describe('Settlements - generate settlement', () => {
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
       expect(confirmSpy).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Generate Settlement' })).toBeNull();
       await waitFor(() => {
         expect(screen.getByLabelText('Name *')).toHaveValue('Generated Town');
       });

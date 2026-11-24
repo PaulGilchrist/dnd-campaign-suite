@@ -5,7 +5,7 @@
 // duplicate-name
 // guard, form shell, row rendering, and stat-block forms live in the
 // sibling test files.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import NPCs from './NPCs';
 
@@ -251,20 +251,33 @@ describe('NPCs', () => {
   // ── Delete Flow ───────────────────────────────────────────────────
 
   describe('Delete flow', () => {
-    it('deletes the NPC and closes the modal when the confirmation is accepted', async () => {
+    // QA backlog 2026-11-24: the native `Delete NPC "X"?` confirm is retired —
+    // the footer Delete button arms the shared role="dialog" tier (mirrors the
+    // Notes/Sessions/Quests lanes); the staged confirm is the only writer.
+    const FORBID = () => vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the npc-delete path');
+    });
+
+    it('deletes the NPC and closes the modal when the in-app dialog is confirmed', async () => {
       const { management } = renderNPCs();
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const confirmSpy = FORBID();
       clickDeleteOn();
-      expect(confirmSpy).toHaveBeenCalledWith('Delete NPC "Goblin"?');
+      const dialog = await screen.findByRole('dialog', { name: 'Delete NPC' });
+      expect(dialog).toHaveTextContent('Goblin');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
+      expect(confirmSpy).not.toHaveBeenCalled();
       await waitFor(() => expect(management.deleteItem).toHaveBeenCalledWith('Goblin'));
       await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     });
 
-    it('does not delete the NPC when the confirmation is cancelled', async () => {
+    it('does not delete the NPC when the dialog is cancelled', () => {
       const { management } = renderNPCs();
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const confirmSpy = FORBID();
       clickDeleteOn();
-      expect(confirmSpy).toHaveBeenCalledWith('Delete NPC "Goblin"?');
+      const dialog = screen.getByRole('dialog', { name: 'Delete NPC' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(confirmSpy).not.toHaveBeenCalled();
       expect(management.deleteItem).not.toHaveBeenCalled();
       expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
@@ -272,8 +285,9 @@ describe('NPCs', () => {
     it('keeps the modal open when the delete fails', async () => {
       const deleteItem = vi.fn().mockRejectedValue(new Error('Delete failed'));
       const { management } = renderNPCs(defaultNPCs, { deleteItem });
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       clickDeleteOn();
+      const dialog = screen.getByRole('dialog', { name: 'Delete NPC' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete Permanently' }));
       await waitFor(() => expect(management.deleteItem).toHaveBeenCalledWith('Goblin'));
       expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });

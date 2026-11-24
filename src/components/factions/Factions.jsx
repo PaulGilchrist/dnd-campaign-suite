@@ -105,7 +105,7 @@ function Factions({ campaignName }) {
   const missedListBroadcast = useRef(false);
   // Draft snapshot powering the reload-discard guard — shared with the NPC
   // lane (useReloadGuard, improve 2026-10-28-T backlog).
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, confirmDiscardDraft, discardDialog } = useReloadGuard({
     modalOpen,
     formData,
     confirmMessage: 'Reload the faction list and discard your unsaved edits?',
@@ -179,8 +179,8 @@ function Factions({ campaignName }) {
   // throws away the open draft, so with unsaved edits the loss is NAMED up
   // front and Cancel keeps the banner, editor, and draft fully inert
   // (mirrors NPCs.jsx via shared useReloadGuard).
-  const handleReloadList = () => {
-    if (!confirmDiscardDraft()) return;
+  const handleReloadList = async () => {
+    if (!await confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -192,9 +192,9 @@ function Factions({ campaignName }) {
   // new-draft copy. A clean draft closes silently exactly as before. Kept
   // OUT of handleCloseModal so internal closes (save/delete/reload) never
   // double-confirm; dismiss is fully inert (banner, editor, draft).
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const name = (formData?.name || '').trim() || editingFaction?.name;
-    if (!confirmDiscardDraft(
+    if (!await confirmDiscardDraft(
       name ? `Discard changes to "${name}"?` : 'Discard this new faction draft?'
     )) return;
     handleCloseModal();
@@ -506,6 +506,10 @@ function Factions({ campaignName }) {
       {/* Rendered after the editor so the dialog stacks over the ct-modal
           overlay (same z-index tier, later sibling wins). */}
       <DeleteFactionModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+      {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
+          editor — its backdrop/Escape answer only the toll. */}
+      {discardDialog}
     </div>
   );
 }

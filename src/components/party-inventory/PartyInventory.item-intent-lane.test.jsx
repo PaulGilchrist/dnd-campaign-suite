@@ -116,7 +116,12 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
   let consoleSpy = null;
 
   beforeEach(() => {
-    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // QA backlog 2026-11-24: alerts retired on this lane — the root
+    // role="alert" strip carries the sentence. A native alert firing is a
+    // regression.
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {
+      throw new Error('native window.alert fired on the item-intent path');
+    });
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => {
@@ -190,11 +195,17 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
   });
 
   it('a delete posts ONE row-delete intent and its audit row lands post-ack', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the intent-lane delete path');
+    });
     await renderReady();
     serverItems.push({ id: 'coin1', name: 'QA Concurrent Coin', quantity: 1, description: '' });
 
+    // The row button arms the shared in-app confirm; Yes, Delete is the only writer.
     fireEvent.click(rowOf('QA Lantern').getByTitle('Delete item'));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
     await waitFor(() => expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', {
       action: 'delete', id: 'a1', name: 'QA Lantern', previous: expect.anything(),
     }));
@@ -214,12 +225,12 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
     serverItems = [];
 
     fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(
       'Party item "QA Lantern" was deleted elsewhere — this window now shows the current list; your edit was NOT saved.'
     ));
     // 409 copy law: no dead "reload the list" advice (merged-doc adoption is live)
     // and no generic prefix burying the conflict-specific sentence.
-    const copy = alertSpy.mock.calls[0][0];
+    const copy = screen.getByRole('alert').textContent;
     expect(copy).not.toMatch(/reload the list/i);
     expect(copy).not.toMatch(/^Save failed:/);
     // Stale view replaced by the merged doc: the ghost row is gone, nothing re-POSTed.

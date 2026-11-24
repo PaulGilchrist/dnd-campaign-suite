@@ -7,7 +7,7 @@
 // keeps the old silent one-click behavior. Legs mirror
 // NPCs.reload-discard-confirm.test.jsx; harness mirrors
 // Quests.conflict-reload.test.jsx.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Quests from './Quests';
 
@@ -74,7 +74,9 @@ describe('Quests 409 recovery: Reload list names the discard', () => {
     saveCallCount = 0;
     saveError = conflictError();
     questsFixture = [{ id: 'q1', name: 'The Lost Artifact', status: 'active', description: 'old' }];
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the reload-discard path');
+    });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -90,7 +92,10 @@ describe('Quests 409 recovery: Reload list names the discard', () => {
     await openConflictWithDraft('my unsaved draft');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
-    expect(confirmSpy).toHaveBeenCalledWith(DISCARD_CONFIRM);
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent(DISCARD_CONFIRM);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    fireEvent.click(within(toll).getByRole('button', { name: 'Cancel' }));
 
     // Cancel = nothing happened: banner verbatim, editor open, draft intact,
     // no extra fetch.
@@ -108,12 +113,14 @@ describe('Quests 409 recovery: Reload list names the discard', () => {
 
     // What the other tab persisted — the accept-leg refetch surfaces it.
     questsFixture = [{ id: 'q1', name: 'The Sunken Shrine', status: 'active', description: 'other-tab text' }];
-    confirmSpy.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
 
-    // Named confirm fired, then the existing one-click recovery ran: editor
-    // closed AND the stale list refresh consumed.
-    expect(confirmSpy).toHaveBeenCalledWith(DISCARD_CONFIRM);
+    // In-app toll answered Discard, then the existing one-click recovery ran:
+    // editor closed AND the stale list refresh consumed.
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent(DISCARD_CONFIRM);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await waitFor(() =>
       expect(screen.queryByTestId('quest-field-quest-description')).toBeNull()
     );

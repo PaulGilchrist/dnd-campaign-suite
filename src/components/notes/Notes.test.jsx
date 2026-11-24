@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react';
 import Notes from './Notes.jsx';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
@@ -292,11 +292,16 @@ describe('Notes', () => {
       expect(screen.getByText(String(expectedLevel))).toBeInTheDocument();
     });
 
-    it.each(['Cancel', 'Close'])('closes modal via the %s button', (name) => {
+    it.each(['Cancel', 'Close'])('closes modal via the %s button', async (name) => {
       renderNotes();
       openNewNote();
       fireEvent.click(screen.getByRole('button', { name }));
-      expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
+      // Clean draft: no toll (the guard resolves silently true); the close
+      // settles through the hook's await seam → waitFor, not a sync assert.
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument()
+      );
+      expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
     });
 
     it('does not close modal via overlay click', () => {

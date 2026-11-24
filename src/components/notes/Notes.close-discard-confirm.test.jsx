@@ -1,14 +1,17 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai: 2026-11-24
 // Regression lock for improve 2026-10-29-V (ct-lanes-close-x-unguarded): the
 // Notes lane's ×/Cancel close path must NAME the discard through the shared
 // useReloadGuard when the draft is dirty — wizard precedent
 // `Discard changes to "X"?` (CharacterCreationWizard.jsx) — with the entity
 // name the editor shows (noteDisplayName: party location, else a plain-text
 // description excerpt; unnamed new draft → the wizard's generic new-draft
-// copy). A clean draft keeps closing silently. Dismiss is fully inert
-// (banner, editor, draft survive — zero network); accept closes via the same
-// handleCloseModal path; internal closes (save/delete/reload) stay single-
-// confirm. Harness mirrors Notes.reload-discard-confirm.test.jsx.
+// copy). QA backlog 2026-11-24: the toll rides the SHARED in-app
+// keep/discard dialog (role="dialog", Cancel = Keep) instead of a native
+// window.confirm — a native confirm firing on this path is a regression.
+// A clean draft keeps closing silently. Dismiss is fully inert (banner,
+// editor, draft survive — zero network); Discard closes via the same
+// handleCloseModal path; internal closes (save/delete/reload) never pay the
+// toll. Harness mirrors Notes.reload-discard-confirm.test.jsx.
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Notes from './Notes';
@@ -74,11 +77,21 @@ const openEditor = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit note: Test Hollow' }));
 };
 
-const closeX = () => screen.getByRole('button', { name: 'Close' });
-const cancelButton = () => screen.getByRole('button', { name: 'Cancel' });
+const editorCloseX = () => document.querySelector('.notes-modal .ct-modal-close');
+const editorCancel = () =>
+  [...document.querySelectorAll('.notes-modal button')].find(b => b.textContent.trim() === 'Cancel');
 const editor = () => screen.queryByTestId('preview-toggle-note-description');
 
-describe('Notes ×/Cancel close: dirty draft names the discard', () => {
+// The shared in-app keep/discard toll, asserted to name the loss.
+const openToll = async (copy) => {
+  const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+  expect(toll).toHaveTextContent(copy);
+  return toll;
+};
+const keepToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Cancel' }));
+const discardToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
+
+describe('Notes ×/Cancel close: dirty draft names the discard (in-app toll)', () => {
   let confirmSpy;
   beforeEach(() => {
     loadCallCount = 0;
@@ -93,7 +106,10 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
       partyLevel: 1,
       partyLocation: 'Test Hollow',
     }];
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    // A native confirm that FIRES on this path is a regression — make it loud.
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the close-discard path');
+    });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -101,20 +117,23 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     vi.restoreAllMocks();
   });
 
-  it('dirty draft + ×: exactly ONE named confirm (location names the note)', async () => {
+  it('dirty draft + ×: the toll opens naming the note by location — once', async () => {
     renderNotes();
     await openEditor();
     fireEvent.change(screen.getByLabelText('Party Location'), {
       target: { value: 'Waterdeep' },
     });
 
-    fireEvent.click(closeX());
+    fireEvent.click(editorCloseX());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Waterdeep"?');
+    const toll = await openToll('Discard changes to "Waterdeep"?');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    // Exactly one toll mounted; answering Keep leaves it dismissed.
+    keepToll(toll);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull());
   });
 
-  it('dirty draft + Cancel: dismiss is fully inert — editor, draft, banner survive, zero network', async () => {
+  it('dirty draft + Cancel: Keep is fully inert — editor, draft, banner survive, zero network', async () => {
     // With a 409 banner up too: dismissing the close must leave everything.
     saveError = conflictError();
     renderNotes();
@@ -124,27 +143,27 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     await screen.findByText(/NOT saved/);
     loadCallCount = 0;
 
-    fireEvent.click(cancelButton());
+    fireEvent.click(editorCancel());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Test Hollow"?');
+    const toll = await openToll('Discard changes to "Test Hollow"?');
+    keepToll(toll);
     expect(screen.getByText(/NOT saved/)).toHaveTextContent(CONFLICT_MESSAGE);
     expect(editor()).toBeInTheDocument();
     expect(editor().value).toBe('my unsaved draft');
     expect(loadCallCount).toBe(0);
     expect(saveCallCount).toBe(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('dirty draft + Cancel: accept closes via the same path — no reload, no residue', async () => {
+  it('dirty draft + Cancel: Discard closes via the same path — no reload, no residue', async () => {
     renderNotes();
     await openEditor();
     fireEvent.change(editor(), { target: { value: 'typo fix in progress' } });
-    confirmSpy.mockReturnValue(true);
 
-    fireEvent.click(cancelButton());
+    fireEvent.click(editorCancel());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Test Hollow"?');
+    const toll = await openToll('Discard changes to "Test Hollow"?');
+    discardToll(toll);
     await waitFor(() => expect(editor()).toBeNull());
     // Clean close: no missed-broadcast refresh, list untouched.
     expect(loadCallCount).toBe(1);
@@ -155,9 +174,10 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     renderNotes();
     await openEditor();
 
-    fireEvent.click(closeX());
+    fireEvent.click(editorCloseX());
     await waitFor(() => expect(editor()).toBeNull());
     expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
     expect(loadCallCount).toBe(1);
 
     // Reopen, touch nothing, Cancel: still silent, and the rejected-save
@@ -169,28 +189,29 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     await screen.findByText(/NOT saved/);
     loadCallCount = 0;
 
-    fireEvent.click(cancelButton());
+    fireEvent.click(editorCancel());
     await waitFor(() => expect(editor()).toBeNull());
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(loadCallCount).toBe(1);
   });
 
-  it('unnamed new draft (Private toggle only): wizard generic new-draft copy', async () => {
+  it('unnamed new draft (Private toggle only): toll rides the wizard generic new-draft copy', async () => {
     renderNotes();
     await screen.findByText('old note');
     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
     fireEvent.click(screen.getByLabelText(/Private Note/i));
 
-    fireEvent.click(closeX());
+    fireEvent.click(editorCloseX());
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard this new note draft?');
-    // Dismiss keeps the fresh editor open with the toggle still set.
+    const toll = await openToll('Discard this new note draft?');
+    // Keep: the fresh editor stays open with the toggle still set.
+    keepToll(toll);
     expect(editor()).toBeInTheDocument();
     expect(screen.getByLabelText(/Private Note/i)).toBeChecked();
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('save success still closes without double-confirm', async () => {
+  it('save success still closes without any toll', async () => {
     renderNotes();
     await openEditor();
     fireEvent.change(editor(), { target: { value: 'final text' } });
@@ -198,6 +219,7 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save/i }));
     await waitFor(() => expect(editor()).toBeNull());
     expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
   });
 
   it('delete rides the shared in-app DeleteConfirmModal — no native confirm (QA backlog 2026-11-24)', async () => {

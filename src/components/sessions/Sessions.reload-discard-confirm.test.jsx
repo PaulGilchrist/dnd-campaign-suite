@@ -8,7 +8,7 @@
 // recovery ladder. A clean editor keeps the old one-click behavior — no extra
 // prompt. Harness mirrors NPCs.reload-discard-confirm.test.jsx and reuses the
 // mocked service/modal rig of Sessions.conflict-reload.test.jsx.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Sessions from './Sessions';
 
@@ -124,7 +124,10 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
       throw Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
     };
     sessionsFixture = [{ name: 'Session 7', date: '2026-10-27', summary: '', links: {}, updatedAt: 1 }];
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    // A native confirm that FIRES on this path is a regression — make it loud.
+    confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('native window.confirm fired on the reload-discard path');
+    });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -132,7 +135,17 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
     vi.restoreAllMocks();
   });
 
-  it('dirty editor: Reload list fires exactly ONE named confirm with verbatim copy', async () => {
+  // The shared in-app keep/discard toll (useReloadGuard → DiscardDraftDialog).
+  const openToll = async () => {
+    const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
+    expect(toll).toHaveTextContent(DISCARD_CONFIRM);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    return toll;
+  };
+  const keepToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Cancel' }));
+  const discardToll = (toll) => fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
+
+  it('dirty editor: Reload list opens exactly ONE in-app toll with verbatim copy', async () => {
     renderSessions();
     await screen.findByText(/2026-10-27/);
     expect(loadCallCount).toBe(1);
@@ -140,8 +153,7 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
     await openConflictWithDraft('2026-12-25');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith(DISCARD_CONFIRM);
+    await openToll();
   });
 
   it('cancel leg: fully inert — banner, editor, and draft survive, zero network', async () => {
@@ -151,7 +163,8 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
     await openConflictWithDraft('2026-12-25');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
-    // confirmSpy answers false (beforeEach default).
+    const toll = await openToll();
+    keepToll(toll);
 
     // Nothing happened: banner verbatim, editor open, draft intact, no fetch.
     expect(screen.getByText(/NOT saved/)).toHaveTextContent(CONFLICT_MESSAGE);
@@ -168,12 +181,12 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
 
     // What the other tab persisted — the accept-leg refetch surfaces it.
     sessionsFixture = [{ name: 'Session 7', date: '2026-11-09', summary: '', links: {}, updatedAt: 2 }];
-    confirmSpy.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
 
-    // Named confirm fired, then the existing one-click recovery ran: editor
-    // closed, banner cleared AND the stale list refresh consumed.
-    expect(confirmSpy).toHaveBeenCalledWith(DISCARD_CONFIRM);
+    // In-app toll answered Discard, then the existing one-click recovery ran:
+    // editor closed, banner cleared AND the stale list refresh consumed.
+    const toll = await openToll();
+    discardToll(toll);
     await waitFor(() => expect(screen.queryByTestId('session-planner-modal')).not.toBeInTheDocument());
     expect(screen.queryByText(/NOT saved/)).not.toBeInTheDocument();
     await screen.findByText(/2026-11-09/);
@@ -192,7 +205,7 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
     expect(screen.queryByText(/NOT saved/)).not.toBeInTheDocument();
   });
 
-  it('clean editor: Reload list stays one click — no confirm, closes + refetches', async () => {
+  it('clean editor: Reload list stays one click — no toll, closes + refetches', async () => {
     renderSessions();
     await screen.findByText(/2026-10-27/);
 
@@ -210,7 +223,7 @@ describe('Sessions 409 recovery: Reload list names the discard', () => {
     expect(loadCallCount).toBe(2);
   });
 
-  it('draft reverted to the seed counts as clean — no confirm', async () => {
+  it('draft reverted to the seed counts as clean — no toll', async () => {
     renderSessions();
     await screen.findByText(/2026-10-27/);
 
