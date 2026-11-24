@@ -124,6 +124,15 @@ describe('WizardStepBasic', () => {
     expect(onInputChange).toHaveBeenCalledWith('name', 'New Name');
   });
 
+  it('blurring the name field calls onNameBlur (touch signal owned by the wizard)', () => {
+    const onNameBlur = vi.fn();
+    renderBasic({ onNameBlur });
+
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    expect(onNameBlur).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     { input: '10', expected: 10 },
     { input: '0', expected: 0 }, // falsy level must pass through as a number, not be defaulted away

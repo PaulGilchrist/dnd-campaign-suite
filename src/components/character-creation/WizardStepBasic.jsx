@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function WizardStepBasic({ stepNumber, formData, errors, campaignName, onInputChange }) {
+function WizardStepBasic({ stepNumber, formData, errors, campaignName, onInputChange, onNameBlur }) {
   const [alignments, setAlignments] = useState([]);
 
   useEffect(() => {
@@ -35,6 +35,7 @@ function WizardStepBasic({ stepNumber, formData, errors, campaignName, onInputCh
           type="text"
           value={formData.name}
           onChange={(e) => onInputChange('name', e.target.value)}
+          onBlur={onNameBlur}
           className={errors.name ? 'error' : ''}
          />
          {errors.name && <span className="error-message">{errors.name}</span>}

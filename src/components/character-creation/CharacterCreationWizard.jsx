@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import cloneDeep from 'lodash/cloneDeep';
 import isEqual from 'lodash/isEqual';
 import './CharacterCreationWizard.css';
-import { validateStep, validateFinalFormData, validateAbilityTotals, validateSelectionCaps, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals, validateSelectionCaps } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
@@ -19,6 +19,7 @@ import useWizardFeats from '../../hooks/wizard/useWizardFeats.js';
 import useWizardFeatBuffs from '../../hooks/wizard/useWizardFeatBuffs.js';
 import useWizardSpells from '../../hooks/wizard/useWizardSpells.js';
 import useWizardBackgroundAbility from '../../hooks/wizard/useWizardBackgroundAbility.js';
+import useWizardNameGuard from '../../hooks/wizard/useWizardNameGuard.js';
 
 import useWizardAbilities from '../../hooks/wizard/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/wizard/useWizardArrayToggle.js';
@@ -71,6 +72,7 @@ const WizardStepRenderer = React.memo(({
   onBuildModeChange,
   onRulesetChange,
   onInputChange,
+  onNameBlur,
   onArrayFieldChange,
   onInventoryChange,
   onTempInventoryChange,
@@ -141,6 +143,7 @@ const WizardStepRenderer = React.memo(({
     tempInventory,
     onRulesetChange,
     onInputChange,
+    onNameBlur,
     onArrayFieldChange,
     onInventoryChange,
     onTempInventoryChange,
@@ -261,27 +264,12 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       .filter(n => n.trim() && (!isEditing || n.trim().toLowerCase() !== selfName));
   }, [existingCharacters, characterData, isEditing]);
 
-  // Live inline name error on Step 2: blank/whitespace → required hint,
-  // collision → duplicate hint, valid → cleared. Mirrors NPCs/Quests/Factions
-  // (updateField clears errors.name on each keystroke — this re-arms it while
-  // the name is still invalid). Only writes when the message actually changes
-  // so the happy path stays untouched. Rendered inline by WizardStepBasic's
-  // existing `.error-message` span beneath the name input.
-  useEffect(() => {
-    const trimmedName = (formData.name || '').trim();
-    let expectedNameError = null;
-    if (!trimmedName) {
-      expectedNameError = CHARACTER_NAME_REQUIRED_ERROR;
-    } else if (hasDuplicateCharacterName(formData.name, existingNames)) {
-      expectedNameError = DUPLICATE_CHARACTER_NAME_ERROR;
-    }
-    // Write only to raise/change a live name message, or to clear one this
-    // guard owns — never churn errors owned by other validators.
-    const isLiveNameError = errors.name === DUPLICATE_CHARACTER_NAME_ERROR || errors.name === CHARACTER_NAME_REQUIRED_ERROR;
-    if (expectedNameError ? errors.name !== expectedNameError : isLiveNameError) {
-      setErrors({ ...errors, name: expectedNameError });
-    }
-  }, [formData.name, existingNames, errors, setErrors]);
+  // Live inline name error on Step 2 (touched-gated required hint + live
+  // duplicate check) — see the hook for the full law. handleFieldChange
+  // wraps updateField so any keystroke in the name field marks it touched.
+  const { handleFieldChange, handleNameBlur } = useWizardNameGuard(
+    formData.name, existingNames, errors, setErrors, updateField
+  );
 
   // Navigation
   const {
@@ -597,7 +585,8 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         buildMode={buildMode}
         onBuildModeChange={setBuildMode}
         onRulesetChange={handleRulesetChange}
-        onInputChange={updateField}
+        onInputChange={handleFieldChange}
+        onNameBlur={handleNameBlur}
         onArrayFieldChange={updateArrayField}
         onInventoryChange={updateInventory}
         onTempInventoryChange={updateTempInventory}
@@ -660,7 +649,8 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     tempInventory,
     buildMode,
     handleRulesetChange,
-    updateField,
+    handleFieldChange,
+    handleNameBlur,
     updateArrayField,
     updateInventory,
     updateTempInventory,

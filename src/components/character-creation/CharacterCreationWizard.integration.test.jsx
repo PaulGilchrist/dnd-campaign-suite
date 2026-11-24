@@ -231,19 +231,46 @@ describe('CharacterCreationWizard - Integration', () => {
     await waitFor(() => expect(saveBtn()).toBeEnabled());
   });
 
-  it('create flow: empty name on the Basic step shows the same inline required-hint', async () => {
+  it('create flow: pristine empty name on the Basic step shows NO error until first touch', async () => {
     renderWizard();
 
     fireEvent.click(screen.getByTestId('rules-option-5e'));
     const nameInput = await screen.findByRole('textbox');
+    const next = () => screen.getByRole('button', { name: 'Next' });
 
-    // Step 2 renders with an empty name: hint visible inline, Next blocked.
+    // Arrival at Step 2 with an untouched empty name: no red hint, no error
+    // styling. The retired eager-validations self-fired the required error
+    // ~300 ms after arrival — sample at 0 ms and past that window.
+    expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
+    expect(nameInput).not.toHaveClass('error');
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
+    // Advancement is still hard-gated (unchanged lane, just silent).
+    await waitFor(() => expect(next()).toBeDisabled());
+
+    // First blur with the field still empty arms the hint; Next stays shut.
+    fireEvent.blur(nameInput);
     expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
+    expect(nameInput.closest('.form-group').querySelector('.error-message')).toHaveTextContent(CHARACTER_NAME_REQUIRED_ERROR);
     expect(nameInput).toHaveClass('error');
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(next()).toBeDisabled();
+  });
+
+  it('create flow: typing then clearing the name shows the required hint, a valid name clears it', async () => {
+    renderWizard();
+
+    fireEvent.click(screen.getByTestId('rules-option-5e'));
+    const nameInput = await screen.findByRole('textbox');
+    const next = () => screen.getByRole('button', { name: 'Next' });
 
     fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
-    await waitFor(() => expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument());
+    await waitFor(() => expect(next()).toBeEnabled());
+    expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
+
+    // Clearing after interaction re-arms the required hint immediately.
+    fireEvent.change(nameInput, { target: { value: '' } });
+    expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
+    await waitFor(() => expect(next()).toBeDisabled());
   });
 });
 
