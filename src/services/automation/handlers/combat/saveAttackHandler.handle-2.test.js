@@ -52,6 +52,7 @@ import { handle } from './saveAttackHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as automationExpressions from '../../../combat/automation/automationExpressions.js';
@@ -86,6 +87,9 @@ describe('saveAttackHandler - handle (part 2)', () => {
     savePrompt.buildSaveDc.mockReturnValue(13);
     rangeValidation.rangeToFeet.mockReturnValue(30);
     runtimeState.getRuntimeValue.mockReturnValue(null);
+    // Async contract (savePath.js getCombatContext is async) — a bare vi.fn()
+    // would hand buildAoeModal a sync undefined and mask a dropped await.
+    damageUtils.getCombatContext.mockResolvedValue(null);
   });
 
   describe('handle - uses cost', () => {

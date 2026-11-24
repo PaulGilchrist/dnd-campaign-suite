@@ -44,6 +44,11 @@ vi.mock('../../../combat/automation/automationExpressions.js', () => ({
   resolveScaling: vi.fn(),
 }));
 
+vi.mock('../../../maps/spellOverlayService.js', () => ({
+  overlayTargetId: vi.fn(),
+  fetchSpellOverlays: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './saveAttackHandler.js';
@@ -53,6 +58,7 @@ import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as expirations from '../../../rules/effects/expirations.js';
+import * as spellOverlayService from '../../../maps/spellOverlayService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -188,6 +194,62 @@ describe('saveAttackHandler - handle', () => {
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('saveAttackAoe');
       expect(result.payload.damage).toBe('4d6');
+    });
+  });
+
+  describe('handle - AoE modal overlay lane (awaited getCombatContext)', () => {
+    // buildAoeModal must AWAIT getCombatContext (async damageUtils export) before
+    // reading the attacker cs row target: without the await `cs` is a Promise,
+    // getAttackerTargetName resolves nothing, and payload.activeOverlay is always
+    // null — the overlay picker lane silently degrades to the fallback face.
+    // Regression pin for bug-saveattackhandler-aoe-modal-missing-await-getcombatcontext.
+    const overlayTargetImpl = (targetName) =>
+      typeof targetName === 'string' && targetName.startsWith('overlay-')
+        ? targetName.slice('overlay-'.length)
+        : null;
+
+    it('ships the live overlay row by reference on activeOverlay', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      const cs = { creatures: [{ name: 'TestCaster', targetName: 'overlay-zz1' }] };
+      const overlay = { id: 'zz1', shape: 'sphere', startGridX: 4, startGridY: 4, radiusFt: 20 };
+      damageUtils.getCombatContext.mockResolvedValue(cs);
+      const seen = [];
+      damageUtils.getAttackerTargetName.mockImplementation((ctx) => { seen.push(ctx); return 'overlay-zz1'; });
+      spellOverlayService.overlayTargetId.mockImplementation(overlayTargetImpl);
+      spellOverlayService.fetchSpellOverlays.mockResolvedValue([overlay]);
+
+      const result = await handle(makeAction({ shape: 'cone', damage: '1d8' }), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      // The RESOLVED context (not a pending Promise) is handed to the reader.
+      expect(seen[0]).toBe(cs);
+      // The overlay ships BY REFERENCE — identity, not a copy.
+      expect(result.payload.activeOverlay).toBe(overlay);
+    });
+
+    it('ships activeOverlay null when the armed id matches no live row', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestCaster', targetName: 'overlay-gone' }] });
+      damageUtils.getAttackerTargetName.mockReturnValue('overlay-gone');
+      spellOverlayService.overlayTargetId.mockImplementation(overlayTargetImpl);
+      spellOverlayService.fetchSpellOverlays.mockResolvedValue([]);
+
+      const result = await handle(makeAction({ shape: 'cone', damage: '1d8' }), makePlayerStats(), campaignName, null);
+
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.activeOverlay).toBe(null);
+    });
+
+    it('ships activeOverlay null for a non-overlay-armed attacker without fetching', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      damageUtils.getAttackerTargetName.mockReturnValue('Victim One');
+
+      const result = await handle(makeAction({ shape: 'cone', damage: '1d8' }), makePlayerStats(), campaignName, null);
+
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.activeOverlay).toBe(null);
+      expect(spellOverlayService.fetchSpellOverlays).not.toHaveBeenCalled();
     });
   });
 

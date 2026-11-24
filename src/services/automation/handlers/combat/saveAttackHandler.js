@@ -274,7 +274,7 @@ async function buildConditionModal({ action, auto, playerStats, campaignName, ma
 
 // Handle AoE damage (not heal, not condition-only)
 async function buildAoeModal({ action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess }) {
-    const cs = getCombatContext(campaignName);
+    const cs = await getCombatContext(campaignName);
     const attackerTargetName = getAttackerTargetName(cs, playerStats.name);
     const isOverlayTargeted = attackerTargetName?.startsWith('overlay-');
 
