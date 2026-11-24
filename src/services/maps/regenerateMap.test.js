@@ -69,7 +69,6 @@ const ADJACENT_OPTS = {
     mode: 'adjacent',
     roomSize: 'standard',
     gridSize: 20,
-    density: 0.5,
     seed: 42,
     roomCount: 8,
     corridorLength: 'compact',
@@ -296,7 +295,7 @@ describe('describeGenerationOpts — read-only tooltip copy', () => {
     it('adjacent stamp reads human-readably with every mode-specific key', () => {
         expect(describeGenerationOpts(ADJACENT_OPTS)).toBe(
             'Generated with: Mode: Room Adjacent · Seed: 42 · Grid size: 20 · '
-            + 'Density: 50% · Room size: Standard · Rooms: 8 · Room bounds: 4-9 · '
+            + 'Room size: Standard · Rooms: 8 · Room bounds: 4-9 · '
             + 'Corridors: Compact · Layout: Balanced',
         );
     });
@@ -310,6 +309,38 @@ describe('describeGenerationOpts — read-only tooltip copy', () => {
     it('terrain stamp covers mode/seed/grid and nothing invented', () => {
         expect(describeGenerationOpts(TERRAIN_OPTS)).toBe(
             'Generated with: Mode: Terrain · Seed: 7 · Grid size: 30',
+        );
+    });
+
+    // 2026-11-24 QD ghost-Density fix: the copy names ONLY knobs the stamped
+    // mode has. Adjacent mode swaps the density slider for Rooms/Corridors and
+    // terrain has no knobs beyond grid+seed — yet stamps written before the
+    // assembly fix still carried the BSP density default. Rendering any of that
+    // advertises a knob that never steered the map.
+    it('adjacent copy suppresses a foreign density key', () => {
+        const line = describeGenerationOpts({ ...ADJACENT_OPTS, density: 0.5 });
+        expect(line).not.toContain('Density');
+        expect(line).toBe(describeGenerationOpts(ADJACENT_OPTS));
+    });
+
+    it('terrain copy suppresses density and every adjacent-only knob', () => {
+        const line = describeGenerationOpts({
+            ...TERRAIN_OPTS,
+            density: 0.5,
+            roomSize: 'standard',
+            roomCount: 8,
+            minRoom: 4,
+            maxRoom: 9,
+            corridorLength: 'compact',
+            layoutStyle: 'balanced',
+        });
+        expect(line).toBe('Generated with: Mode: Terrain · Seed: 7 · Grid size: 30');
+    });
+
+    it('bsp copy suppresses the adjacent-only knobs', () => {
+        const line = describeGenerationOpts({ ...BSP_OPTS, roomCount: 8, corridorLength: 'compact' });
+        expect(line).toBe(
+            'Generated with: Mode: BSP Dungeon · Seed: 42 · Grid size: 30 · Density: 50%',
         );
     });
 

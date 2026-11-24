@@ -51,7 +51,6 @@ const ADJACENT_OPTS = {
     mode: 'adjacent',
     roomSize: 'standard',
     gridSize: 20,
-    density: 0.5,
     seed: 42,
     roomCount: 8,
     corridorLength: 'compact',
@@ -61,7 +60,7 @@ const ADJACENT_OPTS = {
 };
 const ADJACENT_TOOLTIP =
     'Generated with: Mode: Room Adjacent · Seed: 42 · Grid size: 20 · '
-    + 'Density: 50% · Room size: Standard · Rooms: 8 · Room bounds: 4-9 · '
+    + 'Room size: Standard · Rooms: 8 · Room bounds: 4-9 · '
     + 'Corridors: Compact · Layout: Balanced';
 
 const GENERATED_MAP = {
@@ -144,6 +143,9 @@ describe('MapsManager Regenerate confirm dialog', () => {
         const dialog = await openRegenerateDialog();
         expect(dialog).toHaveAttribute('aria-modal', 'true');
         expect(dialog).toHaveTextContent(ADJACENT_TOOLTIP);
+        // 2026-11-24 QD: adjacent mode has no density knob — the confirm copy
+        // must never print a ghost "Density" line.
+        expect(dialog.textContent).not.toContain('Density');
 
         fireEvent.click(screen.getByRole('button', { name: 'Yes, Regenerate' }));
         await waitFor(() => {

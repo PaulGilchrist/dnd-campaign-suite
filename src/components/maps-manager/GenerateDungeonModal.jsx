@@ -89,9 +89,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                 const roomMaxSpan = Math.max(2, gridSize - 2);
                 const baseMinRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
                 const baseMaxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
+                // Adjacent mode has NO density knob: the slider renders only in BSP
+                // mode, and the generator's density fallback is unreachable while a
+                // roomCount rides the call — stamping the BSP shared-state default
+                // here only leaked a ghost "Density: 50%" into regenerate copy
+                // (2026-11-24 QD).
                 const adjacentOpts = {
                     gridSize: gridSize,
-                    density: density / 100,
                     seed: seedValue,
                     roomCount: roomCount,
                     corridorLength: corridorLength,

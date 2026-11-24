@@ -40,7 +40,31 @@ const MODE_LABELS = {
     terrain: 'Terrain',
 };
 
+// Mode-specific display keys — exactly the knobs the create modal shows per mode
+// (the Generate modal swaps its controls with the mode: BSP rides the density
+// slider; adjacent swaps it for Rooms/Room size/Corridors/Layout; terrain offers
+// none). The copy must name only knobs the stamped mode actually HAS: a stamp may
+// still carry another mode's default (the 2026-11-24 QD fix stopped the adjacent
+// assembly stamping the BSP density, but stamps written before it still do), and
+// printing it would advertise a knob that never steered the map.
+const MODE_DISPLAY_KEYS = {
+    adjacent: ['roomSize', 'roomCount', 'roomBounds', 'corridorLength', 'layoutStyle'],
+    bsp: ['density'],
+    terrain: [],
+};
+
 const titleCase = (value) => String(value).charAt(0).toUpperCase() + String(value).slice(1);
+
+// One copy fragment per mode-specific key; returns null when the stamp omits the
+// knob (undefined-vs-empty-string checks mirror the keys' own value domains).
+const OPT_FRAGMENT_RENDERERS = {
+    density: opts => opts.density !== undefined ? `Density: ${Math.round(opts.density * 100)}%` : null,
+    roomSize: opts => opts.roomSize ? `Room size: ${titleCase(opts.roomSize)}` : null,
+    roomCount: opts => opts.roomCount !== undefined ? `Rooms: ${opts.roomCount}` : null,
+    roomBounds: opts => opts.minRoom !== undefined ? `Room bounds: ${opts.minRoom}-${opts.maxRoom}` : null,
+    corridorLength: opts => opts.corridorLength ? `Corridors: ${titleCase(opts.corridorLength)}` : null,
+    layoutStyle: opts => opts.layoutStyle ? `Layout: ${titleCase(opts.layoutStyle)}` : null,
+};
 
 // Read-only "Generated with: …" tooltip copy (criterion: mode, seed, gridSize plus the
 // mode-specific keys of the stamp). Returns null for an absent stamp so the Regenerate
@@ -53,12 +77,10 @@ export function describeGenerationOpts(generationOpts) {
         `Seed: ${opts.seed}`,
         `Grid size: ${opts.gridSize}`,
     ];
-    if (opts.density !== undefined) parts.push(`Density: ${Math.round(opts.density * 100)}%`);
-    if (opts.roomSize) parts.push(`Room size: ${titleCase(opts.roomSize)}`);
-    if (opts.roomCount !== undefined) parts.push(`Rooms: ${opts.roomCount}`);
-    if (opts.minRoom !== undefined) parts.push(`Room bounds: ${opts.minRoom}-${opts.maxRoom}`);
-    if (opts.corridorLength) parts.push(`Corridors: ${titleCase(opts.corridorLength)}`);
-    if (opts.layoutStyle) parts.push(`Layout: ${titleCase(opts.layoutStyle)}`);
+    for (const key of MODE_DISPLAY_KEYS[opts.mode] || []) {
+        const fragment = OPT_FRAGMENT_RENDERERS[key](opts);
+        if (fragment) parts.push(fragment);
+    }
     return `Generated with: ${parts.join(' · ')}`;
 }
 

@@ -464,13 +464,14 @@ describe('GenerateDungeonModal', () => {
 
       await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
       // Grid-20 spacious math: base [4,8] × 1.3 → minRoom 5, maxRoom 10.
-      // Adjacent mode has no density slider — the default 50% (0.5) is the
-      // effective knob value handed to the generator.
+      // Adjacent mode has no density knob (the slider is BSP-only and the
+      // generator's density fallback is unreachable while roomCount rides the
+      // call), so the stamp carries none — a ghost "Density" line in the
+      // regenerate copy was the 2026-11-24 QD bug.
       expect(createPayload().generationOpts).toEqual({
         mode: 'adjacent',
         roomSize: 'spacious',
         gridSize: 20,
-        density: 0.5,
         seed: 42,
         roomCount: 10,
         corridorLength: 'sprawling',
@@ -478,12 +479,13 @@ describe('GenerateDungeonModal', () => {
         minRoom: 5,
         maxRoom: 10,
       });
-      // The generator got the same derived opts WITHOUT the label-only extras.
+      // The generator got the same derived opts WITHOUT the label-only extras
+      // and without a foreign density.
       expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-        expect.not.objectContaining({ mode: expect.anything(), roomSize: expect.anything() }),
+        expect.not.objectContaining({ mode: expect.anything(), roomSize: expect.anything(), density: expect.anything() }),
       );
       expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-        expect.objectContaining({ minRoom: 5, maxRoom: 10, roomCount: 10, density: 0.5 }),
+        expect.objectContaining({ minRoom: 5, maxRoom: 10, roomCount: 10 }),
       );
     });
   });
