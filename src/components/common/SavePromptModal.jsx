@@ -12,7 +12,7 @@ import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/r
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
-import { stampLeadingEvasionSelections, clearLeadingEvasionSelection } from '../../services/rules/combat/evasionUtils.js';
+import { stampLeadingEvasionSelections, clearLeadingEvasionSelection, isLeadingEvasionSelected, LEADING_EVASION_KEY } from '../../services/rules/combat/evasionUtils.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import storage from '../../services/ui/storage.js';
 import './SavePromptModal.css';
@@ -27,6 +27,11 @@ import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.
 
 const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
 
+// CLA-211 role: the Leading Evasion chooser TRIGGER only — "does a shareable
+// holder exist in the roster, so should we ask the GM?" It deliberately does
+// NOT answer who gets the share (that is the per-prompt selection stamp read
+// by EvasionNote/resolveAoESaveEvasion); using presence for grants was the
+// retired pre-CLA-211 blanket fold.
 function hasShareableEvasionFor(current, characters) {
   if (current.dcSuccess !== 'half') return false;
   const normalizedSaveType = normalizeSaveType(current.saveType);
@@ -733,7 +738,19 @@ function computeRerollAvailability(current, targetCharacter, campaignName) {
 
 function EvasionNote({ current, characters, campaignName }) {
   const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
-  const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && hasShareableEvasionFor(current, characters);
+  // CLA-211: the shared branch must answer the SAME per-target predicate the
+  // adjudication answers (resolveAoESaveEvasion's hasSelectedEvasion and the
+  // roller's computeHasEvasion gate) — only targets the GM picked at the
+  // Leading Evasion chooser get the share; everyone else pays normal save
+  // damage. The retired blanket shareable-holder PRESENCE test
+  // (hasShareableEvasionFor — kept only as the chooser TRIGGER above) printed
+  // a lying "No damage on success" zero to unselected targets. The stamp
+  // lives from chooser-confirm until dispatch (submitResultAndClear prunes
+  // it), so it is exactly the armed-prompt-face truth; the reactive read
+  // re-renders the note when another client confirms or clears the chooser.
+  useRuntimeValue('campaign', LEADING_EVASION_KEY, campaignName);
+  const hasSelectedEvasion = isLeadingEvasionSelected(campaignName, current.promptId, current.targetName);
+  const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && hasSelectedEvasion;
   const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
   return hasEvasion
     ? <p className="sp-note sp-evasion">Evasion: No damage on success, half damage on failure</p>

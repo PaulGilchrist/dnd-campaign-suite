@@ -27,3 +27,22 @@ Display integrity — the prompt's doctrine line lies to the table on exactly th
 
 ## Suggested fix
 Gate the note's shared branch on the per-prompt selection stamp (`isLeadingEvasionSelected(campaignName, current.promptId, current.targetName)`) — optionally OR'd with the modal's live `selectedAlliesRef` read while the chooser session is open — so the note answers the same predicate the roller and the adjudication answer. Unit-pin: skip → `Half damage on successful save`; selected ally → Evasion note; holder → Evasion note; incapacitated → plain half note.
+
+## Resolution
+FIXED 2026-11-24 (fix-run). The diagnosis held exactly: `EvasionNote`'s shared branch was the sole consumer left on the retired pre-CLA-211 blanket `hasShareableEvasionFor` presence test. The runtime stamp `leadingEvasionSelections[promptId]` is written synchronously to the in-memory store at chooser-confirm and pruned only at dispatch (`submitResultAndClear`), so during the whole armed-prompt window it is exactly the per-target truth the adjudication uses — no `selectedAlliesRef` OR was needed (and it would have been *wrong* cross-tab, being per-client while the stamp is broadcast).
+
+Changes:
+- `src/components/common/SavePromptModal.jsx` — `EvasionNote` shared branch now gates on `isLeadingEvasionSelected(campaignName, current.promptId, current.targetName)` (same predicate as `evasionUtils.resolveAoESaveEvasion` :75-76 and the roller's `computeHasEvasion` gate), with a `useRuntimeValue('campaign', LEADING_EVASION_KEY, …)` subscription so a confirm/clear echo from another client re-renders the note. `hasShareableEvasionFor` is retained ONLY as the CLA-211 chooser TRIGGER (ask-the-GM question) with a comment pinning that role.
+- `src/components/common/SavePromptModal.evasion-note-selection.test.jsx` (new) — 5 tests pinning the note face: Skip → plain `Half damage on successful save` AND dispatch `evasionActive:false` (note and payment agree); selected-for-own-prompt → Evasion note; stamp for another prompt never lights this note; holder own-Evasion branch keeps the note with no chooser; incapacitated-selected → plain half note.
+- Dual-ruleset: `EvasionNote` is one ruleset-agnostic component (both 5e and 2024 feed `computedStats.evasionEffects` into the same `getEvasionContext`/stamp lane), and `MonsterCardModal`'s sibling `hasShareableEvasionForSave` is a chooser trigger, not a note — no 5e sibling needed changing.
+
+Live verification (test-campaign, :5173, DivinationWizard casts Burning Hands DC 19 DEX at FeyRanger; holder HeroesFeastBard in roster):
+- Repro before fix: chooser Skip → prompt STILL read `Evasion: No damage on success, half damage on failure`; success 24 vs 19 paid `Saved — takes 7 Fire damage … halved` + hp_change.
+- Skip leg after fix: prompt reads `Half damage on successful save`; success 30 vs 19 → `takes 6 Fire damage (…, halved)`, `hp_change 6`, `leading_evasion_declined` row. Note and payment agree.
+- Granted leg after fix: tick FeyRanger + Apply → prompt reads the Evasion note; FAIL 18 vs 19 → half paid (19→9, `rollType:'evasion'` FAILURE ledger row); later SUCCESS 24 vs 19 → `takes no damage`, `evasion SUCCESS fd:0`, `→ 0 final`, no hp_change.
+- Holder sanity leg: prompt targeting HeroesFeastBard — no chooser opens, Evasion note shows via his own Evasion (branch untouched).
+
+Tests: `npx vitest run` new file 5/5; whole touched folder `SavePromptModal.*` + `savePromptUtils` 26 files / 204 tests green; `evasionUtils` + `saveProcessing.cla211` 20 green; `npm run lint` zero warnings; `node .opencode/plans/no-timers-guard.mjs` OK.
+
+Closeout: Full Reset (change-data `{}` + log `[]`) via Admin + spell-overlay clear (`overlays []`); dev pair killed by PID.
+
