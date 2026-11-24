@@ -7,7 +7,7 @@ import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
-import { dismissedNoEffectResult } from './AreaEffectSaveFlow.utils.js';
+import { dismissedNoEffectResult, saveEquationText } from './AreaEffectSaveFlow.utils.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
@@ -586,8 +586,8 @@ function AOEConditionModal({
                                 <strong>{r.targetName}</strong>: {r.dismissed
                                     ? 'Save dismissed — unaffected'
                                     : r.success
-                                        ? `Saved — unaffected (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`
-                                        : `Failed — ${conditionLabel}! (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`}
+                                        ? `Saved — unaffected (${saveEquationText(r, saveDc)})`
+                                        : `Failed — ${conditionLabel}! (${saveEquationText(r, saveDc)})`}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -729,6 +729,7 @@ function AOEConditionModal({
                 <ResultsSummaryModal
                     results={resultsState}
                     conditionLabel={conditionLabel}
+                    saveDc={saveDc}
                     onClose={onClose}
                 />
             ) : null}

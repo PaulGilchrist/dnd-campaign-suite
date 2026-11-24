@@ -1,7 +1,8 @@
 import React, { useCallback, memo } from 'react';
 import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
+import { saveEquationText } from './AreaEffectSaveFlow.utils.js';
 
-export function ResultsSummaryModal({ results, conditionLabel, onClose }) {
+export function ResultsSummaryModal({ results, conditionLabel, saveDc, onClose }) {
     const handleClose = useCallback(() => {
         onClose();
     }, [onClose]);
@@ -21,18 +22,15 @@ export function ResultsSummaryModal({ results, conditionLabel, onClose }) {
                 <div className="sp-body">
                     <p><strong>{successCount}</strong> target{successCount !== 1 ? 's' : ''} saved, <strong>{failCount}</strong> target{failCount !== 1 ? 's' : ''} failed{dismissedCount > 0 && <>, <strong>{dismissedCount}</strong> dismissed</>}.</p>
                     <div className="abjure-results-list">
-                        {results.map(r => {
-                            const saveBonusText = r.saveBonus !== 0 ? ' +' + r.saveBonus : '';
-                            return (
-                                <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {r.dismissed
-                                        ? 'Save dismissed — unaffected'
-                                        : r.success
-                                            ? 'Saved — unaffected (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'
-                                            : 'Failed — ' + conditionLabel + '! (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'}
-                                </div>
-                            );
-                        })}
+                        {results.map(r => (
+                            <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
+                                <strong>{r.targetName}</strong>: {r.dismissed
+                                    ? 'Save dismissed — unaffected'
+                                    : r.success
+                                        ? `Saved — unaffected (${saveEquationText(r, saveDc)})`
+                                        : `Failed — ${conditionLabel}! (${saveEquationText(r, saveDc)})`}
+                            </div>
+                        ))}
                     </div>
                 </div>
                 <div className="sp-actions">
