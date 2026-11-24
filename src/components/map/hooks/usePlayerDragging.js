@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { CELL_SIZE } from '../../../config/mapConfig';
+import { CELL_SIZE, isPaintTool } from '../../../config/mapConfig';
 import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { computeMovementObstacles,
     computeReachable,
@@ -147,6 +147,7 @@ export default function usePlayerDragging({
     gridCenterY,
     rulerMode,
     spellMode,
+    tool,
     campaignName,
     isLocalhost,
     walls,
@@ -175,7 +176,14 @@ export default function usePlayerDragging({
     }, []);
 
     const handlePointerDown = useCallback((e, playerId) => {
-        if (rulerMode || spellMode) return;
+        // Pass-through interlock (paint-swallows-token-cell fix 2026-11-24):
+        // the ruler/spell suppression below already returns BEFORE
+        // stopPropagation so the press bubbles to the svg root; the paint/
+        // erase tools join it. With a wall-stroke tool armed the token hit
+        // area must NOT capture the press at all — Map's handleToolPanStart
+        // routes it to the grid paint lane instead (the token drag lane only
+        // owns the press when no paint tool is armed).
+        if (rulerMode || spellMode || isPaintTool(tool)) return;
         e.stopPropagation();
         // House law (2026-11-16 XC, applied at the source in useSelectMove/
         // useWallDrawing/useZoomPan/useItemDragging:54): button-0 ONLY. A
@@ -240,7 +248,7 @@ export default function usePlayerDragging({
             startX: player.gridX,
             startY: player.gridY,
         });
-    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize, campaignName, characters]);
+    }, [rulerMode, spellMode, tool, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize, campaignName, characters]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;

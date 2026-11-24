@@ -13,7 +13,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useItemDragging from './useItemDragging.js';
-import { CELL_SIZE } from '../../../config/mapConfig.js';
+import { CELL_SIZE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT } from '../../../config/mapConfig.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 const mocks = vi.hoisted(() => ({
@@ -63,7 +63,7 @@ describe('useItemDragging', () => {
     ...overrides,
   });
 
-  const getHook = ({ rulerMode = false, spellMode = false, campaign = campaignName } = {}) =>
+  const getHook = ({ rulerMode = false, spellMode = false, tool = undefined, campaign = campaignName } = {}) =>
     renderHook(() =>
       useItemDragging({
         svgRef,
@@ -74,6 +74,7 @@ describe('useItemDragging', () => {
         gridCenterY: (y) => y * CELL_SIZE + CELL_SIZE / 2,
         rulerMode,
         spellMode,
+        tool,
         campaignName: campaign,
         mapData,
         setPopupHtml: advisorySink,
@@ -131,6 +132,12 @@ describe('useItemDragging', () => {
     it.each([
       ['rulerMode', { rulerMode: true }],
       ['spellMode', { spellMode: true }],
+      // Pass-through interlock (paint-swallows-token-cell fix 2026-11-24):
+      // with a wall-stroke tool armed the creature-token hit area must not
+      // swallow the press — no stopPropagation ⇒ it bubbles to the svg root
+      // where Map's handleToolPanStart routes it to the grid paint lane.
+      ['the Paint tool', { tool: TOOL_PAINT }],
+      ['the Erase tool', { tool: TOOL_ERASE }],
     ])('leaves the event untouched and starts no drag when %s is enabled', (_, overrides) => {
       svgRef.current = svgMock();
       const event = mockEvent();
@@ -141,6 +148,13 @@ describe('useItemDragging', () => {
       expect(result.current.itemDragging).toBeNull();
       expect(event.stopPropagation).not.toHaveBeenCalled();
       expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    // Pass-through suppression is paint-family-only: any other armed tool (or
+    // none) keeps the token grab exactly as before.
+    it('still claims the press when a non-paint tool is armed', () => {
+      const { result } = setupDrag('item1', { tool: TOOL_SELECT });
+      expect(result.current.itemDragging).not.toBeNull();
     });
   });
 

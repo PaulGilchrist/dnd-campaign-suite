@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { CELL_SIZE } from '../../../config/mapConfig';
+import { CELL_SIZE, isPaintTool } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 
@@ -39,6 +39,7 @@ export default function useItemDragging({
     gridCenterY,
     rulerMode,
     spellMode,
+    tool,
     campaignName,
     mapData,
     // §8.4 advisory sink (Map.jsx's .map-toast channel) — threaded into the
@@ -49,7 +50,12 @@ export default function useItemDragging({
     const [itemDragging, setItemDragging] = useState(null);
 
     const handleItemPointerDown = useCallback((e, itemId) => {
-        if (rulerMode || spellMode) return;
+        // Pass-through interlock (paint-swallows-token-cell fix 2026-11-24):
+        // mirrors usePlayerDragging.handlePointerDown — with the ruler, the
+        // wand, or a paint-family tool armed the token hit area returns BEFORE
+        // stopPropagation, so the press bubbles to the svg root and Map's
+        // handleToolPanStart routes it to the grid paint lane.
+        if (rulerMode || spellMode || isPaintTool(tool)) return;
         e.stopPropagation();
         if (e.button !== 0) return;
         e.preventDefault();
@@ -95,7 +101,7 @@ export default function useItemDragging({
             moverName: item.name || item.id,
             moverIsPlayer: item.type === 'player',
         });
-    }, [rulerMode, spellMode, placedItems, gridCenterX, gridCenterY, svgRef]);
+    }, [rulerMode, spellMode, tool, placedItems, gridCenterX, gridCenterY, svgRef]);
 
     const handleItemPointerMove = useCallback((e) => {
         if (!itemDragging) return;

@@ -19,7 +19,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import usePlayerDragging from './usePlayerDragging.js';
-import { CELL_SIZE } from '../../../config/mapConfig.js';
+import { CELL_SIZE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT } from '../../../config/mapConfig.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 const mocks = vi.hoisted(() => ({
@@ -188,6 +188,12 @@ describe('usePlayerDragging', () => {
     it.each([
       ['rulerMode', { rulerMode: true }],
       ['spellMode', { spellMode: true }],
+      // Pass-through interlock (paint-swallows-token-cell fix 2026-11-24):
+      // with a wall-stroke tool armed the token hit area must not swallow the
+      // press — no stopPropagation ⇒ it bubbles to the svg root where Map's
+      // handleToolPanStart routes it to the grid paint lane.
+      ['the Paint tool', { tool: TOOL_PAINT }],
+      ['the Erase tool', { tool: TOOL_ERASE }],
     ])('leaves the event untouched and starts no drag when %s is enabled', (_, overrides) => {
       svgRef.current = svgAt(60, 80);
       const ev = mockEvent();
@@ -199,6 +205,13 @@ describe('usePlayerDragging', () => {
       expect(ev.stopPropagation).not.toHaveBeenCalled();
       expect(ev.preventDefault).not.toHaveBeenCalled();
       expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+    });
+
+    // Pass-through suppression is paint-family-only: any other armed tool (or
+    // none — the default press rows above) keeps the token grab unchanged.
+    it('still claims the press when a non-paint tool is armed', () => {
+      const { result } = press('p1', { hook: { tool: TOOL_SELECT } });
+      expect(result.current.dragging).not.toBeNull();
     });
 
     // #910 capture discipline (this row honest-pinned the #905-class SOURCE BUG of

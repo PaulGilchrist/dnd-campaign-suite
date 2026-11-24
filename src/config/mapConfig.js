@@ -19,6 +19,12 @@ export const TOOL_PAINT = 'paint';
 export const TOOL_ERASE = 'erase';
 export const TOOL_SELECT = 'select';
 
+// Paint-family gate: the ONE canonical check for "a wall-stroke tool is armed"
+// (useWallDrawing's stroke lane). The token drag lanes (usePlayerDragging,
+// useItemDragging) suppress on it so a press on a token-occupied cell passes
+// through to the grid paint lane instead of being swallowed by a token grab.
+export const isPaintTool = (tool) => tool === TOOL_PAINT || tool === TOOL_ERASE;
+
 // GM-view dim for hidden (visible === false) markers, shared by every map
 // lane (indoor props/tokens, indoor POIs, hex POIs, 3D meshes) so "hidden"
 // reads the same everywhere. Players never see hidden markers at all —

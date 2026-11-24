@@ -341,12 +341,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     }, [handleMapSSEEvent, handleSpellOverlayEvent]);
 
     const { dragging, snapToast, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
-        svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
+        svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, tool, campaignName,
         isLocalhost, walls: getWalls(mapData), placedItems, characters, setPopupHtml: showMapNotice,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
-        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName, mapData,
+        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, tool, campaignName, mapData,
         setPopupHtml: showMapNotice,
     });
 
