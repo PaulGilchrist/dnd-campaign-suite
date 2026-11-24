@@ -91,7 +91,10 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
         }
     };
 
-    const flushSave = useCallback(() => {
+    // options.keepalive routes the pending document through the unload-twin
+    // PUT lane (pagehide only — see the flush effect below). Every other
+    // caller (pointer-up, map-switch, unmount, debounce) omits it.
+    const flushSave = useCallback((options) => {
         // Read-only (network) clients never author the map document — flushSave
         // is the sole save chokepoint (autosave debounce + pointer-up/leave +
         // unmount flush all route here). Live in the repro a LAN player tab PUT
@@ -109,6 +112,10 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
         if (!pending) return;
         pendingSaveRef.current = null;
         lastSavedRef.current = pending.dataToSave;
+        if (options?.keepalive) {
+            mapsService.saveMapDataKeepalive(pending.campaignName, pending.mapName, pending.dataToSave);
+            return;
+        }
         mapsService.saveMapData(pending.campaignName, pending.mapName, pending.dataToSave)
             .catch(err => console.error('Failed to save map data:', err));
     }, [isLocalhost]);
@@ -223,6 +230,25 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
     }, [mapData, campaignName, gridSize, placedItems, mapName, flushSave]);
 
     useEffect(() => flushSave, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Hard-reload/tab-close safety net (backlog 2026-11-24 QE): the only
+    // flush points were pointer-up, SPA unmount and the 1s debounce, so a
+    // reload mid-stroke (pointer DOWN, moves already committed to state) or
+    // inside the debounce window silently dropped the pending document
+    // (witnessed: DOM 15 walls → reload → disk 12). `pagehide` is the last
+    // event guaranteed before navigation; the keepalive PUT (mirrors the
+    // TV-beacon releaseTvPresenceKeepalive idiom) rides it past the unload.
+    // Zero traffic when clean: pointer-up/debounce flushes consume
+    // pendingSaveRef, so a quiet mount + reload finds nothing pending and
+    // PUTs nothing (and this flush's own consume/move-baseline keeps it
+    // idempotent with the other lanes). bfcache resume is unreachable here
+    // (live EventSource disqualifies the page — QA law), so no pageshow
+    // re-announce twin is needed: a back-nav is always a fresh boot + load.
+    useEffect(() => {
+        const flushOnPageHide = () => flushSave({ keepalive: true });
+        window.addEventListener('pagehide', flushOnPageHide);
+        return () => window.removeEventListener('pagehide', flushOnPageHide);
+    }, [flushSave]);
 
     return { mapData, setMapData, placedItems, setPlacedItems, loadInProgressRef: svgLoadInProgressRef, flushSave };
 }

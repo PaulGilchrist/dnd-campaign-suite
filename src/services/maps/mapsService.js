@@ -179,6 +179,30 @@ export const saveMapData = async (campaignName, mapName, data) => {
   }
 };
 
+// Unload-twin of saveMapData for the pagehide flush (backlog 2026-11-24 QE:
+// a hard reload/tab-close mid-stroke or inside the 1s autosave debounce
+// window dropped the pending document with zero notice — witnessed DOM 15
+// walls → reload → disk 12). Same PUT lane and URL builder, only
+// `keepalive: true` so the request survives navigation — the exact idiom of
+// releaseTvPresenceKeepalive (services/ui/soundOwner.js). Fire-and-forget:
+// nothing on a leaving page awaits the response; failures (e.g. the
+// keepalive 64KB body budget) log loudly, never silently.
+export const saveMapDataKeepalive = (campaignName, mapName, data) => {
+  try {
+    const encodedCampaign = encodeURIComponent(campaignName);
+    const encodedMapName = mapSegment(mapName);
+    return fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      keepalive: true,
+    }).catch(error => console.error('Error flushing map data on unload:', error));
+  } catch (error) {
+    console.error('Error flushing map data on unload:', error);
+    return Promise.resolve();
+  }
+};
+
 export const loadMapData = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
