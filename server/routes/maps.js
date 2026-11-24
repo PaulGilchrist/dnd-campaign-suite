@@ -87,6 +87,21 @@ function refuseOutdoorEditorWriteUnlessGm(req, res) {
   res.status(403).json({ error: 'Access denied: GM-only feature' });
 }
 
+// Shape refusal on the GM editor-scope outdoor PUT (mirrors the type-field 400
+// and the gridSize clamp: validity, not authority). Indoor docs and non-GM
+// tabs return early — the narrow visitor lane cannot change terrain at all
+// (outdoorEditorDelta above answers any terrain delta with the GM-only 403),
+// so its legitimate party-travel echo of an EXISTING stored doc must not gain
+// a refusal the editor never asked for.
+function refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, doc) {
+  if (!isOutdoor || !isLocalhost(req)) return false;
+  const error = outdoorTerrainBoundsError(doc);
+  if (!error) return false;
+  console.log(`[maps] BLOCKED PUT ${req.originalUrl} — ${error}`);
+  res.status(400).json({ error });
+  return true;
+}
+
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.
 function stampActiveMapContext(campaign, mapKey) {
@@ -430,6 +445,40 @@ export function outdoorRowsShapeError(body) {
   return riversShapeError(body?.rivers) || roadsShapeError(body?.roads);
 }
 
+// Terrain-bounds guard (QD backlog 2026-11-24): outdoor terrain is keyed
+// "q,r" hex addresses (hexMapUtils.hexKey) over the hexCols×hexRows board the
+// document derives — hexCols = gridSize × GRID_COLS_MULTIPLIER, hexRows =
+// gridSize (the same geometry centrePartyPosition and generateHexTerrain use).
+// A hand-added `terrain['39,79']` on a grid-40 doc round-tripped through the
+// whole-document PUT with a 200 (only a later Regenerate pruned it), and cells
+// outside the board can never render, paint-match, or be travelled to. Refuse
+// with the canonical "Map save rejected: …" 400 naming EVERY offending key
+// (capped, with the rest counted) and the expected bounds — one refusal, one
+// round-trip, mirroring the erasure guard's whole-list register. A key that
+// doesn't parse as two non-negative integers fails the same test: it is not
+// an address on any grid. No trustworthy grid (absent/null/non-integer
+// gridSize — the sanctioned clear the create/PUT lanes honor) skips the
+// check rather than invent bounds, the pruneRevealedToGrid asymmetry.
+// Returns the 400 message or null.
+export function outdoorTerrainBoundsError(mapData) {
+  const terrain = mapData?.terrain;
+  if (!terrain || typeof terrain !== 'object' || Array.isArray(terrain)) return null;
+  const gridSize = mapData.gridSize;
+  if (!Number.isInteger(gridSize) || gridSize <= 0) return null;
+  const hexCols = gridSize * GRID_COLS_MULTIPLIER;
+  const offending = Object.keys(terrain).filter((key) => {
+    const parts = key.split(',');
+    return !(parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])
+      && Number(parts[0]) < hexCols && Number(parts[1]) < gridSize);
+  });
+  if (offending.length === 0) return null;
+  const listed = offending.slice(0, 5).map((key) => `"${key}"`).join(', ');
+  const more = offending.length > 5 ? ` (+${offending.length - 5} more)` : '';
+  return 'Map save rejected: every outdoor terrain key must be a "q,r" hex address inside '
+    + `the map's ${hexCols}×${gridSize} hex grid (q 0..${hexCols - 1}, r 0..${gridSize - 1}) — `
+    + `${listed}${more} ${offending.length === 1 ? 'is' : 'are'} outside the grid.`;
+}
+
 // Authored label for a freshly created map (FZ backlog 2026-11-09): the list
 // route already prefers `mapContent.displayName` (:126) and the rename lane
 // writes `newName.trim()`, but the create builders used to overwrite any
@@ -584,6 +633,18 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   if (normalizedCreate.error) {
     console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${normalizedCreate.error}`);
     return res.status(400).json({ error: normalizedCreate.error });
+  }
+
+  // Terrain-bounds guard on the create lane too (QD backlog 2026-11-24): the
+  // outdoor builder takes body.terrain verbatim, so an out-of-range key was
+  // just as plantable through POST as through PUT. No origin condition here —
+  // the whole POST lane is already GM-only (refuseUnlessGm at the head).
+  if ((body.type ?? 'indoor') === 'outdoor') {
+    const createTerrainError = outdoorTerrainBoundsError(normalizedCreate.mapData);
+    if (createTerrainError) {
+      console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${createTerrainError}`);
+      return res.status(400).json({ error: createTerrainError });
+    }
   }
 
   fs.writeFileSync(filePath, JSON.stringify(normalizedCreate.mapData, null, 2));
@@ -836,6 +897,11 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   const clampedDoc = bodyDoc?.gridSize == null
     ? bodyDoc
     : { ...bodyDoc, gridSize: clampGridSize(bodyDoc.gridSize) };
+
+  // Terrain bounds checked against the EFFECTIVE (post-clamp) grid the write
+  // is about to store — same seam pruneRevealedToGrid validates against, so a
+  // body can never persist terrain the stored grid cannot render.
+  if (refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, clampedDoc)) return;
 
   const mapData = preserveAuthoredNames(
     storedData,

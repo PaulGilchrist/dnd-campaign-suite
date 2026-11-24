@@ -651,13 +651,17 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
-        const terrain = { grass: '#228B22', water: '#1E90FF' };
+        // Canonical terrain shape: "q,r" hex-address keys → terrain ids
+        // (hexMapUtils.hexKey / generateHexTerrain). The old color-map fixture
+        // never matched anything the hex editor stores.
+        const terrain = { '0,0': 'plains', '3,2': 'water' };
 
         const app = createTestApp();
-        await request(app)
+        const res = await request(app)
             .post('/api/campaigns/test-campaign/maps')
             .send({ name: 'Terrain Map', type: 'outdoor', terrain });
 
+        expect(res.status).toBe(201);
         const mapPath = `${mapsDir}/terrain-map.json`;
         const mapData = JSON.parse(MOCK_FS.get(mapPath));
         expect(mapData.terrain).toEqual(terrain);
@@ -966,16 +970,18 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname', () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
-        setupFs(`${mapsDir}/outdoor.json`, { displayName: 'Outdoor', type: 'outdoor', terrain: {} });
+        setupFs(`${mapsDir}/outdoor.json`, { displayName: 'Outdoor', type: 'outdoor', gridSize: 8, terrain: {}, pois: [] });
 
+        // Canonical terrain: "q,r" hex-address keys → terrain ids (the old
+        // color-map fixture never matched the hex editor's stored shape).
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/maps/outdoor.json')
-            .send({ displayName: 'Updated Outdoor', type: 'outdoor', terrain: { grass: '#228B22' }, pois: [] });
+            .send({ displayName: 'Updated Outdoor', type: 'outdoor', gridSize: 8, terrain: { '2,1': 'forest' }, pois: [] });
 
         expect(res.status).toBe(200);
         const savedData = JSON.parse(MOCK_FS.get(`${mapsDir}/outdoor.json`));
-        expect(savedData.terrain).toEqual({ grass: '#228B22' });
+        expect(savedData.terrain).toEqual({ '2,1': 'forest' });
     });
 
     it('should handle campaign names with special characters', async () => {
