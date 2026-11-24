@@ -1,13 +1,39 @@
 import { useState, useEffect } from 'react';
 import { formatEncounterName } from '../../services/encounters/encountersService.js';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import './EncounterBuilder.css';
+
+// Named-delete copy wrapper over the shared DeleteConfirmModal a11y tier
+// (role="dialog" + aria-modal + labelled heading, initial focus on Cancel, Tab
+// trap, Escape/backdrop → onCancel), mirroring MapsManager's DeleteMapModal
+// (QA backlog 2026-11-24: the pool-row trash retired its native
+// window.confirm, which blocked the whole automation lane until handled).
+// The open-guard lives HERE (null name → renders nothing) rather than as a
+// `{deleteTarget && …}` JSX arm in EncounterModal — complexity-cap hoist.
+function DeleteEncounterModal({ encounterName, onCancel, onConfirm }) {
+  if (!encounterName) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="encounter-modal-delete-title"
+      title="Delete Encounter"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(encounterName)}
+    >
+      This will permanently delete the encounter &apos;<strong>{formatEncounterName(encounterName)}</strong>&apos;.
+      This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
+}
 
 function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRename, encounters, loading, renameTarget: renameTargetProp }) {
   const [name, setName] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState('');
   const [renameTarget, setRenameTarget] = useState(null);
+  // Raw name of the row whose DeleteConfirmModal is open (null = closed).
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
     if (mode === 'save') {
@@ -31,9 +57,21 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
 
   // QA backlog 2026-11-02: Escape closes, mirroring the house overlay-dismiss
   // pattern (DiceTray.jsx:42-48, FontOfMagicModal.jsx:75) — Escape is ×-parity.
-  // The only nested confirmation this modal owns is the native window.confirm
-  // on the delete leg, which blocks all keydown/click while shown, so there is
-  // no custom nested dialog to guard against here.
+  // QA backlog 2026-11-24: the delete leg's native window.confirm retired in
+  // favor of the shared DeleteConfirmModal dialog, so this modal DOES own a
+  // nested dialog now — while it is open, Escape answers only the dialog
+  // (zero-write close of the confirm), never the whole Load overlay.
+  //
+  // The dialog-open lane MUST consume Escape at the document CAPTURE phase
+  // with stopPropagation (live-proved 2026-11-24): the dialog's own React
+  // onKeyDown runs when the keydown reaches the app root, and React's
+  // synchronous discrete-event flush removes the dialog AND re-runs this very
+  // effect (re-attaching the closed-state bubbling listener) BEFORE the same
+  // in-flight keydown bubbles on to document — a closure/attach-order guard
+  // then lets that one keystroke close dialog + overlay together. Capture at
+  // document runs before the root handler exists in the path, and
+  // stopPropagation guarantees the event never reaches any listener
+  // (re)attached during the dispatch.
   useEffect(() => {
     if (!isOpen) {
       // The modal hides without unmounting (:if-guard below), so every dismiss
@@ -46,14 +84,26 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
       setRenameTarget(null);
       setNewName('');
       setError('');
+      setDeleteTarget(null);
       return undefined;
+    }
+    if (deleteTarget) {
+      const guardEscape = (e) => {
+        if (e.key !== 'Escape') return;
+        // Consume the keystroke for the dialog only (its Cancel button,
+        // backdrop and the shared panel lane remain the other dismiss paths).
+        e.stopPropagation();
+        setDeleteTarget(null);
+      };
+      document.addEventListener('keydown', guardEscape, true);
+      return () => document.removeEventListener('keydown', guardEscape, true);
     }
     const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, deleteTarget]);
 
   if (!isOpen) return null;
 
@@ -122,165 +172,181 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     }
   };
 
+  // Confirm leg of the pool-row delete lane (DeleteEncounterModal above is the
+  // gate — no native window.confirm anywhere). Mirrors MapsManager.handleDelete:
+  // the dialog closes on BOTH outcomes; on success the Load modal also closes
+  // (d4da4ebc1), on failure it stays open with the inline .encounter-modal-error
+  // copy (quest fix 752a00c43 shape).
   const handleDelete = async (encounterName) => {
-    if (window.confirm(`Delete "${formatEncounterName(encounterName)}"?`)) {
-      try {
-        // Parent reloads the encounter list before resolving and throws on
-        // non-2xx/network failure, so a resolved await here is a true success.
-        await onDelete(encounterName);
-        setError('');
-        // Close the modal on success — mirrors the quest delete fix (752a00c43).
-        onClose();
-      } catch (err) {
-        console.error('Failed to delete encounter:', err);
-        setError(err.message || 'Failed to delete encounter');
-      }
+    try {
+      // Parent reloads the encounter list before resolving and throws on
+      // non-2xx/network failure, so a resolved await here is a true success.
+      await onDelete(encounterName);
+      setDeleteTarget(null);
+      setError('');
+      // Close the modal on success — mirrors the quest delete fix (752a00c43).
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete encounter:', err);
+      setError(err.message || 'Failed to delete encounter');
+      setDeleteTarget(null);
     }
   };
 
   return (
-    <div
-      className="ct-modal-overlay"
-      role="presentation"
-      onClick={(e) => {
-        // Backdrop dismiss mirrors the DiceTray popup-overlay convention
-        // (DiceTray.jsx:73-80): clicks bubbling from inside the panel are
-        // inert; a pure backdrop click is onClose only — no dispatch, no
-        // state write — while the open (2026-11-02 BF: the z-1000 overlay
-        // used to swallow every click, incl. sidebar nav, until ×).
-        // .ct-* kit convergence (tranche 1): the shell rides the shared
-        // .ct-modal* chrome (scoped by the EncounterBuilder root's
-        // .ct-container); the in-panel guard follows the renamed kit class.
-        if (e.target.closest('.ct-modal')) return;
-        onClose();
-      }}
-    >
-      <div className="ct-modal">
-        <div className="ct-modal-header">
-          <h3>
-            {mode === 'save' && 'Save Encounter'}
-            {mode === 'load' && !renameTarget && 'Load Encounter'}
-            {(mode === 'rename' || renameTarget) && 'Rename Encounter'}
-          </h3>
-          <button className="ct-modal-close" onClick={onClose} aria-label="Close">
-            &times;
-          </button>
-        </div>
+    <>
+      <div
+        className="ct-modal-overlay"
+        role="presentation"
+        onClick={(e) => {
+          // Backdrop dismiss mirrors the DiceTray popup-overlay convention
+          // (DiceTray.jsx:73-80): clicks bubbling from inside the panel are
+          // inert; a pure backdrop click is onClose only — no dispatch, no
+          // state write — while the open (2026-11-02 BF: the z-1000 overlay
+          // used to swallow every click, incl. sidebar nav, until ×).
+          // .ct-* kit convergence (tranche 1): the shell rides the shared
+          // .ct-modal* chrome (scoped by the EncounterBuilder root's
+          // .ct-container); the in-panel guard follows the renamed kit class.
+          // The DeleteConfirmModal rides BELOW this overlay as a fragment
+          // sibling (not a DOM descendant), so its own backdrop clicks never
+          // bubble here and can never close the Load picker alongside it.
+          if (e.target.closest('.ct-modal')) return;
+          onClose();
+        }}
+      >
+        <div className="ct-modal">
+          <div className="ct-modal-header">
+            <h3>
+              {mode === 'save' && 'Save Encounter'}
+              {mode === 'load' && !renameTarget && 'Load Encounter'}
+              {(mode === 'rename' || renameTarget) && 'Rename Encounter'}
+            </h3>
+            <button className="ct-modal-close" onClick={onClose} aria-label="Close">
+              &times;
+            </button>
+          </div>
 
-        <div className="ct-modal-body">
-          {error && <div className="encounter-modal-error">{error}</div>}
+          <div className="ct-modal-body">
+            {error && <div className="encounter-modal-error">{error}</div>}
 
-          {/* .ct-* kit convergence (tranche 1): save/rename fields ride the kit
-              tiers (.ct-label/.ct-input/.ct-btn); the wrapper divs stay as the
-              flex layout container tests anchor the form to. */}
-          {mode === 'save' && (
-            <div className="encounter-modal-save">
-              <label htmlFor="encounter-name" className="ct-label">Encounter Name</label>
-              <input
-                id="encounter-name"
-                type="text"
-                className="ct-input"
-                value={name}
-                onChange={editName}
-                placeholder="e.g., Goblin Ambush"
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                autoFocus
-              />
-              <button className="ct-btn ct-btn-primary" onClick={handleSave} disabled={!name.trim()}>
-                <i className="fa-solid fa-floppy-disk" /> Save
-              </button>
-            </div>
-          )}
+            {/* .ct-* kit convergence (tranche 1): save/rename fields ride the kit
+                tiers (.ct-label/.ct-input/.ct-btn); the wrapper divs stay as the
+                flex layout container tests anchor the form to. */}
+            {mode === 'save' && (
+              <div className="encounter-modal-save">
+                <label htmlFor="encounter-name" className="ct-label">Encounter Name</label>
+                <input
+                  id="encounter-name"
+                  type="text"
+                  className="ct-input"
+                  value={name}
+                  onChange={editName}
+                  placeholder="e.g., Goblin Ambush"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                  autoFocus
+                />
+                <button className="ct-btn ct-btn-primary" onClick={handleSave} disabled={!name.trim()}>
+                  <i className="fa-solid fa-floppy-disk" /> Save
+                </button>
+              </div>
+            )}
 
-          {/* Fix#38 (#410): reachable via local renameTarget (pen click) OR prop
-              mode==='rename' (prop path preserved for renameTargetProp consumers). */}
-          {(mode === 'rename' || renameTarget) && (
-            <div className="encounter-modal-rename">
-              <label htmlFor="encounter-rename" className="ct-label">New Name</label>
-              <input
-                id="encounter-rename"
-                type="text"
-                className="ct-input"
-                value={newName}
-                onChange={editNewName}
-                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                autoFocus
-              />
-              <button className="ct-btn ct-btn-primary" onClick={handleRename} disabled={!newName.trim()}>
-                <i className="fa-solid fa-pen" /> Rename
-              </button>
-            </div>
-          )}
+            {/* Fix#38 (#410): reachable via local renameTarget (pen click) OR prop
+                mode==='rename' (prop path preserved for renameTargetProp consumers). */}
+            {(mode === 'rename' || renameTarget) && (
+              <div className="encounter-modal-rename">
+                <label htmlFor="encounter-rename" className="ct-label">New Name</label>
+                <input
+                  id="encounter-rename"
+                  type="text"
+                  className="ct-input"
+                  value={newName}
+                  onChange={editNewName}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                  autoFocus
+                />
+                <button className="ct-btn ct-btn-primary" onClick={handleRename} disabled={!newName.trim()}>
+                  <i className="fa-solid fa-pen" /> Rename
+                </button>
+              </div>
+            )}
 
-          {mode === 'load' && !renameTarget && (
-            encounters.length === 0 ? (
-              loading ? (
-                <div className="encounter-modal-loading">Loading...</div>
+            {mode === 'load' && !renameTarget && (
+              encounters.length === 0 ? (
+                loading ? (
+                  <div className="encounter-modal-loading">Loading...</div>
+                ) : (
+                  <div className="ct-empty-state">No saved encounters yet.</div>
+                )
               ) : (
-                <div className="ct-empty-state">No saved encounters yet.</div>
+                // QA 2026-10-24: rows render during a list refresh but every row
+                // action is natively `disabled` while `loading` — a stale-node or
+                // eager click in the reload window is absorbed by the browser
+                // (silent-close flake), mirroring the EB empty-save / Save-gate
+                // disable-until-ready precedent.
+                // List rows stay on the bespoke .encounter-list tiers by design:
+                // the kit .ct-list-item carries the clickable-row cursor, while
+                // these rows act ONLY through their (now kit-styled) action
+                // buttons.
+                <ul className="encounter-list">
+                  {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
+                    <li key={enc.name} className="encounter-list-item">
+                      <div className="encounter-list-info">
+                        <span className="encounter-list-name">{formatEncounterName(enc.name)}</span>
+                        {enc.effectiveXP != null && (
+                          <span className="encounter-list-xp">
+                            {enc.effectiveXP.toLocaleString()} effective XP
+                          </span>
+                        )}
+                        {enc.description && (
+                          <div className="encounter-list-description">
+                            <MarkdownPreview text={enc.description} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="encounter-list-actions">
+                        <button
+                          className="ct-btn ct-btn-sm ct-btn-primary"
+                          onClick={() => handleLoad(enc.name)}
+                          aria-label={`Load "${enc.name}"`}
+                          disabled={loading}
+                        >
+                          <i className="fa-solid fa-download" /> Load
+                        </button>
+                        <button
+                          className="ct-btn ct-btn-sm"
+                          onClick={() => setRenameTarget(enc)}
+                          aria-label={`Rename "${enc.name}"`}
+                          title={`Rename "${enc.name}"`}
+                          disabled={loading}
+                        >
+                          <i className="fa-solid fa-pen" />
+                        </button>
+                        <button
+                          className="ct-btn ct-btn-sm ct-btn-danger"
+                          onClick={() => setDeleteTarget(enc.name)}
+                          aria-label={`Delete "${enc.name}"`}
+                          title={`Delete "${enc.name}"`}
+                          disabled={loading}
+                        >
+                          <i className="fa-solid fa-trash-can" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )
-            ) : (
-              // QA 2026-10-24: rows render during a list refresh but every row
-              // action is natively `disabled` while `loading` — a stale-node or
-              // eager click in the reload window is absorbed by the browser
-              // (silent-close flake), mirroring the EB empty-save / Save-gate
-              // disable-until-ready precedent.
-              // List rows stay on the bespoke .encounter-list tiers by design:
-              // the kit .ct-list-item carries the clickable-row cursor, while
-              // these rows act ONLY through their (now kit-styled) action
-              // buttons.
-              <ul className="encounter-list">
-                {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
-                  <li key={enc.name} className="encounter-list-item">
-                    <div className="encounter-list-info">
-                      <span className="encounter-list-name">{formatEncounterName(enc.name)}</span>
-                      {enc.effectiveXP != null && (
-                        <span className="encounter-list-xp">
-                          {enc.effectiveXP.toLocaleString()} effective XP
-                        </span>
-                      )}
-                      {enc.description && (
-                        <div className="encounter-list-description">
-                          <MarkdownPreview text={enc.description} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="encounter-list-actions">
-                      <button
-                        className="ct-btn ct-btn-sm ct-btn-primary"
-                        onClick={() => handleLoad(enc.name)}
-                        aria-label={`Load "${enc.name}"`}
-                        disabled={loading}
-                      >
-                        <i className="fa-solid fa-download" /> Load
-                      </button>
-                      <button
-                        className="ct-btn ct-btn-sm"
-                        onClick={() => setRenameTarget(enc)}
-                        aria-label={`Rename "${enc.name}"`}
-                        title={`Rename "${enc.name}"`}
-                        disabled={loading}
-                      >
-                        <i className="fa-solid fa-pen" />
-                      </button>
-                      <button
-                        className="ct-btn ct-btn-sm ct-btn-danger"
-                        onClick={() => handleDelete(enc.name)}
-                        aria-label={`Delete "${enc.name}"`}
-                        title={`Delete "${enc.name}"`}
-                        disabled={loading}
-                      >
-                        <i className="fa-solid fa-trash-can" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      <DeleteEncounterModal
+        encounterName={deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
+    </>
   );
 }
 

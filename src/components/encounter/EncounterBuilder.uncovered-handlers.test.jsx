@@ -69,7 +69,8 @@ vi.mock('../../hooks/management/useEncounterManagement.js', async () => {
 
 // NOT stubbed: EncounterModal — Fix#38 made rename reachable under prop mode 'load'
 // (pen → local renameTarget → seeded form), so the real leaf is mounted; its
-// delete-confirm is gated by a mocked window.confirm below. MarkdownPreview never
+// delete-confirm is the real shared DeleteConfirmModal (confirm/cancel driving the
+// leaf dialog is exercised below). MarkdownPreview never
 // renders here (fixture rows carry no description) — sibling-lane defensive stub.
 vi.mock('../common/MarkdownPreview.jsx', () => ({
   default: ({ text }) => <div data-testid="markdown-preview">{text}</div>,
@@ -134,25 +135,31 @@ describe('EncounterBuilder - delete/rename server seam', () => {
 
   // Fix#410 (2026-10-22): the builder-side guard `if (window.confirm(...))` at old
   // :424 was REMOVED — it stacked a second raw-name dialog behind the leaf modal's
-  // prompt (EncounterModal.jsx:57-61 owns confirmation; full-stack single-confirm is
-  // pinned by EncounterBuilder.delete-confirmation.test.jsx). This seam now pins the
-  // dispatcher contract, mirroring the rename passthrough below.
-  it('dispatches deleteEncounterAction straight through with the raw name once the leaf prompt is accepted — the builder never adds a second confirm', async () => {
-    // REAL modal's handleDelete gates onDelete behind its own confirm (:58): accept
-    // so the builder seam is reached; the pin is WHAT the builder never prompts.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  // prompt (the leaf owns confirmation — full-stack single-confirm is pinned by
+  // EncounterBuilder.delete-confirmation.test.jsx; the leaf's prompt is the shared
+  // in-app DeleteConfirmModal since the 2026-11-24 QA backlog). This seam now pins
+  // the dispatcher contract, mirroring the rename passthrough below.
+  it('dispatches deleteEncounterAction straight through with the raw name once the leaf dialog is confirmed — the builder never adds a second confirm', async () => {
+    // REAL modal's trash opens its OWN DeleteConfirmModal; confirming it reaches
+    // the builder seam; the pin is WHAT the builder never prompts.
+    const confirmSpy = vi.spyOn(window, 'confirm');
     mountBuilder();
     await openLoadModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
+    // Only the leaf's dialog exists — the builder stacked nothing on top.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+    });
 
     await waitFor(() => {
       expect(h.deleteEncounterAction).toHaveBeenCalledWith('test-encounter');
     });
     expect(h.deleteEncounterAction).toHaveBeenCalledTimes(1);
-    // Regression guard at the builder seam (#410): the retired raw-name prompt
-    // stays retired — count/text ownership lives in delete-confirmation.test.jsx.
-    expect(confirmSpy).not.toHaveBeenCalledWith('Delete "test-encounter"?');
+    // Regression guard at the builder seam (#410 + 2026-11-24 unification): the
+    // retired raw-name prompt and any native window.confirm stay retired here.
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(h.renameEncounterAction).not.toHaveBeenCalled();
   });
 

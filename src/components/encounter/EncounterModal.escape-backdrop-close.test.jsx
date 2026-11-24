@@ -6,9 +6,11 @@
  * listener, :73-80 closest()-guarded overlay click): both are pure onClose —
  * ×-parity, no onLoad/onDelete/onRename dispatch, no mutation. The rename
  * sub-form is an inline panel swap (not a dialog): × already closed the whole
- * modal from it, so Escape/backdrop do too. The only nested confirmation is
- * the native window.confirm on the delete leg, which blocks keydown/click
- * while shown — nothing to guard in JS. Controlled Host owns isOpen so the
+ * modal from it, so Escape/backdrop do too. The nested delete gate is the shared
+ * in-app DeleteConfirmModal (native window.confirm retired 2026-11-24) — while it
+ * is open, Escape answers ONLY the dialog (zero-write), never the whole overlay;
+ * that precedence is pinned in EncounterModal.delete-confirm-modal.test.jsx.
+ * Controlled Host owns isOpen so the
  * overlay's UNMOUNT (the z-1000 interceptor leaving the DOM) is proven, not
  * just spy-called. Load/save/delete/rename action lanes stay in
  * EncounterModal.test.jsx + delete-close/rename-flow siblings. */

@@ -112,10 +112,13 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         expect(mockOnLoad).toHaveBeenCalledTimes(1);
         expect(mockOnLoad).toHaveBeenCalledWith('goblin-ambush');
 
-        // Delete reaches the named confirm (refused — form/list must survive).
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        // Delete reaches the shared in-app confirm dialog (refused via Cancel —
+        // form/list must survive; native window.confirm retired 2026-11-24).
+        const confirmSpy = vi.spyOn(window, 'confirm');
         fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
+        expect(screen.getByRole('dialog', { name: 'Delete Encounter' })).toHaveTextContent('Goblin Ambush');
+        expect(confirmSpy).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(mockOnDelete).not.toHaveBeenCalled();
 
         // Pen opens the seeded rename form (last: the form replaces the list).
@@ -124,7 +127,7 @@ describe('EncounterModal — row actions are disabled while the load list is loa
     });
 
     it('delete commit still self-closes (d4da4ebc1 intact) with reload-window re-render in between', async () => {
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const confirmSpy = vi.spyOn(window, 'confirm');
         let resolveDelete;
         mockOnDelete.mockImplementation(
             () =>
@@ -136,9 +139,11 @@ describe('EncounterModal — row actions are disabled while the load list is loa
 
         // Commit: parent's onDelete (DELETE + list reload) is pending. The
         // hook's reload sets loading=true — surviving rows re-render disabled.
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
         });
+        expect(confirmSpy).not.toHaveBeenCalled();
         rerender(<EncounterModal {...createProps({ loading: true })} />);
         expect(screen.getByRole('button', { name: 'Rename "dragon-lair"' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Delete "dragon-lair"' })).toBeDisabled();

@@ -68,48 +68,56 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
     });
 
     it('a confirmed SUCCESSFUL delete unmounts .ct-modal-overlay with no manual Close click', async () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const confirmSpy = vi.spyOn(window, 'confirm');
         const { container } = render(<Host />);
         expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
 
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+        // In-app shared dialog names the encounter (display case) — no native prompt.
+        const dialog = screen.getByRole('dialog', { name: 'Delete Encounter' });
+        expect(dialog).toHaveTextContent('Goblin Ambush');
+        expect(confirmSpy).not.toHaveBeenCalled();
+
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
         });
 
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
         expect(container.querySelector('.ct-modal-overlay')).not.toBeInTheDocument();
     });
 
-    it('REFUSING the named confirm keeps the modal open, the row present, and fires zero DELETE dispatches', () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('CANCELLING the dialog keeps the modal open, the row present, and fires zero DELETE dispatches', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm');
         const { container } = render(<Host />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+        expect(screen.getByRole('dialog', { name: 'Delete Encounter' })).toBeInTheDocument();
+        expect(confirmSpy).not.toHaveBeenCalled();
 
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
         expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockOnClose).not.toHaveBeenCalled();
         expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete "goblin-ambush"' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
     });
 
-    it('a FAILED delete (onDelete rejects) keeps the modal open showing .encounter-modal-error and never closes', async () => {
+    it('a FAILED delete (onDelete rejects) closes only the dialog — the modal stays open showing .encounter-modal-error and never closes', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         mockOnDelete.mockRejectedValueOnce(new Error('Server said no'));
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = render(<Host />);
 
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
         });
 
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
         expect(container.querySelector('.ct-modal-overlay')).toBeInTheDocument();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         const err = container.querySelector('.encounter-modal-error');
         expect(err).toBeInTheDocument();
         expect(err).toHaveTextContent('Server said no');
@@ -122,14 +130,13 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
     it('a network-shaped rejection with no message falls back to the generic delete error copy', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         mockOnDelete.mockRejectedValueOnce(new Error(''));
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = render(<Host />);
 
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
         });
 
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(container.querySelector('.encounter-modal-error')).toHaveTextContent(
             'Failed to delete encounter'
         );

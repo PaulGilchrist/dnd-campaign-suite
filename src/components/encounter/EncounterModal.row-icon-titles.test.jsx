@@ -9,7 +9,8 @@
  * the text-bearing Load button stays title-free (minimal-change pin — visible
  * text is already its own affordance). Click flows are re-pinned here only to
  * prove the title attribute changed nothing: pen still opens the seeded
- * #encounter-rename form, trash still fires the native `Delete "X"?` confirm. */
+ * #encounter-rename form, trash still opens the shared DeleteConfirmModal
+ * (native window.confirm retired 2026-11-24). */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import EncounterModal from './EncounterModal.jsx';
@@ -94,8 +95,8 @@ describe('EncounterModal load-pool row icon titles', () => {
         });
     });
 
-    it('title changes nothing in the flows: pen still seeds #encounter-rename, trash still asks the native confirm', async () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('title changes nothing in the flows: pen still seeds #encounter-rename, trash still opens the in-app confirm dialog', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm');
         renderLoadPool(encounters);
 
         fireEvent.click(screen.getByRole('button', { name: 'Rename "test-encounter"' }));
@@ -113,7 +114,9 @@ describe('EncounterModal load-pool row icon titles', () => {
         expect(mockOnRename).toHaveBeenCalledWith('test-encounter', 'test-encounter');
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "Test Encounter"?');
+        expect(screen.getByRole('dialog', { name: 'Delete Encounter' })).toHaveTextContent('Test Encounter');
+        expect(confirmSpy).not.toHaveBeenCalled();
         expect(mockOnDelete).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     });
 });

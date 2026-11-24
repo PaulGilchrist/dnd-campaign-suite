@@ -7,7 +7,9 @@
  * stay raw. MarkdownPreview is a lightweight stub (sanitize/markdown rendering is owned
  * by its own lane); this file only pins the `enc.description &&` conditional (:129).
  * KNOWN DEFECTS (#410) — status:
- *   1) FIXED fix#410 2026-10-22: :55 is now the SINGLE owner of the delete confirm.
+ *   1) FIXED fix#410 2026-10-22: this leaf is the SINGLE owner of the delete
+ *      confirm (a shared in-app DeleteConfirmModal since the 2026-11-24 QA
+ *      backlog — the native window.confirm is retired).
  *      EncounterBuilder.handleDeleteEncounter used to confirm again with the raw name
  *      (two stacked dialogs per click); it is a straight dispatcher now. The
  *      full-stack one-dialog-per-click pin lives in
@@ -144,7 +146,8 @@ describe('EncounterModal', () => {
         render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
         // Verbatim quoting pin (sheet-family canon, 35777ab7f): row aria labels
         // name the encounter in QUOTES — `Load "X"` / `Rename "X"` / `Delete "X"`
-        // — matching the modal's named-quoted `Delete "X"?` confirm copy (:79).
+        // — and opening the trash names the same row in the shared
+        // DeleteConfirmModal (display name in the confirm copy, 2026-11-24).
         const loadOrder = screen
             .getAllByRole('button', { name: /^Load "/ })
             .map((btn) => btn.getAttribute('aria-label'));
@@ -189,23 +192,32 @@ describe('EncounterModal', () => {
         expect(mockOnLoad).toHaveBeenCalledWith('dragon-lair');
     });
 
-    // Fix#410: this modal-side prompt at :55 is the ONLY delete dialog — the leaf
-    // owns confirmation (house pattern); the builder's duplicate raw-name guard is gone.
-    it('confirms deletes with the formatted name and calls onDelete with the raw name only when confirmed', async () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Fix#410 + QA backlog 2026-11-24: this modal is the ONLY delete gate — the
+    // row trash opens the shared in-app DeleteConfirmModal naming the DISPLAY
+    // name; confirming dispatches onDelete with the raw name, cancelling never.
+    it('confirms deletes through the shared DeleteConfirmModal (formatted name) and calls onDelete with the raw name only when confirmed', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm');
         const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
         render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+        const dialog = screen.getByRole('dialog', { name: 'Delete Encounter' });
+        expect(dialog).toBeInTheDocument();
+        expect(dialog).toHaveTextContent('Goblin Ambush');
+        expect(confirmSpy).not.toHaveBeenCalled();
+
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
         });
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
 
-        confirmSpy.mockReturnValue(false);
+        // Cancel leg: the second row's dialog closes with a zero-write Cancel.
         fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
-        expect(confirmSpy).toHaveBeenLastCalledWith('Delete "Dragon Lair"?');
+        expect(screen.getByRole('dialog', { name: 'Delete Encounter' })).toHaveTextContent('Dragon Lair');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
+        expect(confirmSpy).not.toHaveBeenCalled();
     });
 
     // ── fix#38 (#410): the pen at :145 is the production rename entry point.
