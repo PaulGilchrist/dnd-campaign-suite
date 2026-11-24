@@ -33,6 +33,17 @@ const CURRENCY_PERSIST_DEBOUNCE_MS = 400;
 
 const EMPTY_FORM = { id: '', name: '', quantity: 1, description: '' };
 
+// QA backlog 2026-11-24: an invalid Quantity in the Add/Edit modal (0, −3, 1.5, blank)
+// used to be silently rewritten to 1 — once at the keystroke (Math.max clamp in the
+// input's onChange) and again before the POST. The field now holds the raw input and
+// Save is gated on a whole number ≥ 1 by the SAME disabled-button idiom as the blank
+// name: an honest refusal instead of a quiet fix. (The ROW stepper's own clamps stay —
+// that is a separate auto-save lane whose input parses to whole numbers before them.)
+function isWholeQuantity(value) {
+  const qty = Number(value);
+  return Number.isInteger(qty) && qty >= 1;
+}
+
 // Row label for the 409 conflict alert — mirrors the server's itemConflict fallback
 // (trimmed name, row id when no name is known). setQty/delete intents carry `name`;
 // modal update intents carry the row under `item`.
@@ -377,6 +388,10 @@ function GiveCurrencyModal({ currency, characters, giveState, onChange, onClose,
 function ItemEditModal({ form, equipmentData, isNew, saving, error, onChange, onClose, onSave }) {
   const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
     useModalDismiss(onClose, { disabled: saving, panelSelector: '.pi-modal' });
+  // One gate for both required fields (blank name, non-whole/non-positive qty):
+  // the button's disabled state IS the feedback, mirroring the currency chips'
+  // honest disable rather than rewriting what the user typed.
+  const canSave = Boolean(form.name.trim()) && isWholeQuantity(form.quantity);
   return (
     <div
       className="pi-modal-overlay"
@@ -413,7 +428,7 @@ function ItemEditModal({ form, equipmentData, isNew, saving, error, onChange, on
             className="ct-input"
             min="1"
             value={form.quantity}
-            onChange={(e) => onChange({ ...form, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+            onChange={(e) => onChange({ ...form, quantity: e.target.value })}
           />
           <label className="ct-label" htmlFor="pi-item-desc">Description</label>
           <textarea
@@ -431,7 +446,7 @@ function ItemEditModal({ form, equipmentData, isNew, saving, error, onChange, on
             <button
               className="ct-btn ct-btn-primary"
               onClick={onSave}
-              disabled={saving || !form.name.trim()}
+              disabled={saving || !canSave}
             >
               <i className="fa-solid fa-floppy-disk" /> {saving ? 'Saving…' : 'Save'}
             </button>
@@ -1041,7 +1056,10 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     const targetId = editForm.id
       || inv.items.find(i => i.name.toLowerCase() === name.toLowerCase())?.id
       || null;
-    const row = { name, quantity: Math.max(1, editForm.quantity), description: editForm.description };
+    // The modal's Save gate (canSave) already refuses non-whole/non-positive input,
+    // so this is a type coercion of a validated value — never the retired silent
+    // Math.max clamp that rewrote 0/−3/1.5 to 1 before the POST.
+    const row = { name, quantity: Number(editForm.quantity), description: editForm.description };
     const items = [...inv.items];
     const existingIndex = targetId ? items.findIndex(i => i.id === targetId) : -1;
     let id = targetId;

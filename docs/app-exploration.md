@@ -150,5 +150,3 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-24 explore RE] PartyInventory `Add/Edit item` silently normalizes an invalid Quantity input: `#pi-item-qty` accepts 0/−3/1.5 with Save ENABLED, then the client rewrites it to 1 before POST — the user typed a number and got a different one with zero feedback (the currency lane is the model: chips disable honestly). Suggest: disable Save while qty < 1/NaN (or clamp visibly + toast), mirroring the name-blank gate. Minor UX.
-
