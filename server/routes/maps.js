@@ -134,6 +134,18 @@ function refuseCreateBoundsError(res, campaign, name, doc, isOutdoorCreate) {
   return true;
 }
 
+// Walls hygiene at the PUT save seam (indoor lane only — outdoor docs keep
+// their never-policed-for-walls doctrine), run BEFORE the bounds gate so a
+// refusal names each offender once and never lists a row this pass already
+// resolved: duplicate rows dedupe, and when THIS save shrinks (or clamps) the
+// stored grid, rows the new grid cannot render prune the way revealed does.
+// What still refuses afterwards is a row that was poison under the stored
+// grid too (see dedupeWallsRows / pruneWallsToShrunkGrid).
+function sanitizeIndoorWalls(isOutdoor, clampedDoc, storedData) {
+  if (isOutdoor) return clampedDoc;
+  return dedupeWallsRows(pruneWallsToShrunkGrid(clampedDoc, storedData?.gridSize));
+}
+
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.
 function stampActiveMapContext(campaign, mapKey) {
@@ -528,8 +540,10 @@ export function outdoorTerrainBoundsError(mapData) {
 // — absent/null/non-integer gridSize (the sanctioned clear) skips it rather
 // than inventing bounds. Absent/null `walls` passes: the guard never
 // over-validates documents that carry neither key. Duplicate rows are
-// shape-legal (the client keys its wall layer on a Set, which dedupes them)
-// and stay unpoliced.
+// shape-legal but no longer stored forever — dedupeWallsRows below compacts
+// them at the same save seam, and a grid SHRINK prunes rows the new grid
+// cannot render (pruneWallsToShrunkGrid), so this refusal still answers only
+// rows that were poison under the stored grid too.
 const WALL_CELL_ROW = /^\d+,\d+$/;
 const isWallCellRow = (row) => typeof row === 'string' && WALL_CELL_ROW.test(row);
 
@@ -557,6 +571,57 @@ export function indoorWallsBoundsError(mapData) {
   const reason = hasGrid ? 'malformed or outside the grid' : 'malformed';
   return 'Map save rejected: every wall must be a "gx,gy" cell address like "7,2"'
     + `${boundsCopy} — ${listed}${more} ${offending.length === 1 ? 'is' : 'are'} ${reason}.`;
+}
+
+// Walls store-hygiene legs (QE backlog 2026-11-24, twin of pruneRevealedToGrid
+// above) — both run BEFORE the bounds gate at the save seam so a refusal names
+// each offender once and never lists a row this pass already resolved.
+//
+// dedupeWallsRows — the client keys its wall layer on a Set, so a stored
+// duplicate row renders as ONE wall but doubles every save payload and SSE
+// broadcast forever (the hygiene leg of bug-map-walls-unvalidated-nonstring-
+// row-bricks-map-view). Dedupe deterministically — first occurrence wins, in
+// Set order — on BOTH write lanes so disk, echo and broadcast carry unique
+// rows. Rows compare by raw value (Set semantics), so numeric 5 and string
+// "5" stay distinct offenders: the bounds gate still names each malformed row.
+export function dedupeWallsRows(mapData) {
+  if (!mapData || !Array.isArray(mapData.walls) || mapData.walls.length === 0) {
+    return mapData;
+  }
+  const kept = [...new Set(mapData.walls)];
+  if (kept.length === mapData.walls.length) return mapData;
+  console.log(`[maps] deduped ${mapData.walls.length - kept.length} duplicate walls rows (first occurrence wins)`);
+  return { ...mapData, walls: kept };
+}
+
+// pruneWallsToShrunkGrid — revealed[] sheds cells outside a shrunken grid at
+// every save; walls now do the same WHEN THE SAVE SHRINKS THE GRID (effective
+// grid < stored grid — including the 5..100 clamp, so a legacy 110 doc
+// clamped to 100 sheds its 100..109 wall tail instead of 400-locking the
+// shrink). Rows outside the NEW grid can never render or survive the fog math,
+// so a genuine shrink prunes them; this is the ONE case where an out-of-grid
+// string is stored-adjacent instead of refused, because the refusal it would
+// otherwise raise blocks a legitimate edit. An unshrunk save keeps the bounds
+// refusal verbatim, and malformed rows are NEVER silently dropped: only valid
+// "gx,gy" strings outside the new grid prune; anything else stays in the list
+// for indoorWallsBoundsError to name.
+export function pruneWallsToShrunkGrid(mapData, priorGridSize) {
+  if (!mapData || !Array.isArray(mapData.walls) || mapData.walls.length === 0) {
+    return mapData;
+  }
+  const gridSize = mapData.gridSize;
+  if (!Number.isInteger(gridSize) || gridSize <= 0) return mapData;
+  if (!Number.isInteger(priorGridSize) || priorGridSize <= 0 || gridSize >= priorGridSize) {
+    return mapData;
+  }
+  const kept = mapData.walls.filter((row) => {
+    if (!isWallCellRow(row)) return true;
+    const [gx, gy] = row.split(',').map(Number);
+    return gx < gridSize && gy < gridSize;
+  });
+  if (kept.length === mapData.walls.length) return mapData;
+  console.log(`[maps] pruned ${mapData.walls.length - kept.length} walls rows outside the shrunk ${gridSize}×${gridSize} grid (stored grid was ${priorGridSize})`);
+  return { ...mapData, walls: kept };
 }
 
 // Authored label for a freshly created map (FZ backlog 2026-11-09): the list
@@ -620,7 +685,7 @@ const buildOutdoorMapData = (name, body) => {
   };
 };
 
-const buildIndoorMapData = (name, body) => ({
+const buildIndoorMapData = (name, body) => dedupeWallsRows({
   displayName: createDisplayName(name, body),
   name: toKebabCase(name.trim()),
   type: body.type ?? 'indoor',
@@ -977,13 +1042,15 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   // Terrain bounds checked against the EFFECTIVE (post-clamp) grid the write
   // is about to store — same seam pruneRevealedToGrid validates against, so a
   // body can never persist terrain the stored grid cannot render. Walls ride
-  // the sibling gate (refuseIndoorWallsBounds), the indoor twin.
-  if (refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, clampedDoc)) return;
-  if (refuseIndoorWallsBounds(req, res, isOutdoor, clampedDoc)) return;
+  // the sibling gate (refuseIndoorWallsBounds), the indoor twin — fed by the
+  // walls hygiene pass first (dedupe + shrink-prune, see sanitizeIndoorWalls).
+  const wallsDoc = sanitizeIndoorWalls(isOutdoor, clampedDoc, storedData);
+  if (refuseOutdoorTerrainBoundsUnlessGm(req, res, isOutdoor, wallsDoc)) return;
+  if (refuseIndoorWallsBounds(req, res, isOutdoor, wallsDoc)) return;
 
   const mapData = preserveAuthoredNames(
     storedData,
-    pruneRevealedToGrid(clampedDoc)
+    pruneRevealedToGrid(wallsDoc)
   );
 
   if (!fs.existsSync(mapsDir)) {

@@ -11,8 +11,12 @@
 // rows echoed JSON-stringified so a numeric 5 never reads as the string "5".
 // Parse failures and out-of-range strings share the one list. A body with no
 // trustworthy grid (absent/null gridSize — the sanctioned clear) keeps the
-// SHAPE check but skips BOUNDS (the pruneRevealedToGrid asymmetry). Duplicate
-// rows are shape-legal (the client keys its wall layer on a Set). The indoor
+// SHAPE check but skips BOUNDS (the pruneRevealedToGrid asymmetry). Store
+// hygiene rides the same seam (QE backlog 2026-11-24): duplicate rows dedupe
+// deterministically (first occurrence wins) on BOTH write lanes instead of
+// doubling every payload forever, and a save that SHRINKS (or clamps) the
+// stored grid prunes out-of-new-grid wall rows the way pruneRevealedToGrid
+// prunes revealed — malformed rows are never silently dropped. The indoor
 // whole-doc PUT is already GM-only, so no visitor echo lane exists to protect
 // (the outdoor doc's party-travel echo is not policed for walls either — the
 // hex builder never stores them). Harness mirrors
@@ -20,7 +24,9 @@
 import express from 'express';
 import fs from 'fs';
 import { request } from '../test-utils/localhostSupertest.js';
-import maps, { indoorWallsBoundsError } from './maps.js';
+import maps, {
+    indoorWallsBoundsError, dedupeWallsRows, pruneWallsToShrunkGrid,
+} from './maps.js';
 
 const mockFsState = { exists: new Set(), files: new Map() };
 let publishedEvents = [];
@@ -184,14 +190,27 @@ describe('maps indoor walls-bounds guard', () => {
     });
 
     describe('PUT acceptance legs', () => {
-        it('round-trips all in-range walls verbatim, duplicates included (shape-legal — the client Set dedupes)', async () => {
+        it('dedupes duplicate rows deterministically on store (first occurrence wins — nothing stores twice forever)', async () => {
             seedHallDoc();
-            const walls = ['0,0', '11,11', '9,3', '9,3']; // duplicate row is legal
+            const walls = ['0,0', '11,11', '9,3', '9,3', '9,3'];
 
             const res = await putMap('hall', storedIndoor(walls));
 
             expect(res.status).toBe(200);
-            expect(readStored().walls).toEqual(walls);
+            expect(readStored().walls).toEqual(['0,0', '11,11', '9,3']);
+            // the SSE echo carries the SAME deduped rows the disk got.
+            const echo = publishedEvents.find((e) => e.key === 'map-data-test-campaign-hall');
+            expect(echo.data.walls).toEqual(['0,0', '11,11', '9,3']);
+        });
+
+        it('dedupes BEFORE the bounds gate so a repeated malformed row is named once, not twice', async () => {
+            seedHallDoc();
+
+            const res = await putMap('hall', storedIndoor(['9,0', 5, 5]));
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('— 5 is malformed or outside the grid.');
+            expect(res.body.error).not.toContain('5, 5');
         });
 
         it('accepts the true grid-corner boundary and refuses the one-past legs on BOTH axes', async () => {
@@ -243,6 +262,99 @@ describe('maps indoor walls-bounds guard', () => {
         });
     });
 
+    describe('PUT grid-shrink walls prune (pruneRevealedToGrid parity — QE backlog 2026-11-24)', () => {
+        it('shrinking the grid prunes walls rows outside the new grid instead of 400-locking the shrink', async () => {
+            const wide = { ...storedIndoor(['5,5', '15,15', '19,19']), gridSize: 20 };
+            seedHallDoc(wide);
+
+            const res = await putMap('hall', { ...wide, gridSize: 10 });
+
+            expect(res.status).toBe(200);
+            const saved = readStored();
+            expect(saved.gridSize).toBe(10);
+            expect(saved.walls).toEqual(['5,5']); // 15,15 and 19,19 pruned
+            const echo = publishedEvents.find((e) => e.key === 'map-data-test-campaign-hall');
+            expect(echo.data.walls).toEqual(['5,5']); // broadcast sheds the tail too
+        });
+
+        it('the 5..100 clamp counts as a shrink — a legacy 110-doc sheds walls outside the clamped 100 grid', async () => {
+            const legacy = { ...storedIndoor(['3,3', '105,5']), gridSize: 110 };
+            seedHallDoc(legacy);
+
+            const res = await putMap('hall', legacy); // re-saves 110, clamps to 100
+
+            expect(res.status).toBe(200);
+            expect(readStored().gridSize).toBe(100);
+            expect(readStored().walls).toEqual(['3,3']);
+        });
+
+        it('a shrink sweeps legacy out-of-grid poison strings off disk but still REFUSES malformed rows', async () => {
+            const wide = { ...storedIndoor(['15,2', '999,999']), gridSize: 20 };
+            seedHallDoc(wide);
+
+            const pruned = await putMap('hall', { ...wide, gridSize: 10 });
+            expect(pruned.status).toBe(200); // both valid-shape rows outside 10×10 prune
+            expect(readStored().walls).toEqual([]);
+
+            seedHallDoc(wide);
+            const malformed = await putMap('hall', { ...wide, gridSize: 10, walls: ['15,2', '999,999', 5] });
+            // 15,2 / 999,999 prune; numeric 5 is never silently dropped — the
+            // bounds gate names it against the shrunk grid.
+            expect(malformed.status).toBe(400);
+            expect(malformed.body.error).toContain('10×10 grid (x 0..9, y 0..9)');
+            expect(malformed.body.error).toContain('5 is malformed or outside the grid.');
+            expect(readStored()).toEqual(wide); // zero write on refusal
+        });
+
+        it('an unshrunk save keeps the bounds refusal verbatim (same-grid writes and growth never prune)', async () => {
+            seedHallDoc(); // stored grid 12
+
+            const sameGrid = await putMap('hall', storedIndoor(['9,0', '13,0']));
+            expect(sameGrid.status).toBe(400); // 13,0 outside the unchanged 12-grid
+            expect(sameGrid.body.error).toContain('"13,0"');
+
+            const grown = await putMap('hall', { ...storedIndoor(['9,0', '13,0']), gridSize: 15 });
+            expect(grown.status).toBe(200); // growth renders 13,0 — it is legal now
+            expect(readStored().walls).toEqual(['9,0', '13,0']);
+
+            const grownStillBad = await putMap('hall', { ...storedIndoor(['16,0']), gridSize: 15 });
+            expect(grownStillBad.status).toBe(400); // 16,0 fits NEITHER grid — refuse stands
+            expect(grownStillBad.body.error).toContain('"16,0"');
+        });
+
+        it('no prune without a trustworthy stored grid (create-via-PUT keeps the refusal; the sanctioned null clear stays unpoliced)', async () => {
+            // Fresh doc (no stored file): nothing to shrink FROM — refuse stands.
+            mockFsState.exists.add(MAPS_DIR);
+            const fresh = await putMap('hall', storedIndoor(['999,999']));
+            expect(fresh.status).toBe(400);
+            expect(mockFsState.files.has(HALL_FILE)).toBe(false);
+
+            // Stored grid null → no trustworthy prior bounds → prune skips,
+            // and the body's null grid skips BOUNDS as before.
+            const nullGrid = { ...storedIndoor(['999,999']), gridSize: null };
+            seedHallDoc(nullGrid);
+            const cleared = await putMap('hall', nullGrid);
+            expect(cleared.status).toBe(200);
+            expect(readStored().walls).toEqual(['999,999']);
+        });
+
+        it('never polices an outdoor document for walls on a shrink either (the guard is the indoor lane)', async () => {
+            mockFsState.exists.add(MAPS_DIR);
+            const outdoor = {
+                displayName: 'Wilds', name: 'wilds', type: 'outdoor', gridSize: 40,
+                terrain: { '0,0': 'plains' }, rivers: [], roads: [], pois: [],
+                zoom: 1, panX: 0, panY: 0, partyPosition: { q: 40, r: 20 },
+                walls: ['50,50'],
+            };
+            mockFsState.files.set(`${MAPS_DIR}/wilds.json`, JSON.stringify(outdoor));
+
+            const res = await putMap('wilds', { ...outdoor, gridSize: 10 });
+
+            expect(res.status).toBe(200);
+            expect(readStored(`${MAPS_DIR}/wilds.json`).walls).toEqual(['50,50']);
+        });
+    });
+
     describe('visitor origin — authority answer first', () => {
         it('still 403s a foreign-Host indoor PUT carrying malformed walls (shape guard never flips the origin face)', async () => {
             const original = seedHallDoc();
@@ -281,6 +393,18 @@ describe('maps indoor walls-bounds guard', () => {
             expect(bare.status).toBe(201);
             expect(readStored(`${MAPS_DIR}/qa-bare.json`).walls).toEqual([]);
         });
+
+        it('dedupes duplicate create rows on store (first occurrence wins)', async () => {
+            mockFsState.exists.add(MAPS_DIR);
+
+            const res = await postMap({
+                name: 'QA Dups', type: 'indoor', gridSize: 12,
+                walls: ['3,4', '9,3', '3,4', '9,0', '3,4'],
+            });
+
+            expect(res.status).toBe(201);
+            expect(readStored(`${MAPS_DIR}/qa-dups.json`).walls).toEqual(['3,4', '9,3', '9,0']);
+        });
     });
 
     describe('indoorWallsBoundsError helper', () => {
@@ -295,6 +419,44 @@ describe('maps indoor walls-bounds guard', () => {
         it('names the single offender with singular grammar', () => {
             const message = indoorWallsBoundsError({ gridSize: 12, walls: ['12,0'] });
             expect(message).toContain('"12,0" is malformed or outside the grid.');
+        });
+    });
+
+    describe('walls store-hygiene helpers', () => {
+        it('dedupeWallsRows keeps first occurrences in order and returns the SAME object when nothing changes', () => {
+            const clean = { walls: ['1,1', '2,2'] };
+            expect(dedupeWallsRows(clean)).toBe(clean);
+            expect(dedupeWallsRows({ walls: [] })).toEqual({ walls: [] });
+            expect(dedupeWallsRows({ walls: null })).toEqual({ walls: null });
+            expect(dedupeWallsRows(undefined)).toBeUndefined();
+
+            const duped = dedupeWallsRows({ walls: ['3,4', '9,3', '3,4'] });
+            expect(duped.walls).toEqual(['3,4', '9,3']);
+        });
+
+        it('dedupeWallsRows compares by raw value — numeric 5 and string "5" stay distinct for the gate', () => {
+            const mixed = dedupeWallsRows({ walls: [5, '5', 5] });
+            expect(mixed.walls).toEqual([5, '5']);
+        });
+
+        it('pruneWallsToShrunkGrid only fires on a trustworthy shrink (growth, same size, null/absent prior all no-op identity)', () => {
+            const doc = { gridSize: 10, walls: ['2,2', '15,15'] };
+            expect(pruneWallsToShrunkGrid(doc, 10)).toBe(doc); // no shrink
+            expect(pruneWallsToShrunkGrid(doc, 5)).toBe(doc); // growth
+            expect(pruneWallsToShrunkGrid(doc, null)).toBe(doc); // no prior bounds
+            expect(pruneWallsToShrunkGrid(doc, '20')).toBe(doc); // untrusted prior
+            expect(pruneWallsToShrunkGrid({ gridSize: null, walls: ['15,15'] }, 20))
+                .toEqual({ gridSize: null, walls: ['15,15'] }); // no effective grid
+
+            const shrunk = pruneWallsToShrunkGrid(doc, 20);
+            expect(shrunk.walls).toEqual(['2,2']);
+        });
+
+        it('pruneWallsToShrunkGrid never drops malformed rows — they ride on for the bounds gate to name', () => {
+            const doc = { gridSize: 10, walls: [5, '999,999', -1] };
+            expect(pruneWallsToShrunkGrid(doc, 20).walls).toEqual([5, -1]);
+            expect(indoorWallsBoundsError(pruneWallsToShrunkGrid(doc, 20)))
+                .toContain('5, -1 are malformed or outside the grid.');
         });
     });
 });
