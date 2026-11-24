@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGetCurrentOverlayTarget = vi.fn();
 const mockGetCreaturesInsideOverlay = vi.fn();
 const mockGetTargetMapStatuses = vi.fn();
+const mockGetRuntimeValue = vi.fn();
 
 vi.mock('../../../../services/maps/spellOverlayService.js', async (importOriginal) => {
     const actual = await importOriginal();
@@ -15,6 +16,16 @@ vi.mock('../../../../services/maps/spellOverlayService.js', async (importOrigina
         getCurrentOverlayTarget: (...args) => mockGetCurrentOverlayTarget(...args),
         getCreaturesInsideOverlay: (...args) => mockGetCreaturesInsideOverlay(...args),
         getTargetMapStatuses: (...args) => mockGetTargetMapStatuses(...args),
+    };
+});
+
+// PC rows read their HP affordance from the character buckets
+// (currentHitPoints/hitPoints) — drive that store per-test.
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        getRuntimeValue: (...args) => mockGetRuntimeValue(...args),
     };
 });
 
@@ -64,6 +75,9 @@ function heightenRadios() {
 describe('CreatureSelectionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no bucket data anywhere — PC rows degrade to bare names unless a
+    // test seeds getRuntimeValue.
+    mockGetRuntimeValue.mockReset().mockReturnValue(null);
   });
 
   // ── Rendering ──
@@ -102,11 +116,15 @@ describe('CreatureSelectionModal', () => {
     expect(screen.getByText(/Choose up to 3 targets:/)).toBeInTheDocument();
   });
 
-  it('shows rounded HP percent for damaged non-player targets only', () => {
+  // Row HP affordance law (backlog 2026-11-24 improve picker-hp-affordance):
+  // monster rows read their cs-row pair; PC rows read ONLY the character
+  // buckets so a `currentHp: 1` placeholder cs row can never print a
+  // fabricated percentage.
+
+  it('shows rounded HP percent for damaged monster rows from their row values', () => {
     const targets = [
       { name: 'Goblin', type: 'enemy', currentHp: 5, maxHp: 10 },
       { name: 'Monster', type: 'enemy', currentHp: 7, maxHp: 20 },
-      { name: 'Player Character', type: 'player', currentHp: 20, maxHp: 30 },
       { name: 'Ghost', type: 'enemy', currentHp: null, maxHp: 10 },
       { name: 'Wraith', type: 'enemy', currentHp: 5 },
       { name: 'Ambiguous', type: 'enemy' },
@@ -116,10 +134,51 @@ describe('CreatureSelectionModal', () => {
     expect(screen.getByText('(35% HP)')).toBeInTheDocument();
     const rowNamed = (name) => [...document.querySelectorAll('.secondary-target-row')]
       .find(row => row.textContent.includes(name));
-    expect(rowNamed('Player Character').textContent).not.toContain('% HP');
     expect(rowNamed('Ghost').textContent).not.toContain('% HP');
     expect(rowNamed('Wraith').textContent).not.toContain('% HP');
     expect(rowNamed('Ambiguous').textContent).not.toContain('% HP');
+  });
+
+  it('shows the same (N% HP) affordance on PC rows, resolved from the character buckets', () => {
+    mockGetRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'FullAlly' && key === 'currentHitPoints') return 28;
+      if (name === 'FullAlly' && key === 'hitPoints') return 28;
+      if (name === 'HurtAlly' && key === 'currentHitPoints') return 10;
+      if (name === 'HurtAlly' && key === 'hitPoints') return 28;
+      return null;
+    });
+    const targets = [
+      { name: 'FullAlly', type: 'player' },
+      { name: 'HurtAlly', type: 'player', currentHp: 1, maxHp: 1 },
+      { name: 'NoBucketAlly', type: 'player', currentHp: 20, maxHp: 30 },
+    ];
+    render(<CreatureSelectionModal {...makeProps({ targets })} />);
+    const rowNamed = (name) => [...document.querySelectorAll('.secondary-target-row')]
+      .find(row => row.textContent.includes(name));
+    expect(rowNamed('FullAlly').textContent).toContain('(100% HP)');
+    // 10 of 28 → 36%, not the placeholder row's 100%.
+    expect(rowNamed('HurtAlly').textContent).toContain('(36% HP)');
+    // No bucket data → honest degradation: bare name, never the cs-row pair.
+    expect(rowNamed('NoBucketAlly').textContent).not.toContain('% HP');
+  });
+
+  it('drops the PC chip when the bucket pair is dishonest or unparseable', () => {
+    mockGetRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Mismatch' && key === 'currentHitPoints') return 60;
+      if (name === 'Mismatch' && key === 'hitPoints') return 1;
+      if (name === 'EmptyStr' && key === 'currentHitPoints') return '';
+      if (name === 'EmptyStr' && key === 'hitPoints') return '';
+      return null;
+    });
+    const targets = [
+      { name: 'Mismatch', type: 'player', currentHp: 60, maxHp: 112 },
+      { name: 'EmptyStr', type: 'player', currentHp: 20, maxHp: 30 },
+    ];
+    render(<CreatureSelectionModal {...makeProps({ targets })} />);
+    const rowNamed = (name) => [...document.querySelectorAll('.secondary-target-row')]
+      .find(row => row.textContent.includes(name));
+    expect(rowNamed('Mismatch').textContent).not.toContain('% HP');
+    expect(rowNamed('EmptyStr').textContent).not.toContain('% HP');
   });
 
   it('renders string targets and passes their names to onConfirm', async () => {

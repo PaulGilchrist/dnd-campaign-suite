@@ -132,6 +132,5 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-24 QD] Overlay picker lists HP affordance for monster rows only (`Goblin(100% HP)`) — PC rows render bare names, so the GM juggling a mixed board can't gauge remaining HP before picking AoE victims. Uniform per-row HP/status affordance.
 - [2026-11-24 QD] Whole-doc outdoor map PUT accepts out-of-range `terrain` keys with a 200 (hand-added `terrain['39,79']` on a 40-grid round-tripped; only a later Regenerate pruned it). Validate terrain keys against the stamped grid bounds in `server/routes/maps.js`.
 
