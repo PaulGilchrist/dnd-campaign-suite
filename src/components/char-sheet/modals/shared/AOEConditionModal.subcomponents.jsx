@@ -10,7 +10,10 @@ export function ResultsSummaryModal({ results, conditionLabel, saveDc, onClose }
     const overlayRef = React.useRef(null);
     useOverlayEntranceFocus(overlayRef);
     const dismissedCount = results.filter(r => r.dismissed).length;
-    const successCount = results.filter(r => r.success && !r.dismissed).length;
+    // Cast-time immunity skips (Stinking Cloud results-face lane): never save-
+    // adjudicated, so they ride neither the saved nor the failed count.
+    const immuneCount = results.filter(r => r.immune).length;
+    const successCount = results.filter(r => r.success && !r.dismissed && !r.immune).length;
     const failCount = results.filter(r => !r.success).length;
 
     return (
@@ -20,15 +23,17 @@ export function ResultsSummaryModal({ results, conditionLabel, saveDc, onClose }
                     <i className="fa-solid fa-dice-d20"></i> Save Results
                 </div>
                 <div className="sp-body">
-                    <p><strong>{successCount}</strong> target{successCount !== 1 ? 's' : ''} saved, <strong>{failCount}</strong> target{failCount !== 1 ? 's' : ''} failed{dismissedCount > 0 && <>, <strong>{dismissedCount}</strong> dismissed</>}.</p>
+                    <p><strong>{successCount}</strong> target{successCount !== 1 ? 's' : ''} saved, <strong>{failCount}</strong> target{failCount !== 1 ? 's' : ''} failed{dismissedCount > 0 && <>, <strong>{dismissedCount}</strong> dismissed</>}{immuneCount > 0 && <>, <strong>{immuneCount}</strong> immune</>}.</p>
                     <div className="abjure-results-list">
                         {results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                <strong>{r.targetName}</strong>: {r.dismissed
-                                    ? 'Save dismissed — unaffected'
-                                    : r.success
-                                        ? `Saved — unaffected (${saveEquationText(r, saveDc)})`
-                                        : `Failed — ${conditionLabel}! (${saveEquationText(r, saveDc)})`}
+                                <strong>{r.targetName}</strong>: {r.immune
+                                    ? 'Immune — no save needed, unaffected'
+                                    : r.dismissed
+                                        ? 'Save dismissed — unaffected'
+                                        : r.success
+                                            ? `Saved — unaffected (${saveEquationText(r, saveDc)})`
+                                            : `Failed — ${conditionLabel}! (${saveEquationText(r, saveDc)})`}
                             </div>
                         ))}
                     </div>

@@ -264,6 +264,21 @@ function resolveCastTargetStats(targetName, characters) {
     return targetCharacter?.computedStats || targetCharacter;
 }
 
+// Results-face record for one adjudicated save (improve-condition-aoe-results-face):
+// same numbers the save_result log row carries, shaped for the shared
+// ResultsSummaryModal rows (saveEquationText seam). Hoisted module-level:
+// handle() sits at the complexity ceiling and the ?? defaults would tip it.
+function buildSaveResultRecord(targetName, saveResult) {
+    return {
+        targetName,
+        success: saveResult.success === true,
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        saveBonus: saveResult.saveBonus ?? 0,
+        conditionApplied: saveResult.success !== true,
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, characters) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -323,6 +338,12 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     let savedCount = 0;
     let immuneCount = 0;
     const results = [];
+    // Results-face records (improve-condition-aoe-results-face, 2026-11-24): one
+    // per adjudicated/skipped target, in the shape the shared condition-lane
+    // Results face renders (AOEConditionModal.subcomponents ResultsSummaryModal —
+    // `.abjure-result` rows via saveEquationText). Display-only sibling of the
+    // save_result log rows; the machine truth (tes, conditions, logs) is untouched.
+    const saveResultRecords = [];
 
     for (const target of targets) {
         const targetName = target.name;
@@ -341,6 +362,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
                 description: `${targetName} is immune to Stinking Cloud (Poison immunity).`,
             }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
             results.push(`${targetName} is immune.`);
+            saveResultRecords.push({ targetName, success: true, immune: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false });
             immuneCount++;
             continue;
         }
@@ -362,6 +384,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
         }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
 
         const saveResult = await promise;
+        saveResultRecords.push(buildSaveResultRecord(targetName, saveResult));
 
         if (saveResult.success) {
             savedCount++;
@@ -390,7 +413,23 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
         }
     }
 
-    return spellNoticePopup(action.name, buildStinkingCloudSummary(affectedCount, savedCount, immuneCount, results));
+    // Results-face payload (improve-condition-aoe-results-face): the sheet-cast
+    // chooser lane (SIMPLE_SPELL_SPECS → runStinkingCloud) hands this to the
+    // shared popup transport; CharSheet.modals renderPopup routes the type to
+    // the condition lane's ResultsSummaryModal (`.abjure-result` rows,
+    // saveEquationText equations, honest Poisoned/unaffected/immune copy — no
+    // damage or halving claims). Early refusal pops stay plain automation_info.
+    return {
+        type: 'popup',
+        payload: {
+            type: 'aoe_condition_results',
+            name: action.name,
+            description: buildStinkingCloudSummary(affectedCount, savedCount, immuneCount, results),
+            conditionLabel: 'Poisoned',
+            saveDc: dc,
+            results: saveResultRecords,
+        },
+    };
 }
 
 // Expiration: the spell lasts at most 1 minute (10 rounds) even with

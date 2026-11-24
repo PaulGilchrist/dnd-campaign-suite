@@ -6,6 +6,7 @@ import AttackResultPopup from '../common/AttackResultPopup.jsx'
 import PolymorphSelectionModal from './modals/PolymorphSelectionModal.jsx'
 import AnimalShapesSelectionModal from './modals/AnimalShapesSelectionModal.jsx'
 import ObjectTransformModal from './modals/ObjectTransformModal.jsx'
+import { ResultsSummaryModal } from './modals/shared/AOEConditionModal.subcomponents.jsx'
 
 const ShieldOfFaithTargetSelectionModal = ({ popupHtml, setPopupHtml, handleShieldOfFaithTargetSelected }) => {
     const targets = popupHtml?.creatureTargets?.map(name => ({ name, type: 'creature' })) || [];
@@ -26,6 +27,17 @@ const ShieldOfFaithTargetSelectionModal = ({ popupHtml, setPopupHtml, handleShie
 // CLA-391: stable array identity — inline literals in props refire the modal's load effect.
 const SHAPECHANGE_EXCLUDE_TYPES = ['construct', 'undead'];
 
+// Types whose face is mounted OUTSIDE the popup lane (CharSheet renders
+// ShieldOfFaithTargetSelectionModal from its own state; the barkskin picker
+// rides the same lane) — renderPopup must stay silent for both. Consolidated
+// from two `if` siblings into one table lookup when the aoe_condition_results
+// route joined (complexity ceiling; suppression law pinned by
+// CharSheet.popupRendering.test.jsx).
+const POPUP_TYPES_HANDLED_OUTSIDE = new Set([
+    'shield_of_faith_target_selection',
+    'barkskin_target_selection',
+]);
+
 export { ShieldOfFaithTargetSelectionModal };
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -35,13 +47,24 @@ export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats,
     if (typeof popupHtml === 'string') {
         return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div></Popup>;
     }
-    if (popupHtml.type === 'shield_of_faith_target_selection') return null;
-    if (popupHtml.type === 'barkskin_target_selection') return null;
+    if (POPUP_TYPES_HANDLED_OUTSIDE.has(popupHtml.type)) return null;
     if (popupHtml.html) {
         return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div></div></Popup>;
     }
     if (popupHtml.type === 'automation_info') {
         return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div></div></Popup>;
+    }
+    // Condition-only AoE lane (Stinking Cloud sheet cast): the handler's resolved
+    // per-target save records land on the SAME Results face vocabulary the
+    // condition modals ride (`.abjure-result` rows + saveEquationText), instead
+    // of the chain closing silently after the last save prompt.
+    if (popupHtml.type === 'aoe_condition_results') {
+        return <ResultsSummaryModal
+            results={popupHtml.results}
+            conditionLabel={popupHtml.conditionLabel}
+            saveDc={popupHtml.saveDc}
+            onClose={() => setPopupHtml(null)}
+        />;
     }
     if (popupHtml.type === 'wild_shape_select') {
         return (

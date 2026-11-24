@@ -82,6 +82,19 @@ const areaExecute = (type, saveType) => async (d, pending, result) => {
   await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null, d.characters)
 }
 
+// Condition-lane Results face (improve-condition-aoe-results-face, 2026-11-24):
+// Stinking Cloud's handle() awaits every sequential per-target save prompt and
+// resolves with per-target save records ({ type: 'aoe_condition_results' }).
+// The chooser lane used to DROP that payload — the chain closed silently after
+// the last save. Stamping it on the shared popup transport lets renderPopup
+// mount the same `.abjure-result`/saveEquationText Results face the condition
+// modals ride. Identical executeHandler call shape to areaExecute (roster
+// threading preserved for the cast-time immunity gate).
+async function runStinkingCloud(d, pending, result) {
+  const popup = await executeHandler(areaAction(d, pending, 'stinking_cloud', 'CON', { targets: result }), d.playerStats, d.campaignName, null, d.characters)
+  showPopupIfPayload(d, popup)
+}
+
 async function runSlow(d, pending, result) {
   const action = {
     name: pending.spellName,
@@ -353,7 +366,7 @@ const SIMPLE_SPELL_SPECS = [
   // PX 2026-11-15: deferCastLog — the refusal+refund lane must not stamp a
   // type:'spell' cast row for a cast that did nothing (see runRevivify).
   { name: 'revivify', key: 'Revivify', run: runRevivify, deferCastLog: true, confirmTargets: (d, pending, sel) => (sel?.targetName ? [sel.targetName] : pending.creatureTargets) },
-  { name: 'stinkingCloud', key: 'StinkingCloud', run: areaExecute('stinking_cloud', 'CON') },
+  { name: 'stinkingCloud', key: 'StinkingCloud', run: runStinkingCloud },
   { name: 'confusion', key: 'Confusion', run: runConfusion },
   { name: 'healingWord', key: 'HealingWord', run: runHealingWord },
   { name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') },

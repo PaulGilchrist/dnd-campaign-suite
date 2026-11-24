@@ -315,6 +315,49 @@ describe('useSpellMetamagicFlow — save-DC confirm lane', () => {
       expect(result.current[row.pending]).toBeNull();
     });
   }
+
+  // improve-condition-aoe-results-face (2026-11-24): the chooser lane used to
+  // DROP the handler's resolved popup — the condition chain closed silently
+  // after the last sequential save prompt. runStinkingCloud now stamps the
+  // Results payload on the shared popup transport (renderPopup mounts the
+  // `.abjure-result` Results face — routing pinned by
+  // CharSheet.modals.aoe-condition-results.test.jsx).
+  it('Stinking Cloud: mounts the Results payload on the popup transport after the chain resolves', async () => {
+    const spell = SPELL_ROWS['Stinking Cloud'];
+    const resultsPayload = {
+      type: 'aoe_condition_results',
+      name: 'Stinking Cloud',
+      description: 'Stinking Cloud affects 1 creature(s).',
+      conditionLabel: 'Poisoned',
+      saveDc: 15,
+      results: [
+        { targetName: 'Goblin A', success: false, roll: 4, saveBonus: -1, total: 3, conditionApplied: true },
+      ],
+    };
+    executeHandler.mockResolvedValue({ type: 'popup', payload: resultsPayload });
+    const { result, setPopupHtml } = await renderGated(spell);
+
+    await act(async () => {
+      await result.current.handleStinkingCloudConfirm(['Goblin A']);
+    });
+
+    expect(setPopupHtml).toHaveBeenCalledWith(resultsPayload);
+    expect(result.current.pendingStinkingCloud).toBeNull();
+  });
+
+  it('Stinking Cloud: a null handler popup leaves the popup transport untouched', async () => {
+    const spell = SPELL_ROWS['Stinking Cloud'];
+    // Explicit null: mockResolvedValue above survives vi.clearAllMocks (mockClear
+    // keeps implementations) — this test owns the silent-handler leg.
+    executeHandler.mockResolvedValue(null);
+    const { result, setPopupHtml } = await renderGated(spell);
+
+    await act(async () => {
+      await result.current.handleStinkingCloudConfirm(['Goblin A']);
+    });
+
+    expect(setPopupHtml).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Cure Wounds: single-target heal transport to onExecute.

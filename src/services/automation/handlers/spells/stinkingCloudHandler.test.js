@@ -515,7 +515,7 @@ describe('stinkingCloudHandler', () => {
   });
 
   describe('popup payload structure', () => {
-    it('should return popup type with automation_info payload', async () => {
+    it('resolves the adjudicated chain with the condition-lane results payload', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
       createSaveListener.mockReturnValue({
         promptId: 'goblin-prompt',
@@ -525,7 +525,10 @@ describe('stinkingCloudHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
+      // improve-condition-aoe-results-face: the sheet-cast chooser lane renders
+      // this as the shared ResultsSummaryModal Results face instead of closing
+      // silently after the last save.
+      expect(result.payload.type).toBe('aoe_condition_results');
       expect(result.payload.name).toBe('Stinking Cloud');
     });
 

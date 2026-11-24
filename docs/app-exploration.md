@@ -132,8 +132,6 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-24 QD] Room-Adjacent Regenerate tooltip + confirm copy print a ghost `Density: 50%` line — adjacent mode has no density knob (the modal swaps the slider for Rooms/Corridors but the stamp carries the BSP default forward, and `describeGenerationOpts` prints `density` whenever defined). Suppress the mode-irrelevant keys per generator (`src/services/maps/regenerateMap.js` describeGenerationOpts / the Generate modal's stamp assembly).
-- [2026-11-24 QD] Condition-only AoE (Stinking Cloud) closes silently after the last save resolves — no `— Results` face, while damage AoEs (Burning Hands) land a `.abjure-result` Results card with the save equations. Same adjudication, two vocabularies; give the condition lane a Results/Summary face (or an honest close toast) reusing `saveEquationText` rows.
 - [2026-11-24 QD] Overlay picker lists HP affordance for monster rows only (`Goblin(100% HP)`) — PC rows render bare names, so the GM juggling a mixed board can't gauge remaining HP before picking AoE victims. Uniform per-row HP/status affordance.
 - [2026-11-24 QD] Whole-doc outdoor map PUT accepts out-of-range `terrain` keys with a 200 (hand-added `terrain['39,79']` on a 40-grid round-tripped; only a later Regenerate pruned it). Validate terrain keys against the stamped grid bounds in `server/routes/maps.js`.
 
