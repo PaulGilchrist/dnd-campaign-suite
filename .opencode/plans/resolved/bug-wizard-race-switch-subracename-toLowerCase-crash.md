@@ -60,7 +60,66 @@ subrace selection settles). Errors repeat per limits recomputation.
   guard, then `sr.index === subraceName.toLowerCase()` throws inside `Array.find`. A `typeof subraceName === 'string'`
   guard at the `:47` entry (or normalizing the value where the race switch resets subrace) closes it.
 
+## Resolution
+
+**FIXED 2026-11-24 (fix subagent).**
+
+### What was actually wrong
+
+The original "trigger shape" note was close but the root cause was one level up: the
+canonical wizard/disk shape for `race.subrace` is ALWAYS `{ name: string }` — `WizardStepRace`
+resets it to `{ name: '' }` the instant you switch races, and every campaign character file on
+disk stores the object form (grep: zero string-form subraces in `public/campaigns/**`). But
+`getResistanceLimits` dual-read the value:
+
+    const subraceName = formData.race?.subrace?.name || formData.race?.subrace || '';
+
+With `{ name: '' }`, the empty `name` is falsy so the fallback passed the raw OBJECT downstream.
+In the 5e lane `extract5eRaceResistances` then does
+`sr.index === subraceName.toLowerCase()` inside `Array.find` — the truthiness guard
+`subraceName && raceData.subraces` passes for a truthy object, and the throw kills the whole
+limits collector for that recompute. The dual-read was also a no-legacy-compat violation; the
+same file's sibling `resolveGrantedSources` (:427) already had the correct single-shape read.
+
+**2024 lane check (per the file's note):** `extract2024SubraceResistances` matches on
+`sr.name === subraceName` only — no `.toLowerCase()` call, so the 2024 path had no crash
+surface (the object simply never matched). No change needed there; the fixed string now feeds
+both lanes.
+
+### Files changed
+
+- `src/services/character/resistancesValidation.js` — `getResistanceLimits` now reads
+  `formData.race?.subrace?.name || ''` (mirrors `resolveGrantedSources`; legacy dual-read
+  branch deleted per the no-backward-compat law).
+- `src/services/character/resistancesValidationLimits.test.js` — (1) regression describe
+  "race-switch seam": 5e fresh switch `subrace: { name: '' }` on a subrace-bearing race
+  resolves with the complete grant set (`['Poison']`), settled subrace (`Hill Dwarf`)
+  completes, 2024 twin holds; fixtures disk-anchored to `public/data/races.json` +
+  `public/data/2024/races.json` prose. (2) The old "string subrace form" fixture (which pinned
+  the removed legacy dual-read shape) migrated to the canonical object form in the same change,
+  per the no-legacy policy. (3) Header seam-map updated to claim the race-switch lane.
+
+### Verification
+
+- **Tests:** `resistancesValidationLimits.test.js` 23/23 green; `src/services/character/`
+  61 files / 1083 tests green; `src/hooks/wizard/` 28 files / 275 tests green;
+  `npm run lint` clean (zero warnings). Full-suite run: see fix-run report (green at exit).
+- **Live repro PRE-fix (Playwright, :5173, test-campaign):** exact steps — add-character →
+  quick + 5e → name → Race=Human → Next → nav back to Race → switch to Dwarf → captured
+  **2 errors**: `Pre-select error:` + `Wizard config validation error:` with
+  `TypeError: subraceName.toLowerCase is not a function` at `resistancesValidation.js:37`
+  inside `Array.find` ← `extract5eRaceResistances`.
+- **Live re-verification POST-fix (fresh session):** identical walk — Human → Dwarf switch
+  yields **ZERO** console errors; wizard continues honest: Subrace=Hill Dwarf selects clean,
+  Class=Fighter, Subclass=Champion, full 16-step quick-build walk to `Create Character` with
+  zero errors throughout, sheet mounts. Saved bytes:
+  `race: {name:'Dwarf', subrace:{name:'Hill Dwarf'}}`, class Fighter/Champion,
+  `resistances: ['Poison']` — the 5e limits collector now runs to completion through the
+  switch seam (the pre-selected grant lands via this lane).
+- **Cleanup:** harness character deleted (404), Admin clear-change-data `{}` + clear-log `[]`,
+  15-char roster aggregate restored byte-exact to pin `e41642cf9f0a43438e9a7d4cf5170010`.
+
 ## Status
 
-OPEN — filed 2026-11-24 by the e2e-improve run (observer report from implementer session
-`ses_defffb685ffeGd7JTQbEkh921b`).
+RESOLVED — filed 2026-11-24 by the e2e-improve run (observer report from implementer session
+`ses_defffb685ffeGd7JTQbEkh921b`); fixed 2026-11-24 (fix subagent).

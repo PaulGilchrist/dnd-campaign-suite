@@ -303,7 +303,10 @@ export async function getResistanceLimits(formData) {
   const ruleset = formData.rules || '5e';
   const className = formData.class?.name || '';
   const raceName = formData.race?.name || '';
-  const subraceName = formData.race?.subrace?.name || formData.race?.subrace || '';
+  // Canonical shape (WizardStepRace/WizardStepSubrace + disk): subrace is always
+  // { name: string } — '' right after a race switch. Reading the raw object as a
+  // fallback crashed extract5eRaceResistances on `.toLowerCase()` mid-switch.
+  const subraceName = formData.race?.subrace?.name || '';
   const level = formData.level || 1;
 
   const limits = ruleset === '2024'

@@ -1,7 +1,8 @@
 // @maintained-by-ai
 // QUARTET lane (see resistancesValidation.test.js header seam map): race-side resistance extraction
 // (5e + 2024) via getResistanceLimits — the CANONICAL home for race extraction (Info lane cites
-// this file per #2049). Class-side immunity extraction + level gates live in
+// this file per #2049) — plus the race-switch subrace seam ({ name: '' } must never reach the
+// extractors as an object; bug-wizard-race-switch-subracename-toLowerCase-crash). Class-side immunity extraction + level gates live in
 // resistancesValidationImmunities.test.js; message contract in resistancesValidation.test.js.
 // Liveness verdict (#2050, verified): getResistanceLimits has ZERO direct importers outside the
 // module, but it IS live production code through getPreSelectedResistances + validateResistances
@@ -175,8 +176,8 @@ describe('getResistanceLimits — 5e race extraction (canonical)', () => {
       expected: ['Fire'],
     },
     {
-      name: 'Dragonborn ancestry from subrace description, string subrace form; decoy subrace ignored (SYNTHETIC prose)',
-      race: { name: 'Dragonborn', subrace: 'Gold Dragonborn' },
+      name: 'Dragonborn ancestry from subrace description; decoy subrace ignored (SYNTHETIC prose)',
+      race: { name: 'Dragonborn', subrace: { name: 'Gold Dragonborn' } },
       raceData: {
         name: 'Dragonborn',
         traits: [],
@@ -217,6 +218,61 @@ describe('getResistanceLimits — 5e race extraction (canonical)', () => {
     const result = await getResistanceLimits(baseArgs({ race }));
 
     expectRaceResistances(result, expected);
+  });
+});
+
+describe('getResistanceLimits — race-switch seam (subrace never resolves as a non-string)', () => {
+  // Regression (bug-wizard-race-switch-subracename-toLowerCase-crash): the wizard's
+  // canonical shape is race.subrace = { name: string } —WizardStepRace resets it to
+  // { name: '' } the instant you switch races. The old dual-read
+  // `subrace?.name || subrace` handed the raw object to extract5eRaceResistances,
+  // whose `sr.index === subraceName.toLowerCase()` threw mid-Array.find and silently
+  // killed the whole 5e limits collector for that recompute (live: Human → Dwarf).
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Disk anchor public/data/races.json: Dwarf traits carry the poison prose verbatim;
+  // subraces carry name + index ('hill-dwarf'), racial_traits never repeat a resistance.
+  const dwarfRaceData = () => ({
+    name: 'Dwarf',
+    traits: [{ name: 'Dwarven Resilience', description: 'You have advantage on saving throws against poison, and you have resistance against poison damage.' }],
+    subraces: [
+      { name: 'Hill Dwarf', index: 'hill-dwarf', racial_traits: [{ name: 'Dwarven Toughness', description: 'Your hit point maximum increases by 1.' }] },
+      { name: 'Mountain Dwarf', index: 'mountain-dwarf', racial_traits: [] },
+    ],
+  });
+
+  it('5e: a fresh switch to a subrace-bearing race (subrace { name: "" }) resolves and still collects the base grant', async () => {
+    mockRace(dwarfRaceData());
+
+    const result = await getResistanceLimits(baseArgs({ race: { name: 'Dwarf', subrace: { name: '' } } }));
+
+    expectRaceResistances(result, ['Poison']);
+  });
+
+  it('5e: once the subrace settles, the collector completes on the exact grant set (no throw, no bleed)', async () => {
+    mockRace(dwarfRaceData());
+
+    const result = await getResistanceLimits(baseArgs({ race: { name: 'Dwarf', subrace: { name: 'Hill Dwarf' } } }));
+
+    expectRaceResistances(result, ['Poison']);
+  });
+
+  // Disk anchor public/data/2024/races.json: 2024 Dwarf trait prose is capital-R
+  // 'You have Resistance to Poison damage.' — the 2024 extractor matches that form.
+  const dwarfRaceData2024 = () => ({
+    name: 'Dwarf',
+    traits: [{ name: 'Dwarven Resilience', description: 'You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.' }],
+    subraces: [{ name: 'Hill Dwarf', traits: [] }],
+  });
+
+  it('2024 twin: the same fresh-switch shape resolves without throwing', async () => {
+    mockRace(dwarfRaceData2024());
+
+    const result = await getResistanceLimits(baseArgs({ rules: '2024', race: { name: 'Dwarf', subrace: { name: '' } } }));
+
+    expectRaceResistances(result, ['Poison']);
   });
 });
 
