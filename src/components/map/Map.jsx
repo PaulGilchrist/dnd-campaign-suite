@@ -783,6 +783,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     campaignName={campaignName}
                     tokenOffsets={tokenStackOffsets.players}
                     localCharacterName={localCharacterName}
+                    // Select-tool marquee exclusion cue (backlog RH 2026-11-24):
+                    // the tool string flows down so Players can gate the
+                    // "not group-selectable" ring+title on TOOL_SELECT alone.
+                    tool={tool}
                 />
 
                 <PlacedItems

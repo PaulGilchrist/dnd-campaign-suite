@@ -177,6 +177,22 @@
     filter: drop-shadow(0 0 3px rgba(34, 197, 94, 0.7));
 }
 
+/* Select-tool marquee exclusion cue (backlog RH 2026-11-24) — GM-only by
+   construction (only localhost can arm Select). While the Select tool is
+   armed every player token wears a hollow dashed amber ring explaining that
+   the marquee (useSelectMove: walls + placedItems only, never players[])
+   will skip it — the token stays individually dragable (usePlayerDragging).
+   Decorative layer: pointer-events: none keeps drags and the right-click
+   menu on the token underneath. Absent whenever Select is disarmed. */
+.map .not-group-select-ring {
+    fill: none;
+    stroke: #f59e0b;
+    stroke-width: 2;
+    stroke-dasharray: 5 3;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
 /* Creature initial (no image) */
 .map .creature-initial {
     pointer-events: none;

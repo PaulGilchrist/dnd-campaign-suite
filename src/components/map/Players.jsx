@@ -1,7 +1,18 @@
 
 import { tokenStackTransform } from '../../services/maps/tokenStackOffsets.js';
+import { TOOL_SELECT } from '../../config/mapConfig';
 
 const RADIUS = 20;
+
+// Select-tool exclusion cue (backlog RH 2026-11-24): the marquee lane
+// (useSelectMove.js) selects WALL CELLS + placedItems only — players live in
+// players[] and are deliberately never group-selectable (documented lane
+// split, useSelectMove.test.js header). While Select is armed the tokens wore
+// NO chrome explaining the exclusion, so a box over a mixed selection looked
+// like it silently dropped them. Cause-naming copy; the marquee law itself is
+// unchanged — this is spectacle only, zero writes, pointer-events: none.
+const NOT_GROUP_SELECTABLE_TITLE =
+    'Player tokens aren\u2019t group-selectable \u2014 drag them individually';
 
 // Ownership tint predicate (roadmap Item 6) — hoisted to keep the token
 // renderer under the complexity ratchet. Minimal honest model: characters
@@ -15,10 +26,11 @@ function isTokenOwnedHere({ isLocalhost, localCharacterName, playerName }) {
     return !isLocalhost && !!localCharacterName && playerName === localCharacterName;
 }
 
-// Player-token chrome (context-menu selection rect + visitor ownership ring)
-// — hoisted out of the token renderer to keep it under the complexity
-// ratchet; both are inert overlays (pointer-events: none).
-function PlayerTokenOverlays({ cx, cy, isSelected, isOwnedHere }) {
+// Player-token chrome (context-menu selection rect + visitor ownership ring
+// + Select-tool exclusion cue) — hoisted out of the token renderer to keep it
+// under the complexity ratchet; all three are inert overlays
+// (pointer-events: none).
+function PlayerTokenOverlays({ cx, cy, isSelected, isOwnedHere, selectArmed }) {
     return (
         <>
             {isSelected && (
@@ -44,11 +56,35 @@ function PlayerTokenOverlays({ cx, cy, isSelected, isOwnedHere }) {
                     pointerEvents="none"
                 />
             )}
+            {/* Drawn last: the armed-tool cue outranks the passive chrome. */}
+            {selectArmed && (
+                <circle
+                    cx={cx}
+                    cy={cy}
+                    r={RADIUS + 4}
+                    className="not-group-select-ring"
+                    pointerEvents="none"
+                />
+            )}
         </>
     );
 }
 
-const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName, tokenOffsets, localCharacterName }) => {
+// Token <g> class list — hoisted to keep the renderer under the complexity
+// ratchet (same lane as PlayerTokenOverlays). Base .creature-group bytes are
+// byte-unchanged; .not-group-selectable is the armed-Select cue marker.
+function tokenGroupClass({ stack, selectArmed }) {
+    let cls = 'creature-group';
+    if (stack) cls += ' token-buried';
+    if (selectArmed) cls += ' not-group-selectable';
+    return cls;
+}
+
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName, tokenOffsets, localCharacterName, tool }) => {
+    // The cue gates on the toolbar tool ONLY (Ruler/Spell are separate
+    // booleans that never set tool, Paint/Erase carry their own values) —
+    // exactly one armed state produces the cue.
+    const selectArmed = tool === TOOL_SELECT;
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
@@ -82,10 +118,13 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                     <g
                         key={player.id}
                         onPointerDown={(e) => handlePointerDown(e, player.id)}
-                        className={stack ? 'creature-group token-buried' : 'creature-group'}
+                        className={tokenGroupClass({ stack, selectArmed })}
                         transform={stack}
                         style={{ cursor: 'grab' }}
                     >
+                        {/* First child = the group's accessible name/tooltip
+                          (SVG <title> idiom) while Select is armed. */}
+                        {selectArmed && <title>{NOT_GROUP_SELECTABLE_TITLE}</title>}
                         <defs>
                             <clipPath id={`creature-clip-${player.id}`}>
                                 <circle cx={cx} cy={cy} r={RADIUS} />
@@ -121,6 +160,7 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                             cy={cy}
                             isSelected={isSelected}
                             isOwnedHere={isOwnedHere}
+                            selectArmed={selectArmed}
                         />
                         {img ? (
                             <image

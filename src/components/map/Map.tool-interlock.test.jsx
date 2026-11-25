@@ -395,4 +395,30 @@ describe('Map container - ruler/spell/paint mode interlock', () => {
         expect(handlers.gridPointerDown).toHaveBeenCalledWith(DOWN, handlers.setMapData);
         expect(handlers.panStart).not.toHaveBeenCalled();
     });
+
+    // Backlog RH 2026-11-24 wiring pin: the toolbar tool state feeds the
+    // Players cue gate (Map.jsx threads `tool` down; Players.jsx gates on
+    // TOOL_SELECT). Cue DOM laws live in Players.select-armed-cue.test.jsx —
+    // this row only pins that ARMING/DISARMING Select through the real
+    // toolbar flips the cue on mounted tokens.
+    it('arming Select cues rendered player tokens as not group-selectable; disarming clears it', async () => {
+        mockState.mapData = createMockMapData({
+            players: [{ id: 'ef', name: 'EvasiveFighter', gridX: 2, gridY: 2 }],
+        });
+        await act(async () => renderMap());
+        expect(document.querySelector('g.creature-group')).toBeInTheDocument();
+        expect(document.querySelector('.not-group-selectable')).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+        const armedToken = document.querySelector('g.creature-group');
+        expect(armedToken).toHaveClass('not-group-selectable');
+        expect(armedToken.querySelector('circle.not-group-select-ring')).toBeInTheDocument();
+        expect(armedToken.querySelector('title').textContent).toContain('group-selectable');
+
+        // Re-clicking an armed button DISARMS (toggle law) — cue gone.
+        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+        expect(document.querySelector('.not-group-selectable')).toBeNull();
+        expect(document.querySelector('circle.not-group-select-ring')).toBeNull();
+        expect(document.querySelector('g.creature-group title')).toBeNull();
+    });
 });
