@@ -134,6 +134,58 @@ function DescriptionEditModal({ map, description, onDescriptionChange, loading, 
     );
 }
 
+// Sibling-row lock while a rename editor is armed (backlog 2026-11-25 BC):
+// every OTHER row kept rendering an identical enabled `Rename "<map>"` button
+// next to the pending editor — the BC scare (a stray cross-row click closed
+// the armed editor and armed a different row). Sibling action buttons now
+// render disabled with this cause-naming title (the NPC-list idiom: a dead
+// button names WHY via title, cf. `.npcs-init-btn`). The lock is purely a
+// render-time derivation of `renamingMap`: when the editor closes through
+// ANY lane (Confirm-commit, Cancel, Escape, blur-revert) `renamingMap` goes
+// null and every row re-renders with its normal live buttons. (Live caveat:
+// the disabled attribute ALONE was not enough — see renameLockPointerDown,
+// which cancels the sibling press before it can blur the armed input.)
+const RENAME_LOCK_TITLE = 'Rename editor open on another row — confirm or cancel that rename first';
+
+function isRenameLockedFor(renamingMap, fileName) {
+    return renamingMap !== null && renamingMap !== fileName;
+}
+
+// Row state tokens: `active` (server-active badge lane), `renaming` (this row
+// owns the armed editor — highlighted) and `rename-locked` (a sibling row of
+// an armed editor — dimmed, its action buttons disabled). Kept out of the JSX
+// map callback so the row renderer stays inside the complexity cap.
+function rowStateClasses(renamingMap, map) {
+    const classes = ['maps-manager-item'];
+    if (map.isActive) classes.push('active');
+    if (renamingMap === map.fileName) classes.push('renaming');
+    else if (renamingMap !== null) classes.push('rename-locked');
+    return classes.join(' ');
+}
+
+// Props spread onto a row's action buttons: locked (disabled + cause title)
+// while another row's editor is armed; otherwise the button's own default
+// title (omitted entirely when it has none) so nothing changes when idle.
+function renameLockProps(renamingMap, fileName, defaultTitle) {
+    if (isRenameLockedFor(renamingMap, fileName)) {
+        return { disabled: true, title: RENAME_LOCK_TITLE };
+    }
+    return defaultTitle === undefined ? {} : { title: defaultTitle };
+}
+
+// Gesture blocker for a locked sibling row (live-proved necessary): a REAL
+// mouse click on a disabled button still fires BLUR on the armed input in
+// Chrome — the revert closes the editor, React re-renders the sibling's
+// buttons ENABLED mid-gesture, and the click's tail re-arms that row (zero
+// writes, but a stray close-and-rearm survived the disabled attribute alone).
+// POINTER events are not subject to the disabled suppression, so capturing
+// pointerdown on the locked row and preventDefault-ing it — the same trick
+// the Confirm/Cancel pair rides (734565d2d) to keep the input focused —
+// cancels the whole gesture before the blur can start it.
+function renameLockPointerDown(renamingMap, fileName) {
+    return isRenameLockedFor(renamingMap, fileName) ? (e) => e.preventDefault() : undefined;
+}
+
 // Row activate/deactivate notice — display-only ephemeral sink mirroring the
 // shared useEphemeralToast lane's null-when-idle contract (CampaignSelection's
 // DeleteNotice / MapNoticeToast.jsx). Backlog 2026-11-16 WK: toggling active
@@ -530,7 +582,8 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                     {maps.map(map => (
                         <li
                             key={map.fileName}
-                            className={`maps-manager-item ${map.isActive ? 'active' : ''}`}
+                            className={rowStateClasses(renamingMap, map)}
+                            onPointerDown={renameLockPointerDown(renamingMap, map.fileName)}
                             title={map.description || undefined}
                         >
                             <div className="maps-manager-item-info">
@@ -593,16 +646,16 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     display name rides along as the 2nd arg so a rejected document load
                                     can name the map the way the user just saw it (backlog
                                     map-load-notice-slug-naming) — the slug stays the storage key. */}
-                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''), map.name)} aria-label={`Open "${map.name}"`}>Open</button>
+                                <button {...renameLockProps(renamingMap, map.fileName)} onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''), map.name)} aria-label={`Open "${map.name}"`}>Open</button>
                                 {/* Row-level activation toggle (backlog 2026-11-04 CQ):
                                     active rows get Deactivate (the server route nulls
                                     activeMaps + '__map__' and broadcasts activeMap:null),
                                     inactive rows keep Activate — one toggle button per row,
                                     same class/aria conventions as every sibling action. */}
                                 {map.isActive ? (
-                                    <button onClick={() => handleDeactivate(map.fileName, map.name)} aria-label={`Deactivate "${map.name}"`}>Deactivate</button>
+                                    <button {...renameLockProps(renamingMap, map.fileName)} onClick={() => handleDeactivate(map.fileName, map.name)} aria-label={`Deactivate "${map.name}"`}>Deactivate</button>
                                 ) : (
-                                    <button onClick={() => handleActivate(map.fileName, map.name)} aria-label={`Activate "${map.name}"`}>Activate</button>
+                                    <button {...renameLockProps(renamingMap, map.fileName)} onClick={() => handleActivate(map.fileName, map.name)} aria-label={`Activate "${map.name}"`}>Activate</button>
                                 )}
                                 {/* While a row's rename is armed, its Rename button swaps to a
                                     Confirm/Cancel pair (backlog 2026-11-24 BA) so the editor has
@@ -634,13 +687,13 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                         </button>
                                     </>
                                 ) : (
-                                    <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
+                                    <button {...renameLockProps(renamingMap, map.fileName)} onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
                                 )}
-                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
+                                <button className="edit-desc-btn" {...renameLockProps(renamingMap, map.fileName, 'Edit description')} onClick={() => handleEditDescription(map)} aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
                                 {/* AI Dress (campaign-authoring residual item 2): in-place op
                                     proposal on the live document — preview first, GM Apply is
                                     the only write, through the normal map save lane. */}
-                                <AiDressButton campaignName={campaignName} map={map} />
+                                <AiDressButton campaignName={campaignName} map={map} locked={isRenameLockedFor(renamingMap, map.fileName)} lockedTitle={RENAME_LOCK_TITLE} />
                                 {/* Row Regenerate renders ONLY on docs carrying the
                                     generationOpts stamp, read off the list row itself
                                     (VG backlog 2026-11-12, VX list-envelope fold;
@@ -651,14 +704,14 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                 {map.generationOpts && (
                                     <button
                                         className="regenerate-btn"
+                                        {...renameLockProps(renamingMap, map.fileName, describeGenerationOpts(map.generationOpts))}
                                         onClick={() => setRegeneratingMap(map.fileName)}
-                                        title={describeGenerationOpts(map.generationOpts)}
                                         aria-label={`Regenerate "${map.name}"`}
                                     >
                                         <i className="fa-solid fa-rotate"></i> Regenerate
                                     </button>
                                 )}
-                                <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
+                                <button className="delete-btn" {...renameLockProps(renamingMap, map.fileName)} onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>
                     ))}

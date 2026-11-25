@@ -111,7 +111,7 @@ function AiDressPreview({ proposal, instruction, busy, onApply, docked }) {
   );
 }
 
-function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) {
+function AiDressButton({ campaignName, map, mount = 'list', onProposalChange, locked, lockedTitle }) {
   const aiConfig = useRuntimeValue('campaign', 'aiConfig', campaignName);
   // Backlog (2026-11-05 CX) no-config-path-POSTs-before-telling: gate on the
   // SAME aiConfig lane the referee surfaces use (AiRefereeSection: `mode &&
@@ -183,8 +183,9 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
       <button type="button"
         className={docked ? 'ai-dress-open-btn ai-dress-map-btn' : 'ct-btn ai-dress-open-btn'}
         onClick={() => setOpen(true)}
+        disabled={locked}
         aria-label={`Dress "${map.name}" with AI`}
-        title="Dress this map with AI in-place ops (you preview and apply — nothing saves silently)">
+        title={locked ? lockedTitle : 'Dress this map with AI in-place ops (you preview and apply — nothing saves silently)'}>
         <i className="fa-solid fa-wand-magic-sparkles" /> AI Dress
       </button>
     );

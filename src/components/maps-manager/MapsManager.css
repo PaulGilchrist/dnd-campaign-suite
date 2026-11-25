@@ -154,6 +154,27 @@
     background-color: var(--background-color-selected-hover);
 }
 
+/* Armed rename editor isolation (backlog 2026-11-25 BC): the row owning the
+   inline rename editor gets a focus-token border/highlight (the same
+   --border-color-focus the editor input rides on :focus) plus a glow so it is
+   unmistakable even when a sibling row happens to be the ACTIVE row (whose
+   border uses the darker primary token), while every sibling row dims under
+   the standard dead-button tier (its action buttons render disabled with the
+   cause title). */
+.maps-manager-item.renaming {
+    border-color: var(--border-color-focus);
+    background-color: var(--background-color-selected);
+    box-shadow: 0 0 8px var(--color-primary-glow);
+}
+
+.maps-manager-item.renaming:hover {
+    background-color: var(--background-color-selected-hover);
+}
+
+.maps-manager-item.rename-locked {
+    opacity: 0.55;
+}
+
 .maps-manager-item-info {
     display: flex;
     align-items: center;

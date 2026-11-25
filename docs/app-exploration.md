@@ -58,8 +58,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-25 (run BC): Maps-manager rename rows keep rendering an identical `Rename "<other>"` button on every OTHER row while an editor is armed — nothing visually dims or blocks the other rows, so multi-row editor mixups are one stray click away (the BC scare). Consider disabling sibling row action buttons while `renamingMap` is set, or auto-scrolling/highlighting the armed row. Likely file: `src/components/maps-manager/MapsManager.jsx`.
-
 ## Blocked / not verified (run BC — replaced each run)
 
 - EB refine hosts under a live model / capture-mock (PT#1) — not budgeted this cycle; stays first-deepen.
