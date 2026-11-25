@@ -1169,6 +1169,20 @@ function App() {
         />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
+            // Sheet-swap hazard (run AZ 2026-11-24): a sidebar click flips
+            // document.title to the new character immediately while CharSheet
+            // recomputes playerStats async — unkeyed, the SAME instance kept
+            // the PREVIOUS character's body (and its live Edit/Delete/Upload
+            // handlers) on screen for that whole window; the named native
+            // confirm was the only backstop. Keying on the character's
+            // identity (same idiom as the edit wizard's
+            // key={editingCharacter?.name} below) forces a clean remount on
+            // every switch: the fresh instance renders nothing until the NEW
+            // character's stats resolve (CharSheet's `!playerStats` guard),
+            // so stale handlers can never be attached to the visible sheet.
+            // Name-only is deliberate: a re-render/roster-refresh of the SAME
+            // character must not destroy legitimate in-sheet state.
+            key={activeCharacter.name}
              allAbilityScores={abilityScores}
              allClasses={classes}
              allClasses2024={classes2024}

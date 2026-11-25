@@ -58,8 +58,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-24 (run AZ) — sheet-swap window leaves stale header actions clickable:** after a sidebar character click, `document.title` flips to the new character immediately while `CharSummary` remounts async; during that window the visible sheet's Edit/Delete/Upload buttons still belong to the PREVIOUS character (the named confirm is the only backstop — it is what prevented permanent fixture damage in this very run). Suggested: key the whole sheet (or at least `CharHeaderButtons`) on `activeCharacter`, or disable header actions while the sheet face ≠ the title's character. `src/components/char-sheet/char-summary/CharSummary.jsx`, `CharHeaderButtons`.
-
 ## Blocked / not verified (run AZ — replaced each run)
 
 - EB refine hosts under a live model / capture-mock (PT#1) — not budgeted this cycle; stays first-deepen.
