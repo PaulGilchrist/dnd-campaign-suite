@@ -280,6 +280,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     goToStep,
     getStepEnabled,
     isSaveEnabled,
+    firstInvalidStep,
    } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, { classSubtypes, ruleset, allFeats: feats, existingNames });
 
   // Quick build prefills (declared after navigation so currentStep exists):
@@ -688,6 +689,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
               isSaveEnabled={isSaveEnabled && abilitiesWithinCap && selectionsWithinCap}
+              firstInvalidStep={firstInvalidStep}
               onSave={handleSubmit}
             />
             <div className="wizard-content">

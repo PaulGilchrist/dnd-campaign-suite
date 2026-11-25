@@ -262,4 +262,47 @@ describe('useWizardNavigation', () => {
       expect(result.current.isSaveEnabled).toBe(false);
     });
   });
+
+  describe('firstInvalidStep (cause label for ladder-disabled controls)', () => {
+    it('is null when every ladder step is valid', async () => {
+      const { result } = renderWizard(1);
+      await flush();
+      expect(result.current.firstInvalidStep).toBe(null);
+    });
+
+    it('names the 2024-only Background step when a no-background switch blocks the ladder', async () => {
+      // Exactly the 5e→2024 edit-switch face: every carried row is valid and
+      // the newly required Background step is the one thing missing.
+      const { result } = renderWizard(2, formDataWith(), mockRacesData, mockClassSubtypes, '2024');
+      await flush();
+      expect(result.current.firstInvalidStep).toBe(5);
+      // The blocking step itself stays navigable; everything after it waits.
+      expect(result.current.getStepEnabled(5)).toBe(true);
+      expect(result.current.getStepEnabled(6)).toBe(false);
+      expect(result.current.isSaveEnabled).toBe(false);
+    });
+
+    it('clears to null once the background is picked', async () => {
+      const { result } = renderWizard(2, formDataWith({ background: 'Soldier' }), mockRacesData, mockClassSubtypes, '2024');
+      await flush();
+      expect(result.current.firstInvalidStep).toBe(null);
+      expect(result.current.isSaveEnabled).toBe(true);
+    });
+
+    it('names the earliest failure when several steps are invalid', async () => {
+      const { result } = renderWizard(1, formDataWith({ race: undefined }), mockRacesData, mockClassSubtypes, '2024');
+      await flush();
+      // Race (3) fails before Background (5) does.
+      expect(result.current.firstInvalidStep).toBe(3);
+    });
+
+    it('names the async-validated Basic Information step when step 2 fails', async () => {
+      validateStep.mockImplementation((step) =>
+        Promise.resolve(step === 2 ? { name: 'Required' } : {})
+      );
+      const { result } = renderWizard(1);
+      await flush();
+      expect(result.current.firstInvalidStep).toBe(2);
+    });
+  });
 });

@@ -97,15 +97,28 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
     return () => { cancelled = true; };
   }, [formData, racesData, classSubtypes, ruleset, existingNames]);
 
+  const stepValidities = useMemo(
+    () => [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid],
+    [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]
+  );
+
   const validPrefixes = useMemo(() => {
-    const stepValidities = [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid];
     const prefixes = [true];
     stepValidities.reduce((allValidSoFar, valid, index) => {
       prefixes[index + 1] = allValidSoFar && valid;
       return prefixes[index + 1];
     }, true);
     return prefixes;
-  }, [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]);
+  }, [stepValidities]);
+
+  // The one step every ladder-disabled button is actually waiting on: the
+  // first step (1..7) that fails, or null when the whole ladder is valid.
+  // Sidebar steps and Save name it in their disabled `title` so the block
+  // is self-explanatory (a ruleset switch can insert a never-seen step).
+  const firstInvalidStep = useMemo(() => {
+    const index = stepValidities.findIndex(valid => !valid);
+    return index === -1 ? null : index + 1;
+  }, [stepValidities]);
 
   const getStepEnabled = useMemo(() => {
     return (targetStep) => {
@@ -125,6 +138,7 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
     setCurrentStep,
     getStepEnabled,
     isSaveEnabled,
+    firstInvalidStep,
   };
 }
 

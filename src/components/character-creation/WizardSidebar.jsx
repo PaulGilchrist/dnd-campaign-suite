@@ -13,9 +13,20 @@ import { getVisibleSteps } from '../../config/steps-config.js';
  * @param {function} props.goToStep - Takes a canonical step number, navigates to it.
  * @param {boolean} props.isSaveEnabled - Whether the save button is active.
  * @param {function} props.onSave - Called when the save tab is clicked.
+ * @param {number|null} props.firstInvalidStep - Canonical number of the first
+ *   step failing the valid-prefix ladder (null when none). Ladder-disabled
+ *   tabs and Save name it in their `title` so the cause is discoverable.
  */
-export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave }) {
+export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave, firstInvalidStep }) {
   const visibleSteps = getVisibleSteps({ ruleset });
+
+  // Cause-naming idiom (mirrors the NPC list's disabled Add-to-Initiative
+  // chip): a disabled control says WHICH step it is waiting on. Only set
+  // when something actually blocks the ladder — enabled buttons stay bare.
+  const blockedStepTitle = firstInvalidStep == null
+    ? null
+    : visibleSteps.find((step) => step.step === firstInvalidStep)?.title;
+  const ladderCause = blockedStepTitle ? `Complete "${blockedStepTitle}" first` : undefined;
 
   return (
     <div className="wizard-sidebar">
@@ -31,6 +42,7 @@ export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, go
             className={`sidebar-tab ${isActive ? 'active' : ''} ${!isEnabled ? 'disabled' : ''}`}
             onClick={() => goToStep(stepConfig.step)}
             disabled={!isEnabled}
+            title={!isEnabled ? ladderCause : undefined}
           >
             <span className="sidebar-tab-number">{stepConfig.displayNumber}</span>
             <span className="sidebar-tab-title">{stepConfig.title}</span>
@@ -41,6 +53,7 @@ export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, go
         className={`sidebar-save ${!isSaveEnabled ? 'disabled' : ''}`}
         onClick={onSave}
         disabled={!isSaveEnabled}
+        title={!isSaveEnabled ? ladderCause : undefined}
       >
         <span className="sidebar-tab-number">✓</span>
         <span className="sidebar-tab-title">Save</span>

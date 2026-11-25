@@ -95,14 +95,32 @@ const SAVED_CHARACTER = {
   feats: ['Alert', 'Savage Attacker', 'Boon Of Combat Prowess'],
 };
 
-function renderEditWizard(props = {}) {
+// A SAVED 5e character with NOTHING the switch ledger ever lists: no spells,
+// no feats, no background. Switching it to 2024 leaves `hasSelections` false,
+// so the switch COMMITS SILENTLY (no ledger modal) and INSERTS the required
+// Background step into the walk — the RH blindside face.
+const SAVED_5E_CHARACTER = {
+  ...cloneDeep(DEFAULT_FORM_DATA),
+  id: 'cause-hint-1',
+  name: 'CauseHintRider',
+  rules: '5e',
+  level: 1,
+  alignment: 'Lawful Good',
+  race: { name: 'Human', subrace: { name: '' } },
+  class: { name: 'Wizard', subclass: { name: 'Evoker' }, divineOrder: '', primalOrder: '' },
+  background: '',
+  spells: [],
+  feats: [],
+};
+
+function renderEditWizard({ character = SAVED_CHARACTER, ...props } = {}) {
   const onComplete = vi.fn();
   const utils = render(
     <CharacterCreationWizard
       onComplete={onComplete}
       onCancel={vi.fn()}
       allClasses={[]}
-      characterData={cloneDeep(SAVED_CHARACTER)}
+      characterData={cloneDeep(character)}
       isEditing={true}
       campaignName="test-campaign"
       existingCharacters={[]}
@@ -231,5 +249,49 @@ describe('CharacterCreationWizard — edit-mode ruleset switch (saved characters
     expect(payload.spells).toEqual(['Fire Bolt', 'Magic Missile']);
     expect(payload.feats).toEqual([]);
     expect(payload.background).toBe('');
+  });
+
+  // RH 2026-11-24 improvement: the 5e→2024 switch has NOTHING removable, so
+  // it commits silently and a never-seen Background step joins the walk —
+  // the moment the monotonic ladder blindsides the rider. Every control the
+  // ladder disables must NAME the cause instead.
+  it('silent 5e→2024 switch: ladder-disabled sidebar steps and Save name the new Background step as the cause', async () => {
+    renderEditWizard({ character: SAVED_5E_CHARACTER });
+    await screen.findByText('Step 2: Basic Information');
+    fireEvent.click(rulesetTab());
+    await screen.findByText('Select Rules System');
+
+    fireEvent.click(screen.getByTestId('rules-option-2024'));
+
+    // The Background step appears...
+    const backgroundTab = await screen.findByRole('button', { name: /Background/ });
+    // ...and with nothing removable the switch committed silently — no ledger
+    // dialog ever opened, and the behavior itself is untouched.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // The blocking step itself stays navigable (that is where the fix lives).
+    expect(backgroundTab).toBeEnabled();
+    expect(backgroundTab).not.toHaveAttribute('title');
+
+    // Every step AFTER it, and Save, wait on Background — and say so.
+    const cause = 'Complete "Background" first';
+    await waitFor(() => expect(saveButton()).toHaveAttribute('title', cause));
+    expect(screen.getByRole('button', { name: /Class/ })).toHaveAttribute('title', cause);
+    expect(screen.getByRole('button', { name: /Spells/ })).toHaveAttribute('title', cause);
+    expect(screen.getByRole('button', { name: /Special Actions/ })).toHaveAttribute('title', cause);
+    // Earlier valid-prefix steps carry no misleading title.
+    expect(screen.getByRole('button', { name: /Basic Information/ })).not.toHaveAttribute('title');
+
+    // Picking a background re-arms the ladder: the steps unlock and every
+    // cause title is gone.
+    fireEvent.click(backgroundTab);
+    await screen.findByText('Step 5: Background');
+    // The step's `<label>Background *</label>` is a sibling (not a wrapper),
+    // so there is no programmatic association — target the select itself.
+    fireEvent.change(document.querySelector('.wizard-step-background select'), { target: { value: 'Soldier' } });
+
+    await waitFor(() => expect(saveButton()).toBeEnabled());
+    expect(saveButton()).not.toHaveAttribute('title');
+    expect(screen.getByRole('button', { name: /Spells/ })).not.toHaveAttribute('title');
+    expect(screen.getByRole('button', { name: /Special Actions/ })).not.toHaveAttribute('title');
   });
 });
