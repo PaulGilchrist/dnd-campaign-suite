@@ -708,6 +708,72 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('pendingOAs')).toHaveLength(0);
     });
 
+    // bug-lastattack-not-a-campaign-key-celebrates-clears-silently: every
+    // attack/save/roll lane writes `lastAttack` campaign-level and the Clear
+    // seam banks it as the victory-celebration evidence
+    // (createCreatureHandlers.confirmClear → attackEvidence). Unregistered,
+    // this exact OBJECT echo fell through to a ghost CHARACTER store named
+    // "lastAttack", so a mounted non-attacking tab silently cleared with
+    // attackEvidence:null / celebrated:false and no banner anywhere
+    // (live-witnessed 2026-11-24; same family as the two pins above).
+    it('mirrors the lastAttack object echo into the campaign store, never a ghost character store', async () => {
+      const stores = new Map();
+      getStore.mockImplementation((name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      });
+
+      const attack = {
+        attackerName: 'FixtureFighter5e', targetName: 'Goblin',
+        hit: true, attackName: 'Longsword', total: 19,
+      };
+      await dispatch({ key: 'change-test-campaign-lastAttack', data: attack });
+
+      // Reader side: getRuntimeValue('campaign','lastAttack') now sees it.
+      expect(stores.get('campaign').get('lastAttack')).toEqual(attack);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      // Ghost-store side: zero writes to a store named after the key.
+      expect(writesFor('lastAttack')).toHaveLength(0);
+      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('lastAttack', attack);
+      expect(stores.has('lastAttack')).toBe(false);
+    });
+
+    // Companion null-echo eviction: an Admin clear-change-data sweep
+    // DELETEs the key and publishes null — the mounted tab's mirror must
+    // REMOVE it (never store a raw null) so a stale attack row can never
+    // re-celebrate after the docs are wiped.
+    it('removes lastAttack from the campaign store on a null cleared-key echo', async () => {
+      const campaignStore = new Map([['lastAttack', { attackerName: 'FixtureFighter5e', hit: true }]]);
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-lastAttack', data: null });
+
+      expect(campaignStore.has('lastAttack')).toBe(false);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('lastAttack')).toHaveLength(0);
+    });
+
+    // Audit-sweep companion (prefix family): a per-instance automation flag
+    // like the Flesh to Stone save tracking must adopt its OBJECT echo into
+    // the campaign store too — readers (CreatureCard badges, the
+    // concentration/clearAll store sweeps) all read it campaign-level.
+    it('mirrors per-instance underscore-family echoes via the isCampaignKey prefix rules', async () => {
+      const stores = new Map();
+      getStore.mockImplementation((name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      });
+
+      const tracking = { casterName: 'ElderPaladin', targetName: 'Goblin', dc: 14 };
+      await dispatch({ key: 'change-test-campaign-_fleshToStone_Goblin', data: tracking });
+      await dispatch({ key: 'change-test-campaign-_cover_shot', data: { attacker: 'Goblin', target: 'HexWarlock', round: 2 } });
+
+      expect(stores.get('campaign').get('_fleshToStone_Goblin')).toEqual(tracking);
+      expect(stores.get('campaign').get('_cover_shot')).toEqual({ attacker: 'Goblin', target: 'HexWarlock', round: 2 });
+      expect(stores.has('_fleshToStone_Goblin')).toBe(false);
+      expect(stores.has('_cover_shot')).toBe(false);
+    });
+
     // bug-hex-arrival-null-echo-blank-screen: arrival's per-key DELETEs echo
     // null for the typed COMPLETED_TRIP_KEYS; raw null in the store crashed
     // useTravelManagement's render (path.length). Mirror them as removals so

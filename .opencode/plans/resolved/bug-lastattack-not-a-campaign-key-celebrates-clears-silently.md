@@ -27,3 +27,26 @@ Add `'lastAttack'` to `CAMPAIGN_KEYS` with a one-line comment citing the family 
 
 ## Severity
 Broken feature (narrow blast radius). The celebration/banner lane is presentation-only by design, but it SILENTLY fails in the routine two-tab GM workflow (sheet tab attacks, tracker/TV tab clears) and after any delegated-visitor kill — with zero console/network feedback. No data-integrity risk: the board bookkeeping itself was correct.
+
+## Resolution
+FIXED 2026-11-24 (fix run). The diagnosis was confirmed verbatim.
+
+**Root cause (verified live + in code).** `lastAttack` is written campaign-level by every roll lane and read campaign-level by the Clear-seam victory bank (`createCreatureHandlers.js` `confirmClear` → `attackEvidence`), but was missing from `CAMPAIGN_KEYS`. `applyStoreUpdate`/`handleChangeKeyEvent` (`src/App.jsx:113-197`) route an OBJECT echo purely by `isCampaignKey(storeKey)`, so a mounted non-attacking tab dispatched `change-<c>-lastAttack` to a ghost CHARACTER store named `lastAttack` and its campaign mirror stayed absent until reload. Live repro rode the exact steps-to-reproduce: GM tab A mounted Initiative + GM tab B killed a 1-HP Goblin with FixtureFighter5e's Longsword (`lastAttack` HIT row fresh at top of change-data) → tab A Clear stamped verbatim `{"stamp":1795577966131,…,"celebrated":false,"attackEvidence":null}` with zero banner and zero console/network feedback.
+
+**Audit (suggested-fix item (d)).** Grepped EVERY `setRuntimeValue('campaign', …)` / `useSyncedState('campaign', …)` producer and diffed against the set (cross-checked against the server registry `server/utils/changeDataKeys.js`, which already recognized all of them). Additionally-missing STORE-LANE keys, now registered:
+- Literals: `tacticalMasterPending` (CharActions setter write / useCharActionsCleave read — sibling of the registered `cleavePending` pair), `leadingEvasionSelections` (evasionUtils write / SavePromptModal `useRuntimeValue` read), `_cover_shot` (coverService stamp / target-AC read).
+- Prefix rules added to `isCampaignKey` for the per-instance families: `_activeGreaterInvisibility_*` (the twin of the already-ruled `_activeInvisibility_*`), `_fleshToStone_*`, `_prismaticSprayIndigo_*`, `_prismaticSprayViolet_*`, `_animalFriendship_*`.
+
+Deliberately NOT registered (documented in the code comment): `combatSummary` (its echo rides the dedicated `syncCombatSummaryCache` + character-bucket REPLACE lane — pinned by `useRuntimeState.evictCharacterStores.test.js`, moving it to the campaign store would break that lane); the `savePrompt-`/`deathSavePrompt-`/`concentrationPrompt-`/`fleshToStonePrompt-` families (each prompt modal subscribes its own `change-<c>-<prefix>` SSE family directly, not the store); `gameMode` (test-fixture-only producer in `useRuntimeState.core.test.js`). Dual-ruleset: `campaignKeys.js` is ruleset-agnostic and shared by both 5e and 2024 lanes — no sibling module needed the change.
+
+**Files changed.**
+- `src/services/automation/common/campaignKeys.js` — added `lastAttack`, `tacticalMasterPending`, `leadingEvasionSelections`, `_cover_shot` to `CAMPAIGN_KEYS` + five prefix rules in `isCampaignKey`, each with a comment citing the family precedent.
+- `src/services/automation/common/campaignKeys.last-attack.test.js` — NEW: pins the registrations, the look-alike guard, the prefix families, and the intentional exclusions.
+- `src/App.runtime-events.test.jsx` — appended the sibling-style echo pins: `lastAttack` OBJECT echo mirrors into the campaign store (never a ghost store), null cleared-key echo REMOVES it, and a `_fleshToStone_Goblin`/`_cover_shot` prefix-family echo pin.
+
+**Verification.**
+1. Full live repro pre-fix (behavior above), then dev-pair admin clears, then the ORIGINAL repro steps re-run live on :5173 post-fix: tab A (mounted Initiative, never attacked) → tab B Goblin join + HP-thin to 1 + armed target + Longsword HIT `9 damage applied to Goblin — HP: 1 → 0` → tab A Clear → **Victory banner rendered live on tab A**: `Victory! / The party survived 1 round! / 1 foe defeated / 15 of 15 heroes standing`; server stamp flipped to `celebrated: true` with non-null banked `attackEvidence`. Tab B switching to Initiative live-adopted the same undismissed banner. Continue-dismiss retired it; board regenerated 15 placeholder cards; zero pageerrors/console errors in a live 3 s probe window on both tabs.
+2. `npx vitest run` — new test + the 4 sibling campaignKeys tests: 5 files/14 tests green; `src/App.runtime-events.test.jsx` + `App.bucket-null-echo.test.jsx`: 35 green; every test file referencing a touched key family/registry (34 files): 477 green; touched-area sweep `src/components/initiative src/hooks/runtime src/services/automation/common src/App`: **192 files / 1599 tests green**.
+3. `npm run lint`: clean (zero warnings). `node .opencode/plans/no-timers-guard.mjs`: OK.
+4. Exit census: change-data `{}`, log `[]` via admin clears; browser closed.
+

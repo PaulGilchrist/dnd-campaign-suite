@@ -107,6 +107,32 @@ export const CAMPAIGN_KEYS = new Set([
     // level (soundOwner.js); every other tab's mute chip and cue gate must
     // follow the claim live, not on reload (same misroute family as above).
     'soundOwner',
+    // bug-lastattack-not-a-campaign-key-celebrates-clears-silently (same
+    // misroute family as the victory stamp above): `lastAttack` is written
+    // campaign-level by every roll lane (attackPostProcessing.js,
+    // saveProcessing.js, useLoggedDiceRollAttack.js, handlePlainDamage.js,
+    // executeActionManeuvers.js, …) and read campaign-level by 10+ consumers —
+    // the Clear-seam victory bank (createCreatureHandlers.js `attackEvidence`),
+    // Stunning Strike attribution, save-prompt origin, monster split/reaction
+    // resolvers, Tactical Master. Unregistered, the `change-<c>-lastAttack`
+    // OBJECT echo failed isCampaignKey in applyStoreUpdate and landed in a
+    // ghost CHARACTER store named "lastAttack" — a mounted non-attacking tab
+    // (tracker/TV) silently cleared with attackEvidence:null and never
+    // celebrated. Live-witnessed 2026-11-24.
+    'lastAttack',
+    // Same-family audit additions (2026-11-24, diffed against every
+    // setRuntimeValue('campaign', …) / useSyncedState('campaign', …) producer):
+    // Tactical Master modal scratch (CharActions.jsx setter writes it,
+    // useCharActionsCleave.js reads campaign-level) — sibling of the
+    // registered cleavePending/cleaveSecondTargets pair.
+    'tacticalMasterPending',
+    // Leading Evasion chooser stamps (evasionUtils.js LEADING_EVASION_KEY =
+    // { [promptId]: [targetName] }); SavePromptModal subscribes it
+    // campaign-level via useRuntimeValue.
+    'leadingEvasionSelections',
+    // Cover-shot round stamp {attacker, target, round} (coverService.js
+    // COVER_SHOT_KEY), read campaign-level during target-AC computation.
+    '_cover_shot',
 ]);
 
 /**
@@ -119,5 +145,24 @@ export function isCampaignKey(key) {
     if (key.startsWith('_activeInvisibility_')) return true;
     if (key.startsWith('_activeFriends_')) return true;
     if (/^_.*_appliedTarget$/.test(key)) return true;
+    // Dynamic campaign-scoped automation flags written per-instance via
+    // setRuntimeValue('campaign', key, …) and read back campaign-level —
+    // same adoption law as the static keys above (audit 2026-11-24,
+    // bug-lastattack-not-a-campaign-key family). Greater Invisibility is the
+    // twin of the _activeInvisibility_ line (restRules/invisibilityService/
+    // buffHandler write it, concentrationService's INVISIBILITY_FLAG_PREFIXES
+    // sweep reads it); _fleshToStone_/_prismaticSpray*_ per-target save
+    // tracking rides CreatureCard badges + the concentration/clearAll sweeps;
+    // _animalFriendship_ <caster>_<target> charms are ended from the
+    // damage-dealt lane on whichever client rolls the hit.
+    // NOTE: the *_prompt-* families (savePrompt-/deathSavePrompt-/
+    // concentrationPrompt-/fleshToStonePrompt-) are NOT store-lane keys — each
+    // prompt modal subscribes its own change-<c>-<prefix> SSE family directly,
+    // so they intentionally stay OUT of this dispatch.
+    if (key.startsWith('_activeGreaterInvisibility_')) return true;
+    if (key.startsWith('_fleshToStone_')) return true;
+    if (key.startsWith('_prismaticSprayIndigo_')) return true;
+    if (key.startsWith('_prismaticSprayViolet_')) return true;
+    if (key.startsWith('_animalFriendship_')) return true;
     return false;
 }
