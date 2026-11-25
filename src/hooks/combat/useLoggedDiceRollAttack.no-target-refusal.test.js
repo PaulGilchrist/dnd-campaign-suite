@@ -170,6 +170,10 @@ describe('no-target attack refusal at the createLogAndShow seam (sheet-lane TA-1
 
     const entries = () => deps.logEntry.mock.calls.map(c => c[0]);
     const rollRow = () => entries().find(e => e.type === 'roll');
+    // Refusal detector covering both faces: the legacy string lane and the
+    // sheet's { html, armTargetName } deep-link popup value.
+    const refusalPopupShown = () => deps.setPopupHtml.mock.calls.some(
+        ([p]) => (typeof p === 'string' ? p : p?.html || '').includes('mc-no-target-refusal'));
 
     /** Attacker + Goblin on the board; `armed` arms TestFighter's row. */
     function mockBoard({ armed }) {
@@ -200,17 +204,19 @@ describe('no-target attack refusal at the createLogAndShow seam (sheet-lane TA-1
     it('unarmed in-combat attack press → loud refusal, zero roll, zero spend', async () => {
         await fn('Glaive', 5, 'attack', {});
 
-        // ONE popup: the shared `.mc-no-target-refusal` string lane (the
-        // sheet's Popup host renders it with Done/Escape/backdrop dismissal).
+        // ONE popup: the shared `.mc-no-target-refusal` lane carried as
+        // { html, armTargetName } — same copy, plus the sheet host's
+        // "Arm a target" deep-link affordance.
         expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
-        const html = deps.setPopupHtml.mock.calls[0][0];
-        expect(typeof html).toBe('string');
+        const popup = deps.setPopupHtml.mock.calls[0][0];
+        const html = popup.html;
         expect(html).toContain('mc-no-target-refusal');
         expect(html).toContain('TestFighter cannot use Glaive');
         expect(html).toContain('no target is armed');
         expect(html).toContain('Arm a target with the Target select on the initiative card.');
         expect(html).toContain('No attack rolled, nothing spent.');
         expect(html).not.toContain('AoE rows');
+        expect(popup.armTargetName).toBe(CHARACTER);
 
         // ONE log row: the <weapon-slug>_refused zero-spend truth…
         expect(entries()).toHaveLength(1);
@@ -248,7 +254,7 @@ describe('no-target attack refusal at the createLogAndShow seam (sheet-lane TA-1
             rollType: 'attack',
             name: 'Glaive',
         }));
-        expect(deps.setPopupHtml.mock.calls.every(c => typeof c[0] !== 'string' || !c[0].includes('mc-no-target-refusal'))).toBe(true);
+        expect(refusalPopupShown()).toBe(false);
         expect(entries().some(e => e.automationType === 'glaive_refused')).toBe(false);
     });
 
@@ -282,7 +288,7 @@ describe('no-target attack refusal at the createLogAndShow seam (sheet-lane TA-1
             await fn('Athletics', 3, rollType, {});
 
             expect(rollD20).toHaveBeenCalled();
-            expect(deps.setPopupHtml.mock.calls.every(c => typeof c[0] !== 'string' || !c[0].includes('mc-no-target-refusal'))).toBe(true);
+            expect(refusalPopupShown()).toBe(false);
             expect(entries().some(e => e.automationType === 'athletics_refused')).toBe(false);
         }
     );

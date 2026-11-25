@@ -58,7 +58,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-24 (run BA): the attack-denial popup for an un-armed card is honest and instructive, but has no affordance to fix the problem — consider deep-linking/`Arm a target` shortcut that focuses (or opens) the creature's Initiative card target select instead of only describing it (likely `src/components/char-sheet/` denial popup producer).
 
 ## Blocked / not verified (run BA — replaced each run)
 

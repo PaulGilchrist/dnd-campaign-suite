@@ -1201,6 +1201,7 @@ function App() {
              onEditCharacter={() => handleEditCharacter(activeCharacter)}
              onUploadClick={handleUploadClick}
              onSaveClick={handleSaveClick}
+             onViewInitiative={() => setActiveView('initiative')}
            />
         )}
         {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} onOpenEncounters={() => setActiveView('encounter')} onAddCharacter={handleAddCharacter} localCharacterName={activeCharacter?.name} />}

@@ -29,16 +29,19 @@ describe('buildNoTargetRefusalPopup — chip defaults byte-identical', () => {
     });
 
     it('sheet lane (armHint override): names PC + weapon, no modal-header hint, no AoE note', () => {
-        let html = null;
+        let popup = null;
         const logs = [];
         const refused = refuseUnarmedAttackPress({
             combatSummary: { creatures: [{ name: 'EvasiveFighter', type: 'player' }, { name: 'Goblin', type: 'npc' }] },
             attackerName: 'EvasiveFighter',
             actionName: 'Glaive',
-            setPopupHtml: (h) => { html = h; },
+            setPopupHtml: (h) => { popup = h; },
             log: (e) => { logs.push(e); },
         });
         expect(refused).toBe(true);
+        // The sheet host receives { html, armTargetName }: copy byte-identical,
+        // the armTargetName drives the "Arm a target" deep-link footer.
+        const html = popup.html;
         expect(html).toContain('mc-no-target-refusal');
         expect(html).toContain('EvasiveFighter cannot use Glaive');
         expect(html).toContain('no target is armed');
@@ -46,9 +49,25 @@ describe('buildNoTargetRefusalPopup — chip defaults byte-identical', () => {
         expect(html).toContain('No attack rolled, nothing spent.');
         expect(html).not.toContain('at the top of this card');
         expect(html).not.toContain('AoE rows');
+        expect(popup.armTargetName).toBe('EvasiveFighter');
         // The refusal rides the caller's log lane with the <weapon>_refused row.
         expect(logs).toHaveLength(1);
         expect(logs[0].automationType).toBe('glaive_refused');
+    });
+
+    it('armTargetName carries the exact BOARD row name (suffix twin)', () => {
+        let popup = null;
+        refuseUnarmedAttackPress({
+            combatSummary: { creatures: [{ name: 'Goblin 1' }] },
+            attackerName: 'Goblin',
+            actionName: 'Scimitar',
+            setPopupHtml: (h) => { popup = h; },
+            log: () => {},
+        });
+        // Copy still names the bare presser…
+        expect(popup.html).toContain('Goblin cannot use Scimitar');
+        // …but the focus request targets the card that exists on the board.
+        expect(popup.armTargetName).toBe('Goblin 1');
     });
 });
 

@@ -34,6 +34,16 @@ export function buildNoTargetRefusalLog({ monsterName, actionName, rollNoun = 's
     };
 }
 
+// Suffix twin of findCreatureByName: a bare-name press matches the "Name 1"
+// row. Module-private — the predicate and the refusal's focus name share it.
+function findAttackerRow(combatSummary, attackerName) {
+    const creatures = combatSummary?.creatures;
+    if (!creatures?.length || !attackerName) return null;
+    return creatures.find(c => c.name === attackerName)
+        || creatures.find(c => c.name.startsWith(`${attackerName} `))
+        || null;
+}
+
 /**
  * Board truth for an attack press: refuses ONLY when the attacker has a row
  * on the initiative board and that row carries no armed targetName. An
@@ -42,10 +52,7 @@ export function buildNoTargetRefusalLog({ monsterName, actionName, rollNoun = 's
  */
 export function isUnarmedAttackPress({ combatSummary, attackerName, explicitTargetName }) {
     if (explicitTargetName) return false;
-    const creatures = combatSummary?.creatures;
-    if (!creatures?.length || !attackerName) return false;
-    const row = creatures.find(c => c.name === attackerName)
-        || creatures.find(c => c.name.startsWith(`${attackerName} `));
+    const row = findAttackerRow(combatSummary, attackerName);
     return !!row && !row.targetName;
 }
 
@@ -54,11 +61,19 @@ export function isUnarmedAttackPress({ combatSummary, attackerName, explicitTarg
  * createLogAndShow attack lane: sets the `.mc-no-target-refusal` popup
  * (names the character + weapon, points at the initiative card's Target
  * select) and writes the `<weapon-slug>_refused` zero-spend log row via the
- * caller's log lane. Returns true when the press was refused.
+ * caller's log lane. Returns true when the press was refused. The popup
+ * value carries `armTargetName` (the attacker's exact BOARD row name) so the
+ * sheet host can render the "Arm a target" deep link (backlog 2026-11-24
+ * run BA) — copy byte-identical, the affordance is host chrome, and the
+ * monster-modal lanes keep calling the plain string builder directly.
  */
 export function refuseUnarmedAttackPress({ combatSummary, attackerName, explicitTargetName, actionName, setPopupHtml, log }) {
     if (!isUnarmedAttackPress({ combatSummary, attackerName, explicitTargetName })) return false;
-    setPopupHtml(buildNoTargetRefusalPopup({ monsterName: attackerName, actionName, rollNoun: 'attack', armHint: SHEET_ARM_HINT }));
+    const row = findAttackerRow(combatSummary, attackerName);
+    setPopupHtml({
+        html: buildNoTargetRefusalPopup({ monsterName: attackerName, actionName, rollNoun: 'attack', armHint: SHEET_ARM_HINT }),
+        armTargetName: row.name,
+    });
     log(buildNoTargetRefusalLog({ monsterName: attackerName, actionName, rollNoun: 'attack' }));
     return true;
 }

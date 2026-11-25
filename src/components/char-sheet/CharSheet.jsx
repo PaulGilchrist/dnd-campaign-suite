@@ -215,7 +215,7 @@ async function applyMovementPassives(stats, playerName, campaignName) {
     }
 }
 
-function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
+function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, onViewInitiative, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     // bug-charsheet-stale-body-minimal-payload: when the rules engine rejects
     // this character's file (e.g. an API-created file missing class/inventory
@@ -438,6 +438,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             onEditCharacter={onEditCharacter}
             onUploadClick={onUploadClick}
             onSaveClick={onSaveClick}
+            onViewInitiative={onViewInitiative}
             campaignName={campaignName}
             activeMapName={activeMapName}
             characters={characters}
@@ -487,6 +488,7 @@ function CharSheetContent({
     onEditCharacter,
     onUploadClick,
     onSaveClick,
+    onViewInitiative,
 }) {
     const handleConditionsChange = () => { }
     const handleBuffsChange = () => { }
@@ -739,7 +741,7 @@ function CharSheetContent({
                 <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
             </div>
         </React.Fragment>
-                {renderPopup({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters, popupHandlers })}
+                {renderPopup({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters, popupHandlers, onViewInitiative })}
                 {popupHtml?.type === 'shield_of_faith_target_selection' && (
                     <ShieldOfFaithTargetSelectionModal popupHtml={popupHtml} setPopupHtml={setPopupHtml} playerStats={playerStats} campaignName={campaignName} handleShieldOfFaithTargetSelected={handleShieldOfFaithTargetSelected} />
                 )}

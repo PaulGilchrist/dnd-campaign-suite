@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
+import { consumePendingArmTarget, subscribeToArmTarget } from '../../services/ui/armTargetSignal.js'
 
 const SHAPE_LABELS = {
     sphere: 'Sphere',
@@ -20,6 +22,28 @@ function overlayLabel(o) {
 // write one canonical targetName and stay in sync live without reload.
 // Lifted verbatim out of CreatureCard.jsx — do not fork a second copy.
 export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, localCharacterName, allCreatures, overlays, onTargetChange, tvMode = false }) {
+    // "Arm a target" deep link (backlog 2026-11-24 run BA): the sheet's loud
+    // no-target refusal offers a button that navigates here and asks THIS
+    // card's select to take focus, so the arm is one click away. Consumption
+    // is name-matched and single-shot (armTargetSignal law): sibling cards
+    // never eat the request, a card with no mountable select never clears it
+    // (the visitor plain-span face simply stays on the board), and an
+    // honored request never re-steals focus on a later visit. Per-client
+    // focus only — this writes zero game state; arming stays the select's
+    // own onChange lane.
+    const selectRef = useRef(null)
+    useEffect(() => {
+        const honorArmTargetRequest = () => {
+            if (selectRef.current && consumePendingArmTarget(creature.name)) {
+                selectRef.current.focus()
+            }
+        }
+        // Mount seam: the request fired while this view was unmounted (the
+        // sheet's denial click navigates first); subscribe covers a request
+        // arriving to an already-mounted board.
+        honorArmTargetRequest()
+        return subscribeToArmTarget(honorArmTargetRequest)
+    }, [creature.name])
     // TV-mode GM card (owner decision 2026-11-23): the table-mounted screen is
     // shared with players, so a GM tab in TV mode takes the presentation door
     // wholesale — NO arm select on ANY row, even ones a visitor WOULD arm (the
@@ -66,6 +90,7 @@ export default function TargetSelect({ creature, isLocalhost, isPlayerSummoned, 
     return (
         <div className='creature-target'>Target&nbsp;
             <select
+                ref={selectRef}
                 aria-label={`${creature.name} target`}
                 data-testid="target-select"
                 value={creature.targetName || ''}

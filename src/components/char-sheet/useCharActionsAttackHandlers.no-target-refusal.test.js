@@ -83,15 +83,17 @@ describe('sheet weapon-row no-target refusal (useCharActionsAttackHandlers)', ()
 
         handlers.handleAttackClick(makeAttack());
 
-        // Loud refusal in the shared sheet popup lane.
+        // Loud refusal in the shared sheet popup lane: { html, armTargetName }
+        // — the host renders the same copy plus the "Arm a target" deep link.
         expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
-        const html = deps.setPopupHtml.mock.calls[0][0];
-        expect(typeof html).toBe('string');
+        const popup = deps.setPopupHtml.mock.calls[0][0];
+        const html = popup.html;
         expect(html).toContain('mc-no-target-refusal');
         expect(html).toContain('Korgath cannot use Greataxe');
         expect(html).toContain('no target is armed');
         expect(html).toContain('Arm a target with the Target select on the initiative card.');
         expect(html).toContain('No attack rolled, nothing spent.');
+        expect(popup.armTargetName).toBe(playerName);
 
         // One honest refusal row; no roll was ever logged downstream.
         expect(logService.addEntry).toHaveBeenCalledTimes(1);

@@ -1,6 +1,7 @@
 import React from 'react'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
+import { requestArmTarget } from '../../services/ui/armTargetSignal.js'
 import Popup from '../common/popup.jsx'
 import AttackResultPopup from '../common/AttackResultPopup.jsx'
 import PolymorphSelectionModal from './modals/PolymorphSelectionModal.jsx'
@@ -41,7 +42,7 @@ const POPUP_TYPES_HANDLED_OUTSIDE = new Set([
 export { ShieldOfFaithTargetSelectionModal };
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters: _characters, popupHandlers }) => {
+export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters: _characters, popupHandlers, onViewInitiative }) => {
     if (!popupHtml) return null;
     
     if (typeof popupHtml === 'string') {
@@ -49,7 +50,12 @@ export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats,
     }
     if (POPUP_TYPES_HANDLED_OUTSIDE.has(popupHtml.type)) return null;
     if (popupHtml.html) {
-        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div></div></Popup>;
+        return (
+            <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+                <div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div></div>
+                <ArmTargetFooter armTargetName={popupHtml.armTargetName} setPopupHtml={setPopupHtml} onViewInitiative={onViewInitiative} />
+            </Popup>
+        );
     }
     if (popupHtml.type === 'automation_info') {
         return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div></div></Popup>;
@@ -175,6 +181,28 @@ export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats,
         {...buildAttackResultHandlers(popupHtml, popupHandlers)}
     />;
 }
+
+// "Arm a target" deep link (backlog 2026-11-24 run BA): the sheet no-target
+// refusal copy explains the arm lane; this footer button walks the user there —
+// sheet → Initiative (via the same setActiveView callback lane as Encounter
+// Builder's Join Encounter / NPCs' onViewInitiative) and arms a per-client
+// focus request the ATTACKER's card Target select honors on mount. It writes
+// NOTHING: no targetName, no game state (server-first law — ephemeral UI
+// flags stay local). No armTargetName (every other `{html}` popup) → renders
+// nothing, chrome byte-unchanged.
+const ArmTargetFooter = ({ armTargetName, setPopupHtml, onViewInitiative }) => {
+    if (!armTargetName) return null;
+    const handleArmClick = () => {
+        setPopupHtml(null);
+        requestArmTarget(armTargetName);
+        onViewInitiative?.();
+    };
+    return (
+        <div className="popup-close-row">
+            <button type="button" className="popup-close-btn" onClick={handleArmClick}>Arm a target</button>
+        </div>
+    );
+};
 
 const HealMultiPopup = ({ popupHtml, setPopupHtml }) => {
     const healResults = popupHtml.results || [];
