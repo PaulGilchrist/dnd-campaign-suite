@@ -58,7 +58,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-24 (run BA): Maps-manager has TWO near-identical name-entry affordances with different Enter semantics — the toolbar create field (placeholder `New map name...`, Enter immediately CREATES a map) and the row's inline rename editor (no placeholder, Enter commits the rename). Live self-trap: a rename attempt that filled the toolbar field + Enter silently created an extra map. Suggest: give the inline editor a distinct placeholder (`Rename to…`) or swap the row's `Rename` button to a Confirm/Cancel pair while armed (likely `src/components/maps/MapsManager.jsx` or the row component).
 - 2026-11-24 (run BA): the attack-denial popup for an un-armed card is honest and instructive, but has no affordance to fix the problem — consider deep-linking/`Arm a target` shortcut that focuses (or opens) the creature's Initiative card target select instead of only describing it (likely `src/components/char-sheet/` denial popup producer).
 
 ## Blocked / not verified (run BA — replaced each run)

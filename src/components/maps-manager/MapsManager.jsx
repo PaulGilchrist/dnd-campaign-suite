@@ -346,6 +346,14 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         }
     };
 
+    // Cancel leg of the armed rename (Confirm/Cancel pair, backlog
+    // 2026-11-24 BA): mirrors the Escape lane exactly — drop any banner the
+    // edit superseded and close the editor. Zero writes.
+    const handleCancelRename = () => {
+        setError(null);
+        setRenamingMap(null);
+    };
+
     const handleRenameKeyDown = (e, fileName) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -526,6 +534,11 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                            `input[value=…]` attribute locators raced the
                                            controlled property on `.press()`). */
                                         aria-label={`New name for "${map.name}"`}
+                                        /* Distinct placeholder so the armed row can never be
+                                           mistaken for the toolbar's `New map name...` create
+                                           field (both commit on Enter with DIFFERENT semantics —
+                                           the live self-trap behind backlog 2026-11-24 BA). */
+                                        placeholder="Rename to…"
                                         autoFocus
                                         onChange={(e) => setRenameValue(e.target.value)}
                                         onBlur={() => handleRenameSave(map.fileName)}
@@ -574,7 +587,37 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                 ) : (
                                     <button onClick={() => handleActivate(map.fileName, map.name)} aria-label={`Activate "${map.name}"`}>Activate</button>
                                 )}
-                                <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
+                                {/* While a row's rename is armed, its Rename button swaps to a
+                                    Confirm/Cancel pair (backlog 2026-11-24 BA) so the editor has
+                                    an always-visible affordance distinct from the toolbar create
+                                    field. onMouseDown preventDefault keeps focus on the input:
+                                    without it the button press BLURS the input first and the
+                                    existing onBlur-commit fires under the click — Cancel would
+                                    silently commit instead of cancelling (criterion 4), and
+                                    Confirm would double-POST the rename.
+                                    - Confirm = exactly today's Enter lane (handleRenameSave).
+                                    - Cancel = exactly today's Escape lane (zero writes). */}
+                                {renamingMap === map.fileName ? (
+                                    <>
+                                        <button
+                                            className="rename-confirm-btn"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => handleRenameSave(map.fileName)}
+                                            aria-label={`Confirm rename for "${map.name}"`}
+                                        >
+                                            Confirm
+                                        </button>
+                                        <button
+                                            className="rename-cancel-btn"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={handleCancelRename}
+                                            aria-label={`Cancel rename for "${map.name}"`}>
+                                            Cancel
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
+                                )}
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
                                 {/* AI Dress (campaign-authoring residual item 2): in-place op
                                     proposal on the live document — preview first, GM Apply is
