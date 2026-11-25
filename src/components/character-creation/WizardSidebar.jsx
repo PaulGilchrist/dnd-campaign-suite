@@ -1,4 +1,4 @@
-import { getVisibleSteps } from '../../config/steps-config.js';
+import { getVisibleSteps, getLadderCauseTitle } from '../../config/steps-config.js';
 
 /**
  * Left sidebar navigation for the character creation wizard.
@@ -23,10 +23,8 @@ export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, go
   // Cause-naming idiom (mirrors the NPC list's disabled Add-to-Initiative
   // chip): a disabled control says WHICH step it is waiting on. Only set
   // when something actually blocks the ladder — enabled buttons stay bare.
-  const blockedStepTitle = firstInvalidStep == null
-    ? null
-    : visibleSteps.find((step) => step.step === firstInvalidStep)?.title;
-  const ladderCause = blockedStepTitle ? `Complete "${blockedStepTitle}" first` : undefined;
+  // Shared with the edit-mode footer Save Changes via getLadderCauseTitle.
+  const ladderCause = getLadderCauseTitle(firstInvalidStep, { ruleset });
 
   return (
     <div className="wizard-sidebar">

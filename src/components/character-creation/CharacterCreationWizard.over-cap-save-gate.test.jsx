@@ -174,4 +174,44 @@ describe('CharacterCreationWizard — loaded over-cap feats/skills gate the Save
     fireEvent.click(saveButton());
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
+
+  it('footer Save Changes on the last step mirrors the sidebar ✓ Save gate exactly', async () => {
+    const { onComplete } = renderEditWizard();
+    await screen.findByText('Step 2: Basic Information');
+    await waitFor(() => expect(saveButton()).toBeDisabled());
+
+    // The ladder (steps 1-7) is VALID here — only the caps belt blocks —
+    // so the last-step tab is reachable and the footer renders its submit.
+    const specialTab = await screen.findByRole('button', { name: /Special Actions/ });
+    await waitFor(() => expect(specialTab).toBeEnabled());
+    fireEvent.click(specialTab);
+
+    const footerSave = await screen.findByRole('button', { name: 'Save Changes' });
+    // Same gate: both disabled, and the caps-only block names NO ladder
+    // cause on either control (sidebar parity — it owns no title here).
+    expect(footerSave).toBeDisabled();
+    expect(saveButton()).toBeDisabled();
+    expect(footerSave).not.toHaveAttribute('title');
+    expect(saveButton()).not.toHaveAttribute('title');
+
+    // Repair the feat lane (the loaded skill row was already 3-of-2; the
+    // sibling test owns the full repair walk) — re-derive via deselect here
+    // too so BOTH gates flip together with zero extra clicks in between.
+    goToStep('Feats');
+    await screen.findByText('Step 7: Feats');
+    fireEvent.click(featItem('Savage Attacker').querySelector('.list-item-checkbox'));
+    goToStep('Skill Proficiencies');
+    await screen.findByText('Step 9: Skill Proficiencies');
+    fireEvent.click(skillCheckbox('Intimidation'));
+    await waitFor(() => expect(saveButton()).toBeEnabled());
+
+    goToStep('Special Actions');
+    const armed = await screen.findByRole('button', { name: 'Save Changes' });
+    expect(armed).toBeEnabled();
+    fireEvent.click(armed);
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    const payload = onComplete.mock.calls[0][0];
+    expect(payload.feats).toEqual([]);
+    expect(payload.skillProficiencies).toEqual(['Athletics', 'Acrobatics']);
+  });
 });

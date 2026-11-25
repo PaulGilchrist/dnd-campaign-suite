@@ -286,3 +286,17 @@ export const getDisplayNumber = (stepNumber, { ruleset } = {}) =>
  */
 export const getStepConfig = (stepNumber) => WIZARD_STEPS.find((step) => step.step === stepNumber);
 
+/**
+ * Cause sentence shown on every ladder-disabled wizard control (sidebar tabs,
+ * sidebar ✓ Save, edit-mode footer Save Changes): names the first step the
+ * valid-prefix ladder is waiting on, using the CURRENT ruleset flow's titles.
+ * Returns undefined when nothing blocks the ladder (null firstInvalidStep —
+ * e.g. a caps-only Save disablement, which owns its own messaging) or when
+ * the blocking step is not part of the visible flow (stale mid-switch render).
+ */
+export const getLadderCauseTitle = (firstInvalidStep, { ruleset } = {}) => {
+  if (firstInvalidStep == null) return undefined;
+  const title = getVisibleSteps({ ruleset }).find((step) => step.step === firstInvalidStep)?.title;
+  return title ? `Complete "${title}" first` : undefined;
+};
+

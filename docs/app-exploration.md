@@ -168,7 +168,6 @@ Rows tagged with verifying run + key source paths. Unlisted lanes' prior depth l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [RH 2026-11-24] Wizard edit mode shows no submit in the footer on the LAST step (`Cancel`/`Next`, and Next wraps to step 2); the only commit is the sidebar `✓Save`. Give edit-mode's last step a `Save Changes` footer button mirroring create-mode's `Create Character`. `WizardFooter.jsx` `isLastStep`/`lastCanonicalStep` wiring in `CharacterCreationWizard.jsx`.
 - [RH 2026-11-24] Character wizard commit fires the whole-doc character PUT TWICE per save (fetch census: 2× PUT + 2× 200 for `QA_Wizard_Kid.json`; same pair pattern on every roster GET at mount) — same-URL double-writes churn the SSE echo twice; find the duplicate caller (probably state-commit + effect-persist) and coalesce.
 
 

@@ -7,6 +7,7 @@ import {
   getStepConfig,
   getVisibleSteps,
   getDisplayNumber,
+  getLadderCauseTitle,
   getTotalSteps,
 } from './steps-config.js';
 
@@ -147,5 +148,28 @@ describe('steps-config', () => {
       expect(getDisplayNumber(step.step)).toBe(step.displayNumber);
     }
     expect(getDisplayNumber(5)).toBeUndefined();
+  });
+
+  // Shared cause sentence for EVERY ladder-disabled wizard control (sidebar
+  // tabs, sidebar ✓ Save, edit-mode footer Save Changes).
+  describe('getLadderCauseTitle', () => {
+    it('names the blocking step using the CURRENT ruleset flow', () => {
+      expect(getLadderCauseTitle(4, { ruleset: '5e' })).toBe('Complete "Subrace" first');
+      expect(getLadderCauseTitle(5, { ruleset: '2024' })).toBe('Complete "Background" first');
+    });
+
+    it('stays silent when nothing blocks the ladder (null firstInvalidStep)', () => {
+      expect(getLadderCauseTitle(null, { ruleset: '5e' })).toBeUndefined();
+      expect(getLadderCauseTitle(undefined)).toBeUndefined();
+    });
+
+    it('omits the cause when the blocking step is outside the visible flow', () => {
+      // 5e flow has no Background step: a stale mid-switch 5 must name nothing.
+      expect(getLadderCauseTitle(5, { ruleset: '5e' })).toBeUndefined();
+    });
+
+    it('ignores out-of-range step numbers', () => {
+      expect(getLadderCauseTitle(99, { ruleset: '2024' })).toBeUndefined();
+    });
   });
 });

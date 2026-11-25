@@ -542,6 +542,10 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
   const lastCanonicalStep = visibleSteps[visibleSteps.length - 1]?.step;
   const stepNumber = visibleSteps.findIndex((step) => step.step === currentStep) + 1;
 
+  // ONE Save gate value feeding BOTH save controls — the sidebar ✓ Save and
+  // the edit-mode footer Save Changes — so they can never disagree.
+  const saveGateEnabled = isSaveEnabled && abilitiesWithinCap && selectionsWithinCap;
+
   const renderStep = useCallback(() => {
     return (
       <WizardStepRenderer
@@ -688,7 +692,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
               ruleset={ruleset}
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
-              isSaveEnabled={isSaveEnabled && abilitiesWithinCap && selectionsWithinCap}
+              isSaveEnabled={saveGateEnabled}
               firstInvalidStep={firstInvalidStep}
               onSave={handleSubmit}
             />
@@ -706,6 +710,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           onSubmit={handleSubmit}
           isEditing={isEditing}
           isNextDisabled={isNextDisabled}
+          isSaveEnabled={saveGateEnabled}
+          ruleset={ruleset}
+          firstInvalidStep={firstInvalidStep}
           />
         </div>
         {pendingRulesetSwitch && (

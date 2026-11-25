@@ -14,10 +14,16 @@ const POSITION_CASES = [
     buttons: [['Cancel', false, 'btn btn-secondary'], ['Next', true, 'btn btn-primary']] },
   { name: 'middle step', props: { isFirstStep: false, isLastStep: false },
     buttons: [['Previous', false, 'btn btn-secondary'], ['Next', false, 'btn btn-primary']] },
+  { name: 'middle step (edit)', props: { isFirstStep: false, isLastStep: false, isEditing: true },
+    buttons: [['Previous', false, 'btn btn-secondary'], ['Next', false, 'btn btn-primary']] },
   { name: 'last step (create)', props: { isFirstStep: false, isLastStep: true },
+    buttons: [['Previous', false, 'btn btn-secondary'], ['Create Character', false, 'btn btn-success']] },
+  { name: 'last step (create), Save lane gated', props: { isFirstStep: false, isLastStep: true, isSaveEnabled: false },
     buttons: [['Previous', false, 'btn btn-secondary'], ['Create Character', false, 'btn btn-success']] },
   { name: 'last step (edit)', props: { isFirstStep: false, isLastStep: true, isEditing: true },
     buttons: [['Previous', false, 'btn btn-secondary'], ['Save Changes', false, 'btn btn-success']] },
+  { name: 'last step (edit), Save lane gated', props: { isFirstStep: false, isLastStep: true, isEditing: true, isSaveEnabled: false },
+    buttons: [['Previous', false, 'btn btn-secondary'], ['Save Changes', true, 'btn btn-success']] },
   { name: 'single step (create)', props: { isFirstStep: true, isLastStep: true },
     buttons: [['Cancel', false, 'btn btn-secondary'], ['Create Character', false, 'btn btn-success']] },
   { name: 'single step (edit)', props: { isFirstStep: true, isLastStep: true, isEditing: true },
@@ -67,5 +73,42 @@ describe('WizardFooter', () => {
     for (const [key, fn] of Object.entries(all)) {
       if (key !== handler) expect(fn).not.toHaveBeenCalled();
     }
+  });
+
+  describe('edit-mode Save Changes gate (sidebar ✓ Save parity)', () => {
+    const lastStepEdit = { isFirstStep: false, isLastStep: true, isEditing: true };
+    const saveChanges = () => screen.getByRole('button', { name: 'Save Changes' });
+
+    // Gating idiom: the disabled STATE is the pin (repo law — assert the
+    // disabled attribute, never click a disabled control). The truth-table
+    // case 'last step (edit), Save lane gated' owns the disabled assertion;
+    // here we own the cause-title faces the sidebar Save already ships.
+
+    // Same cause-naming idiom the sidebar Save ships (e8643bce3): the
+    // disabled button names the step the ladder waits on.
+    it('names the ladder cause on a gated button, per the CURRENT ruleset flow', () => {
+      render(
+        <WizardFooter
+          {...createProps()}
+          {...lastStepEdit}
+          isSaveEnabled={false}
+          ruleset="5e"
+          firstInvalidStep={4}
+        />
+      );
+      expect(saveChanges()).toHaveAttribute('title', 'Complete "Subrace" first');
+    });
+
+    it('stays silent on a non-ladder (caps-only) disablement', () => {
+      render(<WizardFooter {...createProps()} {...lastStepEdit} isSaveEnabled={false} firstInvalidStep={null} />);
+      expect(saveChanges()).toBeDisabled();
+      expect(saveChanges()).not.toHaveAttribute('title');
+    });
+
+    it('shows no cause title and no gate when the Save lane is open', () => {
+      render(<WizardFooter {...createProps()} {...lastStepEdit} ruleset="2024" firstInvalidStep={5} />);
+      expect(saveChanges()).toBeEnabled();
+      expect(saveChanges()).not.toHaveAttribute('title');
+    });
   });
 });

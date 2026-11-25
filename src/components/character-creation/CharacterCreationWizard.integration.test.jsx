@@ -190,10 +190,21 @@ describe('CharacterCreationWizard - Integration', () => {
     // prefix passes (real getStepEnabled / isSaveEnabled wiring).
     const specialTab = await screen.findByRole('button', { name: /Special Actions/ });
     await waitFor(() => expect(specialTab).toBeEnabled());
+
+    // Non-last edit steps carry NO submit in the footer — neither the
+    // edit-mode Save Changes nor the create-mode Create Character.
+    expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create Character' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+
     fireEvent.click(specialTab);
 
-    // Reaching canonical step 17 flips the footer to the submit button.
+    // Reaching canonical step 17 flips the footer to the submit button —
+    // the edit-mode twin of create-mode's Create Character, enabled exactly
+    // while the sidebar ✓ Save is.
     const save = await screen.findByRole('button', { name: 'Save Changes' });
+    expect(save).toBeEnabled();
+    expect(document.querySelector('.sidebar-save')).toBeEnabled();
     fireEvent.click(save);
 
     // Exact payload, byte-for-byte: the full merged form state, untouched
