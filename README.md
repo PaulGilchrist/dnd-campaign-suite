@@ -26,7 +26,9 @@
   <strong>📺 TV presentation mode</strong> &nbsp;·&nbsp;
   <strong>📋 Campaign log with full audit trail</strong> &nbsp;·&nbsp;
   <strong>🎒 Shared party inventory</strong> &nbsp;·&nbsp;
-  <strong>🎵 Ambience &amp; music player</strong>
+  <strong>🎵 Ambience &amp; music player with table-wide combat sound cues</strong> &nbsp;·&nbsp;
+  <strong>🧪 One-click encounter playtest — full rollback</strong> &nbsp;·&nbsp;
+  <strong>⌨️ WASD keyboard camera on every map surface</strong>
 </p>
 
 ---
@@ -70,11 +72,11 @@ A **complete D&D character sheet and campaign management suite** that runs on yo
 
 **As a printable sheet:** The app creates **beautiful, well-organized character sheets that fit on a single page**. All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
 
-**As a GM toolkit:** Indoor maps with fog of war and spell overlays — plus a real-time **3D map view** with extruded walls, fog volumes, portrait tokens, and torch lighting — outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a BSP dungeon generator and adjacent dungeon generator, procedural terrain and settlement generators, quest tracking, faction management, NPC management with full stat blocks, a session planner, campaign notes, a comprehensive activity log with a full audit trail, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin and Druid aura systems, a combat automation engine with 600+ verified automations, transformation tracking for Polymorph and Shapechange, summoned creature lifecycle management, passive skill computation, campaign snapshots for backup and restore, random events during overland travel, campaign admin tools for clearing state and resetting — everything you need to run a campaign from one app.
+**As a GM toolkit:** Indoor maps with fog of war and spell overlays — plus a real-time **3D map view** with extruded walls, fog volumes, portrait tokens, and torch lighting — outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a BSP dungeon generator and adjacent dungeon generator, procedural terrain and settlement generators, quest tracking, faction management, NPC management with full stat blocks, a session planner, campaign notes, a comprehensive activity log with a full audit trail, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin and Druid aura systems, a combat automation engine with 600+ verified automations, transformation tracking for Polymorph and Shapechange, summoned creature lifecycle management, passive skill computation, campaign snapshots for backup and restore, one-click encounter playtest with total rollback, table-wide combat sound cues with a movable sound-screen role, WASD keyboard camera control on every map surface, random events during overland travel, campaign admin tools for clearing state and resetting — everything you need to run a campaign from one app.
 
 **As an optional rules referee:** Flip one switch and the app starts enforcing the rules for you — turn order lock-down, action/bonus/reaction economy, movement budgets, line of sight, opportunity attacks, persistent zone damage, auto-encounters, and auto-rewards. Every denial, spend, and award is written to an audit trail you can read afterwards, and one button hands control straight back to a human. **Everything is off by default** — with the switches off, the app behaves exactly as the classic play aid it always was.
 
-**As an optional (and private) AI table:** Plug in a **local** model server and the app gains an AI rules referee, an AI NPC director that only picks from a monster's real stat block, a world keeper that recaps your actual campaign ledger, and an AI campaign designer that drafts whole adventures for you to approve or reject one entity at a time. Campaign data never leaves your machine, the model never rolls dice or writes state, and every AI proposal, override, and refusal is logged.
+**As an optional (and private) AI table:** Plug in a **local** model server and the app gains an AI rules referee, an AI NPC director that only picks from a monster's real stat block, a world keeper that recaps your actual campaign ledger — and remembers it, because that log becomes every AI's "Story so far" — and an AI campaign designer that drafts whole adventures for you to approve or reject one entity at a time. Campaign data never leaves your machine, the model never rolls dice or writes state, and every AI proposal, override, and refusal is logged.
 
 > **No computer expertise required.** If you can open a web browser, you can use this app. The setup instructions at the bottom are written for complete beginners.
 
@@ -151,8 +153,13 @@ Then open **http://localhost** — that's the GM link, with every feature unlock
 | 🧭 **Play Phase Tracking** | Exploration / Encounter / Travel / Roleplay pills that move with your actions (or one click to declare the table's mode), plus a rolling enforcement & AI audit ledger |
 | 🎒 **Shared Party Inventory** | Collective party stash and currency — loot lands unclaimed, then gets given, moved, and split between pack and stash, with every transfer logged |
 | 🎵 **Ambience Player** | Five moods (Town, Outdoors, Combat, Dungeon, Tavern) with auto-play, transport controls, custom categories, and per-mood track editing — the DJ role is delegable to a player |
+| 🔊 **Combat Sound Cues** | Every crit, miss, fumble, save success/failure, player-down, and death chimes on every screen — cues ride the shared log lane, never double-voice a moment, and a movable **sound-screen** role keeps exactly one device (GM machine or TV) talking |
+| 🎉 **Nat 20 & Fumble Flourish** | A full-screen visual flourish when anyone rolls a natural 20 or a 1 — synced to the same log moments as the audio cues |
+| ⌨️ **Keyboard Camera Control** | WASD/arrows pan (2D) or orbit (3D), **+/-** zoom, **Shift** for speed, **R** resets — the identical key model on all four map surfaces, indoor and outdoor, 2D and 3D |
+| 🧭 **GM Copilot & In-App Help** | One-time, dismissible guidance cards and conditional "Try next" invitations point the way (they never block); a searchable Help drawer holds the full user guide, imported from the docs at build time so app and documentation can never drift |
 | 🧾 **Full Audit Trail** | Enforcement denials, economy spends, cover calls, auto-rewards, AI rulings, and manual takeovers all persist to the log — you can retrace exactly what the machine did, and why |
 | 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load, auto-generation by environment, loot tables |
+| 🧪 **Encounter Playtest** | One click plays any saved encounter against your real party with **zero persisted impact** — the app snapshots the campaign, stages a battle map with fresh randomized cover, drops the party and monsters onto it, and **End Playtest rolls everything back** (HP, log, XP, loot, maps, overlays) to the snapshot |
 | 🎮 **Control Delegation** | GM hands any NPC/monster to a player's device (🎮 picker on the card) — visitors run monsters, players multi-control, summons follow their caster; all rolls use the real engine lanes, every hand-off logged |
 | ⚔️ **Arena Quick-Create** | One click builds a disposable arena campaign from the campaign screen: two carved sparring halls + a saved low-CR encounter pool (real bestiary names/stats/art); pickup play, then delete the folder — nothing leaks |
 | 🌱 **Starter Campaign** | Seeded, replayable sandbox: generated village (folk, services, rumours), hex wilds with settlement + dungeon portal POIs, party marker, 3 quests naming the generated places, Dungeon Wave 1–3, chest loot, and a first-session checklist that deep-links every step; Admin → Regenerate re-rolls the whole adventure layer while the village and party stay |
@@ -169,7 +176,7 @@ Then open **http://localhost** — that's the GM link, with every feature unlock
 | ⚡ **NPC Generator** | Instant procedural NPC generation — race-based names, traits, stat blocks, and personality at the click of a button |
 | 📜 **Quest Tracking** | Active/completed/failed statuses, color-coded badges, markdown descriptions, rewards, notes, search |
 | 🤝 **Faction Management** | Influence scale (1-10) with 4 color-coded tiers, goals, markdown notes, search |
-| 📋 **Campaign Activity Log** | Dice rolls with full details, manual notes, travel events, loot awards, condition tracking, rests, summons, buffs, AI rulings, and enforcement refusals — all timestamped and filterable |
+| 📋 **Campaign Activity Log** | Dice rolls with full details, manual notes, GM narrative prose (markdown), session recaps, travel events, loot awards, condition tracking, rests, summons, buffs, AI rulings, and enforcement refusals — all timestamped and filterable |
 | 🎲 **Built-In Dice Roller** | Advantage, disadvantage, custom expressions, animated rolls, auto-crit/fumble detection, resistance notices |
 | 🎲 **Dice Tray** | Inline d4, d6, d8, d10, d12, d20, d100 dice buttons in the sidebar for quick reference rolls |
 | 🎯 **Advanced Dice Results** | Indomitable Will reroll, Fanatical Focus, Disciplined Survivor, Stroke of Luck, Lucky feat, Potent Cantrip, Glorious Defense, Shield spell immunity, graze damage, Unbreakable Majesty, Veer (Mounted Combatant), Restore Balance, Quick-roll player saves |
@@ -420,7 +427,9 @@ When battle erupts, the app becomes your **tactical command center**:
 
 - **TV button** on the tracker header switches any browser into presentation mode — spotlight on the active creature (with pulse), an "Up next" strip, big HP bars with OK/BLOODIED/DEAD badges, and target chips; edit chrome hides automatically (fullscreen where the browser allows, per-screen preference)
 - **Damage & heal floaters** with crit-big numbers and hit flashes animate on every card as HP changes — on all devices
-- **Victory banner** at the combat-clear seam on every screen: rounds, kills vs foes that drove off, and heroes standing
+- **Combat sound cues** — hits, crits, misses, fumbles, save successes and failures, player-down, and deaths each chime on every connected screen, decoded from the shared log lane so a remote SSE-driven attack sounds at the whole table (never a backlog on mount, never the same moment twice). One device is the **sound screen** — a single click moves that role between the GM machine and the TV, and every other screen shows who's talking
+- **Nat 20 & Fumble flourish** — a full-screen visual punch on every natural 20 and natural 1, synced to the same moment as its audio cue
+- **Victory banner** at the combat-clear seam on every screen: rounds, kills vs foes that drove off, and heroes standing; a dismiss in one tab retires it in every same-context tab
 
 <img src="public/initiative.png" alt="Combat Tracking" width="800" />
 
@@ -490,6 +499,16 @@ Turn order, round counter, NPC management, battle notes, and keyboard shortcuts 
 - **Smart generation** — Randomly builds encounters from environment-appropriate monsters, scaling CR to party level, respecting XP budgets, and prioritizing variety (multiple monster types over hordes)
 - **Up to 3 suggestions** per generation, ranked by closeness to target difficulty
 
+#### 🧪 Encounter Playtest — try a fight, roll it all back
+
+The **Playtest** button on any saved encounter answers "will this actually work?" without risking the campaign:
+
+- **Snapshot first** — the app writes a restore point before touching anything
+- **Staged battlefield** — a reusable encounter map is generated with fresh randomized cover (half, three-quarter, and full), party tokens placed in marching order, and a monster ring around the edge
+- **Real party, real engine** — monsters join through the normal Encounter Builder lane, so difficulty is measured against the party's actual HP, AC, and resistances
+- **Live banner** — a Playtest ribbon persists across reloads and carries the **End Playtest** button
+- **Total rollback** — ending the test (or crashing mid-test) restores the snapshot: HP, conditions, XP, loot, log rows, map edits, and overlays all revert together. Only one playtest at a time; the button names the reason while one is live
+
 #### ✨ Loot Generation
 
 CR-tiered treasure tables that generate:
@@ -536,6 +555,7 @@ Tactical grid-based dungeon maps with a full suite of editing tools:
 - Configurable grid size (5–100, default 30×30)
 - Zoom (0.25x–4x) with mouse wheel support, zoom buttons, and reset
 - Pan by dragging when no tool is active
+- **Keyboard camera** — WASD/arrows pan, **+/-** zoom (anchored at the viewport center), **Shift** doubles the speed, **R** resets the view — hold-to-move smoothness, no click-to-focus ritual, and the keys never fight text fields, rename editors, or dialogs
 - Dark/light theme support
 
 **Wall & Terrain Tools:**
@@ -596,7 +616,7 @@ One click of the **3D** button on any indoor map turns your tactical grid into a
 - **Torch & fire lighting** — glowing flame textures with warm point lights cast onto the scene, toggleable
 - **Fog of war in 3D** — unfogged areas only; GM sees translucent fog, players see solid — mirroring the 2D rules, including hidden secret doors and items
 - **Spell overlays as 3D volumes** — sphere, cylinder, cube, cone, and beam overlays rendered above the fog, staying visible during combat
-- **Full camera control** — orbit, pan, and zoom with damping, auto-framing on entry, and a one-click "Top-down" view
+- **Full camera control** — orbit, pan, and zoom with damping, auto-framing on entry, and a one-click "Top-down" view; keyboard too — **WASD/arrows** rotate and tilt, **+/-** dolly, **Shift+WASD** pans across the scene, **R** snaps to top-down
 - **Live sync** — edits made in the 2D view by the GM (or any client) appear instantly in every open 3D view
 - **Soft shadows and cinematic tone mapping** for a table-ready look
 
@@ -610,6 +630,7 @@ Full overland exploration system with hex-grid mapping, terrain painting, and ov
 - Pointy-top hex grid using axial coordinates
 - Configurable grid size (30–100, default 30×60)
 - Zoom (2x–8x) with scroll wheel and pan with bounds clamping
+- Same keyboard camera as the indoor grid: WASD/arrows pan, +/- zoom, Shift for speed, R to refit
 - Compass rose and scale legend ("1 hex = 6 miles")
 - SSE real-time sync of all map state across clients
 
@@ -775,6 +796,8 @@ A comprehensive running record of everything that happens during play — synced
 **Entry Types:**
 - **Dice Rolls** — Character name, roll type (attack, save, damage, spell attack, initiative, condition save), rolls with advantage/disadvantage mode displayed, total with bonus, target with HIT/MISS result, save success/failure vs DC, NAT 20/FUMBLE badges, damage type, resistance notices, timestamp
 - **Manual Notes** — Add text notes to the log with character attribution (or Anonymous); send with Ctrl/Cmd+Enter
+- **Narrative Prose** — The composer toggles between Note and **Narrative**: GM-posted story prose rendered as sanitized markdown, with an optional in-world speaker label and a session stamp. Narrative authorship is GM-only, enforced at the server
+- **Session Recaps** — The AI world keeper can write up a played session as an enthralling recap row, posted server-side as `GM` and rendered as readable markdown prose
 - **Travel Events** — Advance, arrive, camp, forced march, event triggered, event accepted/skipped/re-rolled, extreme weather halt, budget exhausted, travel cancelled — each with terrain, weather, hex coordinates, and event details
 - **Loot Awards** — XP per character and itemized loot list
 - **Condition Changes** — "Condition Applied" / "Condition Broken" with character name, condition name, DC, and ability
@@ -803,6 +826,7 @@ The GM's planning notebook, one entry per game night:
 - **Link the resources you expect to use** — maps, encounters, NPCs, quests, factions and settlements, picked from your campaign
 - **Prep checklist** — tick off what you've prepared; **suggested XP budgets and rumours** for the night
 - **Mark as Played** — afterwards, the recap prompt flows straight into the campaign log
+- **Write recap** — one button asks the local AI to compose the played session's story from the real log and post it as the session's canonical recap (disabled with a plain reason when AI is off)
 - **Concurrent-edit safe** — a stale edit is refused with a conflict reload rather than silently overwriting your co-GM's work
 - **AI-refineable** — ask the local model to tighten a session's plan before you commit it
 
@@ -827,6 +851,7 @@ A full-screen ambience player so the table has a soundtrack:
 - **Auto-play on mood select** — pick the scene, the audio starts; pause/resume and volume on the transport bar
 - **Custom categories** — build your own mood list and edit the tracks inside any mood
 - **The DJ role is delegable** — a player can run the music, and every change syncs to all connected screens (with a note chip so you can see who changed it)
+- **One speaker at a time** — ambience and combat cues sound from a single **sound screen**; one button moves that role between the GM machine and the TV, and every other screen knows which device is talking
 
 ---
 
@@ -875,6 +900,8 @@ On a monster's turn, *"Ask the AI to decide X's turn"* offers an intent chosen *
 ### 🌍 World Keeper
 
 Session recaps and flavour grounded in your real campaign ledger — quests, factions, NPCs, settlements, and recent log. It may only reference entities that exist; a fabricated NPC or settlement fails closed and the advisory tells you which names didn't match. Confirmed recaps land in the log; AI-drafted quests save with a provenance note.
+
+And the log feeds back: **every AI role receives a "Story so far"** built hierarchically from your campaign's own memory — once a session has a written recap, that recap *is* its compressed memory (raw rows retire in its favour), while the session you're playing right now is always carried raw, so nothing live hides behind a stale summary.
 
 ### ✍️ AI Campaign Designer (Drafts)
 
@@ -991,8 +1018,10 @@ A comprehensive automation system with **~320 handlers**, **618 verified combat 
 
 - **Clean, organized layout** — Find what you need quickly during play
 - **Dark/Light theme toggle** — Easy on the eyes during late-night sessions
-- **Works on any device** — Phone, tablet, laptop, or desktop
+- **Works on any device** — Phone, tablet, laptop, or desktop; on small screens the sidebar docks off-canvas behind a toggle so the sheet or map gets the full width
 - **Real-time updates** — Everyone sees changes instantly via SSE
+- **Help that lives in the app** — A sidebar **?** opens a drawer with a plain-English summary of the screen you're on plus the full, searchable user guide — imported from the docs at build time, so app and documentation can never drift
+- **Every tab names itself** — The browser tab title reads `<campaign> — <view>`, so a table juggling sheets, maps, and a TV tab never loses track of what's what
 
 ### On Paper
 
@@ -1143,7 +1172,7 @@ And it meets you where you are: bring it as a **prep bench** and keep paper at t
 | **Combat engine** | An event-chain pipeline (20+ ordered steps per attack) with pluggable feature riders and modals that can pause and resume mid-roll |
 | **Automation** | ~320 handlers and 618 verified combat automations, driven by declarative metadata inside the rules JSON |
 | **Enforcement & AI** | Server-side validators on every enforcement-relevant write; AI confined to a local provider funnel with schema-validated, fail-closed output |
-| **Tests** | 3,388 co-located Vitest files — roughly 36,000 unit/integration tests, plus verification registries that track every one of the 2,080 monster action rows and all 618 combat automations back to its source |
+| **Tests** | 3,575 co-located Vitest files — roughly 38,000 unit/integration tests, plus verification registries that track every one of the 2,080 monster action rows and all 618 combat automations back to its source |
 | **Quality gates** | Zero-warning ESLint with a **custom plugin that enforces the server-first architecture mechanically**, plus a guard script that fails the build if any timer touches game state |
 
 **Repo layout:** `src/` React app · `server/` Express routes and utils · `public/data/` 5e rules JSON · `public/data/2024/` 2024 Essentials JSON · `public/campaigns/<name>/` your runtime campaign data · `docs/` architecture, user guide, and verification registries.
@@ -1188,7 +1217,7 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-Quite a lot — here's the honest list. **Combat:** initiative tracker with keyboard shortcuts and TV presentation mode, encounter builder with XP budgets, auto-generation by environment and loot tables, fully interactive monster stat blocks (2,080 verified clickable action rows across 636 monsters — attacks, AoE save pickers, recharge gates, legendary actions, lair hazards, reactions, summons into initiative), control delegation so players can run monsters, one ally-list model behind teams/PvP/betrayal, a 4-level cover system, range validation, Paladin/Druid/Cleric auras with combo effects, and a combat automation engine (~320 handlers, 618 verified automations, 91 per-spell services) covering save prompts, concentration checks, auto-damage, condition propagation, healing pools, buffs, reactions, and 70+ class-specific feature modals. **Maps:** indoor tactical grids with fog of war, 25+ furniture types, doors, rulers and server-synced spell overlays; a real-time 3D WebGL view of any indoor map; outdoor hex maps with procedural terrain, rivers, A\* roads, POIs, weather, overland travel and random events. **Generation:** BSP dungeon generator, adjacent dungeon generator, fractal terrain generator, settlement generator, NPC generator, auto-balanced encounters, CR-tiered loot. **World management:** quests, factions, NPCs with full stat blocks, settlements, sessions planner, markdown notes, shared party inventory, campaign log with a full audit trail. **Safety & admin:** campaign snapshots, download/upload, scoped clears, rename and typed-delete, transformation tracking (Polymorph/Shapechange/Animal Shapes/True Polymorph), summoned-creature lifecycle management, and passive skill computation. **Optional (all off by default):** ten rules-enforcement switches with server validation and a claimable referee, and a local AI suite — rules referee, NPC director, world keeper, campaign designer with a drafts-approval queue, map dressing, and entity refinement.
+Quite a lot — here's the honest list. **Combat:** initiative tracker with keyboard shortcuts and TV presentation mode, table-wide combat sound cues with a movable sound-screen role, encounter builder with XP budgets, auto-generation by environment and loot tables, and one-click **encounter playtest** that stages a randomized-cover battlefield and rolls the entire campaign back when you end the test. Monster stat blocks are fully interactive (2,080 verified clickable action rows across 636 monsters — attacks, AoE save pickers, recharge gates, legendary actions, lair hazards, reactions, summons into initiative), control delegation so players can run monsters, one ally-list model behind teams/PvP/betrayal, a 4-level cover system, range validation, Paladin/Druid/Cleric auras with combo effects, and a combat automation engine (~320 handlers, 618 verified automations, 91 per-spell services) covering save prompts, concentration checks, auto-damage, condition propagation, healing pools, buffs, reactions, and 70+ class-specific feature modals. **Maps:** indoor tactical grids with fog of war, 25+ furniture types, doors, rulers and server-synced spell overlays; a real-time 3D WebGL view of any indoor map; outdoor hex maps with procedural terrain, rivers, A\* roads, POIs, weather, overland travel and random events — all four surfaces with a WASD/arrow keyboard camera. **Generation:** BSP dungeon generator, adjacent dungeon generator, fractal terrain generator, settlement generator, NPC generator, auto-balanced encounters, CR-tiered loot. **World management:** quests, factions, NPCs with full stat blocks, settlements, sessions planner, markdown notes, shared party inventory, campaign log with a full audit trail. **Safety & admin:** campaign snapshots, download/upload, scoped clears, rename and typed-delete, transformation tracking (Polymorph/Shapechange/Animal Shapes/True Polymorph), summoned-creature lifecycle management, and passive skill computation. **Optional (all off by default):** ten rules-enforcement switches with server validation and a claimable referee, and a local AI suite — rules referee, NPC director, world keeper (with the campaign log as its hierarchical "Story so far" memory), campaign designer with a drafts-approval queue, map dressing, and entity refinement.
 
 **Is the AI going to send my campaign to OpenAI?**
 No — it can't. The app refuses to configure a remote endpoint: only a **local** model server (any OpenAI-compatible server on `localhost`, or Ollama) is accepted. If you don't configure one, no AI code runs at all. An optional API key is stored server-side only, never in campaign data, never sent to players. And the AI is a **proposer, never a decision-maker** — it can't roll dice, can't write state, and everything it proposes needs your click (or falls back to `needs_human` and waits for you).
