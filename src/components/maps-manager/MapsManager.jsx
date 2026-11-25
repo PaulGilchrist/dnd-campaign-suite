@@ -307,51 +307,65 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         setRenameValue(currentName);
     };
 
+    // Single close lane for the armed rename editor (backlog 2026-11-25 BC):
+    // closes ONLY while `fileName` still owns the arm, so a late-resolving
+    // commit can never swallow an editor that a later click just armed.
+    const closeRenameEditor = (fileName) => {
+        setRenamingMap(prev => (prev === fileName ? null : prev));
+    };
+
+    // COMMIT LANES ARE ENTER AND THE CONFIRM BUTTON ONLY (backlog 2026-11-25
+    // BC): blur is no longer a commit — see handleCancelRename's onBlur ride.
+    // Same gates as before (empty/same-name silent cancel, kebab + duplicate
+    // inline banners).
     const handleRenameSave = async (oldFileName) => {
         const newName = renameValue.trim();
         if (!newName) {
-            // Empty/whitespace blur is a silent cancel — a cancel also drops any
-            // stale banner it superseded (backlog 2026-11-12 RS).
+            // Empty/whitespace commit is a silent cancel — a cancel also drops
+            // any stale banner it superseded (backlog 2026-11-12 RS).
             setError(null);
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
             return;
         }
         const existingMap = maps.find(m => m.fileName === oldFileName);
         if (existingMap && existingMap.name === newName) {
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
             return;
         }
         // Same empty-kebab gate as create/rename-server — an empty handle
         // would move the file onto the undeletable `.json` dotfile slug.
         if (!mapsService.toKebabCase(newName)) {
             setError('Map name must contain letters or numbers');
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
             return;
         }
         // Check for duplicates (compare display names directly)
         const newKebab = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         if (maps.some(m => m.fileName !== oldFileName && m.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === newKebab)) {
             setError('A map with that name already exists');
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
             return;
         }
         try {
             setError(null);
             await mapsService.renameMap(campaignName, oldFileName, newName);
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
             await loadMapsList();
         } catch (err) {
             setError(err.message || 'Failed to rename map');
-            setRenamingMap(null);
+            closeRenameEditor(oldFileName);
         }
     };
 
-    // Cancel leg of the armed rename (Confirm/Cancel pair, backlog
-    // 2026-11-24 BA): mirrors the Escape lane exactly — drop any banner the
-    // edit superseded and close the editor. Zero writes.
-    const handleCancelRename = () => {
+    // Cancel/REVERT leg of the armed rename: drop any banner the edit
+    // superseded and close the editor — zero writes. It rides three lanes
+    // (backlog 2026-11-25 BC sharpened the third): the explicit Cancel button,
+    // Escape, and BLUR. Blur is a REVERT, never a commit: a cross-row click
+    // (or any focus departure without Enter/Confirm) must not silently PUT a
+    // rename the user never confirmed.
+    const handleCancelRename = (fileName) => {
         setError(null);
-        setRenamingMap(null);
+        closeRenameEditor(fileName);
     };
 
     const handleRenameKeyDown = (e, fileName) => {
@@ -359,10 +373,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             e.preventDefault();
             handleRenameSave(fileName);
         } else if (e.key === 'Escape') {
-            // Escape cancels — clear any banner from an earlier commit attempt
-            // so nothing stale survives the cancel (backlog 2026-11-12 RS).
-            setError(null);
-            setRenamingMap(null);
+            handleCancelRename(fileName);
         }
     };
 
@@ -526,6 +537,12 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                 {renamingMap === map.fileName ? (
                                 <input
                                     type="text"
+                                    /* Keyed by the armed file (backlog 2026-11-25 BC):
+                                       a loadMapsList refresh that keeps this row (same
+                                       fileName) reconciles onto the SAME input, so the
+                                       armed editor, its pending value and focus survive
+                                       the re-render. */
+                                    key={`rename-${map.fileName}`}
                                     value={renameValue}
                                         /* Accessible name mirrors the row-control idiom
                                            (`Rename "<map>"`, `Open "<map>"`) so automation
@@ -541,7 +558,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                         placeholder="Rename to…"
                                         autoFocus
                                         onChange={(e) => setRenameValue(e.target.value)}
-                                        onBlur={() => handleRenameSave(map.fileName)}
+                                        onBlur={() => handleCancelRename(map.fileName)}
                                         onKeyDown={(e) => handleRenameKeyDown(e, map.fileName)}
                                     />
                                 ) : (
@@ -590,13 +607,14 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                 {/* While a row's rename is armed, its Rename button swaps to a
                                     Confirm/Cancel pair (backlog 2026-11-24 BA) so the editor has
                                     an always-visible affordance distinct from the toolbar create
-                                    field. onMouseDown preventDefault keeps focus on the input:
-                                    without it the button press BLURS the input first and the
-                                    existing onBlur-commit fires under the click — Cancel would
-                                    silently commit instead of cancelling (criterion 4), and
-                                    Confirm would double-POST the rename.
-                                    - Confirm = exactly today's Enter lane (handleRenameSave).
-                                    - Cancel = exactly today's Escape lane (zero writes). */}
+                                    field. Commit lanes are Enter and Confirm ONLY (blur became a
+                                    REVERT — backlog 2026-11-25 BC). onMouseDown preventDefault
+                                    keeps focus on the input so the editor is never torn down
+                                    under the click: without it the button press BLURS first and
+                                    the revert closes the editor before onClick lands, so neither
+                                    Confirm nor Cancel would fire.
+                                    - Confirm = exactly the Enter lane (handleRenameSave).
+                                    - Cancel = exactly the Escape/blur revert lane (zero writes). */}
                                 {renamingMap === map.fileName ? (
                                     <>
                                         <button
@@ -610,7 +628,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                         <button
                                             className="rename-cancel-btn"
                                             onMouseDown={(e) => e.preventDefault()}
-                                            onClick={handleCancelRename}
+                                            onClick={() => handleCancelRename(map.fileName)}
                                             aria-label={`Cancel rename for "${map.name}"`}>
                                             Cancel
                                         </button>

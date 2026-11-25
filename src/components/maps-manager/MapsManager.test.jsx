@@ -458,19 +458,28 @@ describe('MapsManager', () => {
     describe('Rename Flow', () => {
         const map = () => makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' });
 
-        it.each(['Enter', 'blur'])('saves the rename via %s and closes the input', async (trigger) => {
+        it('saves the rename via Enter and closes the input', async () => {
             await renderWithMaps(map());
             const input = startRename();
             fireEvent.change(input, { target: { value: 'Renamed Map' } });
-            if (trigger === 'Enter') {
-                fireEvent.keyDown(input, { key: 'Enter' });
-            } else {
-                fireEvent.blur(input);
-            }
+            fireEvent.keyDown(input, { key: 'Enter' });
 
             await waitFor(() => {
                 expect(mapsService.renameMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json', 'Renamed Map');
             });
+            expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
+        });
+
+        // Backlog 2026-11-25 BC: blur is a REVERT, never a commit — leaving the
+        // editor without Enter/Confirm discards the pending value (zero writes).
+        it('reverts the rename on blur with zero writes', async () => {
+            await renderWithMaps(map());
+            const input = startRename();
+            fireEvent.change(input, { target: { value: 'Renamed Map' } });
+            fireEvent.blur(input);
+
+            expect(mapsService.renameMap).not.toHaveBeenCalled();
+            expect(screen.queryByDisplayValue('Renamed Map')).not.toBeInTheDocument();
             expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
         });
 

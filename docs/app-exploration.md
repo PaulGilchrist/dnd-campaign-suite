@@ -58,7 +58,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-25 (run BC): Maps-manager rename — the explicit `Confirm`/`Cancel` pair implies "commit is explicit", but clicking another row's button STILL blur-commits the pending value silently (proved live: `SILENT CROSS-ROW` landed on disk via a cross-row Rename click). Worse, the commit's async `loadMapsList` re-render can swallow the arm the same click just opened (editor vanishes mid-sequence). Suggest: make blur a REVERT when focus moves into another row's control (or make blur-revert entirely, keeping Enter/Confirm as the only commit lanes), and key the armed editor so the list refresh doesn't unmount it. Likely files: `src/components/maps-manager/MapsManager.jsx` (`onBlur=handleRenameSave`, `renamingMap` state, `handleStartRename`).
 - 2026-11-25 (run BC): Maps-manager rename rows keep rendering an identical `Rename "<other>"` button on every OTHER row while an editor is armed — nothing visually dims or blocks the other rows, so multi-row editor mixups are one stray click away (the BC scare). Consider disabling sibling row action buttons while `renamingMap` is set, or auto-scrolling/highlighting the armed row. Likely file: `src/components/maps-manager/MapsManager.jsx`.
 
 ## Blocked / not verified (run BC — replaced each run)
