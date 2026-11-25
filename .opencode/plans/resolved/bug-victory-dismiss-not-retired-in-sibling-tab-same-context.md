@@ -29,3 +29,18 @@ Smallest honest fix: subscribe to `window.addEventListener('storage', …)` for 
 
 ## Severity
 Minor UX issue. Presentation-only, no data risk; but the two-GM-window table setup (operating tab + tracker/TV tab) is a first-class supported layout, and the stale celebrant tab has no self-heal short of reload.
+
+## Resolution
+FIXED 2026-11-24. The black-box diagnosis held exactly: `useTvPresentation.js` derived `victoryVisible` from a render-time `localStorage.getItem('initiative-victory-dismissed')` read, re-evaluated only when its own memo deps changed (`lastCombatResult`, `trackerHasFoes`, or the local `victoryDismissTick` bumped by the *clicking* tab's `dismissVictory`). No `storage` listener existed anywhere in `src/` (grep-verified), so a sibling tab's dismiss write never woke anyone — the sibling's UI kept contradicting its own persisted pref until reload.
+
+Per the bug file's Expected law (dismiss is per-CONTEXT by the existing localStorage design — keep the key, fix the fan-out), the minimal honest fix is exactly the suggested one: a `window.addEventListener('storage', …)` effect in the hook that bumps `victoryDismissTick` when the event key is `initiative-victory-dismissed` (or `null`, i.e. a full `storage.clear()`). Storage events fire only in the OTHER same-origin tabs — precisely the missing fan-out; the writing tab's local bump stays as-is since it never receives its own event. Structure mirrors the sibling `fullscreenchange` listener effect already in the same hook (effect + cleanup, no new store, no new event type, presentation-only, no timers).
+
+Changed files:
+- `src/components/initiative/useTvPresentation.js` — added the storage-event effect (13 lines incl. comment).
+- `src/components/initiative/useTvPresentation.cross-tab-dismiss.test.js` — NEW regression pin: banner mounted → sibling-write localStorage + dispatch synthetic `storage` event for the dismiss key at the current stamp → `victoryVisible` flips false; plus guards that a DIFFERENT-stamp event keeps it up, unrelated-key events never hide it, and unmount detach + remount honors the persisted stamp. Verified red-when-the-listener-is-disabled (fails precisely on the bug's face).
+
+Verification:
+- Live repro BEFORE fix (two GM tabs, same context, Initiative both mounted, forged undismissed celebrated stamp via wildcard `POST /lastCombatResult`): tab1 dismiss → `{"tabA":{"banner":false,"ls":"1795578640123"},"tabB":{"banner":true,"ls":"1795578640123"}}` — exact documented face.
+- Live re-verify AFTER fix (tabA + tabB same context + separate-context tab, :5173 live source): dismiss on tabA → `{"tabA":{"banner":false,"ls":"1795578808456"},"tabB":{"banner":false,"ls":"1795578808456"},"iso":{"banner":true,"ls":null}}` — sibling retires live, separate context keeps its undismissed face (correct by design). Fresh stamp afterwards re-showed the banner on all three, including the dismissed same-context tabs. Dismiss-in-own-tab unchanged. Zero console errors.
+- Tests: new pin 4/4 green; whole `src/components/initiative/` folder 133 files / 997 tests green (EXIT 0); `npm run lint` zero warnings (needed `new window.StorageEvent` — jsdom's mocked `localStorage` is not a native `Storage` so `storageArea` must be omitted, and `StorageEvent` is not in the eslint test-env globals).
+- Exit hygiene: admin `clear-change-data` (verified `{}`) + `clear-log` (verified `[]`); `initiative-victory-dismissed` / `initiative-tv` swept from all rig contexts.

@@ -146,6 +146,22 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
     // celebrated:false, so a tracker tidy never masquerades as a combat victory.
     const lastCombatResult = useRuntimeValue('campaign', 'lastCombatResult', campaignName)
     const [victoryDismissTick, setVictoryDismissTick] = React.useState(0)
+    // Sibling tabs of the same browser context share the localStorage stamp but
+    // never re-render when another tab writes it — and the `storage` event
+    // fires ONLY in the other same-origin tabs, exactly the needed fan-out.
+    // Bump the tick so the memo below re-reads the persisted dismiss state and
+    // an already-mounted banner retires live (the writing tab keeps its own
+    // local bump in dismissVictory — it never receives its own storage event).
+    React.useEffect(() => {
+        const onStorage = (e) => {
+            // key is null on a full storage.clear() — re-evaluate there too.
+            if (e.key === VICTORY_DISMISS_KEY || e.key === null) {
+                setVictoryDismissTick(t => t + 1)
+            }
+        }
+        window.addEventListener('storage', onStorage)
+        return () => window.removeEventListener('storage', onStorage)
+    }, [])
     const trackerHasFoes = displayCreatures.some(c => c.type === 'npc' && !isBareNpcPlaceholder(c))
     const victoryVisible = React.useMemo(() => {
         void victoryDismissTick
