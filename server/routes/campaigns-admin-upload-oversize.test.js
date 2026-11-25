@@ -92,7 +92,7 @@ vi.mock('../utils/changeData.js', () => ({
     readFile: vi.fn(),
 }));
 
-vi.mock('./log.js', () => ({ logCache: new Map() }));
+vi.mock('./log.js', () => ({ logCache: new Map(), flushLogs: vi.fn() }));
 vi.mock('archiver', () => {
     class MockZipArchive {
         constructor() {

@@ -12,7 +12,7 @@ import { createSnapshot, listSnapshotFiles } from '../utils/campaignSnapshots.js
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
 import { bucketKeySlug, censusChangeDataKeys } from '../utils/changeDataKeys.js';
 import { CAMPAIGN_TYPES, writeCampaignMeta } from './campaigns-meta.js';
-import { logCache } from './log.js';
+import { logCache, flushLogs } from './log.js';
 
 const router = express.Router();
 
@@ -526,6 +526,12 @@ router.post('/api/campaigns/:campaign/admin/rollback', asyncHandler(async (req, 
 
     // Flush in-memory data to disk before extracting snapshot
     saveFile();
+    // Cancel + drain the log's own 1s debounce too: a pending timer firing
+    // between the async extract and reloadCampaign would re-write the
+    // pre-rollback log over the restored file (playtest-snapshot race,
+    // 2026-11-25). reloadCampaign drops the cache anyway — flushing here
+    // makes the cancel effective and the race impossible.
+    flushLogs();
 
     // Clear campaign folder and extract snapshot
     fs.rmSync(dir, { recursive: true, force: true });

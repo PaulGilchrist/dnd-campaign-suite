@@ -75,7 +75,8 @@ vi.mock('../utils/changeData.js', () => ({
     readFile: vi.fn(),
 }));
 
-vi.mock('./log.js', () => ({ logCache: new Map() }));
+const { flushLogsSpy } = vi.hoisted(() => ({ flushLogsSpy: vi.fn() }));
+vi.mock('./log.js', () => ({ logCache: new Map(), flushLogs: flushLogsSpy }));
 vi.mock('archiver', () => {
     class MockZipArchive {
         constructor() {
@@ -145,6 +146,10 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/snapshot', () => 
         const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
         expect(res.status).toBe(200); expect(res.body.message).toBe('Snapshot created');
         expect(typeof res.body.size).toBe('number');
+        // Playtest-envelope law (2026-11-25): the zip must contain the FULL
+        // current log — the debounced log cache is flushed alongside
+        // saveFile() BEFORE archiving, or a rollback loses pre-test rows.
+        expect(flushLogsSpy).toHaveBeenCalled();
     });
 
     it('should return a timestamped filename', async () => {
@@ -301,6 +306,10 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/rollback', () => 
         ensureSnapshot('test-campaign');
         await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'localhost');
         expect(saveFile).toHaveBeenCalled();
+        // …and drain the log debounce too (playtest race, 2026-11-25): a
+        // timer firing between extract and reload would re-write the
+        // pre-rollback log over the restored file.
+        expect(flushLogsSpy).toHaveBeenCalled();
     });
 
     it('should publish reload event after rollback', async () => {

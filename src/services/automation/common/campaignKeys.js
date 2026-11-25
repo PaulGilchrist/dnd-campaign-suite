@@ -3,6 +3,12 @@
  * These keys are stored at the campaign level (characterKey = 'campaign')
  * rather than under a character name or the campaign name.
  */
+// Canonical name of the playtest session stamp (its CAMPAIGN_KEYS entry is
+// the registration law below; the constant lives here so every reader —
+// banner, loot gates, autoReward guard — shares ONE key string without
+// pulling the playtest service's import graph).
+export const PLAYTEST_KEY = 'playtest';
+
 export const CAMPAIGN_KEYS = new Set([
     'targetEffects',
     // CLA-044: top-level activeCreatureName is truth (initiative Next writes it
@@ -133,6 +139,16 @@ export const CAMPAIGN_KEYS = new Set([
     // Cover-shot round stamp {attacker, target, round} (coverService.js
     // COVER_SHOT_KEY), read campaign-level during target-AC computation.
     '_cover_shot',
+    // Encounter playtest session stamp (playtest plan 2026-11-25):
+    // { active: true, snapshot, encounterName } written by the Encounter
+    // Builder's Playtest lane before the test starts and read campaign-level
+    // by the PlaytestBanner / loot-panel gates; the rollback at End restores
+    // the campaign to the pre-stamp snapshot, so the key never needs a
+    // manual clear on the success lane (only on a failed start — abort
+    // evicts it via deleteRuntimeKey). Unregistered, its OBJECT echo would
+    // misroute to a ghost CHARACTER store
+    // (bug-victory-stamp-not-sse-adopted-missing-campaign-key family).
+    'playtest',
 ]);
 
 /**

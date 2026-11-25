@@ -5,8 +5,8 @@
  * plan .opencode/plans/ai-campaign-authoring.md Phase 2).
  *
  * Behavior is byte-identical to the admin routes it came from:
- *  - flush the change-data cache BEFORE zipping (saveFile) so in-memory
- *    rows are inside the restore point;
+ *  - flush the change-data cache AND the debounced log cache BEFORE zipping
+ *    (saveFile / flushLogs) so in-memory rows are inside the restore point;
  *  - never zip the .snapshots dir itself;
  *  - keep at most SNAPSHOT_RETENTION restore points per campaign.
  */
@@ -15,6 +15,7 @@ import path from 'path';
 import * as archiverLib from 'archiver';
 import { campaignDir, campaignSnapshotDir, snapshotTimestamp } from './campaignPaths.js';
 import { saveFile } from './changeData.js';
+import { flushLogs } from '../routes/log.js';
 
 // Keep at most 4 restore points per campaign (owner cap 2026-10-28; pruned
 // per-campaign in pruneSnapshots — the shared .snapshots/ dir holds every
@@ -47,6 +48,7 @@ export function pruneSnapshots(campaign) {
 export function createSnapshot(campaign) {
     return new Promise((resolve, reject) => {
         saveFile();
+        flushLogs();
 
         const snapshotDir = campaignSnapshotDir();
         if (!fs.existsSync(snapshotDir)) {

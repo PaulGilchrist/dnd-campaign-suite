@@ -39,26 +39,45 @@ export function loadLog(campaign) {
 // a combat row costs, a whole long campaign's log stays well under a few MB,
 // so unbounded disk is intentional; archival/rotation is a future concern
 // (see .opencode/plans/campaign-log-ai-memory-roadmap.md).
+function persistLogs() {
+  for (const campaign of logCache.keys()) {
+    if (!fs.existsSync(campaignDir(campaign))) {
+      console.error(`[log] Skipping persist for campaign "${campaign}" — its directory no longer exists on disk. Removing from memory to prevent phantom campaign regeneration.`);
+      logCache.delete(campaign);
+      continue;
+    }
+    ensureDataDir(campaign);
+    const file = campaignDataFile(campaign, 'campaign-log.json');
+    try {
+      const log = logCache.get(campaign);
+      fs.writeFileSync(file, JSON.stringify(log, null, 2));
+    } catch (err) {
+      console.error(`Failed to save log for campaign ${campaign}:`, err.message);
+    }
+  }
+}
+
 function saveLogFile() {
   if (saveLogFile._timer) clearTimeout(saveLogFile._timer);
   saveLogFile._timer = setTimeout(() => {
-    for (const campaign of logCache.keys()) {
-      if (!fs.existsSync(campaignDir(campaign))) {
-        console.error(`[log] Skipping persist for campaign "${campaign}" — its directory no longer exists on disk. Removing from memory to prevent phantom campaign regeneration.`);
-        logCache.delete(campaign);
-        continue;
-      }
-      ensureDataDir(campaign);
-      const file = campaignDataFile(campaign, 'campaign-log.json');
-      try {
-        const log = logCache.get(campaign);
-        fs.writeFileSync(file, JSON.stringify(log, null, 2));
-      } catch (err) {
-        console.error(`Failed to save log for campaign ${campaign}:`, err.message);
-      }
-    }
+    persistLogs();
     saveLogFile._timer = null;
   }, 1000);
+}
+
+// Synchronous flush for snapshot/rollback seams (playtest snapshot, 2026-11-25):
+// change-data and overlays flush inside saveFile(), but the log cache rides its
+// OWN 1s debounce — so a snapshot taken mid-debounce zipped a stale
+// campaign-log.json and its rollback would silently drop the seconds of log
+// rows written just BEFORE the playtest, not just the test's own rows. Cancel
+// the pending debounce and persist every cached log NOW, so the zip's disk
+// state is exactly the in-memory truth (same pre-zip doctrine as saveFile()).
+export function flushLogs() {
+  if (saveLogFile._timer) {
+    clearTimeout(saveLogFile._timer);
+    saveLogFile._timer = null;
+  }
+  persistLogs();
 }
 
 // Active-session stamp (memory-prep, owner vision 2026-11-21): every row

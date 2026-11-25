@@ -80,6 +80,7 @@ vi.mock('../utils/changeData.js', () => ({
 
 vi.mock('./log.js', () => ({
     logCache: new Map(),
+    flushLogs: vi.fn(),
 }));
 
 function ensureCampaign(name) {

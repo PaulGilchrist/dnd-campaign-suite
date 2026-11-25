@@ -98,6 +98,20 @@ describe('refusals — zero loot-gen, zero writes, zero logs (#1026/#1095 census
         expect(addEntry).not.toHaveBeenCalled();
         expect(lootCalls).toHaveLength(0);
     });
+
+    it('active playtest stamp pays nothing even with autoRewards ON (plan 2026-11-25)', async () => {
+        store['campaign::enforcement'] = { autoRewards: true };
+        store['campaign::playtest'] = { active: true, snapshot: 'test-campaign-x.zip', encounterName: 'Goblin Drill' };
+        const r = await autoAwardCombatRewards({
+            campaignName: CN,
+            combatSummary: SUMMARY([npc('Goblin 1', 0)]),
+            characters: PARTY,
+        });
+        expect(r).toEqual({ awarded: false, reason: 'playtest mode' });
+        expect(generateLootFromCombatSummary).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
 });
 
 describe('autoRewards ON — award lane', () => {

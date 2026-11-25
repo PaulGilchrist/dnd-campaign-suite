@@ -16,6 +16,7 @@
  */
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { resolveEnforcement } from '../combat/canTakeAction.js';
+import { PLAYTEST_KEY } from '../automation/common/campaignKeys.js';
 import { generateLootFromCombatSummary, filterNoLootSentinel } from './lootGenerator.js';
 import * as logService from '../ui/logService.js';
 
@@ -30,13 +31,27 @@ function pluralize(count, word) {
     return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
+// Single refusal gate for the Clear-seam auto-reward lane (the reasons are
+// stable strings pinned by autoRewardService.test.js). Module-level so the
+// async body keeps its statement budget for the payout itself. The playtest
+// guard (plan 2026-11-25): a live playtest session pays NOTHING even on a
+// campaign with autoRewards ON — the GM is rehearsing a fight, and while the
+// End rollback would undo an award anyway, this keeps the XP writes + audit
+// rows from ever being offered.
+function rewardsRefusalReason(campaignName, combatSummary) {
+    if (!campaignName || !combatSummary) return 'no campaign/combat';
+    if (getRuntimeValue('campaign', PLAYTEST_KEY)?.active === true) return 'playtest mode';
+    const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
+    if (!flags.autoRewards) return 'autoRewards off';
+    return null;
+}
+
 /**
  * @returns {Promise<{awarded:boolean, reason?:string, xpPerChar?:number}>}
  */
 export async function autoAwardCombatRewards({ campaignName, combatSummary, characters = [] }) {
-    if (!campaignName || !combatSummary) return { awarded: false, reason: 'no campaign/combat' };
-    const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
-    if (!flags.autoRewards) return { awarded: false, reason: 'autoRewards off' };
+    const refusal = rewardsRefusalReason(campaignName, combatSummary);
+    if (refusal) return { awarded: false, reason: refusal };
 
     const defeated = (combatSummary.creatures || []).filter(isDefeatedNpc);
     if (defeated.length === 0) return { awarded: false, reason: 'no defeated npcs on the tracker' };

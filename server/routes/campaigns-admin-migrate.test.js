@@ -52,7 +52,7 @@ vi.mock('../utils/changeData.js', () => ({
     readFile: vi.fn(),
 }));
 
-vi.mock('./log.js', () => ({ logCache: new Map() }));
+vi.mock('./log.js', () => ({ logCache: new Map(), flushLogs: vi.fn() }));
 vi.mock('archiver', () => ({ default: { ZipArchive: vi.fn().mockImplementation(() => ({ on: vi.fn().mockReturnThis(), pipe: vi.fn().mockReturnThis(), directory: vi.fn().mockReturnThis(), finalize: vi.fn(), abort: vi.fn() })) } }));
 vi.mock('extract-zip', () => ({ default: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('multer', () => {

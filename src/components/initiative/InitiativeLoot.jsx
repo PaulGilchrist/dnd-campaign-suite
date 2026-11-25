@@ -1,5 +1,7 @@
 import React from 'react'
 import { parseCurrencyFromLootText } from '../../services/items/lootGenerator.js'
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { PLAYTEST_KEY } from '../../services/automation/common/campaignKeys.js'
 
 // TV display tier (owner decision 2026-11-23 — Paul verbatim: "nor
 // generate loot, prev, next, etc. All that is done in initiative tracker
@@ -8,9 +10,26 @@ import { parseCurrencyFromLootText } from '../../services/items/lootGenerator.js
 // face. The gate rides a thin wrapper because the panel body sits AT the
 // eslint complexity ceiling (PlayerLocalhostHpRow precedent), and the
 // Initiative call site stays branch-free (AlliesButton self-gate law).
-export default function InitiativeLoot({ tvMode = false, ...panelProps }) {
+//
+// The wrapper also owns the playtest soft gate (plan 2026-11-25): while the
+// campaign carries an active `playtest` stamp the Generate/Award CTAs lock
+// with the cause in their title — their writes (party inventory, XP, audit
+// rows) would evaporate at the End rollback anyway. All disabled/title
+// decisions are resolved here so LootPanel stays under its ceiling.
+export default function InitiativeLoot({ tvMode = false, campaignName, playtestActive: forced = null, ...panelProps }) {
+    const stamp = useRuntimeValue('campaign', PLAYTEST_KEY, campaignName)
+    const playtestActive = forced !== null ? forced : stamp?.active === true
     if (tvMode) return null
-    return <LootPanel {...panelProps} />
+    return (
+        <LootPanel
+            {...panelProps}
+            generateDisabled={panelProps.generatingLoot || playtestActive}
+            generateTitle={playtestActive ? 'Disabled during playtest' : 'Generate loot from defeated monsters in combat'}
+            awardDisabled={panelProps.awardingLoot || playtestActive}
+            awardOpenDisabled={playtestActive}
+            awardTitle={playtestActive ? 'Disabled during playtest' : 'Award loot and XP to party'}
+        />
+    )
 }
 
 function LootPanel({
@@ -25,6 +44,11 @@ function LootPanel({
     handleAwardLoot,
     handleClearLoot,
     characters,
+    generateDisabled,
+    generateTitle,
+    awardDisabled,
+    awardOpenDisabled,
+    awardTitle,
 }) {
     const hasLoot = lootData.lootEntries.length > 0 || lootTextValue.length > 0
     const xpPerCharacter = Math.floor(lootData.totalEncounterXp / (characters && characters.length > 0 ? characters.length : 1))
@@ -47,8 +71,8 @@ function LootPanel({
             <button
               className='ct-generate-btn'
               onClick={handleGenerateLoot}
-              disabled={generatingLoot}
-              title="Generate loot from defeated monsters in combat"
+              disabled={generateDisabled}
+              title={generateTitle}
             >
               <i className="fa-solid fa-coins"></i>&nbsp; {generatingLoot ? 'Generating...' : 'Generate Loot'}
             </button>
@@ -79,8 +103,8 @@ function LootPanel({
                         <button
                           className='ct-btn ct-btn-primary'
                           onClick={handleAwardLoot}
-                          disabled={awardingLoot}
-                          title="Award loot and XP to party"
+                          disabled={awardDisabled}
+                          title={awardTitle}
                         >
                           <i className="fa-solid fa-trophy"></i>{awardingLoot ? 'Awarding...' : 'Award Loot'}
                         </button>
@@ -97,7 +121,8 @@ function LootPanel({
                       <button
                         className='ct-btn ct-btn-primary'
                         onClick={() => setShowAwardLoot(true)}
-                        title="Award loot and XP to party"
+                        disabled={awardOpenDisabled}
+                        title={awardTitle}
                       >
                         <i className="fa-solid fa-trophy"></i>Award Loot
                       </button>

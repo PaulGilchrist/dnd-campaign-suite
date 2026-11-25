@@ -36,6 +36,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
   return {
     getStore: vi.fn(() => store),
     setRuntimeValue: vi.fn(),
+    useRuntimeValue: vi.fn(() => null),
     listeners: new Map(),
   };
 });

@@ -54,6 +54,7 @@ import ConcentrationPromptModal from './components/common/ConcentrationPromptMod
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
+import PlaytestBanner from './components/playtest/PlaytestBanner.jsx';
 import HelpDrawer from './components/HelpDrawer/HelpDrawer.jsx';
 import EmptyCampaignState from './components/campaign-empty-state/EmptyCampaignState.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
@@ -1151,6 +1152,10 @@ function App() {
             in FirstSessionChecklist) — 'load' auto-opens the builder's
             saved-wave list; every other step navigates as before. */}
         <FirstSessionChecklist key={checklistEpoch} campaignName={campaignName} onNavigate={(view, intent) => handleChecklistNavigate(view, intent, setActiveView)} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
+        {/* Playtest session ribbon (playtest plan 2026-11-25): app-level so it
+            follows the GM across every view while the server-first `playtest`
+            stamp is active — including a tab reloaded mid-test. GM-only. */}
+        <PlaytestBanner campaignName={campaignName} isLocalhost={isLocalhost} />
         {/* Zero-character empty state (backlog UM 2026-11-20, owner doctrine
             2026-11-23): a zero-character campaign lands here — the main stage
             used to go fully blank once the retired offer-once auto-wizard was

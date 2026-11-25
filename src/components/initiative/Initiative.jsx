@@ -1251,6 +1251,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 handleClearLoot={handleClearLoot}
                 characters={characters}
                 tvMode={tvMode}
+                campaignName={campaignName}
               />
               )}
             {/* GM-private stat block: per-client open state, and never on a TV

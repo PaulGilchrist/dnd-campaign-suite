@@ -594,6 +594,39 @@ describe('File persistence', () => {
     });
 });
 
+// ─── Synchronous flush (flushLogs — snapshot/rollback seam, 2026-11-25) ─────
+
+describe('flushLogs', () => {
+    it('persists the in-memory log immediately (no debounce wait) and cancels the pending timer', async () => {
+        const fsMock = await import('fs');
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+        await request(app)
+            .post('/api/campaigns/test-campaign/log')
+            .send({ type: 'note', characterName: 'GM', message: 'Just before the snapshot' });
+
+        // Zero wait: the snapshot lane zips right after flushing, so the
+        // write must already be on disk when flushLogs() returns.
+        logModule.flushLogs();
+
+        const written = fsMock.default.writeFileSync.mock.calls
+            .filter(([p]) => p === '/mock/campaigns/test-campaign/data/campaign-log.json')
+            .map(([, data]) => JSON.parse(data));
+        expect(written.length).toBeGreaterThan(0);
+        expect(written[written.length - 1].some((e) => e.message === 'Just before the snapshot')).toBe(true);
+
+        // The cancelled debounce must not fire a stale second write later.
+        const writesBefore = fsMock.default.writeFileSync.mock.calls.length;
+        await new Promise((r) => setTimeout(r, 1100));
+        expect(fsMock.default.writeFileSync.mock.calls.length).toBe(writesBefore);
+    });
+
+    it('is a no-op with an empty cache (never crashes on a fresh server)', () => {
+        logModule.logCache.clear();
+        expect(() => logModule.flushLogs()).not.toThrow();
+    });
+});
+
 // ─── Phantom-campaign guard (saveLogFile) ───────────────────────────────────
 
 describe('Phantom-campaign guard in flush', () => {

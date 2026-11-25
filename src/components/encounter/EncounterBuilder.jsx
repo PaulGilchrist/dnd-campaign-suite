@@ -8,6 +8,7 @@ import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
 import EncounterModal from './EncounterModal.jsx';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
+import EncounterPlaytestButton from './EncounterPlaytestButton.jsx';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
@@ -724,6 +725,21 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
           >
               <i className="fa-solid fa-skull" aria-hidden="true"></i>Join Encounter
           </button>
+          {/* Playtest lane (plan 2026-11-25): snapshot → staged cover map →
+              same join; the app-level PlaytestBanner carries End/rollback. */}
+          <EncounterPlaytestButton
+            campaignName={campaignName}
+            encounterTitle={encounterTitle}
+            currentEncounterName={currentEncounterName}
+            selectedMonsters={selectedMonsters}
+            characters={characters}
+            onStarted={() => {
+              setSelectedMonsters([]);
+              setDescription('');
+              onJoinEncounter?.();
+            }}
+            onToast={showToast}
+          />
         </div>
       )}
 

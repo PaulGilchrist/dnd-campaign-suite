@@ -42,7 +42,14 @@
 import * as mapsService from '../maps/mapsService.js';
 
 export const STAGING_MAP_NAME = 'Travel Encounter Stage';
-export const STAGING_MAP_SLUG = mapsService.toKebabCase(STAGING_MAP_NAME);
+// The slug stays a literal rather than mapsService.toKebabCase(name) AT
+// MODULE SCOPE: the playtest lane imports this service from the Encounter
+// Builder graph, and 21 EB/initiative test files mock mapsService with a
+// partial factory (no toKebabCase) — a module-load-time call crashed every
+// one of them at import (full-suite run, 2026-11-25). The literal stays
+// pinned to the shared kebab rule by the assertion in
+// encounterStagingService.test.js:90 (toKebabCase(NAME) === SLUG).
+export const STAGING_MAP_SLUG = 'travel-encounter-stage';
 const STAGING_FILE_NAME = `${STAGING_MAP_SLUG}.json`;
 
 // Mirrors the sets in rules/combat/coverService.js (buildCoverMap).

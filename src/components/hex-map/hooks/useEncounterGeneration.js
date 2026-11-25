@@ -4,6 +4,7 @@ import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
 import { buildEncounterMapDisplayName } from '../../../services/encounters/encounterMapNaming.js';
 import { stageEventEncounterMap } from '../../../services/encounters/encounterStagingService.js';
+import { generateMonsterPlacements } from '../../../services/encounters/monsterTokenPlacement.js';
 
 function useEncounterGeneration({
     campaignName,
@@ -13,41 +14,9 @@ function useEncounterGeneration({
     onEncounterCreated,
     parentDisplayName,
 }) {
-    const generateMonsterPlacements = useCallback((monsters, gridSize) => {
-        const center = Math.floor(gridSize / 2);
-        const items = [];
-        let idCounter = 0;
-        const occupied = new Set();
-
-        for (const group of monsters) {
-            for (let i = 0; i < group.qty; i++) {
-                let attempts = 0;
-                let gx, gy, key;
-                do {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = 6 + Math.random() * 6;
-                    gx = Math.round(center + Math.cos(angle) * distance);
-                    gy = Math.round(center + Math.sin(angle) * distance);
-                    gx = Math.max(1, Math.min(gridSize - 2, gx));
-                    gy = Math.max(1, Math.min(gridSize - 2, gy));
-                    key = `${gx},${gy}`;
-                    attempts++;
-                } while (occupied.has(key) && attempts < 20);
-
-                occupied.add(key);
-                items.push({
-                    id: `enc-monster-${idCounter++}`,
-                    type: 'npc',
-                    name: group.name,
-                    gridX: gx,
-                    gridY: gy,
-                    visible: true,
-                });
-            }
-        }
-
-        return items;
-    }, []);
+    // Placement rule lives in services/encounters/monsterTokenPlacement.js
+    // (shared verbatim with the playtest staging lane since 2026-11-25); the
+    // hook keeps returning it so existing HexMap wiring/tests are unchanged.
 
     const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = [], eventTitle = null) => {
         const terrainType = terrain[hexKey(q, r)] || 'plains';

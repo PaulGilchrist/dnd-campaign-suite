@@ -738,6 +738,10 @@
   margin-bottom: 16px;
   display: flex;
   justify-content: center;
+  /* Join + Playtest sit side by side (playtest plan 2026-11-25) — the flex
+     row needs an explicit gap; the buttons' icon↔label spacing stays the
+     .ct-btn kit gap. */
+  gap: 10px;
 }
 
 /* The Join CTA rides the kit .ct-btn ct-btn-primary tier — the bespoke
