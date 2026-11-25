@@ -156,6 +156,55 @@ describe('useWizardData', () => {
     });
   });
 
+  describe('single-fetch-per-URL law (2026-11-24 fetch census)', () => {
+    // racesData and allRacesData read the SAME races file — one GET must
+    // feed both setters (the classes lane already did this; the races lane
+    // double-fetched the identical URL until the coalesce). Static rule-data
+    // GETs carry no SSE semantics, so this pins traffic, not state: state
+    // equality for both views is covered by the ruleset tests above.
+    const fetchCountsByUrl = (mock) => {
+      const counts = {};
+      for (const [url] of mock.mock.calls) counts[url] = (counts[url] || 0) + 1;
+      return counts;
+    };
+
+    it('fetches the 2024 races file exactly once and fills both race views', async () => {
+      const races = [{ name: 'Human 2024' }];
+      const fetchMock = createMockFetch(
+        create2024Responses([], races, [], [], [])
+      );
+      global.fetch = fetchMock;
+
+      const { result } = renderHook(() => useWizardData('2024'));
+
+      await waitFor(() => {
+        expect(result.current.isDataLoading).toBe(false);
+      });
+
+      expect(fetchCountsByUrl(fetchMock)['/data/2024/races.json']).toBe(1);
+      expect(result.current.racesData).toEqual(races);
+      expect(result.current.allRacesData).toEqual(races);
+    });
+
+    it('fetches the 5e races file exactly once and fills both race views', async () => {
+      const races = [{ name: 'Human' }];
+      const fetchMock = createMockFetch(
+        create5eResponses(races, [], [], [])
+      );
+      global.fetch = fetchMock;
+
+      const { result } = renderHook(() => useWizardData('5e'));
+
+      await waitFor(() => {
+        expect(result.current.isDataLoading).toBe(false);
+      });
+
+      expect(fetchCountsByUrl(fetchMock)['/data/races.json']).toBe(1);
+      expect(result.current.racesData).toEqual(races);
+      expect(result.current.allRacesData).toEqual(races);
+    });
+  });
+
   describe('ruleset switching', () => {
     it('should reload data when ruleset changes from 5e to 2024', async () => {
       const responses = {

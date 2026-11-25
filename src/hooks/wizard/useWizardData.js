@@ -23,8 +23,14 @@ function useWizardData(ruleset) {
   useEffect(() => {
     if (ruleset === '2024') {
       loadData('/data/2024/backgrounds.json', setBackgrounds);
-      loadData('/data/2024/races.json', setRacesData);
-      loadData('/data/2024/races.json', setAllRacesData);
+      // ONE fetch supplies both race views (mirrors the single classes fetch
+      // below): racesData and allRacesData load the SAME file and can never
+      // diverge, so the second same-URL GET was pure duplicate traffic
+      // (live census 2026-11-24: 2× GET /data/2024/races.json per wizard open).
+      loadData('/data/2024/races.json', (data) => {
+        setRacesData(data);
+        setAllRacesData(data);
+      });
       loadData('/data/2024/classes.json', (data) => {
         setClassSubtypes(data.map(cls => ({
           className: cls.name,
@@ -36,8 +42,10 @@ function useWizardData(ruleset) {
       loadData('/data/magic-items.json', setMagicItems);
       } else {
       setBackgrounds([]);
-      loadData('/data/races.json', setRacesData);
-      loadData('/data/races.json', setAllRacesData);
+      loadData('/data/races.json', (data) => {
+        setRacesData(data);
+        setAllRacesData(data);
+      });
       loadData('/data/classes.json', (data) => {
         setClassSubtypes(data.map(cls => ({
           className: cls.name,
