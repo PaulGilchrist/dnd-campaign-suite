@@ -1233,3 +1233,23 @@
     border-color: #2c5f8a;
     color: #333;
 }
+
+/* Keyboard camera hint (owner 2026-11-25, trackpad game-day) — the
+   .map3d-hint idiom scoped to the 2D board: small, muted, italic one-liner
+   with info icon, in flow ABOVE the svg so it never eats canvas pointer
+   events. Mirrored by .hex-map-keyboard-hint in HexMap.css for the
+   outdoor twin (the 3D twins duplicate the same style per component). */
+.map .map-keyboard-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #99a;
+    font-size: 11px;
+    font-style: italic;
+    padding: 0 0 4px;
+}
+
+[data-theme="light"] .map .map-keyboard-hint {
+    color: #667;
+}

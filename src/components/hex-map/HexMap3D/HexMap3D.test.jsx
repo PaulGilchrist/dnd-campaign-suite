@@ -18,9 +18,18 @@ const updatePartyMock = vi.fn();
 const updateTravelPathMock = vi.fn();
 const setWeatherMock = vi.fn();
 const topDownMock = vi.fn();
+const stepCameraMock = vi.fn();
 const disposeMock = vi.fn();
 const initMock = vi.fn();
 const constructedContainers = [];
+
+// Keyboard lane harness (indoor Map3D.test twin): mocked useHeldKeys captures
+// the live opts so wiring — ready-gating + stepCamera/topDown routing — is
+// asserted without real listeners or rAF pumps.
+const keyLane = vi.hoisted(() => ({ opts: null }));
+vi.mock('../../../hooks/ui/useHeldKeys.js', () => ({
+    default: (opts) => { keyLane.opts = opts; },
+}));
 
 vi.mock('./hex3dScene.js', () => ({
     Hex3DScene: class {
@@ -44,6 +53,9 @@ vi.mock('./hex3dScene.js', () => ({
         }
         setWeather(weather) {
             setWeatherMock(weather);
+        }
+        stepCamera(input) {
+            stepCameraMock(input);
         }
         topDown() {
             topDownMock();
@@ -196,7 +208,7 @@ describe('HexMap3D', () => {
         const { container } = renderHex3D();
         const hint = container.querySelector('.hex3d-hint');
         expect(hint).toBeTruthy();
-        expect(hint.textContent).toBe('Left-drag to pan · Right-drag to orbit · Scroll to zoom');
+        expect(hint.textContent).toBe('Left-drag to pan · Right-drag to orbit · Scroll to zoom · WASD/arrows rotate · +/- zoom · Shift+WASD pan · R top-down');
         // Sibling of the viewport, never inside it.
         expect(hint.closest('.hex3d-viewport')).toBeNull();
         expect(screen.getByTitle('Top-down view')).toBeInTheDocument();
@@ -320,5 +332,17 @@ describe('HexMap3D', () => {
         disposeMock.mockClear();
         unmount();
         expect(disposeMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('arms the keyboard camera lane only once the scene is ready, routing frames to stepCamera and R to top-down', async () => {
+        renderHex3D();
+        expect(keyLane.opts.enabled).toBe(false);
+        await act(async () => {});
+        expect(keyLane.opts.enabled).toBe(true);
+        const input = { forward: 0, strafe: 1, zoom: 1, shift: false, dt: 0.04 };
+        act(() => keyLane.opts.onFrame(input));
+        expect(stepCameraMock).toHaveBeenCalledWith(input);
+        act(() => keyLane.opts.onAction('reset'));
+        expect(topDownMock).toHaveBeenCalledTimes(1);
     });
 });

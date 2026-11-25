@@ -1,7 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { MIN_ZOOM, MAX_ZOOM, CELL_SIZE } from '../../../config/mapConfig';
+import useHeldKeys from '../../../hooks/ui/useHeldKeys';
 
-function useZoomPan(svgRef) {
+// Keyboard camera speeds (owner 2026-11-25, trackpad game-day lane): pan is
+// expressed in CSS px per second so the on-screen travel feels the same at
+// every zoom level (converted viewBox-side below); zoom is a continuous
+// exponential rate, so one second holding '+' ≈ five toolbar zoomIn clicks.
+const KEY_PAN_PX_PER_SEC = 900;
+const KEY_ZOOM_RATE = 0.9;
+
+function useZoomPan(svgRef, { keyboardEnabled = false } = {}) {
     const [zoom, setZoom] = useState(1);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
@@ -36,6 +44,51 @@ function useZoomPan(svgRef) {
         setPanX(0);
         setPanY(0);
     }, []);
+
+    // ── Keyboard camera lane (trackpad game-day, owner 2026-11-25) ──
+    // One onFrame per held animation frame. Pan converts CSS-px/s through the
+    // live viewBox so a held key travels the same SCREEN distance at any zoom
+    // (viewBox.width is always exactly the visible span). Zoom keeps the
+    // viewport centre pinned — the deliberate keyboard-only choice; the wheel
+    // lane still anchors the cursor and the toolbar buttons are untouched.
+    const keyPanStep = useCallback((forward, strafe, shift, dt, scale) => {
+        const step = KEY_PAN_PX_PER_SEC * (shift ? 2 : 1) * dt * scale;
+        setPanX((p) => p + strafe * step);
+        setPanY((p) => p - forward * step);
+    }, []);
+
+    const keyZoomStep = useCallback((zoomDir, dt, viewW, viewH) => {
+        const currentZoom = zoomValueRef.current;
+        const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM,
+            currentZoom * Math.exp(zoomDir * KEY_ZOOM_RATE * dt)));
+        if (next === currentZoom) return;
+        setZoom(next);
+        if (!viewW || !viewH) return;
+        const cx = panXValueRef.current + viewW / 2;
+        const cy = panYValueRef.current + viewH / 2;
+        setPanX(cx - (viewW * currentZoom / next) / 2);
+        setPanY(cy - (viewH * currentZoom / next) / 2);
+    }, []);
+
+    const handleKeyFrame = useCallback(({ forward, strafe, zoom: zoomDir, shift, dt }) => {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox && svg.viewBox.baseVal;
+        const viewW = vb && vb.width ? vb.width : 0;
+        const viewH = vb && vb.height ? vb.height : 0;
+        if (forward || strafe) {
+            keyPanStep(forward, strafe, shift, dt, rect.width && viewW ? viewW / rect.width : 1);
+        }
+        if (zoomDir) keyZoomStep(zoomDir, dt, viewW, viewH);
+    }, [svgRef, keyPanStep, keyZoomStep]);
+
+    useHeldKeys({
+        enabled: keyboardEnabled,
+        onFrame: handleKeyFrame,
+        // R resets — the same committed view the toolbar Reset button gives.
+        onAction: keyboardEnabled ? resetView : undefined,
+    });
 
     const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
     const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);

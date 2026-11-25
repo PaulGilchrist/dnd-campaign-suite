@@ -1,10 +1,17 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
+import useHeldKeys from '../../../hooks/ui/useHeldKeys.js';
 import {
     hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM,
 } from '../../../services/maps/hexViewMath.js';
 
-function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY }) {
+// Keyboard camera speeds — shared contract with the indoor lane
+// (map/hooks/useZoomPan.js): pan in CSS px/s (constant SCREEN speed at any
+// zoom), zoom as a continuous exponential rate per second.
+const KEY_PAN_PX_PER_SEC = 900;
+const KEY_ZOOM_RATE = 0.9;
+
+function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled = false }) {
     const [panning, setPanning] = useState(null);
 
     const zoomValueRef = useRef(MIN_ZOOM);
@@ -58,6 +65,61 @@ function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, pa
         setPanX(clamped.x);
         setPanY(clamped.y);
     }, [centerView, setZoom, setPanX, setPanY]);
+
+    // ── Keyboard camera lane (trackpad game-day, owner 2026-11-25) ──
+    // Same contract as the indoor lane: held keys move at a constant SCREEN
+    // speed (CSS px/s converted through the live viewBox), zoom pins the
+    // viewport centre, and EVERY step rides the existing clampPan so the
+    // keyboard can never push the view outside the board. Committed bytes
+    // flow through the same loader setters as mouse pans, so the outdoor
+    // view autosave/persistence lane is unchanged.
+    const keyPanStep = useCallback((forward, strafe, shift, dt, scale) => {
+        const step = KEY_PAN_PX_PER_SEC * (shift ? 2 : 1) * dt * scale;
+        const clamped = clampPan(zoomValueRef.current,
+            panXValueRef.current + strafe * step,
+            panYValueRef.current - forward * step);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+    }, [clampPan, setPanX, setPanY]);
+
+    const keyZoomStep = useCallback((zoomDir, dt, viewW, viewH) => {
+        const currentZoom = zoomValueRef.current;
+        const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM,
+            currentZoom * Math.exp(zoomDir * KEY_ZOOM_RATE * dt)));
+        if (next === currentZoom) return;
+        let newPanX = panXValueRef.current;
+        let newPanY = panYValueRef.current;
+        if (viewW && viewH) {
+            const cx = newPanX + viewW / 2;
+            const cy = newPanY + viewH / 2;
+            newPanX = cx - (viewW * currentZoom / next) / 2;
+            newPanY = cy - (viewH * currentZoom / next) / 2;
+        }
+        const clamped = clampPan(next, newPanX, newPanY);
+        setZoom(next);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+    }, [clampPan, setZoom, setPanX, setPanY]);
+
+    const handleKeyFrame = useCallback(({ forward, strafe, zoom: zoomDir, shift, dt }) => {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox && svg.viewBox.baseVal;
+        const viewW = vb && vb.width ? vb.width : 0;
+        const viewH = vb && vb.height ? vb.height : 0;
+        if (forward || strafe) {
+            keyPanStep(forward, strafe, shift, dt, rect.width && viewW ? viewW / rect.width : 1);
+        }
+        if (zoomDir) keyZoomStep(zoomDir, dt, viewW, viewH);
+    }, [svgRef, keyPanStep, keyZoomStep]);
+
+    useHeldKeys({
+        enabled: keyboardEnabled,
+        onFrame: handleKeyFrame,
+        // R resets — the same committed view the toolbar Reset button gives.
+        onAction: keyboardEnabled ? resetView : undefined,
+    });
 
     const handlePanStart = useCallback((e) => {
         if (e.button !== 0) return;

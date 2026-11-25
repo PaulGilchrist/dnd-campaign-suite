@@ -378,3 +378,75 @@ describe('useZoomPan', () => {
     expect(result.current.zoom).toBe(MIN_ZOOM);
   });
 });
+
+// ── Keyboard camera lane (owner 2026-11-25, trackpad game-day) ──
+// useHeldKeys is mocked wholesale: the KEY→frame contract is owned by
+// useHeldKeys.test.js — here we pin only the frame→view interpretation
+// (constant-screen-speed pan through the live viewBox, center-pinned
+// exponential zoom, R → resetView) and the keyboardEnabled arm/quiet flag.
+const keyLane = vi.hoisted(() => ({ opts: null }));
+vi.mock('../../../hooks/ui/useHeldKeys', () => ({
+  default: (opts) => { keyLane.opts = opts; },
+}));
+
+const keyboardSvg = () => ({
+  current: {
+    getBoundingClientRect: () => ({ width: 600, height: 300 }),
+    viewBox: { baseVal: { width: 1200, height: 1200 } },
+  },
+});
+const frame = (input) => act(() => { keyLane.opts.onFrame(input); });
+
+describe('useZoomPan keyboard lane', () => {
+  it('reports the arm state down to useHeldKeys (silent hook by default)', () => {
+    const { rerender } = renderHook(
+      ({ enabled }) => useZoomPan({ current: null }, { keyboardEnabled: enabled }),
+      { initialProps: { enabled: false } },
+    );
+    expect(keyLane.opts.enabled).toBe(false);
+    expect(keyLane.opts.onAction).toBeUndefined();
+    rerender({ enabled: true });
+    expect(keyLane.opts.enabled).toBe(true);
+    expect(keyLane.opts.onAction).toBeTypeOf('function');
+  });
+
+  it('pan keeps constant SCREEN speed: 900 css px/s → viewBox-side through the live rect (W = panY -90/tick)', () => {
+    const { result } = renderHook(() => useZoomPan(keyboardSvg(), { keyboardEnabled: true }));
+    frame({ forward: 1, strafe: 0, zoom: 0, shift: false, dt: 0.1 });
+    // scale = viewW/rectW = 1200/600 = 2 svg units per css px.
+    expect(result.current.panY).toBeCloseTo(-180, 6);
+    frame({ forward: 0, strafe: 1, zoom: 0, shift: false, dt: 0.1 });
+    expect(result.current.panX).toBeCloseTo(180, 6);
+    // Shift doubles.
+    frame({ forward: -1, strafe: 0, zoom: 0, shift: true, dt: 0.1 });
+    expect(result.current.panY).toBeCloseTo(-180 + 360, 6);
+  });
+
+  it('zoom pins the viewport centre and clamps at MIN/MAX', () => {
+    const { result } = renderHook(() => useZoomPan(keyboardSvg(), { keyboardEnabled: true }));
+    frame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
+    expect(result.current.zoom).toBeCloseTo(Math.exp(0.05 * 0.9), 6);
+    // Centre was (600, 600); after narrowing, pan = 600 - viewW'/2 each side.
+    expect(result.current.panX).toBeCloseTo(600 - 600 / result.current.zoom, 6);
+    expect(result.current.panY).toBeCloseTo(600 - 600 / result.current.zoom, 6);
+    for (let i = 0; i < 200; i++) frame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
+    expect(result.current.zoom).toBe(MAX_ZOOM);
+    for (let i = 0; i < 400; i++) frame({ forward: 0, strafe: 0, zoom: -1, shift: false, dt: 0.05 });
+    expect(result.current.zoom).toBe(MIN_ZOOM);
+  });
+
+  it('R resets to the toolbar-identical home view', () => {
+    const { result } = renderHook(() => useZoomPan(keyboardSvg(), { keyboardEnabled: true }));
+    frame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
+    expect(result.current.zoom).not.toBe(1);
+    act(() => { keyLane.opts.onAction('reset'); });
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
+  });
+
+  it('a frame with no live svg is inert (no throw, no churn)', () => {
+    renderHook(() => useZoomPan({ current: null }, { keyboardEnabled: true }));
+    expect(() => frame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.05 })).not.toThrow();
+  });
+});

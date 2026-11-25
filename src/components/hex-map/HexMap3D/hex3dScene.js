@@ -12,6 +12,7 @@ import {
     getHexGridPixelDimensions, isValidHexKey,
 } from '../../../services/maps/hexMapUtils.js';
 import { tintedTerrainRgb } from '../../../services/maps/hexColors.js';
+import { applyCameraStep } from '../../../services/maps/cameraStep.js';
 import { poiModelHref } from '../../../services/maps/poiSprites.js';
 
 // World units are the SVG pixel space 1:1 (hexToPixel output), centred on the
@@ -470,6 +471,13 @@ export class Hex3DScene {
         this.controls.update();
     }
 
+    // Keyboard camera lane (trackpad game-day, owner 2026-11-25): one step of
+    // the shared pure-math driver against the LIVE camera/controls. The rAF
+    // loop's controls.update() then damps it like any mouse gesture.
+    stepCamera(input) {
+        return applyCameraStep(this.controls, this.camera, input);
+    }
+
     _frameCamera(mapKey) {
         if (this._framedFor === mapKey) return;
         this._framedFor = mapKey;
@@ -479,6 +487,10 @@ export class Hex3DScene {
         this.camera.updateProjectionMatrix();
         this.camera.position.set(size * 0.1, size * 0.36, size * 0.55);
         this.controls.target.set(0, 0, 0);
+        // Keep the camera in a sane shell around the board for BOTH the wheel
+        // dolly and the keyboard +/- lane (update() clamps to these).
+        this.controls.minDistance = size * 0.06;
+        this.controls.maxDistance = size * 3;
         this.controls.update();
         const sc = this._sun.shadow.camera;
         sc.left = -size * 0.7;

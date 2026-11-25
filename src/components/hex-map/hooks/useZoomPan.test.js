@@ -291,3 +291,87 @@ describe('useZoomPan', () => {
         });
     });
 });
+
+// ── Keyboard camera lane (owner 2026-11-25, trackpad game-day) ──
+// Key→frame contract is owned by useHeldKeys.test.js; here we pin only the
+// frame→view interpretation THROUGH the real clampPan (expectations are
+// cross-checked against the hook's own clamp, house style — never re-derived
+// from hexViewMath internals) plus the keyboardEnabled arm flag.
+const keyLane = vi.hoisted(() => ({ opts: null }));
+vi.mock('../../../hooks/ui/useHeldKeys.js', () => ({
+    default: (opts) => { keyLane.opts = opts; },
+}));
+
+const armedSetup = () => {
+    const svgRef = createSvgRef();
+    const hostRef = { zoom: 2, panX: 0, panY: 0 };
+    const utils = renderHook(() => {
+        const [zoom, setZoom] = useState(2);
+        const [panX, setPanX] = useState(0);
+        const [panY, setPanY] = useState(0);
+        hostRef.zoom = zoom;
+        hostRef.panX = panX;
+        hostRef.panY = panY;
+        return useZoomPan({ svgRef, hexCols: 10, hexRows: 10, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: true });
+    });
+    return { ...utils, svgRef, hostRef };
+};
+const keyFrame = (input) => act(() => { keyLane.opts.onFrame(input); });
+
+describe('useZoomPan keyboard lane (hex)', () => {
+    it('stays un-armed without keyboardEnabled; arms with it', () => {
+        const quiet = renderHook(() => useZoomPan({
+            svgRef: createSvgRef(), hexCols: 10, hexRows: 10,
+            zoom: 2, setZoom: vi.fn(), panX: 0, setPanX: vi.fn(), panY: 0, setPanY: vi.fn(),
+        }));
+        expect(keyLane.opts.enabled).toBe(false);
+        expect(keyLane.opts.onAction).toBeUndefined();
+        quiet.unmount();
+        armedSetup();
+        expect(keyLane.opts.enabled).toBe(true);
+        expect(keyLane.opts.onAction).toBeTypeOf('function');
+    });
+
+    it('every pan lands inside the board: committed bytes === clampPan(input)', () => {
+        const { result, hostRef } = armedSetup();
+        // rect 600 ↔ viewBox 600 → scale 1; dt 0.1 → 90 svg-unit step.
+        keyFrame({ forward: 1, strafe: 1, zoom: 0, shift: false, dt: 0.1 });
+        const expected = result.current.clampPan(2, 90, -90);
+        expect(hostRef.panX).toBeCloseTo(expected.x, 9);
+        expect(hostRef.panY).toBeCloseTo(expected.y, 9);
+        // Shift doubles the raw step before the clamp (900·2·0.1 = 180).
+        keyFrame({ forward: -1, strafe: 0, zoom: 0, shift: true, dt: 0.1 });
+        const expected2 = result.current.clampPan(2, expected.x, expected.y + 180);
+        expect(hostRef.panX).toBeCloseTo(expected2.x, 9);
+        expect(hostRef.panY).toBeCloseTo(expected2.y, 9);
+    });
+
+    it('zoom pins the viewport centre, rides the clamp, and holds MIN/MAX exactly', () => {
+        const { result, hostRef } = armedSetup();
+        keyFrame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
+        const next = 2 * Math.exp(0.05 * 0.9);
+        expect(hostRef.zoom).toBeCloseTo(next, 9);
+        // Viewbox 600×300 at pan 0 → centre (300, 150); new pan = c − viewSpan/2.
+        const clamped = result.current.clampPan(
+            next,
+            300 - (600 * 2 / next) / 2,
+            150 - (300 * 2 / next) / 2,
+        );
+        expect(hostRef.panX).toBeCloseTo(clamped.x, 9);
+        expect(hostRef.panY).toBeCloseTo(clamped.y, 9);
+        for (let i = 0; i < 500; i++) keyFrame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
+        expect(hostRef.zoom).toBe(MAX_ZOOM);
+        for (let i = 0; i < 800; i++) keyFrame({ forward: 0, strafe: 0, zoom: -1, shift: false, dt: 0.05 });
+        expect(hostRef.zoom).toBe(MIN_ZOOM);
+    });
+
+    it('R commits the toolbar reset view', () => {
+        const { result, hostRef } = armedSetup();
+        keyFrame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
+        act(() => { keyLane.opts.onAction('reset'); });
+        const centered = result.current.centerView(VIEW_RESET_ZOOM);
+        expect(hostRef.zoom).toBe(VIEW_RESET_ZOOM);
+        expect(hostRef.panX).toBe(centered.x);
+        expect(hostRef.panY).toBe(centered.y);
+    });
+});

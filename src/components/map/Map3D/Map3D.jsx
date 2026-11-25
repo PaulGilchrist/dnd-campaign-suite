@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Map3DScene } from './map3dScene.js';
 import { buildCensusLine } from './map3dCensus.js';
+import useHeldKeys from '../../../hooks/ui/useHeldKeys.js';
 import './Map3D.css';
 
 // Mirrors Players.jsx getPlayerImage: resolve a player's portrait to a
@@ -122,6 +123,18 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         sceneRef.current?.topDown();
     }, []);
 
+    // Keyboard camera lane (trackpad game-day, owner 2026-11-25): WASD/arrows
+    // orbit, +/- dolly, Shift+WASD ground-pans, R jumps to top-down. Armed
+    // once the scene is live; the shared useHeldKeys guards (typing targets,
+    // dialogs/menus, browser modifiers) keep it from ever hijacking keys.
+    useHeldKeys({
+        enabled: ready,
+        onFrame: useCallback((input) => sceneRef.current?.stepCamera(input), []),
+        onAction: useCallback((action) => {
+            if (action === 'reset') sceneRef.current?.topDown();
+        }, []),
+    });
+
     // Header census: mirrors the LIVE scene per origin (owner ruling
     // 2026-11-20 "count only live-visible"). map3dCensus derives every term
     // from the same visibility predicates the scene's _buildNpcs/
@@ -168,7 +181,7 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
                 lives in map3dScene.js (LEFT pan / RIGHT orbit / wheel zoom). */}
             <div className="map3d-hint no-print">
                 <i className="fa-solid fa-circle-info"></i>
-                <span>Left-drag to pan · Right-drag to orbit · Scroll to zoom</span>
+                <span>Left-drag to pan · Right-drag to orbit · Scroll to zoom · WASD/arrows rotate · +/- zoom · Shift+WASD pan · R top-down</span>
             </div>
             <div className="map3d-viewport" ref={containerRef}>
                 {initError && <div className="map3d-error">{initError}</div>}

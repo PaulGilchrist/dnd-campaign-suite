@@ -2,6 +2,7 @@ import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../../config/mapConfig.js';
 import { getAssetUrl } from './map3dAssets.js';
 import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
+import { applyCameraStep } from '../../../services/maps/cameraStep.js';
 import { isItemVisible, isCreatureToken, isPlayerVisible } from './map3dVisibility.js';
 // One label law shared with the 2D twin (PlacedItems.jsx imports the same fn):
 // the ghost title base is placedItemLabel(item), so the nameless-token face
@@ -113,6 +114,9 @@ export class Map3DScene {
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
         controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+        // Never dive under the board (the hex scene's clamp law, now shared by
+        // the keyboard tilt lane too).
+        controls.maxPolarAngle = Math.PI * 0.495;
         this.controls = controls;
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -181,6 +185,13 @@ export class Map3DScene {
         this.controls.update();
     }
 
+    // Keyboard camera lane (trackpad game-day, owner 2026-11-25): one step of
+    // the shared pure-math driver against the LIVE camera/controls. The rAF
+    // loop's controls.update() then damps it like any mouse gesture.
+    stepCamera(input) {
+        return applyCameraStep(this.controls, this.camera, input);
+    }
+
     // Frames the default overview once per grid size. Repeat builds for the
     // same map (overlay-adjacent dep churn, restacked props) must never yank
     // the user's orbit/zoom back to default.
@@ -193,6 +204,10 @@ export class Map3DScene {
         this.camera.updateProjectionMatrix();
         this.camera.position.set(size * 0.52, size * 0.5, size * 0.92);
         this.controls.target.set(0, 0, 0);
+        // Keep the camera in a sane shell around the board for BOTH the wheel
+        // dolly and the keyboard +/- lane (update() clamps to these).
+        this.controls.minDistance = size * 0.06;
+        this.controls.maxDistance = size * 3;
         this.controls.update();
     }
 

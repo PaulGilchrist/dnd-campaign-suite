@@ -263,7 +263,12 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     const hexRows = gridSize;
 
     // ── Zoom/pan interaction ──
-    const zoomPan = useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY });
+    // 2D editor ↔ read-only 3D diorama swap (indoor Map.jsx viewMode twin).
+    // Pure per-client display state — never persisted, never game state.
+    // Declared ABOVE the zoom lane so the keyboard camera keys arm ONLY in
+    // 2D mode (the 3D diorama runs its own key lane).
+    const [viewMode, setViewMode] = useState('2d');
+    const zoomPan = useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: viewMode === '2d' });
     const { svgWidth, svgHeight, zoomIn, zoomOut, resetView, clampPan, centerView,
         panning, handlePanStart, handlePanMove, handlePanEnd, handleWheel } = zoomPan;
 
@@ -277,9 +282,6 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     const [poiPanelOpen, setPoiPanelOpen] = useState(false);
     const [marchingOpen, setMarchingOpen] = useState(false);
     const [partyContextMenu, setPartyContextMenu] = useState(null);
-    // 2D editor ↔ read-only 3D diorama swap (indoor Map.jsx viewMode twin).
-    // Pure per-client display state — never persisted, never game state.
-    const [viewMode, setViewMode] = useState('2d');
 
     // ── Terrain painting ──
     const terrainPainting = useTerrainPainting({ hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers });
@@ -762,6 +764,12 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
                 description (and while mapData is still loading), so this
                 call site adds zero branches. */}
             <MapDescriptionPanel mapData={mapLoader.mapData} />
+            {/* Keyboard camera hint (owner 2026-11-25) — same chip as the
+                indoor 2D/3D lanes; keys work with no pointer focus. */}
+            <div className="hex-map-keyboard-hint no-print">
+                <i className="fa-solid fa-circle-info"></i>
+                <span>WASD/arrows to pan · +/- to zoom · Shift 2× · R to reset view</span>
+            </div>
 
             {loading ? (
                 <div className="hex-map-loading">Loading map...</div>

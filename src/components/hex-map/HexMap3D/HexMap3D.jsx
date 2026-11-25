@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Hex3DScene } from './hex3dScene.js';
+import useHeldKeys from '../../../hooks/ui/useHeldKeys.js';
 import './HexMap3D.css';
 
 // Read-only 3D diorama for outdoor hex maps — the outdoor twin of
@@ -112,6 +113,18 @@ function HexMap3D({
         sceneRef.current?.topDown();
     }, []);
 
+    // Keyboard camera lane (trackpad game-day, owner 2026-11-25): WASD/arrows
+    // orbit, +/- dolly, Shift+WASD ground-pans, R jumps to top-down. Armed
+    // once the scene is live; the shared useHeldKeys guards (typing targets,
+    // dialogs/menus, browser modifiers) keep it from ever hijacking keys.
+    useHeldKeys({
+        enabled: ready,
+        onFrame: useCallback((input) => sceneRef.current?.stepCamera(input), []),
+        onAction: useCallback((action) => {
+            if (action === 'reset') sceneRef.current?.topDown();
+        }, []),
+    });
+
     // Honest counts line (backlog 2026-11-02 BD): singular/plural per slot,
     // and the POI count mirrors the mesh lane — LAN players never see hidden
     // POIs so the line does not count them; the GM sees them dimmed, so the
@@ -159,7 +172,7 @@ function HexMap3D({
                 eats canvas pointer events (indoor .map3d-hint idiom). */}
             <div className="hex3d-hint no-print">
                 <i className="fa-solid fa-circle-info"></i>
-                <span>Left-drag to pan · Right-drag to orbit · Scroll to zoom</span>
+                <span>Left-drag to pan · Right-drag to orbit · Scroll to zoom · WASD/arrows rotate · +/- zoom · Shift+WASD pan · R top-down</span>
             </div>
             <div className="hex3d-viewport" ref={containerRef}>
                 {initError && <div className="hex3d-error">{initError}</div>}

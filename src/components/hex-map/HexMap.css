@@ -1426,3 +1426,22 @@
         display: none;
     }
 }
+
+/* Keyboard camera hint (owner 2026-11-25) — outdoor 2D twin of
+   .map .map-keyboard-hint (Map.css), same .map3d-hint idiom: small, muted,
+   italic one-liner above the canvas, never intercepting board pointer
+   events. */
+.hex-map .hex-map-keyboard-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #99a;
+    font-size: 11px;
+    font-style: italic;
+    padding: 0 0 4px;
+}
+
+[data-theme="light"] .hex-map .hex-map-keyboard-hint {
+    color: #667;
+}

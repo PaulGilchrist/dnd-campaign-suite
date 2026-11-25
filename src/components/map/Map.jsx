@@ -222,7 +222,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         panning, handlePanStart, handlePanMove, handlePanEnd,
         handleWheel,
         clientToSVG,
-    } = useZoomPan(svgRef);
+    } = useZoomPan(svgRef, { keyboardEnabled: viewMode !== '3d' });
 
     // Item/token removal staging (backlog 2026-11-01 AZ2): the named confirm
     // is the in-app DeleteFromMapModal tier — a delete request STAGES as a
@@ -709,6 +709,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 panel self-gates on empty/missing description, so this call
                 site adds zero branches. */}
             <MapDescriptionPanel mapData={mapData} />
+            {/* Keyboard camera hint (owner 2026-11-25, trackpad game-day):
+                the .map3d-hint idiom on the 2D board — muted one-liner so
+                the WASD/arrow/+/-/R lane is discovered, not memorized. */}
+            <div className="map-keyboard-hint no-print">
+                <i className="fa-solid fa-circle-info"></i>
+                <span>WASD/arrows to pan · +/- to zoom · Shift 2× · R to reset view</span>
+            </div>
             <svg
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}

@@ -19,9 +19,18 @@ const buildMapMock = vi.fn();
 const setTogglesMock = vi.fn();
 const updateOverlaysMock = vi.fn();
 const topDownMock = vi.fn();
+const stepCameraMock = vi.fn();
 const disposeMock = vi.fn();
 const initMock = vi.fn();
 const constructedContainers = [];
+
+// Keyboard lane harness: useHeldKeys is mocked to capture the live opts, so
+// the wiring (enabled gating + stepCamera/topDown routing) is asserted
+// without any real window listeners or rAF pumps.
+const keyLane = vi.hoisted(() => ({ opts: null }));
+vi.mock('../../../hooks/ui/useHeldKeys.js', () => ({
+    default: (opts) => { keyLane.opts = opts; },
+}));
 
 vi.mock('./map3dScene.js', () => ({
     Map3DScene: class {
@@ -39,6 +48,9 @@ vi.mock('./map3dScene.js', () => ({
         }
         updateSpellOverlays(overlays) {
             updateOverlaysMock(overlays);
+        }
+        stepCamera(input) {
+            stepCameraMock(input);
         }
         topDown() {
             topDownMock();
@@ -138,7 +150,7 @@ describe('Map3D', () => {
         const { container } = renderMap3D();
         const hint = container.querySelector('.map3d-hint');
         expect(hint).toBeTruthy();
-        expect(hint.textContent).toBe('Left-drag to pan · Right-drag to orbit · Scroll to zoom');
+        expect(hint.textContent).toBe('Left-drag to pan · Right-drag to orbit · Scroll to zoom · WASD/arrows rotate · +/- zoom · Shift+WASD pan · R top-down');
         // Sibling of the viewport, never inside it — the hint must not sit over
         // the canvas where it could eat OrbitControls pointer events.
         expect(hint.closest('.map3d-viewport')).toBeNull();
@@ -290,5 +302,17 @@ describe('Map3D', () => {
         disposeMock.mockClear();
         unmount();
         expect(disposeMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('arms the keyboard camera lane only once the scene is ready, routing frames to stepCamera and R to top-down', async () => {
+        renderMap3D();
+        expect(keyLane.opts.enabled).toBe(false);
+        await act(async () => {});
+        expect(keyLane.opts.enabled).toBe(true);
+        const input = { forward: 1, strafe: 0, zoom: -1, shift: true, dt: 0.05 };
+        act(() => keyLane.opts.onFrame(input));
+        expect(stepCameraMock).toHaveBeenCalledWith(input);
+        act(() => keyLane.opts.onAction('reset'));
+        expect(topDownMock).toHaveBeenCalledTimes(1);
     });
 });
