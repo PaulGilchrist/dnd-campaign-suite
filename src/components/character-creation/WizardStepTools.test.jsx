@@ -9,7 +9,9 @@
 // - toolLimits starts null (useWizardConfig slot initial) and then always carries
 //   { categoryLimits, preSelected, skilledUsesAvailable } — "{}" and missing-categoryLimits
 //   props are unreachable and unpinned; zero-count map entries never enter the Map
-//   (addCategoryLimit only adds positive parsed counts).
+//   (addCategoryLimit only adds positive parsed counts), but an EMPTY Map is reachable
+//   (level-1 Fighter/Human quick build — pinned by useWizardTools.integration.test.js
+//   `categoryLimits.size === 0`), which must hide the choice sentence entirely.
 // - pre-selected ⊆ selected: useWizardConfig batches preSelectedTools + formData merge, and
 //   useWizardArrayToggle refuses to un-toggle pre-selected items — so the only stable
 //   pre-selected state is checked+disabled, pinned once below.
@@ -185,6 +187,23 @@ describe('WizardStepTools', () => {
     // Insertion order preserved in the choice sentence (background grant before class grant).
     expect(screen.getByText(/You may choose 1 Gaming Sets, 3 Musical Instrument\./)).toBeInTheDocument();
     expect(screen.getByText(/You have selected 3 tool proficiency\/ies \(1 pre-selected, 2 chosen\)/)).toBeInTheDocument();
+  });
+
+  it('hides the choice sentence when categoryLimits carries no positive entries (level-1 Fighter)', async () => {
+    // Empty Map is the reachable no-grants face (useWizardTools.integration.test.js
+    // pins categoryLimits.size === 0); it must not dangle as "You may choose ."
+    const { rerender } = await renderStep({
+      toolLimits: BARD_SOLDIER_LIMITS({ categoryLimits: new Map() }),
+    });
+
+    expect(screen.queryByText(/You may choose/)).not.toBeInTheDocument();
+    // The rest of the rules panel is unchanged.
+    expect(screen.getByText(/Rules:/)).toBeInTheDocument();
+    expect(screen.getByText(/You have selected 0 tool proficiency\/ies/)).toBeInTheDocument();
+
+    // Positive entries re-appear with the exact same copy and join formatting.
+    rerender(<WizardStepTools {...makeProps()} />);
+    expect(screen.getByText('You may choose 1 Gaming Sets, 3 Musical Instrument.')).toBeInTheDocument();
   });
 
   it('shows the Skilled pool row only when skilledUsesAvailable > 0', async () => {

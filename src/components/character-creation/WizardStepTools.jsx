@@ -34,6 +34,14 @@ function WizardStepTools({ stepNumber, formData, errors, onToolToggle, toolLimit
     const isPlaceholder = useCallback((toolName) => /^(\d+) from: (.+)$/.test(toolName), []);
     const realToolCount = useMemo(() => tools.filter(t => !isPlaceholder(t)).length, [tools, isPlaceholder]);
 
+    // Positive category-limit entries only — an empty list (e.g. level-1 Fighter) hides the
+    // choice sentence entirely instead of rendering "You may choose ." (WizardStepSkills.jsx
+    // guards its choice-source sentences the same way with a length check).
+    const categoryChoiceSummaries = useMemo(
+        () => Array.from(toolLimits?.categoryLimits || []).filter(([, count]) => count > 0),
+        [toolLimits]
+    );
+
     // Compute Skilled tool usage - use total from skillLimits (includes skills + tools)
     const skilledToolInfo = useMemo(() => {
         const skilledUsesAvailable = toolLimits?.skilledUsesAvailable || 0;
@@ -88,7 +96,9 @@ function WizardStepTools({ stepNumber, formData, errors, onToolToggle, toolLimit
             {toolLimits && Object.keys(toolLimits).length > 0 && (
                 <div className="rule-info">
                     <p><strong>Rules:</strong> You get tool proficiencies from your class, background, and feats.</p>
-                    <p>You may choose {Array.from(toolLimits.categoryLimits || []).filter(([, count]) => count > 0).map(([cat, count]) => `${count} ${cat}`).join(', ')}.</p>
+                    {categoryChoiceSummaries.length > 0 && (
+                        <p>You may choose {categoryChoiceSummaries.map(([cat, count]) => `${count} ${cat}`).join(', ')}.</p>
+                    )}
                     <p>You have selected {realToolCount} tool proficiency/ies ({preSelected.length} pre-selected, {realToolCount - preSelected.length} chosen).</p>
                     {skilledToolInfo.available > 0 && (
                         <div className="tool-source-breakdown">
