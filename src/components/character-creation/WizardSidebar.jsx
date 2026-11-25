@@ -16,8 +16,12 @@ import { getVisibleSteps, getLadderCauseTitle } from '../../config/steps-config.
  * @param {number|null} props.firstInvalidStep - Canonical number of the first
  *   step failing the valid-prefix ladder (null when none). Ladder-disabled
  *   tabs and Save name it in their `title` so the cause is discoverable.
+ * @param {string} [props.saveCauseTitle] - Full cause sentence for the
+ *   disabled Save button (ladder or caps belt), computed once by the wizard
+ *   via getSaveCauseTitle so both save controls always agree. Falls back to
+ *   the ladder cause when not provided.
  */
-export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave, firstInvalidStep }) {
+export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, goToStep, isSaveEnabled, onSave, firstInvalidStep, saveCauseTitle }) {
   const visibleSteps = getVisibleSteps({ ruleset });
 
   // Cause-naming idiom (mirrors the NPC list's disabled Add-to-Initiative
@@ -25,6 +29,11 @@ export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, go
   // when something actually blocks the ladder — enabled buttons stay bare.
   // Shared with the edit-mode footer Save Changes via getLadderCauseTitle.
   const ladderCause = getLadderCauseTitle(firstInvalidStep, { ruleset });
+
+  // Save owns a second blocker besides the ladder — the caps belt — so it
+  // rides the wizard's single getSaveCauseTitle sentence when supplied,
+  // falling back to the ladder cause for ladder-only callers/tests.
+  const saveCause = saveCauseTitle || ladderCause;
 
   return (
     <div className="wizard-sidebar">
@@ -51,7 +60,7 @@ export default function WizardSidebar({ currentStep, ruleset, getStepEnabled, go
         className={`sidebar-save ${!isSaveEnabled ? 'disabled' : ''}`}
         onClick={onSave}
         disabled={!isSaveEnabled}
-        title={!isSaveEnabled ? ladderCause : undefined}
+        title={!isSaveEnabled ? saveCause : undefined}
       >
         <span className="sidebar-tab-number">✓</span>
         <span className="sidebar-tab-title">Save</span>

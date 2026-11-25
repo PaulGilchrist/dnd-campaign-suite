@@ -8,6 +8,7 @@ import {
   getVisibleSteps,
   getDisplayNumber,
   getLadderCauseTitle,
+  getSaveCauseTitle,
   getTotalSteps,
 } from './steps-config.js';
 
@@ -170,6 +171,44 @@ describe('steps-config', () => {
 
     it('ignores out-of-range step numbers', () => {
       expect(getLadderCauseTitle(99, { ruleset: '2024' })).toBeUndefined();
+    });
+  });
+
+  // Combined disabled-Save sentence feeding BOTH save controls (sidebar
+  // ✓ Save + edit-mode footer Save Changes) — the ladder idiom extended to
+  // cover the caps belt so a disabled Save is never silent (run AZ backlog).
+  describe('getSaveCauseTitle', () => {
+    it('names the ladder step first — a ladder break wins over any caps break', () => {
+      expect(getSaveCauseTitle({
+        firstInvalidStep: 5,
+        ruleset: '2024',
+        abilityCapBroken: true,
+        selectionCapBroken: true,
+      })).toBe('Complete "Background" first');
+    });
+
+    it('names the feats/skills lanes when only the selection caps are broken', () => {
+      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e', selectionCapBroken: true }))
+        .toBe('Feats/skills exceed the rules limit — fix highlighted steps');
+    });
+
+    it('names the ability lane when only the ability totals are over cap', () => {
+      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e', abilityCapBroken: true }))
+        .toBe('Ability totals exceed the rules limit — fix highlighted steps');
+    });
+
+    it('names both lanes on a combined caps break', () => {
+      expect(getSaveCauseTitle({
+        firstInvalidStep: null,
+        ruleset: '2024',
+        abilityCapBroken: true,
+        selectionCapBroken: true,
+      })).toBe('Ability totals and feats/skills exceed the rules limit — fix highlighted steps');
+    });
+
+    it('stays undefined when nothing blocks Save', () => {
+      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e' })).toBeUndefined();
+      expect(getSaveCauseTitle()).toBeUndefined();
     });
   });
 });

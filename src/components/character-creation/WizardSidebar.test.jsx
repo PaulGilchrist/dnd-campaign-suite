@@ -137,12 +137,46 @@ describe('WizardSidebar', () => {
       expect(saveButton()).not.toHaveAttribute('title');
     });
 
-    it('stays silent on a non-ladder disablement (no firstInvalidStep given)', () => {
-      // Save can also be disabled by the wizard's over-cap gates — that lane
-      // owns its own messaging, so the ladder cause must not be fabricated.
-      renderSidebar({ isSaveEnabled: false, firstInvalidStep: null });
+    it('names the caps cause from saveCauseTitle on a non-ladder disablement', () => {
+      // The wizard's over-cap gates close the Save belt while the ladder is
+      // fully valid; the combined sentence (getSaveCauseTitle) rides the
+      // disabled button so the block is never silent.
+      renderSidebar({
+        isSaveEnabled: false,
+        firstInvalidStep: null,
+        saveCauseTitle: 'Feats/skills exceed the rules limit — fix highlighted steps',
+      });
       expect(saveButton()).toBeDisabled();
-      expect(saveButton()).not.toHaveAttribute('title');
+      expect(saveButton()).toHaveAttribute(
+        'title',
+        'Feats/skills exceed the rules limit — fix highlighted steps'
+      );
+      // Tabs have no caps stake — they stay titleless while enabled.
+      expect(tabByTitle('Special Actions')).not.toHaveAttribute('title');
+    });
+
+    it('the wizard sentence wins over the ladder fallback on mixed drafts', () => {
+      // Ladder break + over-caps: the wizard sentence names the ladder step.
+      renderSidebar({
+        ruleset: '2024',
+        currentStep: 2,
+        getStepEnabled: (step) => step <= 5,
+        isSaveEnabled: false,
+        firstInvalidStep: 5,
+        saveCauseTitle: 'Complete "Background" first',
+      });
+      expect(saveButton()).toHaveAttribute('title', 'Complete "Background" first');
+    });
+
+    it('falls back to the ladder cause when no wizard sentence is supplied', () => {
+      renderSidebar({
+        ruleset: '2024',
+        currentStep: 2,
+        getStepEnabled: (step) => step <= 5,
+        isSaveEnabled: false,
+        firstInvalidStep: 5,
+      });
+      expect(saveButton()).toHaveAttribute('title', 'Complete "Background" first');
     });
 
     it('omits the title when the blocking step is not part of the visible flow', () => {

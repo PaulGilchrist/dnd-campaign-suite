@@ -99,7 +99,24 @@ describe('WizardFooter', () => {
       expect(saveChanges()).toHaveAttribute('title', 'Complete "Subrace" first');
     });
 
-    it('stays silent on a non-ladder (caps-only) disablement', () => {
+    it('names the caps cause from saveCauseTitle on a non-ladder (caps-only) disablement', () => {
+      render(
+        <WizardFooter
+          {...createProps()}
+          {...lastStepEdit}
+          isSaveEnabled={false}
+          firstInvalidStep={null}
+          saveCauseTitle="Feats/skills exceed the rules limit — fix highlighted steps"
+        />
+      );
+      expect(saveChanges()).toBeDisabled();
+      expect(saveChanges()).toHaveAttribute(
+        'title',
+        'Feats/skills exceed the rules limit — fix highlighted steps'
+      );
+    });
+
+    it('stays silent only when no cause is supplied at all (bare component face)', () => {
       render(<WizardFooter {...createProps()} {...lastStepEdit} isSaveEnabled={false} firstInvalidStep={null} />);
       expect(saveChanges()).toBeDisabled();
       expect(saveChanges()).not.toHaveAttribute('title');

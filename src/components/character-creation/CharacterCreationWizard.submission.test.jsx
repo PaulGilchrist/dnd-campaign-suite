@@ -251,6 +251,10 @@ vi.mock('../../config/steps-config.js', () => {
   return {
     WIZARD_STEPS: mockSteps,
     getVisibleSteps: vi.fn(mockGetVisibleSteps),
+    // Save-cause sentence oracle: this file asserts the gate BOOLEAN via the
+    // sidebar mock's isSaveEnabled span, never the title, so the helper is
+    // stubbed inert (titleless like an unblocked Save).
+    getSaveCauseTitle: vi.fn(() => undefined),
   };
 });
 

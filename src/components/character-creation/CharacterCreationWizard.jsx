@@ -7,7 +7,7 @@ import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
 import WizardSidebar from './WizardSidebar.jsx';
-import { WIZARD_STEPS, getVisibleSteps } from '../../config/steps-config.js';
+import { WIZARD_STEPS, getVisibleSteps, getSaveCauseTitle } from '../../config/steps-config.js';
 import useWizardForm from '../../hooks/wizard/useWizardForm.js';
 import useWizardData from '../../hooks/wizard/useWizardData.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
@@ -546,6 +546,16 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
   // the edit-mode footer Save Changes — so they can never disagree.
   const saveGateEnabled = isSaveEnabled && abilitiesWithinCap && selectionsWithinCap;
 
+  // ONE cause sentence feeding both controls' disabled `title`: the ladder
+  // blocker names its step, otherwise the caps belt names the over-cap
+  // lanes (a caps-only disk draft used to leave both buttons silent).
+  const saveCauseTitle = getSaveCauseTitle({
+    firstInvalidStep,
+    ruleset,
+    abilityCapBroken: !abilitiesWithinCap,
+    selectionCapBroken: !selectionsWithinCap,
+  });
+
   const renderStep = useCallback(() => {
     return (
       <WizardStepRenderer
@@ -694,6 +704,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
               goToStep={goToStep}
               isSaveEnabled={saveGateEnabled}
               firstInvalidStep={firstInvalidStep}
+              saveCauseTitle={saveCauseTitle}
               onSave={handleSubmit}
             />
             <div className="wizard-content">
@@ -713,6 +724,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           isSaveEnabled={saveGateEnabled}
           ruleset={ruleset}
           firstInvalidStep={firstInvalidStep}
+          saveCauseTitle={saveCauseTitle}
           />
         </div>
         {pendingRulesetSwitch && (

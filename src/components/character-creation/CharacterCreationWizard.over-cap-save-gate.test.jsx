@@ -122,6 +122,11 @@ describe('CharacterCreationWizard — loaded over-cap feats/skills gate the Save
 
     // The belt lands async (same validators, same fetch lane the steps use).
     await waitFor(() => expect(saveButton()).toBeDisabled());
+    // The disabled Save names the caps cause instead of staying silent.
+    expect(saveButton()).toHaveAttribute(
+      'title',
+      'Feats/skills exceed the rules limit — fix highlighted steps'
+    );
 
     // Feat lane face is real: the step still renders the row as selected.
     goToStep('Feats');
@@ -187,12 +192,13 @@ describe('CharacterCreationWizard — loaded over-cap feats/skills gate the Save
     fireEvent.click(specialTab);
 
     const footerSave = await screen.findByRole('button', { name: 'Save Changes' });
-    // Same gate: both disabled, and the caps-only block names NO ladder
-    // cause on either control (sidebar parity — it owns no title here).
+    // Same gate: both disabled, and the caps-only block names its CAUSE on
+    // both controls (run-AZ backlog fix: the belt used to be silent).
+    const capsCause = 'Feats/skills exceed the rules limit — fix highlighted steps';
     expect(footerSave).toBeDisabled();
     expect(saveButton()).toBeDisabled();
-    expect(footerSave).not.toHaveAttribute('title');
-    expect(saveButton()).not.toHaveAttribute('title');
+    expect(footerSave).toHaveAttribute('title', capsCause);
+    expect(saveButton()).toHaveAttribute('title', capsCause);
 
     // Repair the feat lane (the loaded skill row was already 3-of-2; the
     // sibling test owns the full repair walk) — re-derive via deselect here

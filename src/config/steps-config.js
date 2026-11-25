@@ -291,12 +291,44 @@ export const getStepConfig = (stepNumber) => WIZARD_STEPS.find((step) => step.st
  * sidebar ✓ Save, edit-mode footer Save Changes): names the first step the
  * valid-prefix ladder is waiting on, using the CURRENT ruleset flow's titles.
  * Returns undefined when nothing blocks the ladder (null firstInvalidStep —
- * e.g. a caps-only Save disablement, which owns its own messaging) or when
- * the blocking step is not part of the visible flow (stale mid-switch render).
+ * e.g. a caps-only Save disablement, which owns its own messaging via
+ * getSaveCauseTitle) or when the blocking step is not part of the visible
+ * flow (stale mid-switch render).
  */
 export const getLadderCauseTitle = (firstInvalidStep, { ruleset } = {}) => {
   if (firstInvalidStep == null) return undefined;
   const title = getVisibleSteps({ ruleset }).find((step) => step.step === firstInvalidStep)?.title;
   return title ? `Complete "${title}" first` : undefined;
+};
+
+/**
+ * Cause sentence shown on BOTH save controls (sidebar ✓ Save and the
+ * edit-mode footer Save Changes) while the Save gate is closed. Mirrors the
+ * ladder idiom above so a disabled Save always names its cause: a ladder
+ * break wins (it is what blocks navigation too); otherwise the caps lanes
+ * that close the belt say so — a disk-loaded or ruleset-switched over-cap
+ * draft used to leave both buttons disabled with a NULL title.
+ * Returns undefined only when nothing blocks Save at all.
+ *
+ * @param {object} options
+ * @param {number|null} options.firstInvalidStep - Ladder blocker (see above).
+ * @param {string} options.ruleset - Current flow's ruleset for step titles.
+ * @param {boolean} options.abilityCapBroken - Any ability total over cap.
+ * @param {boolean} options.selectionCapBroken - Feats/skills over their slots.
+ */
+export const getSaveCauseTitle = ({
+  firstInvalidStep = null,
+  ruleset,
+  abilityCapBroken = false,
+  selectionCapBroken = false,
+} = {}) => {
+  const ladder = getLadderCauseTitle(firstInvalidStep, { ruleset });
+  if (ladder) return ladder;
+  const lanes = [];
+  if (abilityCapBroken) lanes.push('ability totals');
+  if (selectionCapBroken) lanes.push('feats/skills');
+  if (lanes.length === 0) return undefined;
+  const phrase = lanes.join(' and ');
+  return `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} exceed the rules limit — fix highlighted steps`;
 };
 
