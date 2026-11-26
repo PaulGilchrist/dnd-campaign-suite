@@ -51,8 +51,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-26 (wizard toll focus law):** after the re-arm bug is fixed, consider moving initial focus into `DiscardDraftDialog`… already on Cancel — fine; the ACTUAL friction: the toll's Cancel/`Yes, Discard` buttons are unstyled generic `<button>`s on the `modal-shell` tier while every other confirm in the app family renders `.ct-btn`/`.delete-confirm-btn` — visually quiet for a destructive answer. Cosmetic only. Paths: `src/components/common/DeleteConfirmModal.jsx:143-148`.
-
 ## Blocked / not verified (replaced each run)
 
 - EB refine hosts under a live model / capture-mock (PT#1) — not entered this cycle.
