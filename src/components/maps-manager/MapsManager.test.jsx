@@ -527,6 +527,8 @@ describe('MapsManager', () => {
                 expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
             });
             expect(mapsService.renameMap).not.toHaveBeenCalled();
+            // Refused, not closed: the editor stays armed holding 'forest'.
+            expect(screen.getByDisplayValue('forest')).toBeInTheDocument();
         });
 
         it('shows the default rename error when the service fails', async () => {

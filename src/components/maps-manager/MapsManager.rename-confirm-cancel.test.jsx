@@ -138,20 +138,22 @@ describe('MapsManager — armed rename is distinguishable from the toolbar creat
         });
     });
 
-    it('Cancel clears a stale error banner like the Escape lane (criterion 4)', async () => {
+    it('Cancel after a dup refusal clears the banner like the Escape lane (criterion 4)', async () => {
         await openRename();
         const input = screen.getByRole('textbox', { name: 'New name for "Battle Arena"' });
 
-        // Dup commit sets the banner (gate branch closes the editor)...
+        // Dup commit sets the banner and REFUSES: the editor stays armed with
+        // the pending value (backlog 2026-11-26 refused-keep-open)...
         fireEvent.change(input, { target: { value: 'Test Map' } });
         fireEvent.keyDown(input, { key: 'Enter' });
         await waitFor(() =>
             expect(screen.getByText('A map with that name already exists')).toBeInTheDocument());
+        expect(input).toHaveValue('Test Map');
 
-        // ...a fresh arm, then Cancel, ends with no banner and zero writes.
-        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
+        // ...Cancel then closes it with no banner and zero writes.
         fireEvent.click(screen.getByRole('button', { name: 'Cancel rename for "Battle Arena"' }));
         expect(screen.queryByText('A map with that name already exists')).not.toBeInTheDocument();
+        expect(screen.queryByRole('textbox', { name: 'New name for "Battle Arena"' })).not.toBeInTheDocument();
         await waitFor(() => expect(mapsService.renameMap).not.toHaveBeenCalled());
     });
 });

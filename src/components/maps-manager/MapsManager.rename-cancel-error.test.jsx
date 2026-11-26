@@ -6,6 +6,11 @@
 // "A map with that name already exists" hovering over an untouched row.
 // Cancel branches (Escape, empty-blur) and a fresh handleStartRename now
 // mirror the setError(null)-on-action pattern of the success lanes.
+// Backlog 2026-11-26 sharpened the dup lane: the refusal now KEEPS the editor
+// armed with the pending value (hex-POI refused-edit idiom), so the banner is
+// live behind the open input and every close lane here starts from that
+// armed-refusal state. The fresh-arm-clears-banner leg rides the async
+// rename-error close (the one lane that still closes with a live banner).
 // Harness mirrors MapsManager.empty-kebab-gate.test.jsx.
 
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -61,9 +66,10 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         props = { campaignName: 'test-campaign', onOpenMap: vi.fn() };
     });
 
-    // Trigger the dup-rename inline error: rename Battle Arena to an existing
+    // Trigger the dup-rename refusal: rename Battle Arena to an existing
     // display name and commit with Enter. The gate branch sets the banner and
-    // closes the input; renameMap must never fire.
+    // LEAVES the editor armed with the pending value (backlog 2026-11-26);
+    // renameMap must never fire.
     const triggerDupError = async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
         const input = screen.getByDisplayValue('Battle Arena');
@@ -71,6 +77,9 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         fireEvent.keyDown(input, { key: 'Enter' });
         await waitFor(() => expect(screen.getByText(DUP_COPY)).toBeInTheDocument());
         expect(mapsService.renameMap).not.toHaveBeenCalled();
+        // The refusal is a KEEP-OPEN: the same input is still mounted, still
+        // holding the rejected text.
+        expect(screen.getByDisplayValue('Test Map')).toBeInTheDocument();
     };
 
     const mount = async () => {
@@ -78,30 +87,23 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         await waitFor(() => expect(screen.getByText('Battle Arena')).toBeInTheDocument());
     };
 
-    it('dup error → fresh Rename clears the banner and Escape cancels with zero writes (criteria 1 + 3)', async () => {
+    it('dup refusal keeps the banner live; Escape then clears it and closes with zero writes (criteria 1 + 3)', async () => {
         await mount();
         await triggerDupError();
 
-        // Criterion 3: handleStartRename resets error — no stale banner the
-        // moment a fresh rename opens.
-        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
-        expect(screen.queryByText(DUP_COPY)).not.toBeInTheDocument();
-        const input = screen.getByDisplayValue('Battle Arena');
-
         // Criterion 1: Escape cancels — banner gone from the DOM, row name
         // byte-intact, and no rename request ever hit the service.
-        fireEvent.keyDown(input, { key: 'Escape' });
+        fireEvent.keyDown(screen.getByDisplayValue('Test Map'), { key: 'Escape' });
         expect(screen.queryByText(DUP_COPY)).not.toBeInTheDocument();
         expect(screen.getByText('Battle Arena')).toBeInTheDocument();
         await waitFor(() => expect(mapsService.renameMap).not.toHaveBeenCalled());
     });
 
-    it('dup error → empty/whitespace blur ends with the banner gone and zero writes (criterion 2)', async () => {
+    it('dup refusal → empty/whitespace blur ends with the banner gone and zero writes (criterion 2)', async () => {
         await mount();
         await triggerDupError();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
-        const input = screen.getByDisplayValue('Battle Arena');
+        const input = screen.getByDisplayValue('Test Map');
         fireEvent.change(input, { target: { value: '   ' } });
         fireEvent.blur(input);
 
@@ -110,10 +112,10 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         await waitFor(() => expect(mapsService.renameMap).not.toHaveBeenCalled());
     });
 
-    // The gate branches close the input as they set the banner, so the only way
-    // a banner is live WHILE the rename input is open is an async lane error
-    // (a list reload failing behind the open input) — the race rig below pins
-    // the Escape and empty-blur cancel legs directly, independently of the
+    // The only lane that still closes with a LIVE banner is an async error
+    // landing while the input is open (a list reload failing behind it) or the
+    // rejected renameMap commit below — the rig here pins the Escape and
+    // empty-blur cancel legs directly, independently of the
     // handleStartRename clear.
     const openRenameBehindAsyncError = async () => {
         const gate = deferred();
@@ -155,24 +157,44 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         expect(mapsService.renameMap).not.toHaveBeenCalled();
     });
 
-    it('a successful rename still saves and clears the banner (criterion 4)', async () => {
+    it('a successful rename after a refusal still saves and clears the banner (criterion 4)', async () => {
         await mount();
         await triggerDupError();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
-        const input = screen.getByDisplayValue('Battle Arena');
+        // Fix it in place: the armed input takes the corrected name and Enter
+        // commits — exactly one rename call, banner cleared.
+        const input = screen.getByDisplayValue('Test Map');
         fireEvent.change(input, { target: { value: 'Renamed Arena' } });
         fireEvent.keyDown(input, { key: 'Enter' });
 
         await waitFor(() =>
             expect(mapsService.renameMap).toHaveBeenCalledWith('test-campaign', 'battle-arena.json', 'Renamed Arena'));
+        expect(mapsService.renameMap).toHaveBeenCalledTimes(1);
         expect(screen.queryByText(DUP_COPY)).not.toBeInTheDocument();
+    });
+
+    it('a banner left live by a CLOSED commit does not bleed into a fresh arm (criterion 3)', async () => {
+        // The rejected-server commit is the one lane that still closes with the
+        // banner set — handleStartRename's setError(null) must clear it the
+        // moment the next rename opens (backlog 2026-11-12 RS).
+        mapsService.renameMap.mockRejectedValue(new Error('rename failed'));
+        await mount();
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
+        const first = screen.getByDisplayValue('Battle Arena');
+        fireEvent.change(first, { target: { value: 'Renamed Arena' } });
+        fireEvent.keyDown(first, { key: 'Enter' });
+        await waitFor(() => expect(screen.getByText('rename failed')).toBeInTheDocument());
+        expect(screen.queryByPlaceholderText('Rename to…')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
+        expect(screen.queryByText('rename failed')).not.toBeInTheDocument();
     });
 
     it('existing gates preserved: kebab-junk commit errors, same-name commit cancels silently (criterion 4)', async () => {
         await mount();
 
-        // Kebab-junk → inline gate copy, zero write.
+        // Kebab-junk → inline gate copy, zero write, editor stays armed with
+        // the rejected text (backlog 2026-11-26).
         fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
         let input = screen.getByDisplayValue('Battle Arena');
         fireEvent.change(input, { target: { value: '!!!' } });
@@ -180,8 +202,11 @@ describe('MapsManager — rename cancel clears the error banner', () => {
         await waitFor(() =>
             expect(screen.getByText('Map name must contain letters or numbers')).toBeInTheDocument());
         expect(mapsService.renameMap).not.toHaveBeenCalled();
+        expect(screen.getByDisplayValue('!!!')).toBeInTheDocument();
 
-        // Same-name commit → silent cancel: no error, no write.
+        // Escape out of the refusal, then a same-name commit → silent cancel:
+        // no error, no write.
+        fireEvent.keyDown(screen.getByDisplayValue('!!!'), { key: 'Escape' });
         fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
         input = screen.getByDisplayValue('Battle Arena');
         fireEvent.keyDown(input, { key: 'Enter' });

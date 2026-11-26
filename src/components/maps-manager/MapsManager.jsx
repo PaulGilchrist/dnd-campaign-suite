@@ -369,8 +369,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted, isLocalhost = true
 
     // COMMIT LANES ARE ENTER AND THE CONFIRM BUTTON ONLY (backlog 2026-11-25
     // BC): blur is no longer a commit — see handleCancelRename's onBlur ride.
-    // Same gates as before (empty/same-name silent cancel, kebab + duplicate
-    // inline banners).
+    // Gates: empty/same-name commits are silent closes; kebab + duplicate
+    // commits are REFUSED with an inline banner and the editor stays armed
+    // (backlog 2026-11-26) so the pending text can be fixed in place.
     const handleRenameSave = async (oldFileName) => {
         const newName = renameValue.trim();
         if (!newName) {
@@ -385,18 +386,21 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted, isLocalhost = true
             closeRenameEditor(oldFileName);
             return;
         }
+        // REFUSED COMMITS KEEP THE EDITOR ARMED (backlog 2026-11-26, mirroring
+        // the hex POI rename lane's `return false` idiom): the banner names the
+        // problem while the pending text, focus and caret stay in the input so
+        // the user fixes it in place instead of losing the typed value to a
+        // close-and-revert.
         // Same empty-kebab gate as create/rename-server — an empty handle
         // would move the file onto the undeletable `.json` dotfile slug.
         if (!mapsService.toKebabCase(newName)) {
             setError('Map name must contain letters or numbers');
-            closeRenameEditor(oldFileName);
             return;
         }
         // Check for duplicates (compare display names directly)
         const newKebab = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         if (maps.some(m => m.fileName !== oldFileName && m.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === newKebab)) {
             setError('A map with that name already exists');
-            closeRenameEditor(oldFileName);
             return;
         }
         try {

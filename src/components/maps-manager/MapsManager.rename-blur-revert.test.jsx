@@ -209,12 +209,14 @@ describe('MapsManager — rename blur reverts; Enter/Confirm are the only commit
         expect(screen.queryByPlaceholderText('Rename to…')).not.toBeInTheDocument();
         expect(mapsService.renameMap).not.toHaveBeenCalled();
 
-        // Duplicate name raises the inline banner with zero writes.
+        // Duplicate name raises the inline banner with zero writes AND keeps
+        // the editor armed with the rejected text (backlog 2026-11-26).
         input = arm();
         fireEvent.change(input, { target: { value: 'Test Map' } });
         fireEvent.keyDown(input, { key: 'Enter' });
         await waitFor(() =>
             expect(screen.getByText('A map with that name already exists')).toBeInTheDocument());
         expect(mapsService.renameMap).not.toHaveBeenCalled();
+        expect(screen.getByPlaceholderText('Rename to…')).toHaveValue('Test Map');
     });
 });

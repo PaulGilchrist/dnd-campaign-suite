@@ -49,7 +49,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-26 explore: duplicate-name map rename CLOSES the editor and loses the typed value (banner `A map with that name already exists` shows after the row reverted to the old name) — the sibling hex POI rename lane refuses and KEEPS the editor open with the pending text so the user can fix it in place; aligning the maps-manager lane (`handleRenameSave` dup/non-kebab branches → keep open + inline banner) would match the app's own refused-edit idiom.
 
 ## Blocked / not verified (replaced each run)
 
