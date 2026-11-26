@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Lane: useTvPresentation UP-NEXT derivation (FT 2026-11-09 backlog fix).
 // Law: the strip is sliced AFTER resolving the active row's position in the
 // FULL tracker array (the Next-walk order of initiativeService

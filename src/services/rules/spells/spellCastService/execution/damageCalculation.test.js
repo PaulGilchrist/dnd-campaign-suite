@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-087 Spell Sniper base lane — damageCalculation.js module-direct face (owner split #1468):
 //   computeRange -> THIS FILE (FT-087 clause (d) spellRangeBonus, git a6c37627f "test-locked";
 //   automations-manifest.json FT-087 cites damageCalculation:22 as the +60 consumer pin).

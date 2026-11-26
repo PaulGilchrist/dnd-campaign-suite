@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Tests for inline choice modals rendered by CharActionModals (InlineChoiceModals.jsx):
 // - divineFuryChoice: dispatches damage type selection / skip
 // - damageTypeChoice: routes clicks to generic | enhancedUnarmed | damageTypeModifier

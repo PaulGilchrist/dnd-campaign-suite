@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // SearingVengeanceModal is a thin props adapter over shared/CreatureSelectionModal.jsx
 // (selection, gating, and map-overlay behavior are covered by shared/CreatureSelectionModal.test.jsx).
 // This file pins what is unique to this seam: the hardcoded Searing Vengeance copy (verified

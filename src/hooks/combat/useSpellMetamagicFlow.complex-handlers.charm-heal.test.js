@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Charm/heal confirm routing for useSpellMetamagicFlow (SIMPLE_SPELL_SPECS lane).
 // Owns: Charm Person / Charm Monster trigger threading (charmPersonTargets /
 // charmMonsterTargets + characters) and Healing Word / Heal object-target confirms

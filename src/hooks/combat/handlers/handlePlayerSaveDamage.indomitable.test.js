@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Seam: resolveAutoRerolls in handlePlayerSaveDamage.js — how the once-per-rest
 // kill-switches (fanaticalFocusUsed, indomitableUses >= indomitableMax) and the
 // autoRerollBonus expression shape the waiting-save popup. Reroll *computation*

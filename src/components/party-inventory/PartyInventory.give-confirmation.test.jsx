@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // Improve (.pi-modal Give default 0 + confirm sum): the Give modal prefilled the focused
 // currency from the party balance (1 in source, full balance observed live) and submitted
 // with no confirmation — one accidental Enter moved money. Now every amount input defaults

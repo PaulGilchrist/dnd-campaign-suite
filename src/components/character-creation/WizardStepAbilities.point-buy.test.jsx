@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Point-buy lane for WizardStepAbilities: budget enforcement on base-score edits.
 // Cost table and total_points pinned to public/data/rules-validation.json (5e):
 // costs {8:0, 9:1, 10:2, 11:3, 12:4, 13:5, 14:7, 15:9}, total_points 27.

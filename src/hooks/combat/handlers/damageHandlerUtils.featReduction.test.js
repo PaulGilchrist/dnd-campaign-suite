@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // DB 2026-11-06 backlog: feat damage-reduction (Heavy Armor Master) folded into
 // the hp_change damageBreakdown as a sibling 'reduced' entry. buildDamageBreakdownEntry
 // (resistance entries, byte-frozen) and the array twin buildDamageBreakdownEntries

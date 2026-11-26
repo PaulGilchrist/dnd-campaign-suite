@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Lane: Relentless Rage (Barbarian lv11) zero-HP interception through applyDamageToTarget.
 // Owns the interception RETURN CONTRACT at the dispatcher (interceptZeroHitPoints): every
 // intercepted drop-to-0 must carry an honest numeric newHp so consumer rows (fall_damage

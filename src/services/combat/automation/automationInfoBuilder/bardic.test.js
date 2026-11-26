@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // bardic builder envelopes (lane #2095): pins what the BUILDER emits — exact
 // toEqual envelopes, hardcoded-field probes (#2094 pattern), discriminating
 // level fixtures. Die-ladder-from-disk and runtime readers are canonical in

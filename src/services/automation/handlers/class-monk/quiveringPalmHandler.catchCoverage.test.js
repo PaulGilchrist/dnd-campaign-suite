@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Catch-branch coverage for quiveringPalmHandler: pins that each addEntry(...).catch()
 // call site swallows log rejections AND logs '[quiveringPalmHandler:log-error]'.
 // Seam map for the cluster: handle() success-path catch → successCatch.test.js;

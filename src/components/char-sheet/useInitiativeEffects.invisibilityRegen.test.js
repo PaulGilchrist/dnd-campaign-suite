@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane (#invisibilityRegen): sole owner of clearActiveInvisibility (:225-232),
 // clearActiveGreaterInvisibility (:234-241) and restoreRegenerateTargets (:244-256)
 // — verified by grep: no sibling asserts end*/regenerateActive/currentHitPoints.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // bug-speedy-oa-disadvantage-inert — monster-card lane: the pending-trigger
 // OA press consulted NOTHING about the marked mover's passives, so an OA
 // against a 2024 Speedy holder (Agile Movement: "Opportunity Attacks have

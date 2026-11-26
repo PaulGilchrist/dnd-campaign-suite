@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic modal-delegation contract pins for buffHandler:
+// @maintained-by-ai 2026-10-15 — deterministic modal-delegation contract pins for buffHandler:
 // modal names/payload shapes consumed by the char-sheet router, self-exclusion semantics
 // per lane, and confirmTelepathicSpeech (CHA miles, level minutes, awakenedMindTarget key,
 // expiration, log). All IO mocked; only breaks when a lane's contract intentionally changes.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Lane: TargetSelect.jsx render gate (bug-visitor-arms-any-pc-target-cross-
 // player-write). On a LAN (non-localhost) tab the target-arm <select> renders
 // ONLY for (a) monster rows with a resolved controller (delegated execution,

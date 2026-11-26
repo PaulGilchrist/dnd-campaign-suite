@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 import { describe, it, expect } from 'vitest';
 import utils, { DEBUG_FORCE_CRIT } from './utils.js';
 

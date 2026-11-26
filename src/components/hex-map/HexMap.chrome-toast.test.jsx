@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Panel chrome-click → .travel-toast wiring (backlog 2026-11-11 JU): the
 // floating TravelPanel occupies the grid's lower-left and silently absorbed
 // destination clicks. HexMap derives `awaitingDestination` (panel open +

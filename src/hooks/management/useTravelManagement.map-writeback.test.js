@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 /*
  * useTravelManagement — map-file write-back publisher (improve 2026-10-26-D).
  *

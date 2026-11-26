@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for handle()'s GENERIC temp_hp_buff lane
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for handle()'s GENERIC temp_hp_buff lane
 // (missing expression, failed evaluation, grant + popup copy). Fixed lanes are owned by sibling
 // suites: bolsteringTreats (incl. the dispatch-boundary "treat lane not entered" pin),
 // mantleOfInspiration, multiTargetAlly, vitalityOfTheTree, grantTempHpOnRage.

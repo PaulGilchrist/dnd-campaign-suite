@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // ── #1815 self lane — healingHandler.js handleSelfHealing gates, uses ─────
 //    tracking, hit_die_roll, SELF-target reroll/maximize + handle() dispatch

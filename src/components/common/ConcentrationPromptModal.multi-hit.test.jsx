@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // ConcentrationPromptModal — same-target MULTI-HIT prompts (bug-concentration-multi-hit-prompt-collapse)
 //
 // RAW: multiple damage instances on a concentrating target = multiple CON

@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for the Vitality of the Tree lane of tempHpBuffHandler:
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for the Vitality of the Tree lane of tempHpBuffHandler:
 // dispatch into handleVitalityOfTheTree, CLA-378 offer/round gates, modal payload, confirmVitalityOfTheTree.
 // Generic-lane message copy ("No temp HP expression defined" / "Could not calculate temp HP") is owned SOLELY
 // by tempHpBuffHandler.handle.test.js — falls-through cases here pin shape only (type==='popup', no modalName).

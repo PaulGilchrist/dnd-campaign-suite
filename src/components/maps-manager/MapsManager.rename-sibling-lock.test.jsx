@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // MapsManager.rename-sibling-lock.test.jsx — backlog 2026-11-25 BC (follow-up):
 // with a rename editor armed, EVERY other row still rendered an identical
 // enabled `Rename "<other>"` button — nothing dimmed or blocked the siblings,

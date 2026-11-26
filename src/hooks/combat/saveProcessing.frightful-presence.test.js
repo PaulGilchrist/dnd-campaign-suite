@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0048 frightful-presence-specific seam ONLY: the Adult Blue Dracolich
 // "Frightful Presence" disk row (monsters.json, DC 18 WIS, dc_success none,
 // legacy repeat_save with NO `effect` key) byte-builds the save context

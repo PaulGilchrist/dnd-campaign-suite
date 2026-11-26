@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-279 lane — directSpellDamageSteps.js, spell side of the radiant_soul split.
 // Rule (Radiant Soul, Channel Divinity): once per turn, when the holder deals radiant or
 // fire damage with a feature, add Charisma to the roll. execution/index.js computeRadiantSoul

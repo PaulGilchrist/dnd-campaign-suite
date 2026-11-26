@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Regression tests for the character-creation wizard duplicate-name gate:
 // Step 2 validation and final-submit validation must reject names that
 // collide case-insensitively (and whitespace-insensitively) with existing

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // MN-003: Commander's Strike was inert end-to-end — the grant executor had no
 // once-per-turn latch nor 30-ft range gate (die even spent before the no-allies
 // check). These tests pin the MN-003 fixed lanes unique to this file: the

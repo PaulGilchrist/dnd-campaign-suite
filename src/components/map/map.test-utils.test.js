@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Smoke tests for the only real logic in map.test-utils.js:
 //   - grid-center arithmetic               map.test-utils.js:3-4
 //   - default fixture + override spread   map.test-utils.js:6-31

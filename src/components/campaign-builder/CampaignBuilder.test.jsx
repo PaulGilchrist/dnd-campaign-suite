@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Campaign-authoring plan Phase 3 — Campaign Builder review hub: grouped
 // draft rendering, story-tie chips, approve/reject wiring through the
 // shared draftActions service, and the clean empty state.

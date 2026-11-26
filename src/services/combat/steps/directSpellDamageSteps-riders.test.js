@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: directSpellDamageSteps.js steps[3] spellFeatureRiders — the generic spell-side
 // rider dispatch loop. Contract (source :162-174): seed prevData {formula,total,rolls}
 // from ctx (rolls copied), gate each featureModules entry on condition(ctx), await

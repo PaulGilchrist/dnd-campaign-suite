@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-020: Aura of Devotion — saveProcessing failed-save leg suppresses aura-covered
 // charmed (suppression logged naming Aura of Devotion); control targets still get it.
 // Seam-only, charmed sibling of saveProcessing.aura-of-courage.test.js: coverage split,

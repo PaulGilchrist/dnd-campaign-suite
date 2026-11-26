@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  DIRECT lane: what REAL handleGenericAutomation (triggerSpells.js  */
 /*  :453-:469) DOES with the metaCtx that #1505 proved ARRIVES at     */

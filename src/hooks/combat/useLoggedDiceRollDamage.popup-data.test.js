@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Authoritative popup-data lane for createLogDamageAndShow: plain-damage popup
 // structure/flags AND the NPC save-damage popup shape, plus routing (auto-miss,
 // AoE string popup) and missing-target handling.

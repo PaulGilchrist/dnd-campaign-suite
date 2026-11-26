@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0863: Glabrezu "Pincer" — prose carries "If the target is a Medium or
 // smaller creature, it has the Grappled condition (escape DC 15) from one of
 // two pincers" (DC 15 = 8 + STR 7 + PB 0, description authority) but the row

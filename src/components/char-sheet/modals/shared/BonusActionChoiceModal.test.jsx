@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Canonical lane for BonusActionChoiceModal UI: selection gating, handler seam args,
 // applied-state swap, close paths (Cancel/Done only), the modal's own CLA-067
 // per-option log suffixes, and its internal-skill-check dispatch for Sleight of

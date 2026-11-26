@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * campaignService — client-side fetch contract for campaign/character CRUD.
  *

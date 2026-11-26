@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /**
  * Archive pre-flight of the CampaignAdmin upload lane
  * (backlog 2026-10-28-O: empty/foreign zip accepted silently): choosing a

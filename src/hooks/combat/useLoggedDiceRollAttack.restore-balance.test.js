@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the Restore Balance (CLA-295) attack-lane seam of createLogAndShow:
 // maybeCancelForcedMode consults consumeArmedRestoreBalance only for
 // advantage/disadvantage rolls and folds the mode to normal when an armed

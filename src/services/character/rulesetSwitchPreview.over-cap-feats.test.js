@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /**
  * Regression lock for `bug-ruleset-switch-ledger-persists-overcap-feats-skills`.
  *

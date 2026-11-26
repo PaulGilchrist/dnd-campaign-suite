@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 //
 // CHECK lane: pins ONLY the pre-prompt gate of checkRelentlessRage() — the
 // zero-HP interceptor predicate (relentlessRageService.js:52) invoked by

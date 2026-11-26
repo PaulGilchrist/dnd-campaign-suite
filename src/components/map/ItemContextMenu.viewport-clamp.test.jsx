@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // ─── Lane: ItemContextMenu — viewport clamp law ──────────────────────────────
 // Backlog 2026-11-17 (live FI): a token low on the board anchored the SVG menu
 // so its tail rows rendered BELOW the visible board — clipped by the svg

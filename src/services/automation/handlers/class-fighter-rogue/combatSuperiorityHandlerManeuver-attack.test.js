@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // executeManeuver.js lane — the pending-prompt executor's own RUNNER_STEPS
 // effect branches: ally_movement / attack_roll_bonus / secondary_damage
 // (no-candidates popup; chooser + stash pinned in executeManeuver.mn018) /

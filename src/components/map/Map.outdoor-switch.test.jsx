@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ─── Lane: Map CONTAINER — outdoor mapName switch (#798) ─────────────────────
 // OWNED here (only this deep tree can prove):
 //   • outdoor → outdoor switch remounts HexMap so its real useMapLoader

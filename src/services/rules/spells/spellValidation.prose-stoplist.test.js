@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // spellValidation.js prose-stoplist channel (backlog 2026-11-06): the cantrip-capture guard
 // split into two drop channels — benign RAW quantifier prose ('two', 'another', …) is dropped
 // at console.debug (sheet-open noise, zero app fault), while a real catalog miss on a

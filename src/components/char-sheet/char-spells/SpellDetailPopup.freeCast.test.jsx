@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup free-cast authorization lane (component-level).
 // The popup delegates channel logic to the REAL isFreeCastAuthorized service
 // (spellPreparationService) — every channel (Natural Recovery, Bewitching

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Generic/5e Dodge lane: cannotAct gate, toggleBuff + addExpiration byte
 // payloads, toggle-off copy, name propagation, and 5e Dex-clause PRESENCE
 // byte-pinned in BOTH sinks (log AND popup) in one run. The 2024

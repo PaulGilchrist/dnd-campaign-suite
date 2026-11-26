@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: usePlacedItems — the hook's own mutation semantics at the setter SEAM (setPlacedItems/
 //   setSelectedItem owned by the PlacedItems component; no persistence here — no network, no timers).
 //   Render/visibility split (not duplicated here): PlacedItems.test.jsx, PlacedItems-fog.test.jsx and

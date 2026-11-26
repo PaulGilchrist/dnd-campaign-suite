@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // CLA-195 regression: createIndomitableHandler must consume exactly one use
 // (indomitableUses), submit the reroll with the +fighter level bonus threaded

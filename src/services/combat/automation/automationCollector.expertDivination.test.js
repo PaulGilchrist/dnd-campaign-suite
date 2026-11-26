@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-128 supply lane: real Diviner disk data → collector → exact passive row the
 // spellCast gate consumes. Consumer lives in spellCastService/execution/helpers.js
 // (gate predicate + trigger behavior covered in helpers-expertDivination.test.js and

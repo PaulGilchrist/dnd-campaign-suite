@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1020: Imp "Shape-Shift" — formerly a zero-affordance dead prose row
 // (name + description ONLY; MA-1020 audit: 0 buttons/chips/pointer children,
 // 0 whole-log shape-shift transport). NOW a dedicated `monster_shape_shift`

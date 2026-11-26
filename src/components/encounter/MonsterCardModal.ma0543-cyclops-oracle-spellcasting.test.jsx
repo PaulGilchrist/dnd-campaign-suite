@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0543 data lock: Cyclops Oracle Spellcasting rode the MA-0421/MA-0532
 // markup-gap template (save_dc 16 + save_type Wisdom already authored). Pre-fix
 // ONLY the tier headers carried <strong>; Arcane Eye/Detect Magic/Locate

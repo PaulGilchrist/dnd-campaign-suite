@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Router-contract oracle for the LIVE `multi_target_spread` route:
 // automation/index.js HANDLER_MAP (:369) → executeHandler ← CharSpecialActions
 // handleAutomationClick (row click via automationRouter routePassiveSpecial).

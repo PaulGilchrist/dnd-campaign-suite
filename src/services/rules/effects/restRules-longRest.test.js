@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LONG-REST BASE LANE: atomic batch reset (HP/slots/hit dice + the generic
 // null-everything batch over every registered LONG_REST_RESOURCES key — this file's
 // full-set proof subsumes all single-key echo lanes, #1301/#1306/#1311), exhaustion

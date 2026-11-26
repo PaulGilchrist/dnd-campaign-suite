@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Generic spellContext lane — directSpellDamageSteps.js steps[1] (direct-spell path):
 // base-formula selection + the three adders this step folds (Empowered Evocation,
 // Blessed Strikes, Elemental Affinity). spellContext only BUILDS formulas; it must

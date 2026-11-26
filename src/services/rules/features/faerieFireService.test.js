@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * faerieFireService lane — the ENVELOPE-COMPOSITION FORWARDER (faerieFireService.js L3-26).
  * Owns the entire body: exact action envelope sent to executeHandler, the two

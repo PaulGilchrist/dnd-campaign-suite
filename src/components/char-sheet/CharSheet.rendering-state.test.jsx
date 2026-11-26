@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSheet STATE lane — what the load-time fetchData seams stamp onto the
 // stats/props handed to children (applyPreparedSpells, applyAspectOfTheWilds,
 // applyMovementPassives) and the exhaustion clamp reaching CharSummary.

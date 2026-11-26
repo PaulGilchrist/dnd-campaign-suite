@@ -24,7 +24,7 @@
 // file pins the prose + defenderHp surfacing (full strings below).
 // All randomness contained: mockRuntime router for the one uses-exit probe,
 // fixed attack events, deterministic prose substrings.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 

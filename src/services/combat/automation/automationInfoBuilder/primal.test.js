@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── primal.test.js — automationInfoBuilder primal slice (lane #952 template) ──
 // Unit home for the exact emitted info bytes of primalHandlers (primal.js):
 // every companion feature automation row → handler-input envelope.

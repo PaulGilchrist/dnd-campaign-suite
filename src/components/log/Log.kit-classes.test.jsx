@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 //
 // .ct-* design-kit convergence (tranche 2): Log view chrome rides the shared
 // App.css kit. OWNED HERE (unique): the scoping + variant-hierarchy class

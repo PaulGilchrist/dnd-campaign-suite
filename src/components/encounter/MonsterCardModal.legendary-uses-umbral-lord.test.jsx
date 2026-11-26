@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to umbral-lord-distinct lanes: BY-name data
+// @maintained-by-ai 2026-10-18 — trimmed to umbral-lord-distinct lanes: BY-name data
 // locks (header uses:2 — was the swallowed Beguile child, MA-1657; Beguile
 // numeric save child DC 18 WIS — the vampire twin's DC 17 lives in
 // MonsterCardModal.legendary-uses-vampire.test.jsx; Umbral Strike

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // CLA-389: owns the bare {type:'popup'} cast-result seam — trigger results
 // (Wild Magic Surge non-20 roll, once-per-turn refusal) that arrive outside an
 // automationPopup wrapper must reach setPopupHtml, never be silently swallowed.

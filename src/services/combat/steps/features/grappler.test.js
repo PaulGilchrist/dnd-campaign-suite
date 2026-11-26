@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // FT-036 Grappler "Punch and Grab" lane. Owner-split (cite, do NOT re-drive here):
 //  - conditionSaveService.test.js #1005 owns grapple CON-save advantage channels (save math).
 //  - useCharActionsAttackHandlers.cla143-stamp.test.js owns the _attackActionTakenRound write seam;

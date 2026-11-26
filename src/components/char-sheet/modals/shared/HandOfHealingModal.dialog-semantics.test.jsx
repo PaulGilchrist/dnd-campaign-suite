@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Dialog-semantics pin for HandOfHealingModal (backlog 2026-11-10 HD follow-on):
 // all three top-level stages (picker / result / error) borrow .short-rest-modal
 // for a NON-rest flow, so each shell now carries the ShortRestModal tier

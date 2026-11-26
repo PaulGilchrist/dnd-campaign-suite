@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the graze-damage consumption lane of createLogAndShow: the REAL
 // attackPostProcessing.js processGrazeDamage path (ability-mod damage applied
 // on a genuine miss, graze log + popup content, default 'Slashing' type,

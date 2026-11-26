@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation):
 //   - Character header area: name, header action buttons, and the delete-confirm

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // applyCameraStep — the shared 3D keyboard-camera math (no WebGL, no three).
 // Fake camera/controls expose exactly the surface OrbitControls r160 gives:
 // camera.position {x,y,z,set}, controls.target, controls.update(). Pins the

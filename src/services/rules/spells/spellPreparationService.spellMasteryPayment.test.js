@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // SPELL MASTERY PAYMENT lane — CLA-323 (Wizard 'Spell Mastery', lv18; the root-cause fix was
 // "higher-level casts consume no spell slot (free-upcast leak)" — commit e30e441a4). Which
 // EFFECTIVE cast levels ride free (chosen names at their EXACT lowest level, UNLIMITED, no

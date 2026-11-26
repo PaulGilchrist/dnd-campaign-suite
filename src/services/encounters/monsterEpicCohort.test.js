@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CR 25-30 epic cohort — cross-cohort data integrity for the epic-monster
 // batch in public/data/monsters.json (official reprints, licensed icons,
 // original history/legend blocks).

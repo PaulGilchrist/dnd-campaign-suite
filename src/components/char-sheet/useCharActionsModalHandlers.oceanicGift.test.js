@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: Oceanic Gift (Gift of the Sea) target confirm in
 // useCharActionsModalHandlers. Pins the gate reading modalState (wrong-store refusal —
 // never modalState={} vacuity), the modal clearing BEFORE the selectedAllyName gate

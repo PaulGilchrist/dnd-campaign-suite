@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Main lane for darkOnesLuckHandler: owns popup/description formatting (full-string
 // own-composition pins), rollType branches (check/skill/save, null-saveType label),
 // guard logic (uses-zero, attacker filtering, rollType matching, no-side-effect on

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // createLogAndShow — Unbreakable Majesty ATTACK-SIDE trigger lane (hitResolution.
 // runUnbreakableMajesty): guard checks, one-shot attacker mark, save-DC and
 // prompt dispatch, activation/revocation logs, and the indefinite no-timers wait

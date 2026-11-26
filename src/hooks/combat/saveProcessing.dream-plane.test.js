@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment authored
 // failed-save grant — distinct te `lair_dream_plane` on the target (not the
 // MA-0104 `banished_demiplane` and not the PC spell `banishment`), the

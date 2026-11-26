@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory interaction boundaries — seams unique to this file (seam map lives in
 // CharInventory.edgeCases.test.jsx):
 //   - Magic items are DISPLAY-ONLY: their rows render no clickable spans and clicking

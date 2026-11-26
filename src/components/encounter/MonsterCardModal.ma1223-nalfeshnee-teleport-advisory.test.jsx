@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1223 modal press seam: Nalfeshnee "Teleport" advisory chip →
 // resolveMonsterActionAdvisoryRow (wired at MonsterCardModal.jsx:2840).
 // OWNERSHIP: disk row shape + resolver record-only contract are owned by

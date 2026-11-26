@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * TravelPanel — spent-day budget-context hint (backlog 2026-10-27-M).
  *

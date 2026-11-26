@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // One-modal-at-a-time invariant on the campaign-selection screen (2026-11-03
 // QA backlog): the New Campaign + Arena/Starter seed modals each own a
 // full-viewport .modal-overlay, and a stacked pair silently intercepts every

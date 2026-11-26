@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // First-paint lane for WeaponKindMasteryModal: exact header + instruction copy before any
 // selection (meleeOnly distinctness via prop omission, zero-selection count, default maxKinds 2).
 // Other lanes: maxKinds computation → WeaponKindMasteryModalMaxKinds.test.jsx, weapon rows →

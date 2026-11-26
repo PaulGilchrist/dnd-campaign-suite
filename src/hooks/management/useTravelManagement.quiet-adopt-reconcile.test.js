@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * useTravelManagement — quiet-adopt reconciliation (bug-hex-quiet-adopt-stale-file-travelstate).
  *

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // ─── Lane: PlayerContextMenu — Light cycle row (PC-token light lane) ──────────
 // The PC row MIRRORS the creature-side Light row in ItemContextMenu.jsx:
 //   • label bytes `Light: <setting>`, absent = canonical bright default

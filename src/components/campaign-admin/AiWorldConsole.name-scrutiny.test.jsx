@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Backlog 2026-11-01 (AV) — quest_draft accept-scrutiny CHIP on the world
 // card: unknown ledger names get a non-blocking advisory naming them,
 // ledger-grounded cards stay chip-free, and the "Add quest to ledger" apply

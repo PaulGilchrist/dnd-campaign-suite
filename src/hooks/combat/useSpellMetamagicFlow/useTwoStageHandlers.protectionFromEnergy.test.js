@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Protection from Energy lane internals for useTwoStageHandlers (per-handler owner —
 // flow orchestration / stage-machine seam lives in ../useSpellMetamagicFlow.gate-two-stage.test.js;
 // the apply-effect body itself lives in services/automation/handlers/buffs/protectionFromEnergyHandler.test.js).

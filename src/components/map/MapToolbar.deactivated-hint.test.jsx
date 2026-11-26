@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 /**
  * Deactivated-map advisory chip in the map view header (backlog 2026-11-05 CW):
  * when the mounted map is NOT the campaign's active map (GM deactivated it, or

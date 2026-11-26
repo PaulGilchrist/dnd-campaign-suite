@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-361: Thought Shield ("Whenever a creature deals Psychic damage to you, that
 // creature takes the same amount of damage that you take") — handler-seam tests.
 // The old version of this file locked in the fake-write defect (mutating the fetched

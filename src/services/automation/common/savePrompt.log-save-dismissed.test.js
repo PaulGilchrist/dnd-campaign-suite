@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // savePrompt.logSaveDismissed — the shared dismissal log-row producer of the
 // save-dismissed sweep family (2026-11-05). Modal producers without their own
 // refusal helper route the queue's `save-dismissed` broadcast through HERE, so

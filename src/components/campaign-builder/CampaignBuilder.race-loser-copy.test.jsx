@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-13
+// @maintained-by-ai 2026-11-13: 2026-11-13
 // Regression (backlog 2026-11-13 ZC: double-reject race-loser raw copy): two
 // GM tabs reject/approve one draft simultaneously — the loser's DELETE 404s
 // with the server's verbatim `NPC not found` and the banner resurfaced that

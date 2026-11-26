@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Trim pass (2026-10-18): keeps only modal-state seams unique to this lane.
 //
 // Removed:

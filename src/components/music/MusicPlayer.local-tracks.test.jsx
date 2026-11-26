@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-25
+// @maintained-by-ai 2026-11-25: 2026-11-25
 // Lane: locally-hosted ambience in the per-mood track editor (offline-
 // ambience backlog Item 3). Uploads become canonical { kind:'local' } draft
 // rows beside the YouTube textarea, save through the SAME overrides PATCH,

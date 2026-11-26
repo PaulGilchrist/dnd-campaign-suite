@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Regression ledger for bug-boon-nat1-conversion-keeps-critical-miss-banner:
 // Boon of Combat Prowess ("Fearless Aim") legitimately converts a natural-1
 // auto-miss (owner ruling 2026-11-06 — authored copy has no nat-1 carve-out),

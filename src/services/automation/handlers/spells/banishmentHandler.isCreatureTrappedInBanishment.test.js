@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * banishment QUINTET lane #1875 — canonical home for isCreatureTrappedInBanishment
  * internals (banishmentHandler.js L20-23). Seam map in banishmentHandler.edge-cases.test.js.

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-23 — MA-0965 OWNER: Half-Red Dragon Veteran Longsword two-handed versatile disk lock + row wiring (rec #523 applied: offer-shape + select-log fork presses folded to canon; wiring = disk-derived chooser pin per fold twin ma1661:42-49)
+// @maintained-by-ai 2026-10-18: 2026-10-23 — MA-0965 OWNER: Half-Red Dragon Veteran Longsword two-handed versatile disk lock + row wiring (rec #523 applied: offer-shape + select-log fork presses folded to canon; wiring = disk-derived chooser pin per fold twin ma1661:42-49)
 // MA-0965: Half-Red Dragon Veteran Longsword versatile clause was inert-by-
 // construction — prose-only "or 8 (1d10 + 3) ... if used with two hands" with
 // no authored damage_dice_two_handed (buildTwoHandedVariantOffer returned null

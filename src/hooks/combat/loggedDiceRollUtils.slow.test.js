@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // SP-109 producer-side contract: slowHandler stamps lowercase 'slow' into the
 // target's activeConditions (slowHandler.js applySlowToTarget); getSlowAcPenalty
 // reads that key and reports the penalty MAGNITUDE 2 until the condition is gone

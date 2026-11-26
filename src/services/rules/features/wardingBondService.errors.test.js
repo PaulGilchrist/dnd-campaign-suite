@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LANE: this .errors file owns ONLY the failure arms of applyWardingBond's collaborator
 // call sites — which collaborator fails, which arm catches, and what state is stranded
 // when it does. The family map (six faces, verified by header scan):

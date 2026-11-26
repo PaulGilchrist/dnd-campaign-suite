@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-13
+// @maintained-by-ai 2026-11-13: 2026-11-13
 // Improvement (backlog 2026-11-13 ZC: silent one-click draft Reject): Reject on
 // a draft card must no longer delete immediately — it arms the shared
 // DeleteConfirmModal role="dialog" tier naming the draft and stating the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * 2024-racial-bonus lane (race-rules cluster, per FAMILY SEAM MAP in
  * ./2024-immunities.test.js): owns ./2024.js:112-116 getRacialBonus —

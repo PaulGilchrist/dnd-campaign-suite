@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 // Lane: Initiative CONTAINER friendly-fire overlay wiring (backlog 2026-11-04
 // CQ). Proves the end-to-end bridge WITHOUT any native dialog: an ally-target
 // select change opens the FriendlyFireConfirmModal (role=dialog, verbatim copy)

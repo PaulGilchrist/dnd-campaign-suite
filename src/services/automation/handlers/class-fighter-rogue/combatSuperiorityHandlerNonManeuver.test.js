@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // combatSuperiorityHandlerNonManeuver.test.js — export-contract lane for the
 // non-maneuver dispatchers re-exported through the combatSuperiorityHandler
 // barrel: handleCombatSuperioritySkillCheck and

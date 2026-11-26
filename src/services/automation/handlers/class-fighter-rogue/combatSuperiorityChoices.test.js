@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // combatSuperiorityChoices.test.js — chooser-confirm lane contracts for the
 // combat_superiority modal confirms: executeSweepingAttack, executeBaitAndSwitchChoice,
 // executeCommanderStrikeChoice, executeRallyChoice (combatSuperiorityUtils.js) and

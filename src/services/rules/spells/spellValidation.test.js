@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // spellValidation.js contract suite — REAL disk rules data (both rulesets) served through a
 // version-aware dataLoader mock; every expectation is byte-exact so each row is falsifiable.
 //

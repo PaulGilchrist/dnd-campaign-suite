@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-18
+// @maintained-by-ai 2026-11-18: 2026-11-18
 // Sheet-attack no-target refusal at the createLogAndShow seam (monster-chip
 // TA-1116 parity): an in-combat attack press whose attacker initiative row
 // carries NO targetName refuses LOUD — one `.mc-no-target-refusal` popup

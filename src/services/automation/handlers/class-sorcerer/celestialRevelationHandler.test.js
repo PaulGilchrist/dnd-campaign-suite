@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Celestial Revelation dispatcher contract: level/uses gates (shared via
 // celestialRevelationGates), option storage, buff arming, and exact popup
 // copy. Deterministic — all collaborators mocked, no timers, no DOM.

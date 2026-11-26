@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic mocked-seam lane; every external
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic mocked-seam lane; every external
 // module (runtime store, dice, log, damage, findLastAttack, expirations) is mocked,
 // so only the Frost's Chill handler composition runs under test and no churn is
 // needed unless the Frost's Chill handler contract itself moves.

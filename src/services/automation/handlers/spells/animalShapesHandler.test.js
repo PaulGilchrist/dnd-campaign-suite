@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // LANE: animalShapesHandler.js ONLY — the automation dispatch entry for automation.type
 // 'animal_shapes' (registered in services/automation/index.js as handleAnimalShapes).

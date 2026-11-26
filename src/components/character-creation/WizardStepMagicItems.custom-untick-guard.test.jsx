@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // QA improve 2026-11-08 EL: unticking a selected custom:true magic-item row must
 // arm the shared DeleteConfirmModal (role=dialog) instead of instantly destroying
 // the fully-authored item; catalog rows keep the instant selection-only untick.

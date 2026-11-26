@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // MN-003: Commander's Strike (grant_attack) was inert — the collector dropped
 // it at `if (!info) continue` (no DISPATCH entry), the router pushed it to the
 // data-only actions bucket, and it was missing from INTERACTIVE_HANDLER_TYPES,

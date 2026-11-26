@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Quick-monster-spawn picker (roadmap Item 4). Component lane only: the
 // bestiary comes through useMonstersData (mocked — the loader lane is owned
 // by its own tests), filtering is asserted at the PICKER face to prove the

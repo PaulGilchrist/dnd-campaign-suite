@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // HHH 2026-11-21 improve damage-chip-disclosure: the Actions-table DAMAGE-column
 // chip is the ungated direct roller (useSimpleDamageRoll) — it rolls freely even
 // while the paired HIT chip's shot is refused by the armed-target/LoS gates.

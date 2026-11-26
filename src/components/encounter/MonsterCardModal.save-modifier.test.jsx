@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MonsterCardModal save-chip click lane (ownership cited: interaction.test.jsx:10 "action
 // save_dc chip → save-modifier.test.jsx"). Pins the modifier-resolution producer seam once,
 // click → roll: executeBlockSaveRoll (MonsterCardModal.jsx:445-446) resolves the save bonus via

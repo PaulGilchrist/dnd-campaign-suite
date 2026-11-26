@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // resourcePoolHandler — generic resource-pool modal-opener lane (router maps
 // automation.type 'resource_pool' here; index.js owns that registration).
 //

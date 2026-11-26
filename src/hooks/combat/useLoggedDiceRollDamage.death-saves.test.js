@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // AUTHORITATIVE owner of death-save initialization (deathSaves/deathFailures
 // writes) at the useLoggedDiceRollDamage seam — handlePlainDamage.hpEffects.test.js
 // defers hp_change/currentHitPoints shape here for death saves.

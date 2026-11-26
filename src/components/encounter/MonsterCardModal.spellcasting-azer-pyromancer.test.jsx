@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0328 regression lane — Azer Pyromancer Spellcasting save-leg DC 15.
 // Pre-fix the row authored only prose ("spell save DC 15") with no numeric
 // save_dc/save_type, so the Fireball save-leg died at "DC Unknown — no

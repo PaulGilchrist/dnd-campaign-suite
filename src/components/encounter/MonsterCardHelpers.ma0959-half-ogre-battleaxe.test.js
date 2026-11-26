@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0959 OWNER: Half Ogre Battleaxe two-handed versatile disk lock + row wiring (trimmed 5→2)
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0959 OWNER: Half Ogre Battleaxe two-handed versatile disk lock + row wiring (trimmed 5→2)
 // MA-0959: Half Ogre Battleaxe versatile clause was inert-by-construction —
 // prose-only "or 14 (2d10 + 3) ... if used with two hands" with no authored
 // damage_dice_two_handed (buildTwoHandedVariantOffer returns null → zero

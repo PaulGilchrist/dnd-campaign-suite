@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // Improvement 2026-11-03 CL: EB join PC-party fan-out is undocumented UI-wise.
 // Joining a monster via the Encounter Builder seeds ALL saved PCs onto the
 // initiative board (type:player entries, party-alive model) with no log row.

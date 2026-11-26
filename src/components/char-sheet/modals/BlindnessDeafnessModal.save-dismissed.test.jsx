@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // BlindnessDeafnessModal — handleSaveDismissedOverride seam (save-dismissed
 // sweep family, 2026-11-05). The base's processing view has NO buttons until
 // allResolved (results.length >= selected), and resolution ran solely off

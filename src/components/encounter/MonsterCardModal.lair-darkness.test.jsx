@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0043 darkness lane (zoneOnly picker press). Sibling owners: generic
 // lair chip render/title/advisory/cannotAct seams are owned by
 // MonsterCardModal.lair-actions.test.jsx (#610); the insect-cloud zone row

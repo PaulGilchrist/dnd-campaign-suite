@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1907 + MA-1910: Garuda DATA fingerprints — TWO tickets, ONE file, split
 // honestly per ticket (disk rows read 2026-10-20).
 // MA-1907 "Whirlwind Flight (Recharge 5-6)" (actions[4], aoe-save): save core

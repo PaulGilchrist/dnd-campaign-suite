@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for heroesFeastHandler: stable contracts (popup payload shape,
 // runtime-store keys, expiration registration, log entry shape). Mocks are keyed by
 // (name, key) — not call order — so internal call-order churn does not break this file.

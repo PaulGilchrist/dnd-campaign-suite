@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1451: Shadow "Draining Swipe" Strength-drain rider — the fix that made
 // the promised numeric drain LAND (was FAIL(a) zero-state, §942: zero producers
 // AND zero consumers app-wide). Locks: (1) shadow.actions[0] authors the

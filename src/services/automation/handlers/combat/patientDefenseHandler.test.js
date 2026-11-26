@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic pins over the patient_defense handler contract (sole FP writer,
+// @maintained-by-ai 2026-10-16 — deterministic pins over the patient_defense handler contract (sole FP writer,
 // CLA-247): branch wording, exact FP arithmetic, Dodge toggle/expiration delegation, tempHp max-merge
 // with dice stubbed, popup/log payload composition. Stable unless the handler's own composition changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Regression tests for CLA-022: Aura of Warding resistances must be applied
 // during damage calculation (not just displayed in the UI).
 //

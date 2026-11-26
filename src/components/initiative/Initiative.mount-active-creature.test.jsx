@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // FW 2026-11-09 improve — mount-time turn-pointer resolution. A fresh campaign-select +
 // Initiative mount used to (a) let mergeCombatSummaryWithCharacters DISCARD the seeded
 // combatSummary.activeCreatureName (the mount POST then wiped it from the server mirror)

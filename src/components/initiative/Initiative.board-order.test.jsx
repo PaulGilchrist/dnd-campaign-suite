@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // FW 2026-11-09 improve — BOARD ORDER LAW at the mount seam (component face of
 // sseHandlers.board-order.test.js): a fresh mount hydration must RENDER the card
 // row in the exact array order the Next-walk steps through (sortCreaturesForBoard:

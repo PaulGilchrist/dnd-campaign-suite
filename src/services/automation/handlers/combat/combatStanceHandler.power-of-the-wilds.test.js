@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // bug-power-of-the-wilds-row-inert-no-producer regression — lane: lv14 POWER OF THE
 // WILDS (Falcon/Lion/Ram) producer flow through the same combat_stance handler as
 // its lv3 Rage-of-the-Wilds twin. Pre-fix the row's {modalName:'combatStance'}

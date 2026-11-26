@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /**
  * Level-change confirm seam for useCharacterWizard.handleEditWizardComplete:
  * an EDIT save whose level differs from the persisted level arms the IN-APP

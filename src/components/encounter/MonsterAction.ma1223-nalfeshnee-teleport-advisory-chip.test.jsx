@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1223: Nalfeshnee "Teleport" — junk "+0" chip adjudicated bogus to-hit
 // rolls for a RAW pure self-relocation action (live fingerprint 2026-09-25:
 // 2× press → roll/attack bonus:0 hit/miss vs armed Bandit AC 12, lastAttack

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // SavePromptModal — Evasion Effects (Beacon of Hope, Cosmic Omen, Disadvantage lanes)
 // Pins the behavioral outcome of each evasion effect on save resolution: which

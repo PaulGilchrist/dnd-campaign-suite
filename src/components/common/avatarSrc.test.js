@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Canonical avatar-src contract shared by AvatarImage, AvatarModal and the
 // monster-avatar lanes (MonsterCardModal header + CreatureCard visitor popup).
 // Pins the no-double-prefix rule that makes getMonsterImageUrl's already-

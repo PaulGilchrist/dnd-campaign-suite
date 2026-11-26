@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Shared mocks must be imported BEFORE the component so every vi.mock
 // registration wins the module graph (mocks-first ordering law).
 import './CharSpecialActions.modalMocks.jsx';

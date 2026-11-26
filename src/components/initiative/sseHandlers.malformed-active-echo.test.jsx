@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Malformed activeCreatureName echo guard (bug-zero-creature-initiative-null-name):
 // the pre-fix zero-creature mount POSTed an unwrapped {} body, so the server stored
 // {} under activeCreatureName and its SSE echo reached handleActiveCreatureNameChange

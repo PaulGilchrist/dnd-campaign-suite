@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 /**
  * Pass-through + placement contract for the victory banner (EN backlog
  * 2026-11-08, hardened by the EP backlog 2026-11-08).

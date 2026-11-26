@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-091 family, RESULTS lane of the direct-service twin (5e, enforce=false via
 // rules-less CLERIC_STATS). Lane split (READ prayerOfHealingService.js to confirm):
 //   - prayerOfHealingService.test.js (base): trigger/name gate, combat-context

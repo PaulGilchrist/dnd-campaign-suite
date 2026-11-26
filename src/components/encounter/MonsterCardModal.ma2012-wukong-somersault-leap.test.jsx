@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-2012 regression: Sun Wukong "Somersault Leap" (legendary_actions[2])
 // shipped {name, description} only — the generic MA-0021 "Expend Legendary"
 // chip (MonsterAction.jsx:220) SPENT one use unconditionally (resolveLegendaryRow

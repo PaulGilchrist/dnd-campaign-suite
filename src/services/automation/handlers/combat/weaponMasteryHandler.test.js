@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // MAIN lane — weaponMasteryHandler quint closer. Owns: handle() modal routing
 // (registered in automation/index.js as the mastery_rider handler), the
 // applyMasteryEffect dispatch table (MASTERY_EFFECTS keys + unknown-name null),

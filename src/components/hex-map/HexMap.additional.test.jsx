@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // HexMap container wiring — event/command overflow file. Three-way split of the HexMap container tests:
 //   HexMap.test.jsx        — rendering/loading, toolbar, panel open/close, SVG wheel/context/click cleanup,
 //                            POI layer partyPosition prop, drop-to-add-POI.

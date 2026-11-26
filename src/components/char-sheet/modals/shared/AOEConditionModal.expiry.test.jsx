@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-16 — deterministic act() flushes replace real-time waitFor (full-suite load flake fix)
+// @maintained-by-ai 2026-10-16: 2026-10-16 — deterministic act() flushes replace real-time waitFor (full-suite load flake fix)
 // SP-024: Color Spray (2024, save_only) — Blinded condition never expired.
 // Pins the fail-grant expiry clock: ONE addExpiration per failing target
 // ({rounds:1, expireOnCreatureName: caster} — CLA-045 end-of-next-turn convention),

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // SavePromptModal — active-save-prompt testid contract (backlog 2026-11-11 IE).
 // The ACTIVE save prompt's `.sp-modal` carries data-testid="active-save-prompt"
 // across BOTH stages (Roll Save → Done) so harnesses never play `.sp-modal`

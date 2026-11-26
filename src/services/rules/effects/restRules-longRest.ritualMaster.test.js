@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-068 lane: what the LONG REST does to Ritual Master bookkeeping.
 // applyLongRest.js:694-699 writes the ONLY long-rest re-arm of the Quick Ritual latch:
 // key is absent from LONG_REST_RESOURCES (restRules-constants.js) and the disk feat

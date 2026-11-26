@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical home for combatSuperiorityUtils internals: rollManeuverDie Relentless
 // latch / fixed-d8 free roll / paid d12 (combatSuperiorityHandlerUtils.test.js
 // explicitly defers these here — do NOT shrink), checkSuperiorityDice re-arm

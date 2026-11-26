@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Close-restore regression (backlog 2026-11-17 sp-overlay adoption, second
 // half): the open-pull (28e103710) parks focus on the panel, but every close
 // path used to leave activeElement stranded on BODY — FI re-witnessed exactly

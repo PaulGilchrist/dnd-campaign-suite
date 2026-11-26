@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // bug-turn-start-zone-saves-double-arm-via-echo-mirror — the turn-seam expiry sweep
 // (expireStaleEffects, recurring zone saves Phases 3–6: Grease/Sleet Storm/Stinking
 // Cloud/Web) ran TWICE per GM Next press: once synchronously in the local Next/Prev

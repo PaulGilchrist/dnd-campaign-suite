@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // NPCs container contracts: list load/empty/loading, search, create/generate/
 // edit/delete flows, saveNPC rename args, and the add-to-initiative seam
 // (args, blocked-stats error, needs-weapon Add-anyway confirm). SSE sync,

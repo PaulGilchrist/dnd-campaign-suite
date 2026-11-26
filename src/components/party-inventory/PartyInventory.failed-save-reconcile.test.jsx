@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // Regression (backlog FH): a non-409 save failure used to leave the optimistic row
 // drifted — only the DELETE intent rolled back via intent.previous, so a failed stepper
 // press kept showing qty 2 while the server held 1, with no convergence affordance until

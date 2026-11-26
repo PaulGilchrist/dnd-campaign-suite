@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * LANE: chargeEconomy.js — the L5-002 STORE BRIDGE (cloneDeep + persist on the
  * campaign turnState key), not gate decisions, not budget math (charge-trio

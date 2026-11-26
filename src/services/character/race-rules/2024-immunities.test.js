@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * FAMILY SEAM MAP — race-rules cluster (this file opens the 2024 half).
  * Source: ./2024.js exports { getImmunities, getRace, getRacialBonus,

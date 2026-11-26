@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // Backlog (2026-11-12 WY) ai-dress-hides-vocabulary — the dress lane is
 // ITEM-ops-only (validateLiveDressPlan rejects structural targets, pinned
 // server entitySchemas.test.js:164). These pure predicates drive the modal's

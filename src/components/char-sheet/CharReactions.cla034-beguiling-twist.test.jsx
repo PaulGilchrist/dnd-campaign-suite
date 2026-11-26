@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-034: Beguiling Twist redirect confirm — char-sheet UI lane pins only (DC flows from the
 // spell_save_dc payload seam, never a CHA-baked 13; save prompt carries the redirect condition;
 // failing save merges + stamps a 10-round "1 minute" clock; passing save grants nothing).

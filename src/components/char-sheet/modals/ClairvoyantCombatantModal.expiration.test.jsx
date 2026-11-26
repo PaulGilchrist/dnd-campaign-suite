@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * ClairvoyantCombatantModal — EXPIRATION lane (clock queue depth + round-seam semantics).
  *

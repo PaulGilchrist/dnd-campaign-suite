@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Sheet-side handler lane for CharSheet.handlers: puncture damage/flag flow,
 // Savage Attacker click + choice math (incl. FT-069 rider delta), Tactical
 // Mind CLA-352 spend/refusal tiers, Dark One's Luck zero-uses guard,

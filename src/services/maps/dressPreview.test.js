@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // AI Dress overlay-preview helpers (backlog ai-dress-belongs-in-map-view):
 // proposed ops → cell-anchored markers the map view paints over its own grid.
 import { describe, it, expect } from 'vitest';

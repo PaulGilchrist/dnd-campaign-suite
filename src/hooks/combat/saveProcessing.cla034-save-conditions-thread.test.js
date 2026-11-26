@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-034: the monster-card save prompt for a PC must carry the save row's own
 // saveConditions (e.g. ['frightened'] from Fear Ray, monsters.json Gazer '2. Fear
 // Ray' — DC 12 Wisdom, frightened) on the createSaveListener config, and the

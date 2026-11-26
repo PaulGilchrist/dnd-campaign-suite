@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for bardicInspirationUseHandler.handle — the sole execution
 // coverage for the 'bardic_inspiration_use' automation (dispatched via
 // src/services/automation/index.js registry; invoked from CharSheet). Focus is this

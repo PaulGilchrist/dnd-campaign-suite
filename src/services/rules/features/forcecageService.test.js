@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * forcecageService lane — the ENVELOPE-BUILDING FORWARDER (forcecageService.js).
  * Sole export triggerForcecage; sole production caller spellCastService/execution/

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0298 Soul Tome trap SERVICE lane (self-owned bytes only). Provenance:
 // attacker 'Arcanaloth' + action 'Banishing Claw (Requires Soul Tome)' live at
 // public/data/monsters.json:20373/:20386 (disk grep 2026-10-21; no items.json

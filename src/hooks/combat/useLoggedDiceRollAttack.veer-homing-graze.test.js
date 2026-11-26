@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the combined veer→homing→graze WIRING seam of createLogAndShow:
 // hitResolution.js and attackPostProcessing.js are mocked so the resolved
 // verdict (veer redirect / homing-strike conversion, owned live by the

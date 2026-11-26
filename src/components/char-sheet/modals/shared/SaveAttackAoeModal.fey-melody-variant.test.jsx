@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1436: Fey Melody variant picker — the GM-chosen variant threaded via the
 // saveVariant prop drives per-variant outcomes on the emanation picker:
 // Charming fail = charmed+incapacitated + ONE rounds:10 §37 clock + ZERO damage

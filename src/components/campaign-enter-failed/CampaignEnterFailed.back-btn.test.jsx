@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /**
  * CampaignEnterFailed escape-hatch pins (backlog TT 2026-11-22 follow-up):
  * the failure face must offer BOTH a Retry (re-runs the enter GET — pinned at

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-10-28: 2026-10-29
 // Live-sync contract for the Sessions planner (improve settlements-sessions-
 // no-list-sse): every sessions-list-<campaign> SSE event (per server/routes/
 // sessions.js broadcastSessionsList: created/updated/deleted/replaced) must

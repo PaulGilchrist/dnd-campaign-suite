@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0087: Adult Copper Dragon Slowing Breath "slowed" rider clause parse
 // contract. 'slowed' is NOT a registered condition (no badge consumer), so
 // each clause maps to an EXISTING registered te with a live consumer:

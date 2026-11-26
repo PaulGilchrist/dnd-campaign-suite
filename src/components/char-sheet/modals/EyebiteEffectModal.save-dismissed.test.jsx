@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // EyebiteEffectModal — dismiss-softlock regression (save-dismissed sweep
 // family, 2026-11-05, playbook §66 "Eyebite family"). The cast parks a
 // pending row awaiting save-result; the GM's un-rolled Dismiss never

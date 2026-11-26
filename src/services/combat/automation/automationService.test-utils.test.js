@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Fixture lane for makePlayerStats / makeFeature — the ONLY canonical owners of these two
 // builders' contracts live here (automationService.test-utils.js:31-51). Both builders are
 // pure literal spreads with zero derived/computed values, so per #923 no separate defaults

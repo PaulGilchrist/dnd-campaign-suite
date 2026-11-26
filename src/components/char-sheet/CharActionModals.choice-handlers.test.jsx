@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharActionModals host-wiring tests for the Reckless Attack modal.
 // RecklessAttackHost (in CharActionModals.SecondaryModals.jsx) routes the
 // modal's callbacks by mode and injects state the modal itself does not

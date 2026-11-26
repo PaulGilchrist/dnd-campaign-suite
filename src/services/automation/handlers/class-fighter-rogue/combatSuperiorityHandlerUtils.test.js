@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Stable pure-behaviour contracts for the combat_superiority utils lane re-exported
 // through combatSuperiorityHandler.js: superiority-die derivation (FS-010), the
 // default die-expression fallback, FS-010 die faces, and skill-check formatting.

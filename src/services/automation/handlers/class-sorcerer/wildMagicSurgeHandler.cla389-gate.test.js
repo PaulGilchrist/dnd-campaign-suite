@@ -1,5 +1,5 @@
 // @created-by-ai
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-389 gate sub-lane: d20 nat-20 gate ordering before the Controlled Chaos branch.
 // A lv14+ controlled-chaos caster must NOT see the double-roll chooser on a
 // non-20 slot cast — the gate rolls first, the chooser opens only when a

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the pure falseLifeHandler: all side-effecting
 // dependencies (dice roller, log service, temp-HP service) are mocked, so this
 // suite pins expression-selection, temp HP application, logging, and popup

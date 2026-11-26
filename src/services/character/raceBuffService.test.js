@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 import { describe, it, expect } from 'vitest';
 import { computeRaceBuffs, applyRaceBuffsToPlayerData } from './raceBuffService.js';
 import races5e from '../../../public/data/races.json';

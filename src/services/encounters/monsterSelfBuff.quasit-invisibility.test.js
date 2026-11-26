@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1369: Quasit "Invisibility" — formerly a zero-affordance prose-only row
 // with a junk attack_bonus:0 "+0" chip (§490) and no automation; normalized
 // onto the LIVE MA-0658/MA-0919 monster_self_buff seam by MA-1019's imp

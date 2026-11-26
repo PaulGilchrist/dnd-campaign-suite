@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // ── webAreaSave QUINTET lane #1991 .errors ─────────────────────────────────
 // (full seam map: webAreaSaveHandler.areaSave.test.js header; guards lane
 // #1990 .edgeCases pins ZERO console.error by design — this file is the only

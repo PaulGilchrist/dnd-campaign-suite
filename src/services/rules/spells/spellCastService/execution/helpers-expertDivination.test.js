@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-128 consumer lane: REAL triggerExpertDivination internals (helpers.js:336-379),
 // BEHIND the index.js:546 dispatch seam (dispatch arg-tuple face owned by
 // execution-post-cast; refundSpellBreakerSlot :102-107 owned by helpers-spellBreaker).

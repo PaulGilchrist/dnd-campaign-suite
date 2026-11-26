@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Roster-link-lingers-after-failed-delete improve: a failed character DELETE
 // (e.g. route-mocked 404) never broadcasts SSE, so nothing else heals the
 // view. The hook must remember the failed name (deleteErrorName) for the

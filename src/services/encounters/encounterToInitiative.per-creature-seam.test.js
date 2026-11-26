@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Regression: bug-combat-seam-clears-board-wide-violate-per-creature-ruling —
 // owner ruling (Paul, 2026-11-10, verbatim): "EB join is not a board wide new
 // initiative roll. EB join can be used in the middle of combat and frequently

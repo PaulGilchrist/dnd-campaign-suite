@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // P4-a (§10.1/§10.4): session console — which pill is lit, clicks move the
 // phase with an audit, the ledger filters/enforces/caps honestly, and the
 // Take-over-manually safety valve switches enforcement + AI off.

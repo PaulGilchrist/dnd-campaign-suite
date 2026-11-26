@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Regression lock for bug-quick-create-seeded-modal-escape-dead-after-refused-
 // create: the seeded quick-create modals toggle `disabled={seeding}` on BOTH
 // footer buttons, so the clicked Create sheds focus to BODY mid-create and the

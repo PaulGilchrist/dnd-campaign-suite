@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // giantAncestry-cloudsJaunt — Cloud's Jaunt lane seam map (simplest trait:
 // no attack gate, no damage, no targetEffects — pure uses-consumption).
 //

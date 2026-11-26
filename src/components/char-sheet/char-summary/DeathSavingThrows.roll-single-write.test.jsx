@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Regression (fix-run 2026-11-19, same family as the resolved
 // bug-clear-latch-eviction-resurrects-stamps and the clear-lane pin in
 // DeathSavingThrows.clear-single-write.test.jsx): rollDeathSave used to fire

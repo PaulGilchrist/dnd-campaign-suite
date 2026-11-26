@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-19
+// @maintained-by-ai 2026-10-19: 2026-10-19
 // MA-1170 ticket lane (consumeShieldAcBonus, attackPostProcessing.js): the monster
 // reaction Shield stamp (effect 'shield', oneShot:true) is consumed by the ONE
 // resolved attack it defends — hit OR miss both consume (MA-0341 parry lineage).

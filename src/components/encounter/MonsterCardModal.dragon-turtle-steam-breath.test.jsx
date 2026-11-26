@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0629: Dragon Turtle Steam Breath (BY-name disk lock #387) — zero-damage-on-failed-save
 // was a DATA gap: the row carried NO damage_dice_primary/damage_type_primary and
 // its description has no "Failure:" prefix, so extractDamageDiceFromDescription

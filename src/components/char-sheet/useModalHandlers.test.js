@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base lane for useModalHandlers: owns the returned-handler registry contract and
 // handleMasteryClose — the only handler not owned by a slice lane. Sibling owners:
 //   useModalHandlers-damage.test.js  — divine fury / generic / modifier / enhanced-unarmed

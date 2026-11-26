@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // Scoped PATCH coalescing (improvement backlog 2026-11-05 CV): burst arming
 // shipped 3 in-flight same-key PATCHes + 3 full-board SSE echoes (CU PT2,
 // 62 ms window). Same-(campaign,key) writes issued inside the debounce window

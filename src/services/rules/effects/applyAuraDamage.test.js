@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // applyAuraDamage at its own seam: which entities get selected into the aura
 // damage set and the exact applyDamageToTarget call shape.
 // Owned elsewhere (not duplicated here): early-return gates, allyFilter,

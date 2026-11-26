@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1371: Quasit "Shape-Shift" — formerly a junk attack_bonus:0 row rendering
 // a lone clickable "+0" chip (zero real affordance, live audit: presses →
 // zero log delta). Fix = DATA-only: attack_bonus key REMOVED (§490 "+0" leg

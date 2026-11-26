@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * §18 D3 — 2024 dual-ruleset classifier audit (real-data census lane).
  *

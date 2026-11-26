@@ -24,7 +24,7 @@
 // claw is +9/2d8+4 and its 2-use pool makes cost-2/3 pays impossible, so the
 // androsphinx-distinct bytes kept here are: no-lair uses:3 header, Claw
 // delegate +12 / 2d10 + 6, and the full cost-2 and cost-3 advisory pays.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';

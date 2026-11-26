@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // RZ 2026-11-18 backlog (popup-footer leading-space family): the staged-HIT
 // `.popup-modal` footer leaves must be BYTE-EXACT — the Done button's label is
 // ONE expression child after the icon (OA-chip precedent, MonsterCardBody

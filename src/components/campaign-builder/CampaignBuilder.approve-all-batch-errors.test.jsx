@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Regression (backlog 2026-11-01 AU: approve-all mid-loop failures go
 // invisible): a batch "Approve all" that 409s on row k used to have its
 // honest banner erased by row k+1's runAction opening with setError(null) —

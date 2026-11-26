@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 /**
  * App-level pin for the hidden multi-file JSON import input (2026-11-03 QA
  * backlog, filed against "CampaignSelection": the upload

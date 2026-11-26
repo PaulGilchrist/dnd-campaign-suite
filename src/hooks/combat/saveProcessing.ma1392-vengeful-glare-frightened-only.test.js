@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1392: Revenant Vengeful Glare — the prose tail ("If the Frightened target
 // is cursed by the revenant (see Vow of Revenge), the target also has the
 // Paralyzed condition for the duration.") is a gated conditional, but

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: slowEffects.js DIRECT module contract (SP-109 cleanup seam).
 // Family map: slowHandler.test.js owns spell apply + triple-scoped re-apply filter;
 // createRollConditionSaveHandler.test.jsx owns the consumer seam (mocks this module);

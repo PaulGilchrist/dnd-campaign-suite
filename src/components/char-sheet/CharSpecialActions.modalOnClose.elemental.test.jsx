@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // modalOnClose quartet seam map (#76-79):
 //   elemental (this file) — Elemental Affinity / Wild Magic Surge / Destructive Stride:
 //                           Close-dismiss rows (unmount + inertness: no executeHandler

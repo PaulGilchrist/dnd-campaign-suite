@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // PartyPresenceModal — the bulk Split-Party picker: presence initial state
 // from the away flags, Apply emits the full want-away map for every player
 // row, and the quick actions (All Present / All Away) flip the draft set.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 /**
  * Regression lock for improvement-2026-10-26-C: the '__campaign__' force-stamp
  * re-ran on every activeMapName dep change (campaign-select stamp + map-open

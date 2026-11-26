@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /*
  * useMapLoader — API & persistence lane (post-load public surface).
  *

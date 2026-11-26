@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-16: 2026-10-15
 // luckyPointHandler lane: spends a Luck Point and arms luckyAdvantageActive /
 // luckyDisadvantageActive via setRuntimeValue delegation. Consumption of those
 // flags is owned by useLoggedDiceRollAttack.misc-effects.test.js and

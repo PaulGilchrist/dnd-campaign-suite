@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LANE: this .test.js base file owns ONLY the family-map face cited VERBATIM by all five
 // siblings: ".test.js — buff-lookup gates (:57-62), distance gate/end (:67-75),
 // SP-125 end envelopes" (.concentration:8, .damage:7, .log:9-10, .errors:5,

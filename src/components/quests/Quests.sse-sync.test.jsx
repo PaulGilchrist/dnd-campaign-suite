@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 // Live-sync contract for the Quests manager: every quests-list-<campaign> SSE
 // event (per server/routes/quests.js broadcast hook: replaced/deleted) must
 // re-fetch and re-render the list, events for other keys are ignored, and

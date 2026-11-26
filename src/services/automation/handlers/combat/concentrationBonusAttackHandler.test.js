@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-356 regression: Telekinetic Master (Psi Warrior lv18) concentration bonus attack.
 // The row was popup-only (no attack resolved). It must now: gate on LIVE cs concentration
 // (refuse + log, spend nothing when absent), latch once per turn, arm the current target,

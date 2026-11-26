@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: race-rules/index barrel contract only. index.js is a pure forwarding
 // barrel (export { rules5e, rules2024 }); every aspect behavior is pinned
 // verbatim in its owning aspect file — see FAMILY SEAM MAP in

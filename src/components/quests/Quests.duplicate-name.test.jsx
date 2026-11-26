@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-25
+// @maintained-by-ai 2026-10-24: 2026-10-25
 // Duplicate-name banner lifecycle for the Quests modal (backlog 2026-10-13:
 // banner never cleared while typing; 2026-10-25: aligned to the Factions
 // LIVE-typing pattern). Contract: typing a duplicate name shows the inline

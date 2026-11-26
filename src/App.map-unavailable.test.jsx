@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * App-level contract for the player "map unavailable" waiting placeholder.
  *

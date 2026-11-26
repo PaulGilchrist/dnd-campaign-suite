@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSheet RENDER lane — sheet-side buff additive + feature-flag stamps.
 // computeConditionEffects (service) is mocked to a NEUTRAL base here so every
 // asserted value is stamped by the sheet itself (CharSheet.conditionEffects.js

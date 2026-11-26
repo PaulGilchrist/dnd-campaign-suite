@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-27
+// @maintained-by-ai 2026-10-27: 2026-10-27
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import SessionListItem from './SessionListItem.jsx';

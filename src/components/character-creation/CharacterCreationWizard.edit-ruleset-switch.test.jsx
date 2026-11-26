@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Edit-mode ruleset-switch lane (RG 2026-11-19 backlog, owner ruling
  * 2026-11-19): a SAVED character reaches the Ruleset step through the sidebar

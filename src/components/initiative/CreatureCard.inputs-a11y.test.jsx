@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Initiative creature-card INPUT accessible-name census (backlog XY 2026-11-23):
 // every `<input>` rendered inside a `.creature-card` must carry a descriptive
 // aria-label following the existing "<Name> <field>" convention (e.g.

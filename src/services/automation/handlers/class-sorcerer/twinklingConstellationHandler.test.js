@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // twinklingConstellationHandler: CLA-368 chooser lane (distinct from
 // starryFormHandler's assume-form modal and starryFormArrowHandler's attack_roll seam).
 // Deterministic seam: handle() → level gate → Starry Form prerequisite gate (buff stamp OR

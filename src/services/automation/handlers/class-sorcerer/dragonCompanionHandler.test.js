@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Producer-lane unit tests for dragonCompanionHandler (Summon Dragon free cast):
 // uses-gate (popup vs modal), confirm decrement pinned to the exact runtime key
 // (_<FeatureName>_freeCastCount, spaces → underscores), and popup copy pinned as

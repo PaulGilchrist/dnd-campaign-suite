@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  noDamage-chain HEAL/special face of executeSpellCast (index.js)  */
 /*                                                                     */

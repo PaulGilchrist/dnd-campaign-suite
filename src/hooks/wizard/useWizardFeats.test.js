@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // useWizardFeats is a thin config wrapper over useWizardConfig (whose engine
 // behaviour is covered by useWizardConfig.test.js). This file keeps only what
 // it owns: the wiring smoke test, the preSelectedFeats pass-through, and the

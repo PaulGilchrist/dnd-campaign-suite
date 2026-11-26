@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // interceptionHandler sextet — lane: DAMAGE MATH (computeInterceptionReduction +
 // resolveInterceptionDamageBonus: roll + bonus, clamp to 0, null roll, zero damage;
 // applyHealingToTarget amounts and skip paths). Owns the repo-wide

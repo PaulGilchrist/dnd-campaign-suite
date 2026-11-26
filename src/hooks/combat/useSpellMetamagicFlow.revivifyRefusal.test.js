@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-10-15: 2026-11-15
 // SP-100 confirm-stage refusal lane: gate-stage arming is covered by
 // useSpellMetamagicFlow.gate.test.js (breadth) and .console-error.test.js
 // (null-creatures); this file owns the confirm-stage refusal seam —

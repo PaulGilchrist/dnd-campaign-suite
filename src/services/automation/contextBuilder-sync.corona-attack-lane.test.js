@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 // bug-corona-save-disadv-applied-to-attack-roll: Corona of Light (Light Domain
 // Cleric lv17, effect `sunlight_aura`) grants "Disadvantage on SAVING THROWS
 // against spells that deal Fire or Radiant damage" (public/data/2024/classes.json).

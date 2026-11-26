@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // combatStanceHandler sextet — lane: ACTIVATION via handle() with no options chosen.
 //
 // Six-lane seam map (each lane owns what it pins; do not duplicate across lanes):

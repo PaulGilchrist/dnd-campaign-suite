@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0104 modal lane (trimmed): clicking the gated Banish legendary row on the
 // Adult Gold Dragon card arms the banished_demiplane te producer + dc_success
 // 'none' in the save context handed to rollSavingThrow (click->ctx identity

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup — Psionic Sorcery canCast lane (component level).
 // Proves that a Sorcerer whose spell is in the Psionic Sorcery list can cast
 // with NO spell slots when the runtime SP balance covers the spell-level cost:

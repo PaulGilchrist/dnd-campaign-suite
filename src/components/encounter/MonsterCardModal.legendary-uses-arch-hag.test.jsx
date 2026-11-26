@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0306/MA-0307/MA-0308 regression: Arch-hag legendary_actions[0] carried
 // "Legendary Action Uses: 3 (4 in Lair)" ONLY as name-text — no numeric
 // `uses` — so legendaryHeaderAction() returned null, the card rendered the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // TashasLaughterModal BASE lane: initial render/copy, maxTargets header math,
 // target selection/toggle, empty states, pre-confirm inertness, and skip/close.
 // NPC auto-roll resolution lives in TashasLaughterModal.npc-saves.test.jsx;

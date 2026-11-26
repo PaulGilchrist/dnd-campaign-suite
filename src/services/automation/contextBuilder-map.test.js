@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // ── contextBuilder MAP lane: buildAttackContext with a mapName ─────────
 // Owns the whole map lane of contextBuilder-map.js: sync delegation,
 // map/NPC loading, target-position resolution, range + improved-illusion

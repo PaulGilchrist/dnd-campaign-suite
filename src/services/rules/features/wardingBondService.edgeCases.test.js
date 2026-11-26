@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LANE: this .edgeCases file owns ONLY the three #1425/#1426/#1427 assigned byte families
 // ("zero-shape '-0' delta artifact, negative/NaN input verdict, multi-buff first-match"):
 //   1) -0 delta artifact (service shareWardingBondDamage delta byte) + the whole 0-swallow

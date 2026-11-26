@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Ownership — this file owns FiendishLegacyModal in isolation: exact header and
 // intro copy; the three lineage rows (names, descriptions, spellcasting-ability
 // lines, icons) driven by the component's hardcoded FIENDISH_LEGACIES; the

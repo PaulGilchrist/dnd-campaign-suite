@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-091: Prayer of Healing once-per-Long-Rest latch re-arm — CLA-288 byte-twin
 // (relentlessEnduranceUsed, restRules-longRest.js:712 resetFlags). The affected
 // creature's own-store latch (prayerOfHealingAffected, stamped by

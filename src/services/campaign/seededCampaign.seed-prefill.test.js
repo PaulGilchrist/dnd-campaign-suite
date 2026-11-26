@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // seedPrefillName (backlog 2026-11-22 improve seed-prefill-lock-aware): under
 // a CAMPAIGN_LOCK set that refuses the dated quick-create default, the modal
 // prefill must land on a FREE ALLOWLISTED NAME (folder-absent), preferring

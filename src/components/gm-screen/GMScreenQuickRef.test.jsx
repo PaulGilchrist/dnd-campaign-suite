@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Quick-reference section contract: renders condition mechanical effects from
 // /data/conditions.json (sanitized) and the base actions from
 // /data/actions.json with the shared tooltip vocabulary; the dataLoader lane

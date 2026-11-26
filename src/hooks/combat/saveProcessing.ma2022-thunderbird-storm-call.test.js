@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2022: Thunderbird legendary_actions[3] "Storm Call (Costs 2 Actions)" shipped
 // `delegates_to:"Thunderstrike (Recharge 5-6)"` with NO own save/damage fields — the
 // gated press spent 2 legendary uses honestly (MA-1883 name-parse) then routed through

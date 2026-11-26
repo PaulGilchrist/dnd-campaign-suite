@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup — Rage casting restriction (canonical Rage suite).
 // While the "Rage" buff is active the popup blocks ALL casting
 // (computeCanCast's `if (!isRaging)` short-circuits every payment channel).

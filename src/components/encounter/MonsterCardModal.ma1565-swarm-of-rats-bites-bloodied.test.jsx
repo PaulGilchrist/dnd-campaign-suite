@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1565: Swarm of Rats Bites — conditional_damage:{dice:"1d4",damage_type:"Piercing",
 // condition:"Bloodied"} authored on monsters.json swarm-of-rats actions[0] so the HIT popup
 // offers the "or 2 (1d4) Piercing damage if the swarm is Bloodied" variant via the live

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Confirm lane of the massHealingWord trio (#1820; siblings: integration #1821, main #1822).
 // massHealingWordHandler.js is a thin config wrapper around massHealUtils.createMassHealHandler —
 // confirmMassHealingWord IS the factory confirmFn, the same code path as confirmMassCureWounds.

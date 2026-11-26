@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // SavePromptModal — pre-roll save-bonus breakdown (backlog 2026-11-03)
 // Locks the panel's pre-Roll chip lane: base ability-save bonus, an
 // "Aura of Protection" pad shown separately via computeAuraBonus (the SAME

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic handler-contract suite for the psychic_spells popup handler: pins the
 // owned _<FeatureName>_damageType runtime key (exact-key pins, incl. the empty-name
 // '__damageType' seam), the throws-on-undefined-name contract (this handler does NOT

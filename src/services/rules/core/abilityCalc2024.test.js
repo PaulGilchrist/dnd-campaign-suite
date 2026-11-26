@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 import { describe, it, expect, vi } from 'vitest';
 import { getAbilities, getHitPoints, getCarryingCapacity } from './abilityCalc2024.js';
 import { getCarryingCapacity as baseGetCarryingCapacity } from './carryingCapacity.js';

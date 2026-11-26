@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Psionic Strike rider-lane suite: CLA-273 trigger gate, psionicEnergy spend
 // gate, round-keyed once-per-turn latches (psionicStrikeUsedThisTurn + rider
 // telekineticThrustUsedRound), damage math, own-composition wording, and the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Regression: Death Strike (both rulesets classes.json → Rogue → Assassin → lv17,
 // automation type 'attack_rider' + trigger 'first_round_sneak_attack_hit' +
 // damageDoubled) was stored on ANY lv17+ character whose round-1 sneak-attack

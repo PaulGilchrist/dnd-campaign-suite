@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 /* Lane: dice-tray result popup auto-hide (backlog 2026-10-24 — the
  * .dice-tray-popup-overlay stayed up indefinitely and intercepted every
  * page click). Timer lives in Sidebar (owner of diceResult state), hides

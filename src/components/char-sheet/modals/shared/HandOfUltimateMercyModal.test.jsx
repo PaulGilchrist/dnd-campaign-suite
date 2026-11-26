@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // HandOfUltimateMercyModal — the in-sheet corpse chooser host (backlog
 // 2026-11-14 NP improve). Pins the HoH-picker-parity contract: the SHARED
 // SecondaryTargetModal renders inside the borrowed .short-rest-modal dialog

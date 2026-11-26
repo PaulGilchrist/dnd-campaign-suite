@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2002: Smaug the Golden "Detection" (legendary_actions[4]) DATA fingerprint.
 // The MA-1974 ACTIVE-TRAP family: prose-only row starved of the MA-0051
 // ability_check key — the generic Expend chip spent a legendary use, hit the

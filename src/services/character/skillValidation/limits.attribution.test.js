@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // skillValidation limits.js SOURCE-ATTRIBUTION lane (RH 2026-11-24 fix):
 // getSkillLimits' details sentence must name each slot bucket by its REAL source.
 //   • 5e quick-build lane (background '' BY DESIGN — the wizard hides the

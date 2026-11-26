@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4: the Sessions planner row earns a labeled Print One-Pager verb.
 // It hands the SAVED row to the container's handout state, never opens the
 // editor (row click swallowed), and only renders when a print handler is

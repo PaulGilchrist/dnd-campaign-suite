@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // gateMetamagic registry BREADTH seam: every spell in spellGateMap must flip its
 // pending<Key> with the right shape/targets when routed through the hook.
 // Deep per-gate behavior lives in the spellGates.* lanes (hex, bane, magicMissile,

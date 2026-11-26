@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // SP-111 Stinking Cloud — the Poisoned-in-this-way rider ("can't take an
 // action or a Bonus Action") is a per-source te ('no_action_and_bonus_action').
 // computeCharConditionEffects surfaces it as cannotActActions for CharActions /

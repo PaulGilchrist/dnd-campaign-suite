@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // TashasLaughterModal player-saves lane: prompt dispatched to the player,
 // player-chosen failure/success outcomes, Heightened-spell disadvantage flag on
 // the prompt payload (the player client rolls), detail-tolerant resolution, and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CombatSuperiorityModal — RUNTIME-SEAM lane. Owns the getRuntimeValue read seam:
 // every superiority-dice resolution path in computeHasSuperiorityDice and the view
 // gating (or lack of it) that value feeds. Reads only — the component never writes

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /**
  * Ruleset-switch guard wiring (roadmap Item 2) through the REAL wizard tree.
  *

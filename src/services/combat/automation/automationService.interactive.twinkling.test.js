@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-368 regression: twinkling_constellations must be an interactive type so the
 // Special Actions "Twinkling Constellations:" row renders clickable and dispatches
 // twinklingConstellationHandler (previously missing from INTERACTIVE_HANDLER_TYPES,

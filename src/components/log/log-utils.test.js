@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Unit tests for the client-side log filter/window helpers in log-utils.js:
 // filterLogEntries (AND-semantics facets), getEntrySearchText (recursive
 // string harvest + AI audit one-liner fold, ids skipped), formatEntryTypeLabel,

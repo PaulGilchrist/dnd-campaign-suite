@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0329 regression: Azer Pyromancer Hellish Rebuke (2/Day) gated reaction —
 // HELLISH_REBUKE LANE ONLY. Gate identity (damaged-target + damage-dealt probe
 // incl. spell-leg primary+secondary fallback, reacted stamp, attacker identity);

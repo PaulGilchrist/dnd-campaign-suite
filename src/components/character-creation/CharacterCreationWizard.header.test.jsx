@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Header-title lane for CharacterCreationWizard — pins the wizard title
  * BUILDING (WizardHeader itself is a generic prop pass-through, see

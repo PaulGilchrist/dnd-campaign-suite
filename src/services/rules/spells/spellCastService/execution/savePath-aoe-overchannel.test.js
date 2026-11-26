@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // savePath AoE OVERCHANNEL lane — savePath.js:164-171 + :119-149 payload bytes
 // (CLA-244). OWNERSHIP (family map, cited not re-grown): dice-only carriage + gated
 // INT scalar table + golden crash twin -> savePath-aoe-empowered-evocation.test.js

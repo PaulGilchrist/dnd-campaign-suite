@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0681 consumer lane — Elemental Absorption (Elemental Cultist, 1/Day): the
 // press-at-pending-hit resolver stamps a one-shot activeBuffs entry
 // {effect:'elemental_absorption', resistanceTypes:[<type>]}; applyDamageToTarget

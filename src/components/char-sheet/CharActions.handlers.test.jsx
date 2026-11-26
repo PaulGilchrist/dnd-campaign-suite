@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharActions attack-row error resilience (component level).
 // Happy-path click→rollAttack is pinned in CharActions.rendering.test.jsx;
 // hook-level ctx resolution/rejection is pinned in useCharActionsAttackHandlers.test.js.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1520: Sprite "Enchanting Bow" — the row's OWN Hit clause carries the
 // Charmed rider ("Hit: 1 Piercing damage, and the target has the Charmed
 // condition until the start of the sprite's next turn") but the row authored

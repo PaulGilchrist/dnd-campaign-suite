@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // L5-003 §8.1 token-move seam regression (bug-steps-of-the-fey-ignores-token-moving):
 // with enforcement + tokenMoving ON and the caster armed on a target token, EVERY
 // committing leg of StepsOfTheFeyTauntModal must call applyTeleportTokenMove

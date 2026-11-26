@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // damageReductionHandler — EQUIPMENT GATE lane of the damageReduction quint.
 // Owns equipmentRefusal / hasShield / hasShieldOrWeapon (handle() runs this gate
 // before every other branch). The lane map (handle() flow in damageReductionHandler.js):

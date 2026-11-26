@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1275 regression: Otyugh Tentacle Slam grappled-by-the-otyugh prerequisite.
 // OWNER FILE for the MA-0019 by_attacker:true gate lane (ma0687, ma0689, ma1163
 // cite-skip their gates here): the direct evaluateTargetPrerequisiteGate truth

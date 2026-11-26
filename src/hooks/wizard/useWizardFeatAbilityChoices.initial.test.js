@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: empty-state contract of useWizardFeatAbilityChoices.js at mount —
 // result.current.featAbilityChoices stays [] through each early-return guard
 // of the mount effect (feats empty, allFeats not yet loaded, no choice-type

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1012: Ice Devil Ice Spear frozen_grip badge consumer lane. The composite
 // te rides in via the hit_target_effect passthrough; the real fold in
 // conditionEffects.js adds te.value||10 to speedReduction, so the accumulator

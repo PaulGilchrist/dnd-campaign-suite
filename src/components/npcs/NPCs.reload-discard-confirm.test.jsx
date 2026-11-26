@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-10-28: 2026-11-24
 // Regression lock for improve 2026-10-28 (NPCs 409 recovery silently discards
 // the open draft): "Reload list" must NAME the discard before it acts. With
 // unsaved edits (deep-compare against the seed snapshot) it rides the SHARED

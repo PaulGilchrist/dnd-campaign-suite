@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Side-effect behavioral tests for CharActionModals internal handlers.
 //
 // Scope — observable side effects of two async handlers defined inside

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0822: Giant Seahorse Ram — one-field DATA fix: modifier-BEARING conditional_damage
 // {dice:"2d8", modifier:2, damage_type:"Bludgeoning"} authored on monsters.json
 // actions[0] (MA-0007 charge-bonus seam) so the HIT popup offers the

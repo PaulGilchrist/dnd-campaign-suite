@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // L5-005 §9.2 — AI referee console (component lane only): visibility gating,
 // suggest confirm gate, autopilot auto-apply scope, §10.4 proposal override,
 // config save/refuse notices, and campaign-scoped requests.

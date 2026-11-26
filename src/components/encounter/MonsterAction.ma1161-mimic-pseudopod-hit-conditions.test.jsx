@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1161: Mimic "Pseudopod" — prose carries the grapple rider "If the
 // target is a Large or smaller creature, it has the Grappled condition (escape
 // DC 13). Ability checks made to escape this grapple have Disadvantage." but

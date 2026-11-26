@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 /**
  * Campaign-lock DISCLOSURE (not gating) of the Delete Campaign affordance in
  * CampaignAdmin: when GET /api/server-config reports campaignLocked, the

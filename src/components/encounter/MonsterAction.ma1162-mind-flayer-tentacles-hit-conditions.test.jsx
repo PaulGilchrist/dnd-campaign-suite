@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1162: Mind Flayer "Tentacles" — description carries the grapple rider
 // "If the target is a Medium or smaller creature, it has the Grappled condition
 // (escape DC 14) from all the mind flayer's tentacles, and the target has the

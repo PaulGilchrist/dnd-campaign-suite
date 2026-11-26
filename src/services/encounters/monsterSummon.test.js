@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0648 CANON: monster_summon lane base — Drow Mage "Summon Demon" (1/Day
 // gate → d100 coin flip ≤50 shadow-demon else quasit fallback → spawn into
 // combatSummary as ally right after caster → te "summoned" → logs), extended

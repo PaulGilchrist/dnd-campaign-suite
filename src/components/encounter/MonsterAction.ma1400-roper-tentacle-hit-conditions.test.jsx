@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1400: Roper "Tentacle" — prose carries "Hit: The target has the
 // Grappled condition (escape DC 14) … and the target has the Poisoned
 // condition until the grapple ends" but the row shipped WITHOUT

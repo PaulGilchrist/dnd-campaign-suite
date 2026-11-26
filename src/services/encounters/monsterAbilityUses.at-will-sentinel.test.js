@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Centralized At Will sentinel — the ONE helper deciding "unlimited" for every
 // monster reaction counter/prose consumer (chip lane: MonsterCardHelpers
 // monsterReactionUsesRemaining → null → GatedReactionLink hides the em;

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-27
+// @maintained-by-ai 2026-10-27: 2026-10-27
 // Regression lock for bug-ct-editor-concurrent-save-silently-drops-other-tabs-edits:
 // the Notes editor must SURFACE a server conflict (409 "changed elsewhere")
 // instead of silently swallowing the failed save like before. Mirrors the

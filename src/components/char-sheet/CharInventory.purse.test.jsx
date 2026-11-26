@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // CharInventory read-only purse row (improve sheet-purse-read-face, backlog 2026-11-17 AB):
 // the sheet's inventory area surfaces the character's coin via the SHARED
 // characterCurrency rule (services/campaign/characterCurrency.js — same implementation

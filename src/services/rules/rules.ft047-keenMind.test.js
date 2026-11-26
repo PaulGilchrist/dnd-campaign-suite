@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-047 Keen Mind (2024 General Feat, public/data/2024/feats.json:1653, index
 // "keen-mind"; disk bytes: 'Keen Mind' space-separated, no apostrophe) — rules-root
 // regression locks for fix commit 4fbef7732 in rules.js:

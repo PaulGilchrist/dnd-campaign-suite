@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-31
+// @maintained-by-ai 2026-10-31: 2026-10-31
 // Regression (bug-drafts-double-reject-ghost-row): when an approve/reject
 // FAILS, runAction must still re-fetch the drafts before surfacing the error
 // banner. The race: two GM tabs Reject one draft — the loser's DELETE 404s

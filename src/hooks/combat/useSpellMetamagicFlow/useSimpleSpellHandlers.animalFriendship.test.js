@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-002 runAnimalFriendship unit seam (useSimpleSpellHandlers): createConfirmHandler
 // already paid the slot at the stamped paid level (stampPaidSlotLevel / CLA-086), so
 // the runner must only forward the PAID level + selection to onExecute — never

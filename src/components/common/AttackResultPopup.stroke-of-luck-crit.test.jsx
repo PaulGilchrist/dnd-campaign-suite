@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Regression ledger for bug-stroke-of-luck-natural-20-no-crit-damage:
 // a 2024 Stroke of Luck press turns the d20 FACE into a 20 — on an attack
 // roll that is a natural 20, so the popup must show the crit banner (not the

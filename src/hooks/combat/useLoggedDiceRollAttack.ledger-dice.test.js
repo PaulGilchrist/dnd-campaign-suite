@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-10
+// @maintained-by-ai 2026-11-10: 2026-11-10
 // Regression pin for bug-monster-attacks-log-phantom-second-die: the §82 ledger
 // law says `mode` is the ONLY adv/dis truth and `rolls:[a,b]` means a real
 // 2d20 pool — a `mode:'normal'` roll row must therefore carry EXACTLY ONE d20.

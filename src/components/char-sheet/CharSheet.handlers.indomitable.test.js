@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-195 regression + featureRiders #58 lane ownership: handleReroll must
 // consume Indomitable uses against the level-tier cap (indomitableUses),
 // spend exactly one focus point per Disciplined Survivor reroll (focusPoints,

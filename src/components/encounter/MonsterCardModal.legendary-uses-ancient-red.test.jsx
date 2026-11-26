@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0238 regression: Ancient Red Dragon legendary header was display-only
 // prose ("Legendary Action Uses: 3 (4 in Lair)" with NO `uses` field) —
 // legendaryHeaderAction() returned null, the card rendered the UNGATED branch,

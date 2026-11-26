@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Lane: DeleteConfirmModal — the shared in-app named-delete dialog extracted
 // VERBATIM from MapsManager's Delete-map modal (backlog 2026-11-01 AZ2 improve
 // "two delete-confirm idioms"). OWNED here: the a11y tier every named-delete

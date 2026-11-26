@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /* Lane: loading a SAVED encounter into the builder — server GET boundary
  * (loadEncounterData) → state hydration: title/description/selected monsters
  * restored, bestiary-first ref resolution, effective-XP reconcile write-back,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: SP-099 re-arm PRODUCER — clearResistanceUsedThisTurnFlags
 // (turnStartEffects.js:39-47): the campaign.targetEffects te-scan that
 // re-arms resistanceUsedThisTurn for EVERY resistance_damage_reduction

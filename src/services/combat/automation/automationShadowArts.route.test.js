@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-308 Shadow Arts ROUTE lane — dispatch selection ONLY: automation.type
 // 'shadow_arts' → facade buildAttackInfo (misc.js re-aggregates core-handlers.js)
 // → routeAutomation pushes the builder's info row into passives exactly once and

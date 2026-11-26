@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // WM-004: Push weapon mastery lane — owns applyPushMastery (weaponMasteryHandler.js ~:277):
 // size-gate delegation to MN-015 validateSizeLimit, direct instant push te write
 // (bypasses registerTargetEffect by design — mirrors shieldBash), own-composed

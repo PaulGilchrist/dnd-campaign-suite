@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharActions integration: monk Focus Point lane verified end-to-end by clicking the
 // rendered feature rows on the sheet. The skip/spend/refuse decision matrix itself is
 // unit-tested at the hook level (useCharActionsAutomation.test.js and

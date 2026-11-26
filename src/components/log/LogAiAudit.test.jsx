@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // AI AUDIT ROWS lane (backlog 2026-10-31 ai-audit-log-raw-json) — leaf content +
 // registry routing for the WHOLE ai_* audit family (family unification
 // 2026-11-22: director/ruling/draft-review joined the designer/refine/world/

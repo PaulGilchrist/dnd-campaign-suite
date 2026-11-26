@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-068 spellCalc2024 Ritual Master feat lane: chosen lv1 ritual spells injected
 // always-prepared, stamped _ritualMasterRitual with the feat ASI ability (CLA-212/234
 // carry pattern), and the slotless-container grant for zero-caster holders

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1645: Vampire Nightbringer "Bite" (actions[1], +7 melee, 1d6 + 4
 // Piercing plus 3d6 Necrotic) — disk RAW: "The target's Hit Point maximum
 // decreases by an amount equal to the Necrotic damage taken, and the vampire

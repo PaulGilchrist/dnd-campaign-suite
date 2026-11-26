@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0286: Animated Object (Medium) Slam (attack_bonus null, rollable
 // "1d4+3", "Melee Spell Attack" wording) rendered a clickable damage chip
 // that auto-hit — click rolled damage + hp_change with NO attack roll / AC

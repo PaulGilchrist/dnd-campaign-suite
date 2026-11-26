@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit lane for handle()'s activation state machine: already-active guard, rest-use
 // tracking, level-5 spell slot consumption, flight-buff writes (default, custom,
 // carry-over, null fallback, dedupe) on both activation paths, aura-target reset,

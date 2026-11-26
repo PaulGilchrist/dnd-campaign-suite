@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership: the two SUMMARY_BADGE_SPECS badges driven by runtime combat state
 // that no other CharSummary-* sibling asserts:

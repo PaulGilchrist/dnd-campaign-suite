@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // HexMap 2D ↔ 3D view-swap lane (indoor twin pinned in Map.test.jsx #924).
 // Owns ONLY the swap: the toolbar's onEnter3D handler mounts the read-only
 // HexMap3D with the exact structural props HexMap computes, unmounts the SVG

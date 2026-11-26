@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1639: Vampire "Bite" SAVE-seam ATTACKER-RECOVER consumer — the regain
 // twin of MA-1547's drain seam (saveProcessing.ma1547-draining-kiss.test.js
 // harness twin; single-damage drain rows and clauseless dual-row damage legs

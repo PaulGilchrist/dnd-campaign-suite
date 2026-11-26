@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-1842: constrict_grapple turn-start tick consumer — whirlwindService /
 // infernalWoundService seam twin. te-keyed + Grappled-gated recurring
 // start-of-turn HP loss at the ACTIVE creature's turn start; release choke

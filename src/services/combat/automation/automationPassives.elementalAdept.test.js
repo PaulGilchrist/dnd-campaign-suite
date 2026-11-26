@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: automationPassives elementalAdept ticket slice (#867) — the unmocked
 // damage_type_choice/elemental_adept predicate branch of hasIgnoreResistance /
 // hasMinDamage (per-passive chosen-type resolution, minDamage consumption).

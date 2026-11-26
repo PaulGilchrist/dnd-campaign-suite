@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0775/MA-0776 FOLD HOST: Ghast Gravecaller hit_conditions rider pair —
 // ONE it.each over the TWO live disk rows (Claw actions[1] + Horrific
 // Necrosis actions[2]). Normalized twin-diff (fix#230 recipe): identical

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // Regression (bug-inventory-item-save-concurrent-snapshot-last-writer-wins): every item
 // write (modal Save / qty stepper / qty-set / Delete) used to POST the tab's CURRENT FULL
 // item list, and the server replaced inventory.items verbatim — so with two GM windows

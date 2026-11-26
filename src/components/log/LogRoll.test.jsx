@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: LogRollEntry bytes for generic type:'roll' entries (dice values, totals,
 // adv/dis legs, attack outcomes, modifiers, save-damage/aoe/damage lanes).
 // CUT (owner cited): container type-dispatch → LogEntryRendering.test.jsx (#879);

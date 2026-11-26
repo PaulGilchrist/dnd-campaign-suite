@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // SaveAttackHealModal — handleSaveDismissedOverride seam (save-dismissed sweep
 // family, 2026-11-05). The base lane freezes buttonless at "Waiting for save
 // roll..." until every prompt resolves via save-result; the GM's un-rolled

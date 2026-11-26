@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── class-feature-handlers unit lane (#2096 — hidden module) ──────────────
 // Aggregated internally by misc.js into the facade DISPATCH (#2093 family
 // map; 251 types, zero collisions). THIS lane invokes these six handlers

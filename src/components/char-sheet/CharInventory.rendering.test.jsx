@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory section + magic-item row rendering — seams unique to this file
 // (family seam map lives in CharInventory.edgeCases.test.jsx):
 //   - Section order/content: Magic Items / Equipped / Backpack headers in DOM order,

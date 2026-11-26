@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical home for the useSyncedState HOOK contract — the preferred read/write
 // hook of the server-first architecture (AGENTS.md). Covers the hook's own
 // behaviour: defaultValue resolution vs store.has(), the local write path

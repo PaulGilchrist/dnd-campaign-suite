@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0298: Arcanaloth Banishing Claw (Requires Soul Tome) — parseSoulTomeTrapClause
 // truth-table owner (sole test call-site; consumer MonsterCardModal.jsx:1338 arms
 // soulTomeTrap) + BY-name disk fingerprint (#387) for the row feeding it. MA-0104

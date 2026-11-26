@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /*
  * useTravelManagement — cross-client shared-trip adoption keeps the advance
  * refs in lockstep with the SYNCED path/pathIndex (bug-travel-cross-client-

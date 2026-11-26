@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // interceptionHandler sextet — lane: DESCRIPTION COMPOSITION (baseDescription heading +
 // interposition template, attackDetails line templates incl. placeholder fallbacks
 // 'vs AC —', '+ 0', 'd20(undefined)', '→ <b>MISS</b>', and the actualHeal note

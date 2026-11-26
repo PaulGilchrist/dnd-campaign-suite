@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: the player-token lane after the chip hoist (backlog RG 2026-11-19
 // occlusion fix). Status chips no longer live inside the token <g> — the
 // shared derived row set lives in TokenStatusLayer.jsx (chip laws pinned by

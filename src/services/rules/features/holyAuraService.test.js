@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Producer lane for holyAuraService.js:4-28 (sole export triggerHolyAura; LIVE —
 // called by spells/spellCastService/execution/triggerSpells.js:407 handleHolyAura).
 // Honors reciprocal cite from holyAuraDamageService.test.js:15 ("The PRODUCER write

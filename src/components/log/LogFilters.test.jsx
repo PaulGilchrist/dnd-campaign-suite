@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // FILTER/WINDOW lane — Log.jsx client-side filter toolbar, render windowing,
 // and composer disambiguation ("Post as:" author label). Entry content lanes
 // stay in their family files; note dispatch is owned by LogNotes.test.jsx.

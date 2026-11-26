@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Dialog-semantics pin for ShortRestModal (backlog 2026-11-10 HD): the shell that
 // historically sat OUTSIDE the shared role="dialog" tier now carries
 // role="dialog" + aria-modal="true" + aria-labelledby → visible <h3> heading,

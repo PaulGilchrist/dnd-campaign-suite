@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: composition contract of buildAttackRollDamageSteps() ONLY (#1030/#1034).
 // Golden-shape census (#985/#1012) + wiring bytes (#744/#786). Zero mocks (#937):
 // the builders are pure factories — nothing is consulted or executed at build time,

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0751 save-side exhaustion seam: Fomorian Warping Hex — failed WIS save
 // DC 16 "and the target gains 1 Exhaustion level". exhaustion is LEVEL-based
 // (stackable to 6, rest-removed), absent from the CONDITIONS word list, so

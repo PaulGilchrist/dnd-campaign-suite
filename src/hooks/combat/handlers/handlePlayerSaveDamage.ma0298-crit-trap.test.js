@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0298 combo attack+save crit + trap arms ride the pending save prompt:
 // the handler must carry the attack popup's crit flag (and the Soul Tome /
 // MA-0367 Infernal Wound trap arms) into pendingSaves via

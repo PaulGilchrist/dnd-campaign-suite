@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-127 Aid upcast-slot specifics — the Aid-specific half of the paid-slot contract.
 // The generic CLA-086 stamp / heal-metaCtx / raw-slot skip refund lanes live in
 // cla086-upcast-slot.test.js; Magic Missile in sp075. This file pins ONLY what is

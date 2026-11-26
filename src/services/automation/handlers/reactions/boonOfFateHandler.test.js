@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Unit contract for the Boon of Fate handler (registered in automation/index.js
 // as modify_d20_roll; applyBoonFateChoice consumed by BoonFateModal.jsx, which
 // mocks this handler in its own lane). Pins the handle early-exit popup branches

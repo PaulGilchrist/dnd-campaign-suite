@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-268: Psychic Spells (2024 classes.json Warlock majors[3] Great Old One lv3,
 // automation {type:'psychic_spells', damageType:'Psychic', componentReduction:['V','S'],
 // spellSchools:['enchantment','illusion']}) damage-type swap is OPT-IN at execution.

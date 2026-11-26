@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-eb-join-swallowed-network-fail-phantom-row — READ side.
 // loadCombatSummary conflated "fetch failed" with "no combat" (always null),
 // so addMonstersToInitiative normalized a possibly-live board to

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-295 Restore Balance — arm/consume seam lane (restoreBalanceState.js).
 // Family split (#1009): use-cost gate + popup/log composition ->
 //   automation/handlers/class-sorcerer/restoreBalanceHandler.test.js (mocks this module);

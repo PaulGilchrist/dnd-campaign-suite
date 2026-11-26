@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: combat-superiority maneuver-choice modal confirms in useCharActionsModalHandlers.
 // Pins arg-gate refusals (isolated falsy legs), byte-exact dispatch payloads + arity to the
 // combatSuperiorityHandler execute* services, popup surfacing on result.payload only,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * Unit tests for weaponMasteryChoiceHandler.js (2024 Weapon Master choice chooser).
  *

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // Canonical lane for src/services/rules/trackedResources.js — the seed-registry
 // face of the resource system. Registry shape: key -> { current, max }, seeded
 // once per character load (App.jsx:175-176 -> applyServerOverride ->

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-initiative-concurrent-npc-spawn-lost-update — two localhost GM
 // tabs clicking +NPC at (near-)the-same-time read-modify-wrote the FULL
 // combatSummary board with no stamp, so the last write silently won: one accepted

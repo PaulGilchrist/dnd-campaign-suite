@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Rules canon: the app's 2024 "treat any 1 or 2 on a damage die as a 3" contract,
 // pinned verbatim from public/data/2024/feats.json (index "great-weapon-fighting")
 // and public/data/fighting-styles.json — NOT the 2014 "reroll and must use the

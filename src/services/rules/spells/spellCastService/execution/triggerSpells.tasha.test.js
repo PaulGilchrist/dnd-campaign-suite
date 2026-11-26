@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* ------------------------------------------------------------------ */
 /*  DIRECT lane: handleTashasHideousLaughter (triggerSpells.js)       */
 /*  guard three-state, fix#358 (#1459). The OLD law was the RAW-     */

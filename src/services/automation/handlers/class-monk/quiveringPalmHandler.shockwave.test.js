@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic edge-case contract for applyShockwave(): damage defaults
 // ('10d12'/'Force'), exact applyDamageToTarget call args + diceDisplay pin,
 // cs-null damage-skip guard (unique here — nullContext.test.js owns the

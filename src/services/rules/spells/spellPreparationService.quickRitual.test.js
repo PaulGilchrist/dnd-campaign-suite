@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-068 Quick Ritual CONSUME face — spellPreparationService.prepareSpellCast.
 //
 // Ritual-family lane split (who owns what, verified against disk + service spans):

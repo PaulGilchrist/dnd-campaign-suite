@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // useSpellMetamagicFlow lane — ONLY the ownerless gateMetamagic branches.
 // Ownership map of gateMetamagic (useSpellMetamagicGates.js / spellGates.js):
 //   - Sorcerer queue + resolveCantripAutoLevel tables/threshold → .gate-sorcerer

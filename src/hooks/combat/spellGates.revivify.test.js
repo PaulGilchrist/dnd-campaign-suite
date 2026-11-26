@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 //
 // SP-100 gateRevivify lane (spellGates.js). Revivify's "died within the last
 // minute" window is NOT a wall-clock timer (no-timers policy) — the gate only

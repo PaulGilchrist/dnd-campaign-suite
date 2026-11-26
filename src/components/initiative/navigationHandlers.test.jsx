@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 //
 // Base owner of navigationHandlers' dispatch contract: turn-step persistence, round-wrap vs
 // non-wrap housekeeping, the round-scoped turn-start gate (CLA-198/CLA-170/CLA-307), and the

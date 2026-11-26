@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 /**
  * Campaign-lock gating of the Rename Campaign affordance in CampaignAdmin:
  * when GET /api/server-config reports campaignLocked (dev:locked mode), the

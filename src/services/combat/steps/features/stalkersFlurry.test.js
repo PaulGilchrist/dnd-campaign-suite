@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Feature-decision lane: steps/features/stalkersFlurry.js (CLA-326) — the
  * ranger Gloom Stalker lv11 (2024) attack_rider post-hit decision on an armed

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // CreatureCard split-party render faces (plan initiative-split-party):
 // away card chrome (creature-away class + Away badge), the GM-only
 // away/rejoin toggle button (absent for LAN clients and NPC cards), and the

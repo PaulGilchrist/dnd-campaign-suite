@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── CORE LANE: automationService local surfaces + expression-application facade ───
 // Family split (automationService.*, full map):
 //   • THIS FILE — four unique faces, verified against every sibling owner:

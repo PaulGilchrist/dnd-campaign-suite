@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-130 defect(b) lane — Find Steed cast must produce a combatant tracker card +
 // a `summons` log row + a `Summoned (source)` te — never a silent log-only cast.
 // Lane mechanics are owned by summonSpiritHandler.test.js (SP-015/SP-114 AC/HP

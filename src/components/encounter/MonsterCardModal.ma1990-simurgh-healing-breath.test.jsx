@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1990 regression: Simurgh "Healing Breath (Costs 2 Actions)"
 // (legendary_actions[2]) shipped {name, description} only — the bare MA-0021
 // generic Expend chip SPENT TWO legendary uses (MA-1883 name-cost parse live)

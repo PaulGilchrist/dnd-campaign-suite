@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * silenceService — zone-membership / targetEffects store accessor.
  * Lane map (verified 2026-10-22):

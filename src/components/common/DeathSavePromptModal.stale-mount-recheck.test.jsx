@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-15
 // DeathSavePromptModal — mount-side stale re-verdict (improve 2026-11-15 QY
 // death-save-prompt-stale-selfheal)
 //

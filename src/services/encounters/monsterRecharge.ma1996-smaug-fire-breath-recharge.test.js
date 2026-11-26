@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1996: Smaug the Golden "Fire Breath (Recharge 5-6)" save core live-verified
 // EXACT (DC 24 DEX, 22d6 Fire, half-on-success RAW-correct default — do NOT
 // author dc_success; picker opens via DESCRIPTION prose MA-0618) but the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MantleOfInspirationModal is a 26-line thin wrapper around CreatureSelectionModal
 // (tested exhaustively in shared/CreatureSelectionModal.test.jsx). These tests pin
 // only the wrapper's own contract: fixed labels, derived description/note strings,

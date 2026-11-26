@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 /**
  * Regression pins for the belt-and-braces DISPLAY clamp in TrackedResourceInput:
  * even when a producer hands the component an impossible current > max (the

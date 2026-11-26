@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // HpChangeEntry lane (type hp_change): owned contract = DAMAGE-side entry CONTENT bytes —
 // delta magnitude byte, knockout prefix (distinct from NPC 'Defeated' overkill leg),
 // temp-HP leg (no current/max bytes), damage breakdown modifier legs (resistance/immunity

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-308 regression: Shadow Arts long-rest re-arm (re-arm policy lane — cited owner:
 // automationShadowArts.route.test.js and spellCalc2024-shadow-arts.test.js both delegate
 // "re-arm" here; consumption lives in spellPreparationService.shadowArts.test.js).

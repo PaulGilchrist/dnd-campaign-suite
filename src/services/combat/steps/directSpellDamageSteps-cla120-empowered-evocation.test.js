@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-120 lane — directSpellDamageSteps.js steps[1] spellContext (direct-spell path).
 // Rule (5e Evocation 10th level, Empowered Evocation): add your INT modifier to the
 // damage roll of an evocation spell you cast. Single owner of the fold is

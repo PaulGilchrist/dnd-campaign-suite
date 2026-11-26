@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 import { describe, it, expect } from 'vitest';
 import { ENCOUNTER_CONFIG } from './encounterConfig.js';
 

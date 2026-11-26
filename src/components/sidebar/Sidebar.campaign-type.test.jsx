@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Campaign-type lane on the sidebar: an arena battle strips campaign-only
 // planning views out of the nav (fight sandbox), while starter and standard
 // campaigns keep the full nav. Header chips name the non-standard types so

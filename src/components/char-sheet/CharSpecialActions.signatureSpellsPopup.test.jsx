@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions signature-spells lane: what clicking the Signature Spells row
 // dispatches (executeHandler args → chooser mount), what Confirm routes to
 // onSignatureSpellsSelected (exact args incl. the chosen spells), how each popup

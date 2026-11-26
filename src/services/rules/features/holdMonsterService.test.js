@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // hold monster/monster-person TWIN lane, PRODUCER-side envelope builder (there is NO separate
 // holdPersonService.js — grep-confirmed 2026-10-20: one service serves both twins, so this
 // single lane owns BOTH name-gate halves; #1344 family verdict 'each charm service keeps its own

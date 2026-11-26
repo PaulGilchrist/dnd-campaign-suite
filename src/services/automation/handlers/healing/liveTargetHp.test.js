@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // ── liveTargetHp.js — chooser HP precedence (bucket-first / row-fallback) ──
 // Locks the EH 2026-11-13 cs-row-staleness fix face: heal writes commit to the

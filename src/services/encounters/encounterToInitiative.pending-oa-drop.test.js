@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Regression: bug-new-initiative-roll-pendingoa-drop-never-fires — the pendingOAs
 // drop law ("a new initiative roll retires every pending trigger marker",
 // pendingOpportunityAttacks.js header) was implemented ONLY inside Initiative.jsx's

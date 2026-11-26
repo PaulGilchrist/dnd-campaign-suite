@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: tokenStatus pure derivation (roadmap Item 6 — map token indicators).
 // Uses the REAL targetEffectDefinitions registry + CONDITION_DESCRIPTIONS:
 // the whole point of this service is that map and tracker read the SAME

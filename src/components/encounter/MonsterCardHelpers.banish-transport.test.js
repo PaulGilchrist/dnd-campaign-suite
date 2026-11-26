@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0104 helper lane: parseBanishTransportClause truth-table owner (MonsterCardHelpers.js:241-244
 // — guard / case-insensitive match / non-match). Disk fixtures BY NAME verbatim (#387): Adult +
 // Ancient Gold Dragon Banish rows. Adult numerics stay locked here too — save_dc/dc_success are

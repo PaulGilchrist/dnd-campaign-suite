@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1674 Vrock Stunning Scream (1/Day, DC 15 CON, 3d6 Thunder + Stunned) —
 // ticket lane: vrock-only bytes from the REAL on-disk monsters.json row
 // (no transcription, #977; ground-truth verbatim, #993).

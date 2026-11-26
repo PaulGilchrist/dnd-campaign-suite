@@ -29,7 +29,7 @@
 //     captures: every third-arg ctx assertion is exact ({forcedMode} | undefined,
 //     per rayDisadvantageContext/bolsterAdvantageContext at :1510-1525).
 //
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

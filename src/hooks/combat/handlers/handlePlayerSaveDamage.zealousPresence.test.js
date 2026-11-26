@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-394: Zealous Presence (2024 Barbarian, buffExpression advantage_attacks_and_saves
 // stored on the target's activeBuffs by buffToggle.toggleBuff) must grant advantage on
 // the player save-prompt path: handlePlayerSaveDamage computePlayerSaveAdvantage →

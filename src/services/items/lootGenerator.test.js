@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Pure-helper lane (lootGenerator family map #1161/#1162): owns ONLY the four pure exports —
 // normalizeCurrency, formatCurrencyString, parseCurrencyFromLootText, calculateEncounterXp.
 // The combatSummary→suggestions

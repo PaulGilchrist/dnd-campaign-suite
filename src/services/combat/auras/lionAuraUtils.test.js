@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // regression: bug-lion-aura-penalizes-allies-not-just-enemies — the ATTACKER
 // hostility gate (Power of the Wilds "any of your enemies within 5 feet of
 // you") is pinned in the 'attacker hostility gate' block below; regression:

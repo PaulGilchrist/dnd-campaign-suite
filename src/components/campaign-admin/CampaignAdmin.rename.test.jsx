@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Rename Campaign flow of CampaignAdmin: opening the modal, closing it
  * (Cancel / close icon / Escape) without renaming, backdrop clicks that

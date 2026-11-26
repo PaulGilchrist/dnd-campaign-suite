@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0220 regression: Ancient Gold Dragon legendary "Pounce" was inert prose
 // ("The dragon moves up to half its Speed, and it makes one Rend attack.") —
 // the gated "Expend Legendary" chip spent a use then console.errored "no

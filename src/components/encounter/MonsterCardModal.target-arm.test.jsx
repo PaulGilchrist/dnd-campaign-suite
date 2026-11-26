@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // XD-1116 improvement (2026-11-16): the target-arm select mirrors from the
 // initiative card into the .mc-overlay stat-modal header so the full GM attack
 // flow (arm → chip → Done) completes inside the modal. The modal renders the

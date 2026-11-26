@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-16
+// @maintained-by-ai 2026-11-16: 2026-11-16
 // Client-side bestiary-name gate for the NPCs manager (2026-11-16 WK backlog):
 // a published-monster name DISABLES Save live while typing (same disabled
 // family as the empty-name gate) and shows the server guard's copy VERBATIM

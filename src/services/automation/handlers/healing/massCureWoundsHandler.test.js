@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Opener lane of the massCureWounds pair: sibling massCureWoundsHandler.confirm.test.js owns
 // confirmMassCureWounds() application behaviour (clamp/apply, maxTargets slicing, hp_change
 // logging, heal_multi payload internals, maximization rolls). This file owns handle() in

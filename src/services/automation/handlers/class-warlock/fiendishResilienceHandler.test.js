@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical internals home for Fiendish Resilience (2024 Warlock Fiend Patron):
 // handle() modal payload + default DAMAGE_TYPES fallback, the once-per-rest refusal
 // latch, applyTypeChoice store + used-latch writes, invalid/falsy rejection with

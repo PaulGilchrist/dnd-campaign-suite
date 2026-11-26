@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0875 owner lane: parseTempHpGrantClause truth table (#452/#523 THP-clause
 // lane canon). Source: MonsterCardHelpers.js:339-345 — 4 distinct arms: falsy /
 // non-string guard, "one of the following effects occurs" chooser guard,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 //
 // Fix#36-queue: character delete double-confirm (CharSummary.jsx leaf +
 // useCharacterManagement.js hook stacked two dialogs per single click).

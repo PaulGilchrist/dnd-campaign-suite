@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Phase 3.2 lane (Initiative CONTAINER ally editor): proves the GM-only
 // "Allies" trigger reaches every card through the container (LAN devices get
 // none), clicking it opens the shared AllySelectionModal (one allegiance model,

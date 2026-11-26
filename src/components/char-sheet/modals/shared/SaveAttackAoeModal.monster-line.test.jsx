@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0035 monster LINE breath row — modal-side consumption ONLY: header
 // shows the "60-ft Line" label, the row's 60-ft line geometry flows through
 // the canonical isWithinRange gate from the attacker (the mock passes ONLY

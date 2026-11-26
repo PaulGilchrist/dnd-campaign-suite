@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /**
  * App-level contract: the character sheet is KEYED on the active character's
  * identity (App.jsx <CharSheet key={activeCharacter.name}>).

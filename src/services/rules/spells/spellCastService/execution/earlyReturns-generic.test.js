@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  GENERIC automation lane — :710 consumption / :712 bypass contract   */
 /*                                                                     */

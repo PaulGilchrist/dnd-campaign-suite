@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // WildCompanionModal — modal's own UI lane: chooser copy, spell-slot table
 // render/dim/disable, radio selection, atomic pay+grant dispatch (CLA-388:
 // spend + _Wild_Companion_freeCast stamp in ONE setRuntimeBatch — two

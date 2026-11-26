@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Inline quick-roll lane (useLoggedDiceRollSaves.createSaves): evasion eligibility
 // flags incl. the CLA-211 chooser stamp, shield-vs-magic-missile block, the manual
 // intervene shield staying unconsumed here, and the disadvantage_on_next_save rider.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup — Warlock Pact Magic slot lane.
 //
 // Distinct behaviour asserted here (not re-tested in sibling suites):

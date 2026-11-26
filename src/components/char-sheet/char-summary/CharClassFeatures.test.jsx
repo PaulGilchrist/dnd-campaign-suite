@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CORE LANE — CharClassFeatures entry point.
  * Owns: registry dispatch (class name → region, case-sensitive), unknown-class

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1175: Minotaur Skeleton Gore — charge clause ("moved 20+ feet straight toward")
 // live-unarmed: disk authored no conditional_damage so buildChargeBonusOffer (MA-0007
 // seam, MA-1160/MA-1174 additive-delta convention) never armed a HIT-popup offer.

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-31
+// @maintained-by-ai 2026-10-31: 2026-10-31
 // Live-sync contract for the Campaign Builder drafts panel (improve
 // drafts-panel-no-live-sync): approve/reject travel through each kind's
 // normal save/delete lane, which already broadcasts `<kind>-list-<campaign>`

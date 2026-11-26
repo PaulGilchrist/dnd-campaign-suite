@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Regression tests for FT-002: the wizard Skill Proficiencies step (10)
 // previously had no blocking validator — the counter honestly displayed
 // "You have selected 3 of 2 allowed" but Next/Save stayed enabled and the

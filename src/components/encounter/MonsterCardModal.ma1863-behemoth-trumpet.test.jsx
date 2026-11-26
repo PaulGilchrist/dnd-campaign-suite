@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1863 regression: Behemoth legendary_actions[3] "Trumpet (Costs 2 Actions)"
 // authored name+description only — the gated chip spent a use then fall-through'd
 // resolveLegendaryRowMechanic (MonsterCardModal.jsx:715) with console.error

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /**
  * Feature-decision lane: steps/features/crusher.js (2024 Crusher feat —
  * once-per-turn bludgeoning rider move + enhanced-critical advantage).

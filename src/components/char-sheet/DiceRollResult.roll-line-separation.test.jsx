@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // 2026-11-18 QA readability law (roll-face fused token): the total digit and the
 // breakdown's `d20 …` token must never read as one dice-notation fusion
 // (`Glaive17d20 8 +9`). Every face this builder feeds (sheet CharActions lane,

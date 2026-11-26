@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1014: Ice Devil "Ice Wall" — the spell_save_dc-only zone/utility row
 // (spell_save_dc 17, Intelligence, recharge "6", no save_dc/range/damage
 // fields) rendered ZERO affordance. Fix lane A (code only, data byte-unchanged):

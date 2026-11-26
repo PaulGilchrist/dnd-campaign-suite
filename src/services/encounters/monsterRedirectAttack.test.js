@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0891: Goblin Boss "Redirect Attack" (reactions[0]) — gated retarget reaction on
 // automation{type:"monster_redirect_attack", effect:"redirect_attack", ally_size:
 // ["Small","Medium"], range_ft:5}, At Will uses:999 authored on disk. Press order:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── FACADE LANE: automationService.getAutomationInfo / buildAttackInfo ─────
 // Family split (automationService.*):
 //   • THIS FILE — facade wiring of getAutomationInfo: guard battery, delegation

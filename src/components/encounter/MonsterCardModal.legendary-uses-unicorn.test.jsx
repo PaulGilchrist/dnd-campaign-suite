@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1635 regression: Unicorn legendary_actions[0] was the Charging Horn
 // CHILD with numeric uses:1 — legendaryHeaderAction() swallowed it as the
 // header, so the card printed "Charging Horn (1 left)" as inert header text

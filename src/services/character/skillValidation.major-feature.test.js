@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation MAJOR lane (façade seam, canonical home): getSkillLimits' 'major' skill-choice pool —
 // the join where getMajorFeatureProficiencyChoices rows become {source:'major'} pools and +choose allowance.
 // Cited, not re-pinned here (upstream majorFeatureChoices.test.js): level gate (:85, lv2→[]/lv3 included),

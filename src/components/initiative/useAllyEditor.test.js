@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Lane: useAllyEditor (Phase 3.2 tracker ally editor). Owned here: GM-only open
 // gate, roster creature list (self INCLUDED — self-only = "trusts no one", but
 // synthetic secondTurn rows are never candidates), the CLA-360 (Second Turn)

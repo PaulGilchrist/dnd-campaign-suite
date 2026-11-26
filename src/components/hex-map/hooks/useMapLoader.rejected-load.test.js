@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /**
  * Regression lock for backlog map-fresh-fallback-silent (hex producer lane):
  * a named outdoor map whose load THROWS (404 "Map not found", abort, corrupt

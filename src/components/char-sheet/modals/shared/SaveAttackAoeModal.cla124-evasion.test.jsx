@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-124/CLA-125 evasion lane for the caster-AoE prompt path (SaveAttackAoeModal).
 // Evasion folds 0-on-success / floor-half-on-fail. Eligibility is resolved by
 // resolveAoESaveEvasion from the full-stat `characters` prop (persisted

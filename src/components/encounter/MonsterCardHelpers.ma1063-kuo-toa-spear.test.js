@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-1063 OWNER: Kuo-Toa Spear two-handed versatile disk lock + row wiring (trimmed 6→2, rec #523)
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-1063 OWNER: Kuo-Toa Spear two-handed versatile disk lock + row wiring (trimmed 6→2, rec #523)
 // MA-1063: Kuo-Toa Spear versatile "or 5 (1d8 + 1) ... if used with two
 // hands to make a melee attack" was misfiled into damage_dice_secondary —
 // the §118/MA-0426/0531 ADDITIVE combined transport auto-rolled BOTH pools

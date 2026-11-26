@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1728: Wraith "Life Drain" HP-max-drain rider — wraith-row twin of the
 // MA-1489 Specter lane. The row authors hit_hp_max_reduce:{equal_to:"damage"}
 // (previously byte-inert, key ABSENT), so the LIVE attack-hit-path drain seam

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SEARING VENGEANCE HANDLE/SKIP LANE (quad file 3/4). Canonical home of:
 // - handle() routing: exhausted-uses popup, no-combat popup (the handle() twin —
 //   ConfirmPath owns the at-confirm one), 0 HP gate table (alive / dead-flagged /

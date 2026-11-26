@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Skip lanes for the mass-healing modals rendered by HealingModals through
 // CharActionModals. Each case asserts the observable skip behavior: clicking
 // the mounted modal's skip clears exactly its own modalState key and never

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: useWizardFeatBuffs contract — feat-set change detection (compute once per
 // change, clear on empty), and buildFormDataWithBuffs wiring (non-choice ability
 // increases, resistance merge, all_skills expansion, choice-proficiency omission).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-107 lane: hex te purge only (concentrationService.js clearHexEffects).
 // Hex tes stamp duration:'hex_duration' so the generic duration==='concentration'
 // sweep misses them — the purge must remove hex_ability_check_disadvantage +

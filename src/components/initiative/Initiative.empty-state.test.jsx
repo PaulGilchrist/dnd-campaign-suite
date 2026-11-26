@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // [2026-11-12 QR backlog] Zero-subject Initiative empty state: the boardHasSubjects
 // false branch (no combatSummary, or a board with zero subjects and zero characters)
 // used to render a bare void. It now renders a guidance panel (add characters /

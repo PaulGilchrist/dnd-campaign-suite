@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // spellCalc2024 BASE lane: getSpellAbilities dispatch orchestration + the container/
 // slot-math faces siblings cite. PRESERVED-CITED faces (verbatim names): null-chain :60
 // (-advanced), header/first-table :86 (-advanced/-automation), getHighestMajorLevel

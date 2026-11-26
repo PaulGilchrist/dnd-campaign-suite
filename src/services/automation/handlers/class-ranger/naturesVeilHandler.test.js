@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Nature's Veil handler unit tests. Fully deterministic: every external
 // dependency (runtime store, expiration queue, log, combat summary) is mocked;
 // assertions are exact-key / full-args / full-string own-composition pins on

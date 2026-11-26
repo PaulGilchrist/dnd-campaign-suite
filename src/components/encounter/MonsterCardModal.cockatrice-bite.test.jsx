@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0501: Cockatrice Petrifying Bite transport + dc_success adjudication —
 // the attack+save combo rides buildSaveOptions to handleNpcSaveDamage (NPC
 // inline) / buildAbilitySaveRollContext to saveProcessing (PC prompt).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1120: SRD Mage "Protective Magic" reaction was prose-only inert
 // (name+trigger+description only → getGatedMonsterReaction null → zero
 // affordance). DATA fix mirrors the MA-0300 Arcanaloth RAW-unlimited At

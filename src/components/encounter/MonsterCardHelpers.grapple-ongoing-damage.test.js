@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1842: Apep Constrict ongoing grapple-damage rider — parser seam lock.
 // grapple_ongoing_damage:{dice,damage_type} arms ONLY on the structured key
 // (MA-0367/MA-0639 STRUCTURED-KEY-ONLY precedent); the parsed rider rides the

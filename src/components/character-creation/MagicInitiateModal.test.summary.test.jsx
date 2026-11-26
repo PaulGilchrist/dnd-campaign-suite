@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Summary slice only: instance summary-row content (exact numbered rows, spell
 // tags, — / "No class" placeholders, Remove-when->1 rule, Save All presence).
 // Add/edit/remove click routing lives in .test.core; gates in -validation;

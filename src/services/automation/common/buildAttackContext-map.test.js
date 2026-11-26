@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Map-present branch of buildAttackContextForDamage.
 // The map-absent branch is covered by buildAttackContext-noMap.test.js.
 //

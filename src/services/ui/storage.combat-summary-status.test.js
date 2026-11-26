@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-eb-join-swallowed-network-fail-phantom-row — storage.set for
 // 'combatSummary' swallowed POST failures into a RESOLVED promise (and was
 // never awaited), so EB Join logged a phantom `encounter/joined` row over a

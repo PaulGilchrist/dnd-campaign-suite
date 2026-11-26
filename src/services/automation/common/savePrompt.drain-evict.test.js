@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // Drain-to-evict branch for the save-prompt buckets (backlog 2026-11-03 CJ:
 // after a full sweep the change-data store kept `pendingSavePrompts:{}` and
 // `pendingSaveListenerPrompts:[]` as special keys — cosmetic dust until Admin

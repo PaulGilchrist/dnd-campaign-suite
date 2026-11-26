@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // 2024 fighting-styles axis of getAttacks: Archery, Dueling, Thrown Weapon
 // Fighting (FS-011). One it.each truth-table pins the FULL builder row for
 // every gate face (style fires / other style / fightingStyles undefined per

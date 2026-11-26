@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Portent (Divination Wizard) automation handler. Deterministic pure-behaviour suite:
 // dice-pool persistence format, popup/log composition, hit/save outcome math, and the
 // portentDiceChoice modal payload contract consumed by CharSpecialActions.jsx.

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1863: Behemoth Trumpet — the granted half of the fix. The row (now
 // authored save_dc 23 + save_type Wisdom + dc_success none + save_effect
 // "can't take Reactions until the end of its next turn") rides the INLINE

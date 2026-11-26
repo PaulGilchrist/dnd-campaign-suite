@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0868: Gladiator "Shield Bash" (gladiator|actions[2], DC 15 Strength, one
 // creature within 5 feet, 2d4 + 4 Bludgeoning on fail + Prone on Medium-or-smaller)
 // RAW carries NO half-on-success clause — success pays ZERO damage and gains no

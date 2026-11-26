@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /**
  * Contract tests for index.css — the global theme-token sheet.
  *

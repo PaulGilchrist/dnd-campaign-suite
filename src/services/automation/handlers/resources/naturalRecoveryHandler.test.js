@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Contract pin: index.js dispatches automation type `natural_recovery` to this
 // handler; CharSpecialActions.jsx routes the returned modalName
 // `'naturalRecovery'` to setNaturalRecoveryModal (Druid short-rest slot

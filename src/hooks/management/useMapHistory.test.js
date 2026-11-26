@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /**
  * useMapHistory.test.js — history-source pin (backlog 2026-11-11 JV):
  * the stack stays a ref (synchronous push/pop, navigation semantics of the

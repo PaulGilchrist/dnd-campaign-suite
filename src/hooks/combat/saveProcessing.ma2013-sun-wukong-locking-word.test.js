@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2013: Sun Wukong "Locking Word (Costs 2 Actions)" — the DC 24 Wisdom
 // legendary save child adjudicated honestly (chip armed, Bandit rolled raw +0,
 // nat ≤ 20 < DC 24 failure stamped on log/lastAttack, costs-2 spend honest)

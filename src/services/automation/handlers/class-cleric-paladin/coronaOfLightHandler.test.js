@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for coronaOfLightHandler: side-effect arguments,
 // popup payload shape, empty-selection copy, and log-failure resilience.
 // Downstream consumption of `coronaOfLightEnemies` is covered by the

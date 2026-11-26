@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: map ruler measurement state machine (#911).
 // Split: useSelectMove only guards `tool: 'ruler'` (skips interaction); the
 // ruler pointer state machine is owned here. Map.test.jsx mocks this hook,

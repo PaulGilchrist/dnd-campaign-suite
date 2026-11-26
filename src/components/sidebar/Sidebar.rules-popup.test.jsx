@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // Rules-launchpad popup-block feedback lane (backlog 2026-11-12 TE): openRules
 // used to ignore window.open's return, so a browser-blocked popup left the
 // click silent. Blocked face (falsy return) must fire the app's existing toast

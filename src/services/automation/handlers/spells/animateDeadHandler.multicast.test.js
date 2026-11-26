@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * animateDead SEXTET lane #1866 multicast — per the seam map in
  * animateDeadHandler.confirm.details.test.js, this lane owns the MULTI-cast

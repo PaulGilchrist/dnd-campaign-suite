@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /* Lane — update-save onto a deleted encounter row (404 recovery, QA backlog
  * 2026-10-28-S). Load arms the toolbar Update lane; if the disk row is deleted
  * elsewhere before Save, the PUT 404s. Old behavior: generic `Failed to save

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Pure placement math for the quick-spawn map-token stamp (2026-11-20 CCC
 // backlog). Every law the opt-in flow promises the GM is pinned here without a
 // single fetch: party-relative anchor, fixed preferred offset, deterministic

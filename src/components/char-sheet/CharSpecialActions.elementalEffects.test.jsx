@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions sheet-side elemental seam only: executeHandler and the modals are
 // mocked via CharSpecialActions.modalMocks.jsx. Handler internals live in
 // automation/handlers tests; modal internals in modals/*.test.jsx; chip-click→modal-open

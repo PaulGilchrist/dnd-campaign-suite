@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // TravelPanel leaf lane — owns the panel's own DOM: exact button labels + dispatch payloads,
 // byte-guarded disabled states, and prop-rendered display bytes (budget bar, next-hex ETA,
 // weather, forced-march status). Owned upstream, not re-tested here: destination-select

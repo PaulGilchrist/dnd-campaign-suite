@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Overchannel channel of SpellDetailPopup: checkbox eligibility, the live
 // necrotic-damage notice driven by the REAL damage table in overchannelHandler
 // (un-mocked on purpose — it is pure given the mocked runtime store), and the

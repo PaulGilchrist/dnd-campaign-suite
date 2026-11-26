@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // interceptionHandler sextet — lane: RETURN VALUE ENVELOPE (the pass-through contract
 // callers consume from the automation router: registry `interception: handleInterception`).
 //

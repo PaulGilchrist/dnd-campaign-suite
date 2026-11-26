@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1202 data lock: Mummy Lord Spellcasting rode the MA-0421/MA-0532/
 // MA-0576/MA-0611 plain-text zero-affordance template. Pre-fix ONLY the
 // tier headers carried <strong>; Dispel Magic/Thaumaturgy/Animate Dead/

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1878: Demogorgon Gaze choose-or-roll-d6 variant row — the unique
 // contract locked HERE (gaze generics live in the other gaze lanes:
 // frightening-gaze, chilling-gaze-immunity, ma1877-tentacle).

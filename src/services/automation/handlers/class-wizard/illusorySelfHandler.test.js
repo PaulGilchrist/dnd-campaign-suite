@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit tests for illusorySelfHandler (Wizard Illusory Self reaction: an illusory duplicate
 // makes a hit attack automatically miss and rolls back its damage). Deterministic: runtime
 // store, damage rollback utility, and log IO are all mocked; tests pin guard branches,

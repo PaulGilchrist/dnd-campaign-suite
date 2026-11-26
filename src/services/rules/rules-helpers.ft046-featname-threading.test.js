@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-046 featName threading (fix d45838a1f: Inspiring Leader wrong temp HP +
 // no once-per-rest latch). This lane owns the ONLY unwired face of
 // mergeAutomationSpecialActions (rules-helpers.js:21-30): before the fix, the

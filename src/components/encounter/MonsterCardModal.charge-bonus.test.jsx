@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0007 conditional_damage modal lane — canonical owner of resolveChargeBonus
 // (MonsterCardModal.jsx:2676-2704) and the click→ctx offer forward (:1407).
 // Trim pass (2026-10-18): one branch, once.

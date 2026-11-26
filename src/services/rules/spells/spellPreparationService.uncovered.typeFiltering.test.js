@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // spellPreparationService.uncovered.typeFiltering.test.js — the type-filter
 // SKIP FACE of the free-cast family. Routed VERBATIM by #1526

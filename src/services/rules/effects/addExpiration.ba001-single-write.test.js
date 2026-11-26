@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BA-001 / §39: addExpiration previously issued TWO un-awaited setRuntimeValue
 // POSTs to the same /changes/<Name> replace-route when the store key was
 // absent (seed [] then [entry]). Network-side reordering let the seed []

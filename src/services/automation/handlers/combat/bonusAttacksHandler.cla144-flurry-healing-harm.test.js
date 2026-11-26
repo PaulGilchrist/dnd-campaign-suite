@@ -17,7 +17,7 @@
 // - cla143 sibling owns: unarmed-die selection (resolveFlurryWeaponStats) +
 //   rolled-vs-applied honesty. turnStartEffects pins the key's turn-start SET;
 //   this lane owns the in-flurry DECREMENT writes.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../encounters/combatData.js', () => ({

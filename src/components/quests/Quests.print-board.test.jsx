@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4: the GM Quests planner header earns a labeled Print Quest Board
 // verb with the honest disabled face (no player-facing quests — or only
 // drafts — names the cause), and the opened sheet carries the player-facing

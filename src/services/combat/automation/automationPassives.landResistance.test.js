@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: automationPassives land_resistance ticket slice — the landMappedResistance
 // predicate (CLA-237 applyDamage fallback merge) in automationPassives.js. Pins
 // what the predicate ACTUALLY consults: the runtime _circleOfTheLandType store

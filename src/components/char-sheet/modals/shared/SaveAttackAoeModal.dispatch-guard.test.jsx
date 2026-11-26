@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // SaveAttackAoeModal DISPATCH-Guard lane (picker-confirm-live-while-prompts-stack).
 // The picker route (real CreatureSelectionModal) stays MOUNTED behind the
 // save-prompt/evasion/Results overlay stack until the Results modal closes.

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0019 Consume Memories save seam: failed-save condition writes stamp
 // activeConditionMeta[cond].source = the inflicting monster (existing dc/ability
 // keys preserved), and a save-fail that drops a Humanoid target to 0 HP logs the

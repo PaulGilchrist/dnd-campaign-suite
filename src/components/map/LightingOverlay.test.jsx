@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-22
+// @maintained-by-ai 2026-11-22: 2026-11-22
 /**
  * Deferred plan C — LightingOverlay render tiers + THE OFF-STATE IDENTITY
  * LAW: `lighting === null` renders ZERO DOM (the pre-feature map, byte-for-

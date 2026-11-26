@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 //
 // .ct-* design-kit convergence (tranche 3): the Sessions lane arrived
 // ALREADY container-rooted and kit-skinned end to end (the zero-ct-* census

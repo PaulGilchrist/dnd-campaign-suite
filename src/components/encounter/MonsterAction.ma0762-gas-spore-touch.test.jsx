@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0762: Gas Spore "Touch" — prose carries "Melee Weapon Attack: + 0 to hit"
 // but the row shipped WITHOUT attack_bonus, so the attack half was structurally
 // dead (MA-0286 attackRowMissingToHit suppression — this row is NOT in that

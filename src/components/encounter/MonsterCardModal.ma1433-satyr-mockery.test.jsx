@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1433: Satyr Mockery (monsters.json actions[1]) — the attack_bonus:0 decoy
 // (household authoring noise, MA-1427 Salamander twin) AND absent dc_success made
 // dc_success ?? 'half' (MV-20, MonsterCardModal.jsx :1332/:2443) pay HALF of

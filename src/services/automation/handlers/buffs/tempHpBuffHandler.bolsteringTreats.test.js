@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the Bolstering Treats lane of tempHpBuffHandler
 // (handleBolsteringTreats + craftBolsteringTreats). Runtime store and expression
 // evaluation are mocked; tempHpService is intentionally REAL so the replace-if-larger

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pin — bug-admin-clear-leaves-mounted-boards-stale-resurrects-data.
 // POST /api/campaigns/:c/admin/clear-change-data (and full-reset) wipe the
 // server store and publish change-<c>-combatSummary with a NULL payload

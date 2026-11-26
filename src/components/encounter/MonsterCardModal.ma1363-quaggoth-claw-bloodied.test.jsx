@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1363: Quaggoth Claw — modifier-less conditional_damage:{dice:"2d6",damage_type:
 // "Slashing",condition:"bloodied"} authored on monsters.json actions[1]: HIT popup offers
 // "Bloodied: +2d6 Slashing?" via the MA-0007 GM-adjudication seam (additive: base Done

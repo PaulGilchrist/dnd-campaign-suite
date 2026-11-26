@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: handle() seam ONLY — not-active guard (distinct-function twin of the
 // onArcaneWardBonusActionRestore not-active guard: keep both), arcane_ward_bonus_action →
 // 'arcaneWardRestore' modal routing, and the full projected_ward absorption lane

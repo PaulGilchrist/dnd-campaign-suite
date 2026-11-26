@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-13
+// @maintained-by-ai 2026-11-13: 2026-11-13
 // Mixed-save drop warning (improve 2026-11-13 DG backlog): a track list with
 // ≥1 valid entry AND ≥1 non-empty unparseable line used to save the parseable
 // subset in silence (toast only) while the all-junk list was honestly refused

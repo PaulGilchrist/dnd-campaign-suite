@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation FLAT-FAMILY CLOSER — this file's lane: validateSkills warning MESSAGES +
 // getSkillInfo public façade. Sibling lanes are cited, never re-pinned:
 //   • -core: getSkillLimits totals / fromX shapes / the 2024 base details clause verbatim.

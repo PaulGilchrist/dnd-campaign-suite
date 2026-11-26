@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SEARING VENGEANCE CONFIRM LANE (quad file 2/4). Canonical home of:
 // - confirm-path guards: selectedTargets guard table (null/undefined/empty array),
 //   no-combat-at-confirm popup (Handler.test.js covers the handle() twin only),

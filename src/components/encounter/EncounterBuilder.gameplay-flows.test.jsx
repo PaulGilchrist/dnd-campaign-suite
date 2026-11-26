@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Salvaged from the deprecated gameplay-flows tombstone: the XP recomputation
 // chain (select → increase qty → deselect drives Total XP, Monster Count,
 // Multiplier, and Effective XP). The remaining.test.jsx citations in the old

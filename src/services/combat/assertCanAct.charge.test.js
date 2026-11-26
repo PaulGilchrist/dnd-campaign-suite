@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * PAIR SEAM MAP — enforcement home for the action gates (assertCanAct pair):
  *  - THIS file (assertCanAct.charge.test.js): the L5-002 charge-on-allow lane —

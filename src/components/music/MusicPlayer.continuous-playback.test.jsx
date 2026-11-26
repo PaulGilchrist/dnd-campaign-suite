@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-06
+// @maintained-by-ai 2026-11-06: 2026-11-06
 /* Lane: continuous playback across view navigation (owner ruling 2026-11-06).
  * Music must NOT stop when the user leaves the Music view — the component is
  * persistent-mounted in App and only the PANEL hides (visible=false). Leaving

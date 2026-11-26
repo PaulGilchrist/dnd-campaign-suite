@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the Magical Cunning Pact Magic slot-restoration
 // handler: rest-usage gate, slot-level selection, half-round-up / Eldritch-Master
 // regain math, unconditional Celestial Resilience delegation (popup text append vs

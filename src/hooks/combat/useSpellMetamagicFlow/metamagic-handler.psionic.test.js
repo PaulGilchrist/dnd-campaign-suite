@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Psionic handler UNIT seam (CLA-271): useMetamagicHandler.handleConfirm payment
 // arithmetic only — metamagic-options SP spent once, the Psionic Sorcery payment
 // forwarded to prepareSpellCast (which owns slot skip), option/label application

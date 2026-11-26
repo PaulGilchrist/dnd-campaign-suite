@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * healingWordService lane — TRIGGER ENVELOPE + STORE-CANON CAPS (movement determination below).
  *

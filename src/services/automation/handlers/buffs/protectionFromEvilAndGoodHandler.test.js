@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Handler lane for Protection from Evil and Good (SP-094): deterministic contract
 // tests over fully-mocked collaborators. Pins the popup payload, the single merged
 // store writes (activeBuffs + warded types), exact targetEffects/combatSummary/

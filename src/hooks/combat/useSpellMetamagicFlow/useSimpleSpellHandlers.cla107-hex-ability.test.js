@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // CLA-107 runHex handoff seam: the ability chosen in HexAbilityModal arrives via
 // metaCtx and is persisted by gateHex (spellGates.js — the ONLY hex-pending producer,
 // stamping hexAbility as a STR..CHA key or null). runHex must forward it verbatim

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * Feats lane (#298-#303 family): which FEAT passives actually DISPATCH at the
  * hook seam of resolveAttackDamage — real buildPipelineForAction() wiring, mocked

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 //
 // CI 2026-11-03 a11y lane: the sheet-summary Allies trigger must be a REAL
 // <button> with an accessible name that is keyboard-focusable and Enter-

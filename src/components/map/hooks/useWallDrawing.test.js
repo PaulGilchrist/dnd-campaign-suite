@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useWallDrawing pointer contract (grid wall paint/erase).
 // Owned here: cell-key writes via setMapData, painting stroke anchor, pointer
 // capture acquire/release, guard order. Wall MATH (computeEffectiveWalls etc.)

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 quest board one-pager contract: PLAYER-FACING FIELDS ONLY — the
 // component reads {name, status, description, rewards}, so a raw GM planner
 // row's `notes` can never reach paper even when passed directly (the law is

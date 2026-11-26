@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-007: Boon of Combat Prowess once-per-turn round latch — OWNER lane.
 // This service owns only the latch bytes: the key string (hardcoded verbatim
 // by the re-arm lanes in initiative/navigationHandlers.js:58, Initiative.jsx:84

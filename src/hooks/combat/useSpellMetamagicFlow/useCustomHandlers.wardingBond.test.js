@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-125: Warding Bond confirm lane — pay-at-confirm (SP-013 barkskin template)
 // and thread the CHOSEN target name onto the handler metaCtx (the production
 // producer for metaCtx.wardingBondTargetName, previously set only in tests).

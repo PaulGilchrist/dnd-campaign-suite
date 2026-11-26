@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // CLA-322: Spell Breaker display-override registry helper — this file owns ONLY
 // the gate law of isSpellBreakerBonusActionSpell (spellSectionUtils.js:101-106):
 // which spell names the sheet rows / popups badge as "bonus action", gated on the

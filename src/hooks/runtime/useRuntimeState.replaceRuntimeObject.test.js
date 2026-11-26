@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // Canonical home for replaceRuntimeObject contract tests (useRuntimeState.js) —
 // the SSE-echo adoption lane for full-bucket (character) stores.
 // Regression for bug-changedata-key-removal-stale-on-mounted-tab: the server's

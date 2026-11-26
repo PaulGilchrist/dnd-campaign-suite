@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-19: 2026-10-24
 // CLA-120 lane (unit seam, processPotentCantrip): the potent-cantrip miss-half
 // formula rides the pre-baked autoDamageFormula — buildPotentMissFormula appends
 // the INT term ONLY when '[Empowered Evocation]' is absent (CLA-279 idempotency

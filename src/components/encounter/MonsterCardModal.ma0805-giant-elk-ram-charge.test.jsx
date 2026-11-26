@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0805: Giant Elk Ram — the fix authored TWO fields on monsters.json actions[0]:
 // hit_conditions:["prone"] (MA-0010 seam) + modifier-less conditional_damage
 // (MA-0007 charge-bonus seam, galeb-duhr MA-0756 byte-shape twin). This lane keeps

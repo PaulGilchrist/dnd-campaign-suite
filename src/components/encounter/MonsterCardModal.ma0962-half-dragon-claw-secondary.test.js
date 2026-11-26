@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0962: Half-Dragon Claw "plus 7 (2d6) damage of the type chosen for the
 // Draconic Origin trait" rider was inert-by-construction — no authored
 // damage_dice_secondary, so buildSecondaryDamageTransport emitted the byte-inert

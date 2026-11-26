@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // modalOnClose quartet seam map (#76-79):
 //   combat (this file) — Quivering Palm / Steps of the Fey Taunt / Hurl Through Hell /
 //                        Clairvoyant Combatant: Close-dismiss rows + cannotAct guard.

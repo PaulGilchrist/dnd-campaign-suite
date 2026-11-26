@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── passive.test.js — automationInfoBuilder passive slice (lane #867 family) ──
 // Unit home for the exact emitted info bytes of passiveHandlers (passive.js):
 // every passive feature automation row → handler-input envelope.

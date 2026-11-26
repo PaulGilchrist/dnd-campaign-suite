@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-100: Dread Ambush (Gloom Stalker) Ambusher's Leap — once-per-COMBAT
 // speed_boost grant lifecycle, pinned at the DISPATCH layer: the whole decision
 // (round gate, latch, tuple, log) lives in turnStartEffects.js

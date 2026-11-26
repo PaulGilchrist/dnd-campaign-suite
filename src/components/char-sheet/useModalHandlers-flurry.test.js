@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing seam for the Flurry of Blows modals in useModalHandlers:
 // confirm → exact applyFlurryOfBlows payload → popup / openHandFromFlurry handoff,
 // plus the Flurry of Healing and Harm secondary-target branch (CLA-144).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-315 applyDamage consumer-seam lane: trigger passthrough onto campaign
 // lastAttack — applyDamageToTarget(options.trigger) → stampLastAttack
 // (applyDamage.js:937-942) → buildLastAttackUpdate explicit-null default

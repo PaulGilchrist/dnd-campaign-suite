@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-25
+// @maintained-by-ai 2026-10-25: 2026-10-25
 // Lane: mount-proof testid for the maps list → editor navigation.
 //
 // Backlog (2026-10-25 day run): clicking "Open" in the maps list can silently

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Contract suite for largeFormHandler (Giant ancestry "Large Form" toggle):
 // exact popup strings, exact runtime-key writes (largeFormActive,
 // largeFormActive_restUsed, activeBuffs), buff-entry shape, and campaign-log

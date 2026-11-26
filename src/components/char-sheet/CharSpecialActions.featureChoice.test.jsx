@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions feature-choice lane — REAL FeatureChoiceModal on the sheet:
 // - FEATURE_CHOICE_PROMPTS lane (defensive_tactics / hunter_prey): prompt lists hardcoded
 //   options, suppressed once a _<Name>_choice runtime value exists; confirm delegates to

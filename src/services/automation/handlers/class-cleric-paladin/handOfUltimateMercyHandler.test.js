@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-14
+// @maintained-by-ai 2026-10-15: 2026-11-14
 // Deterministic unit coverage for handOfUltimateMercyHandler.handle — all external
 // services mocked; pins focus-point cost/fallback chain, 0-HP gate, dice expression
 // selection (default/custom/maximized), runtime + storage writes, condition curing,

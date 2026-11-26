@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-22
+// @maintained-by-ai 2026-11-22: 2026-11-22
 /**
  * Deferred plan C — useLighting hook contract (fog hook stays single-purpose
  * and owns its own suite; ray math is owned by lighting.test.js).

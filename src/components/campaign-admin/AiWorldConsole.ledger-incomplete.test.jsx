@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Backlog 2026-11-22 — quest_draft ledger-check INCOMPLETE face: a REJECTED
 // ledger lane is UNREADABLE, not empty, so the card must never wear a verdict
 // (advisory or all-clear) grounded against a partial ledger. Instead it shows a

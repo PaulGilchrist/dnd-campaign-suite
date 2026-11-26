@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0694 lane: Empyrean Bolster te consumer fold — te `bolster_advantage`
 // ("Advantage on D20 Tests") folded by the LATE handler in conditionEffects.js
 // (:495): per-te bumpCount on attackAdvantageCount + saveAdvantageCount and

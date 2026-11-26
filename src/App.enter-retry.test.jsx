@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /**
  * App enter-gate escape pins (backlog TT 2026-11-22):
  *

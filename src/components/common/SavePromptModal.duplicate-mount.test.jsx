@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // SavePromptModal — duplicate same-kind overlay mounts (backlog 2026-11-07 DJ).
 // A single dispatch must mount exactly ONE save-prompt overlay in the
 // dispatching tab. Locks the identity gate in appendSavePrompt:

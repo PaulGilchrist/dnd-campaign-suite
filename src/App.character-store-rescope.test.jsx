@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /**
  * Regression: bug-character-store-ghost-keys-survive-campaign-switch.
  *

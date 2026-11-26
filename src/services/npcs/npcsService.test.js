@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: npcsService.js — the ONLY verifier of /api/campaigns/:c/npcs CRUD transport (exact-if-fetch #1010).
 // Split (owner #1180): npcGenerator.test.js owns /data/* transport; npcFormUtils.test.js owns form
 // defaults (#1179); npcCombatService.test.js owns initiative (#1178); consumers mock this module.

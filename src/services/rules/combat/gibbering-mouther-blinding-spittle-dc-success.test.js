@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0839: Gibbering Mouther "Blinding Spittle" (actions[1], DC 10 Dexterity,
 // 10-foot-radius Sphere within 30 feet, 2d6 Radiant, recharge 5-6) RAW carries
 // NO half-on-success clause — "Failure: 7 (2d6) Radiant damage, and the target

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0633 Dretch Fetid Cloud (1/Day) — ticket lane: dretch-only bytes from
 // the REAL on-disk monsters.json row (no transcription, #977).
 //

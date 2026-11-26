@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 // Backlog 2026-10-27-G — travel-toggle desync on file-trip adoption. Opening a
 // map whose FILE carries a live trip (adoption lane: resumedTripRef true) mounts
 // the TravelPanel while the toolbar toggle used to stay inactive /

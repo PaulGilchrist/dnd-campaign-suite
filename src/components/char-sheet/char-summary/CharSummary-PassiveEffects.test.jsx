@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation): automation/passive movement
 // effects of computeCharSummaryContext — the ONLY owner in the family of all four

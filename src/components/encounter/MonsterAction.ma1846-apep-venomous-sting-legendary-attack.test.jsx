@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — trimmed 7→2 tests: tests 1-4 folded into one
+// @maintained-by-ai 2026-10-18: 2026-10-18 — trimmed 7→2 tests: tests 1-4 folded into one
 // exact-shape toEqual (key set + values + absent delegates_to/automation/save/
 // escape keys all fall out of it; avg(4d6+9)=23 fix lives in the description
 // byte); pruned buildHitConditionClause/attackRowMissingToHit re-derivation

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // ─── Lane: spell-overlay destructive dialog mount in Map.jsx ─────────────────
 // Backlog 2026-11-01 BA: the overlay Remove / Clear All lanes no longer pay a
 // native confirm — useSpellOverlay stages a pendingOverlayAction descriptor

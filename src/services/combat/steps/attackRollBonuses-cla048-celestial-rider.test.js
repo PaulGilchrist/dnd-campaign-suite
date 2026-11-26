@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-048 lane: owns attackRollBonuses.js `buildCelestialRevelationStep`'s PROFICIENCY_BONUS
 // resolution — the bug itself: rollExpression('proficiency_bonus') is null (diceRoller NdM
 // constants-only), so the pre-fix step silently returned {} on every hit. This is the ONLY

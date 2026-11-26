@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // BASE lane: the honest core prompt flow of createPlayerSaveDamageHandler —
 // prompt sequence fires once with a shared promptId, the full sendSavePrompt
 // payload, the waiting-popup essentials (attacker fallback + GWF tracking).

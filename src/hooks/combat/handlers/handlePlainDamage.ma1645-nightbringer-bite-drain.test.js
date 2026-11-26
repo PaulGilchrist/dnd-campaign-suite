@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1645: Vampire Nightbringer "Bite" attack-lane drain + regain CONSUMER
 // lane (handlePlainDamage). Row bytes, parseHitHpMaxReduce magnitude scope,
 // parseHitAttackerRecover grammar and buildHitConditionClause threading are

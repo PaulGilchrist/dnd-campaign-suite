@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Host-wiring coverage for bendFateModal in CharActionModals → SecondaryModals.
 //
 // Scope — behavior NOT covered elsewhere:

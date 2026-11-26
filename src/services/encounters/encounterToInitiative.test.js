@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: encounter → initiative ENTRY transformation. Initiative ROLL math is owned
 // by the initiative lanes (#862-#875 / initiativeService.test.js); consumers of the
 // initiative-rolled event live elsewhere (#863). IRV *resolution* is owned by

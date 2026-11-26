@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // inspiringSmiteService lane — TRIGGER ENVELOPE PRODUCER + CLA-200 CAST-TOKEN
 // STAMPER (inspiringSmiteService.js:5-56). Sole production caller of
 // triggerInspiringSmite is spellCastService/execution/index.js:528, fire-and-forget

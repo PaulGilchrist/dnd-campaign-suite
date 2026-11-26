@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1952: Nidhogg legendary_actions "Grave Gale (Costs 2 Actions)" shipped
 // delegates_to:"Corpse Wind (Recharge 5-6)" with NO numeric fields — the gated
 // press self-resolved nothing and the delegate leg hijacked the master's save

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Seam: processInitiativeRoll — the initiative-roll tail: popup rebuild, tracker
 // write, and `initiative-rolled` dispatch. (Roll-side Cosmic Omen / tandem-footwork
 // folding is covered in useLoggedDiceRollAttack.test.js.)

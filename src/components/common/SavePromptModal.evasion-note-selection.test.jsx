@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Regression: the Evasion note's SHARED branch must answer the SAME CLA-211
 // per-target predicate the adjudication answers — the leadingEvasionSelections
 // promptId stamp — never the retired blanket "a shareable holder exists in the

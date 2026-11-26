@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // rulesFactory getPlayerStats FIGHTING-STYLE SURVIVAL lane (regression for
 // bug-rulesfactory-wipes-fightingstyles-mapping): rulesFactory.js:103 REPLACES
 // playerStats.class with a fresh cr.getClass(allClasses, playerSummary) merge

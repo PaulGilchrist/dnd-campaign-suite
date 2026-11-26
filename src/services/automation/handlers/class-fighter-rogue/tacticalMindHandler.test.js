@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for tacticalMindHandler: mocked runtime store +
 // log service, RNG pinned via mockRandom. Stable unless the handler's refusal
 // strings, +1d10 bonus formula, or Second Wind spend semantics change.

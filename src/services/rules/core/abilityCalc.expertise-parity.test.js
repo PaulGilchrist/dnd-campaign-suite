@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Parity contract (fix#81 precedent): the expertise law in abilityCalc.js (5e)
 // and abilityCalc2024.js (2024) is ONE contract across twins — both rulesets
 // must produce byte-equal skill bonuses for the same inputs. RAW: expertise

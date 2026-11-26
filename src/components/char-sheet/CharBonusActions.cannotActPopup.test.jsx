@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-15
 // RB-1115 (2026-11-15): the bonus-action sheet row lanes that used to return
 // SILENTLY on a cannotAct press now route through the shared assertCanAct
 // setPopupHtml lane with the canTakeAction copy ("You cannot take actions

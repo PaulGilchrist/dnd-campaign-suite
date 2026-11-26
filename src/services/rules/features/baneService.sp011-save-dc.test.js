@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // SP-011 lane: the ONLY bane lane that runs applyBaneEffect against the REAL

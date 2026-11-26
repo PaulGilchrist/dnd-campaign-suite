@@ -17,7 +17,7 @@
 // MonsterCardHelpers.hit-choice.test.js:89-94 and MonsterCardModal.hit-choice
 // .test.jsx:214. Hybrid row §147: ONE "+10" chip, no melee/ranged toggles or
 // ranged dice swaps.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';

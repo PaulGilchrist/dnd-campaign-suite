@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1397: Roc "Talons" — prose carries "If the target is a Huge or smaller
 // creature, it has the Grappled condition (escape DC 19) from both talons, and
 // it has the Restrained condition until the grapple ends" but the row shipped

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-070 Shadow Touched FEAT lane — the REAL perSpellTracking span: selection-time
 // spell set, live `_Shadow_Magic_<Spell>_freeCastCount` latch keys, consume/pay/refund
 // ledgers. CLA-308 naming convention (shadowArts sibling owns `_Shadow_Arts_`).

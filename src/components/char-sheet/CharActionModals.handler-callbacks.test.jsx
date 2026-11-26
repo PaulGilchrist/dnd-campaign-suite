@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Handler-callback contract tests for CharActionModals.jsx:
 // - handleStarryChaliceConfirm: full contract (clear, invoke, popup) on target select
 // - SecondaryModals DivineInterventionModal wiring: cast → handler prop, close → clear

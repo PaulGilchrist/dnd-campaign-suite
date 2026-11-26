@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Greater Invisibility handler: thin adapter over invisibilityShared.js.
 // This suite pins ONLY the greater-specific contract (popup type, 1-minute
 // concentration default, 'GreaterInvisibility' buff identity, the

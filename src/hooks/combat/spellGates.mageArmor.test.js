@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // SP-074 gateMageArmor — RAW "You touch a willing creature who isn't wearing
 // armor": the picker offers only unarmored targets, decided by the CLA-225
 // armor-category predicate (speedUtils.checkAnyArmor catalog lookup against the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // Backlog 2026-10-31 (stat-blind referee dice) — client-side actor-stats
 // projection. Fixtures mirror the REAL character-file shape on disk
 // (public/campaigns/test-campaign/*.json): abilities as

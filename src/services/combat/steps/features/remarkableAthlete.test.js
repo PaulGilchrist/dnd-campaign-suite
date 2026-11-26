@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // remarkableAthlete lane — 2024 "Remarkable Athlete" crit-movement latch: a crit by a holder of the
 // auto_effect remarkable_athlete_movement rider (2024/classes.json verbatim) writes the
 // remarkableAthleteNoOA=true store byte; damage data passes through untouched.

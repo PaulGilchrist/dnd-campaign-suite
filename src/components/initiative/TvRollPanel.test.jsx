@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Roadmap Item 5 (TV shared dice) unit lanes: the panel projects ONLY rolls
 // that land after the log lane initializes (baseline), decodes them through
 // the log's own RollEntry (HIT/MISS vs AC, dice faces, NAT 20/FUMBLE/

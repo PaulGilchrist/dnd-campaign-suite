@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0003 regression: Aarakocra Aeromancer Spellcasting clause.
 // The Spellcasting row must expose per-spell castable links (not one
 // anonymous generic DC-save link). A non-damage utility spell (Gust of Wind)

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-0298 (event-bus save-result seam): Arcanaloth Banishing Claw — a failed
 // DC 17 CHA save grants the indefinite Soul Tome te + Incapacitated via
 // soulTomeTrapService; a success grants ZERO trap state yet still pays the

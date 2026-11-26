@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // AUDITED 2026-10-20 — falseLife lane: minimal behavioral suite (guard table, exact envelope + slot chain, error passthrough). Expression selection owned by falseLifeHandler (own lane).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerFalseLife } from './falseLifeService.js';

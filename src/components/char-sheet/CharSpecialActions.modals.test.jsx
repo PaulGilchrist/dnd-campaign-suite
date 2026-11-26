@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Seam map (#76 family) — this file owns the OPEN-ROUTING seam and is the
 // strongest version of those tests (see the modalOnClose.quartet headers):
 //   click a Special Actions row → the clicked action flows through

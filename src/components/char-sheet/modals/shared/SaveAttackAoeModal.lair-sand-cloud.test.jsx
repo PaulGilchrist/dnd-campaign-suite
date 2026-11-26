@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0063 Sand Cloud picker — the damageless save+zone COMPOSITE seam. This
 // lane owns the asymmetric adjudication other lanes cannot pin together: one
 // mixed confirm where the Blinded condition lands ONLY on failed Constitution

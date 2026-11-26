@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // ── HoH pre-spend-at-full-HP improve — REFUSE PRE-SPEND (owner decision) ──
 // SUBJECT: performMonkHeal's confirm-time capacity + Focus gates in

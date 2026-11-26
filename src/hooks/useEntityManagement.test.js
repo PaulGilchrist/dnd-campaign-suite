@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic hook-contract suite for the generic useEntityManagement hook:
 // all load/save/delete dependencies are plain vi.fn() mocks, so there is no
 // network, timer, or randomness here. This is the ONLY coverage of the hook

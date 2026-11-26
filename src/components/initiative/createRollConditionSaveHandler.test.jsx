@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * createRollConditionSaveHandler lane — initiative seam for CONDITION saves.
  * (Concentration saves are owned by the createConcentrationHandlers.* trio — #833-#835 — distinct lane.)

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-405 fleetStep lane (attack-row owner): pins WHEN the attack-row lane
 // invokes grantFleetStep (useCharActionsAttackHandlers.js BA block) and the
 // byte-exact consumer args — row-type gating plus the refusal paths upstream

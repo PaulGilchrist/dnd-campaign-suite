@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Canonical lane for the useSpellUpcastFlow upcast-choice hook seam: the slot-level
 // picker state machine (gateUpcast arms pendingUpcast, handleUpcastConfirm pays the
 // slot via runtime store + hands the level-stamped spell to afterUpcast, cancel rolls

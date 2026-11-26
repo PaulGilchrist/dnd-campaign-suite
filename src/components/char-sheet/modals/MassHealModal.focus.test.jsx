@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Entrance/restore focus tier lock for MassHealModal (backlog 2026-11-17
 // sp-overlay census adoption — the named representative of the mass-heal/
 // Prayer-of-Healing chooser family). Live rides proved the shared

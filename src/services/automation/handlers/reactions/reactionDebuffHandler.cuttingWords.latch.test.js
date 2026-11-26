@@ -27,7 +27,7 @@
 // (handleAttacksVsAlly :463 calls resolveMapPositions with 2 args); our
 // 3-arg arity pin below (bardicRangeRefusal :582 — campaignName, mapName,
 // playerName) is the CORRECT reference shape — keep it strong.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // MapsManager.rename-aria-label.test.jsx — a11y/automation pin (backlog
 // GK 2026-11-17): while a row's inline rename is open, the rename <input>
 // carries a stable, map-name-specific aria-label (`New name for "<map>"`)

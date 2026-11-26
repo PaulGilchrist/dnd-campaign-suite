@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: computeCover rules TABLE (items / doors / walls / geometry) — SOLE OWNER.
 // Consumer lanes cite here, never re-drive the table:
 //   services/maps/effectiveWalls.test.js .. walls Set/array/nullish coercion + secret-door

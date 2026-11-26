@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Regression tests (FT-022/023): closing the Charger (Charge Attack) rider
 // modal in CharActionModals must resume the paused attack damage pipeline,
 // and must latch the once-per-round skip flag only when the player declined

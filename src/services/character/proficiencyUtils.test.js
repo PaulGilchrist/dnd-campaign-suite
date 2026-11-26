@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Unit lane for the shared 5e/2024 proficiency engine (proficiencyUtils.js).
 // Pair split: 2024-specific getProficiencyChoiceCount ("Choose N" string parsing,
 // majors schema) lives in proficiencyUtils2024.test.js. This file stays on the

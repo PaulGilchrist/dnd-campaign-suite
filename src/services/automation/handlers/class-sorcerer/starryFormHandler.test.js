@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // starryFormHandler: modal gate + constellation application lane.
 // Deterministic seam: handle() → wildShapeUses consumption gate (level 10+ with a
 // constellation already active skips consume) → constellation modal;

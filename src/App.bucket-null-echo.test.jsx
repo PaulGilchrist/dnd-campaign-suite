@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Regression: bug-character-bucket-delete-echo-never-self-heals.
  *

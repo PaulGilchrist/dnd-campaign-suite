@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // createLogAndShow — campaign.targetEffects SAVE-FLANK seam.
 // Owns how the targetEffects list survives or is consumed when an attack roll
 // resolves, including the Unbreakable Majesty save outcome (2024 Oath of the

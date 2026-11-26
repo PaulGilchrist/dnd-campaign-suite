@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-388 lane: the ONLY tripwire pinning `_Wild_Companion_freeCast` registration.
 // The grant is stamped by WildCompanionModal.jsx (:43/:60, paid-but-unspent Find
 // Familiar array after expending a slot or a Wild Shape use) and re-armed to null by

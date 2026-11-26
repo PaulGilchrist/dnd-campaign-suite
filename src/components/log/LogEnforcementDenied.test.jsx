@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // ENFORCEMENT_DENIED lane (backlog 2026-11-21 GGG, row attribution): gameplay
 // refusals (assertCanAct, lineOfSightGate, opportunityTrigger, usePlayerDragging)
 // all stamp {type:'enforcement_denied', creature, target?, bucket, source,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Regression pin for bug-character-delete-sanitizer-mismatch: character DELETE
 // derived `name.toLowerCase().replace(/\s+/g,'-')+'.json'` while the server
 // create route wrote `name.replace(/[^a-zA-Z0-9]/g,'_')+'.json'`, so every

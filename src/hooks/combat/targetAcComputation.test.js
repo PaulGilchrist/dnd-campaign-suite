@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Seam: computeTargetAc — the single AC math consumed by hitResolution.js and
 // useLoggedDiceRollAttack.js at the attack-roll seam: player/NPC base-AC
 // resolution, the SP-013 Barkskin min-17 FLOOR (2024; floor semantics, NOT an

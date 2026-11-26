@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Sole owner of dreadAmbushHandler.handle() runtime composition (5e Ranger): uses gate,
 // oncePerTurn gate, findLastAttack attack gates, level scaling resolution, damage apply,
 // uses decrement, log entry, and full-string popup/log description pins.

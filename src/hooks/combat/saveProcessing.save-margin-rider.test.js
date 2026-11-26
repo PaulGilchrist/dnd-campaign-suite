@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // GENERIC save-margin-rider authority (MA-0639 origin: Drow Hand Crossbow
 // "If the saving throw fails by 5 or more, the target is also unconscious
 // while poisoned in this way"). applySaveMarginRider is armed SOLELY by the

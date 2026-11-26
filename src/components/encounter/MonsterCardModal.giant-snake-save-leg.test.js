@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Owner legs (keep stable): disk BY-name bytes · save-chip ctx damage
 // fields adjudicating 3d6 Poison through the composite save-leg path.
 // Predicate truth tables owned by secondary-save-transport.test.js (it.each

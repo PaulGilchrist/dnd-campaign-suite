@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Unit contract for extractDamageDiceFromDescription (MonsterCardModal.jsx:934-939) —
 // the prose dice parser consumed by MonsterCardModal.jsx (:747/:754/:774/:1149/:1290/:1371)
 // and MonsterAction.jsx (:211/:455). Called with falsy/unauthored damage_dice_primary so

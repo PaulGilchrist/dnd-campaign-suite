@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * EyebiteEffectModal — NPC SAVE lane (handleTargetSelected → resolveSave isNpc branch,
  * the immunity gate, and the routing decision between them).

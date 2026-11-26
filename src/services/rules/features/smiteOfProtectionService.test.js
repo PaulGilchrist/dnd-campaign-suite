@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // smiteOfProtectionService lane — post-cast DISPATCHER for Oath of Devotion's
 // Smite of Protection (smiteOfProtectionService.js:1-49, 49-line body, REAL here;
 // every consumer vi.mocks this module — 20+ spellCastService lanes stub it — so this

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Number-agreement and line-presence coverage for buildVictoryLines (victory
 // banner copy): singular/plural faces of every count-bearing line, the wipe
 // vs. survived branch (including defeat-fled honesty: a wipe never claims

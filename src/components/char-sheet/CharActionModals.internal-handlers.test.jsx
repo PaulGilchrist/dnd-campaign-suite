@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Real (unmocked) modal-render lane for CharActionModals host slots: the
 // Healing Illusion target picker (SecondaryTargetModal), the
 // SecondaryTargetModals mapping entries for Starry Form: Chalice and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // autoRerollHandler — misc-paths lane: handleAbilityCheck / handleSaveRoll popup
 // composition, consumeResourceCost gating (refusals + max fallbacks),
 // findAllyMissedAttack internals, getBardicDieSize guard, bardic not-fresh refusal.

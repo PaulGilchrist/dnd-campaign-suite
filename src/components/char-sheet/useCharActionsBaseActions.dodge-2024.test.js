@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // BA-001: 2024-ruleset Dodge lane only. The single branch unique to the 2024
 // path in handleDodgeAction is dexSaveClause === '' (2014 Dodge appends
 // " You have advantage on Dexterity saving throws."; 2024 Dodge per the

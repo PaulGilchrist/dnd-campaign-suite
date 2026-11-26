@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // 2026-11-18 sheet-attack no-target refusal on the CharActions weapon-row
 // seam (monster-chip TA-1116 parity): pressing an ATTACK row while the
 // character's initiative row carries NO targetName refuses LOUD — the shared

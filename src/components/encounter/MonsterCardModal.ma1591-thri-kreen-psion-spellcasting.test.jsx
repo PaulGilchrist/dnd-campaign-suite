@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1591 data lock: Thri-kreen Psion Spellcasting rode the MA-1543 (Storm
 // Giant) byte-twin markup-gap template — the row was fully markup-free
 // (plain-text tiers AND names) → extractSpellNamesFromSpellcasting [] →

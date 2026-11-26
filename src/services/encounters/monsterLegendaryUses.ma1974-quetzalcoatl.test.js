@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1974: Quetzalcoatl "Detection" (legendary_actions[2]) DATA fingerprint.
 // Press burned a legendary use, rolled NOTHING, console error
 // delegates_to:"undefined" — the MA-0051 skill-check lane

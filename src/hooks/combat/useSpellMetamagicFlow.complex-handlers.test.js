@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Complex-handler dispatch/gate seam for useSpellMetamagicFlow.
 // Owns: the dispatch registry that routes gated spells into their dedicated lanes
 // (two-stage Enhance Ability, custom Protection from Poison / Stone Skin) and the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-320: manual Soul Blades Reactions row — RAW gates enforced:
 // trigger is a missed own Psychic Blade attack, natural 1 refuses,
 // already-homed misses refuse (double-dip guard), and the Psionic Energy

@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18: spectator BY-name gaze-row fingerprint +
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18: spectator BY-name gaze-row fingerprint +
 // gate discrimination only; generic parse/picker/synthesis/compute cite-skipped to
 // owners (eye-rays, gazer-eye-rays, slowed-clauses, saveProcessing.eye-rays,
 // applyDamage.helpers). See lane canon header below for citations.

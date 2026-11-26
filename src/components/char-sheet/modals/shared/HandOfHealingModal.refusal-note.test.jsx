@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // HoH pre-spend-at-full-HP improve — picker refusal-note face. The commit-time
 // capacity gate (healingHandler.performMonkHeal) turns a full-HP confirm into

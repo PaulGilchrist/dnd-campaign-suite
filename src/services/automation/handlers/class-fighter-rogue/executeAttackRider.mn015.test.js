@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-015 regression: Pushing Attack save DC must come from the forwarded
 // combat_superiority automation (8 + STR + PB), never the buildSaveDc DC-10
 // fallback; oversized (Huge) targets are refused BEFORE the die is rolled or

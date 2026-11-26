@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Same-cell token stacking derivation (backlog GA 2026-11-10: overlapping
 // tokens made drag-grabs ambiguous — paint order alone decided the mover and
 // the buried token was invisible). This is the PURE seam pinned by the fix:

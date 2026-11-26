@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1436/MA-1878: breathAoeShape SHAPE lane (pure function, real disk rows,
 // zero mocks) — authored emanation RANGE vs prose shape scrape vs the MA-1878
 // LOS-sanitize double guard.

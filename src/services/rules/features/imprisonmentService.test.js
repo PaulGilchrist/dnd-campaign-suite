@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * imprisonmentService lane — ENVELOPE-BUILDING FORWARDER and NUMERIC-DC PRODUCER
  * (imprisonmentService.js L5-32). Sole export triggerImprisonment; sole production

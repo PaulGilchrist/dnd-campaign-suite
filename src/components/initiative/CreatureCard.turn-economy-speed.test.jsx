@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Lane: CreatureCard → TurnEconomyStrip movement DENOMINATOR
 // (bug-movement-budget-caps-all-movers-at-30, display face).
 //

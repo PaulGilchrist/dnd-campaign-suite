@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Monk lane of the CharClassFeatures registry entry point
  * (class name 'Monk' → MonkFeatures). Owns display of monk-specific

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: legacy saved-choice key migration and removed-feat filtering in the mount
 // effect of useWizardFeatAbilityChoices.js — unsuffixed legacy keys ("<Feat>") are
 // renamed onto their grouped id ("<Feat>-<idx>") with saved assignments preserved

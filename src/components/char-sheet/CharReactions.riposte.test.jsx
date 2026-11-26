@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MN-017: CharReactions.handleAutomationReaction must flush handler logEntries to the
 // campaign log on EVERY handled result type (the drop shared with MN-013 Parry / CLA-228) —
 // mirror of the MN-016 Rally flush. Three lanes, three pins:

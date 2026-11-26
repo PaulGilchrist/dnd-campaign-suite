@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Abilities-guard lane for 2024 getAttacks (attackCalc2024.js) — ledgers #1236
 // (playerStats.abilities.find unguarded at the 4 apex find sites: absent
 // 'abilities' KEY throws TypeError) and #1243 (bare ctx.strength.bonus /

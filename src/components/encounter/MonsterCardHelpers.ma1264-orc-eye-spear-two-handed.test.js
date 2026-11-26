@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 7→5 tests (disk lock incl. key placement; both
+// @maintained-by-ai 2026-10-18 — trimmed 7→5 tests (disk lock incl. key placement; both
 // formulas parse incl. '+'-joined grammar guard; offer; no-additive guard;
 // select logs). All assertions kept except provably-redundant two_handed
 // not.toBe(primary) (both literals already toBe-locked). Twin note: the

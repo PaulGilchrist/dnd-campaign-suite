@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Handler-only lane for zealousPresenceHandler.js (producer seam): handle() gating
 // (already-active, uses/rage resource management, range-gated chooser modal) and
 // confirmZealousPresence() (activation marker, toggleBuff producer shape, expiration

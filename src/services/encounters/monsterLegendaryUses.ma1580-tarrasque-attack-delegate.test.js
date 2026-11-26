@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1580 lane: Tarrasque legendary_actions "Attack" was plain text with zero
 // affordance — the claw-or-tail choice was never consumable (post-MA-1579 the
 // row was the MA-0510 silent-burn shape: Expend chip armed, click spends,

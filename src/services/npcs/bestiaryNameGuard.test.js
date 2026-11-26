@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-16
+// @maintained-by-ai 2026-11-16: 2026-11-16
 // Pure-lane pins for the client bestiary-name gate service: the predicate
 // mirrors server/routes/npcs.js `isBestiaryMonsterName` semantics EXACTLY
 // (trim + lowercase, exact match against the monsters.json name-set), the

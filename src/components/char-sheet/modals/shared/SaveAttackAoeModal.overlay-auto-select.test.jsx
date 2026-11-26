@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Regression pin for the 2026-10-30 overlay-targeted AoE picker bug: casting an
 // area spell (repro: Fireball, sheet lane) while the caster's combatSummary
 // target was armed to `overlay-<id>` opened the fully-generic picker with ZERO

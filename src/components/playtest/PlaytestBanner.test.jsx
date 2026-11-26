@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // PlaytestBanner — the app-level session ribbon (plan 2026-11-25). Owns ONLY:
 // stamp-driven visibility (incl. the GM-only gate), the End→confirm→rollback
 // handoff wiring, and the honest failure face when the restore point is gone

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0610: Djinni Create Whirlwind — zone-picker openability + dc_success
 // none + data integrity. BEFORE the fix this row had NO zone dict + carried
 // instant damage_dice_primary: the cylinder hard-exclusion (sphereRadiusFeet

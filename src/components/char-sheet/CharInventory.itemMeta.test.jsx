@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory itemMeta seam (seam map in CharInventory.edgeCases.test.jsx):
 //   - "×n" quantity suffix derived from itemMeta: suffix only when quantity > 1;
 //     meta present-but-qty-1 and meta-absent both render the bare name; meta keys

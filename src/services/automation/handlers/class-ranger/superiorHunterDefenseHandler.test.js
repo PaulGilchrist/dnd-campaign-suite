@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit contract for superiorHunterDefenseHandler: RAW trigger gates
 // (no-attack / wrong-target / miss / round-latch refusal), resistance-type selection,
 // retroactive healing, latch serialization (CLA-371), and the single merged

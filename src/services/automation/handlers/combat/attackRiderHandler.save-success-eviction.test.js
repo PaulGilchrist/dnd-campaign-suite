@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // attackRiderHandler.handleRiderSave SAVE-RESOLUTION lane (DG 2026-11-06
 // improve): a successful save evicts the pre-save descriptor row from the
 // campaign-root targetEffects store (no misreadable prone residue; the

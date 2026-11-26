@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: postCastRiderHandler.js (automation handler, HANDLER_MAP['post_cast_rider'] — index.js:363).
 // Live: Beguiling Magic (2024 classes.json College of Glamour passive_rule+riderSave) →
 // useConfirmableFlow triggerPostCastRiderSaves → executeHandler → this handle().

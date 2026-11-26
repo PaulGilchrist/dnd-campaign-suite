@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2021: Thunderbird "Wing Clap" legendary save — DC 23 Strength, 2d6 Thunder,
 // "Failure: pushed 20 ft. and knocked Prone". The row shipped save_dc/save_type/
 // damage_dice_primary + hit_conditions:["prone"] BAIT (buildHitConditionClause is

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-1367 OWNER: quaggoth-thonot Psionic Defense disk-row lock (shield byte-twin of MA-1170 — gate/press legs cite-skip owner per #422/#522)
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-1367 OWNER: quaggoth-thonot Psionic Defense disk-row lock (shield byte-twin of MA-1170 — gate/press legs cite-skip owner per #422/#522)
 // MA-1367: Quaggoth Thonot Psionic Defense — FAIL(b) zero affordance fixed with
 // the MA-1170 Shield byte-shape (mind-flayer-arcanist / noble-prodigy verbatim).
 // RAW: reaction to a spell trigger → casts Feather Fall OR Shield; the Shield leg

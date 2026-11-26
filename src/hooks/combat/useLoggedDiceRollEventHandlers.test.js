@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Base event-handlers lane for useLoggedDiceRollEventHandlers.setupEventListeners:
 // listener registration/install-guard lifecycle, generic save-result event dispatch
 // (pending-prompt resolution, evasion/damage plumbing, HP sync, logging, popup),

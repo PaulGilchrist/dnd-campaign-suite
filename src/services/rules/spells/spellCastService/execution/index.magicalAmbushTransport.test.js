@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  OWNER: CLA-219 :680 fold TRANSPORT face (hub executeSpellCast).  */
 /*  Ownership reconciled by bytes (2026-10-21): execution-early-      */

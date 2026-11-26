@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import RecklessAttackModal from './RecklessAttackModal.jsx';

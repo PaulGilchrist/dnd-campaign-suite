@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Trim pass (2026-10-18): handleAttack payload-transport seams unique to this lane.
 //
 // Collapsed (one it.each per branch owner, shared render):

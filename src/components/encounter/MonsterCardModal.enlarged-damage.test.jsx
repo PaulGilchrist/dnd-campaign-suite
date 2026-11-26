@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0655: Enlarge STR-dice consumer — the monster attack-damage seam
 // (buildAutoDamageOptions via enlargedAttackDamageFields in handleAttack)
 // doubles the PRIMARY dice count of `strength_based:true` rows ONLY while

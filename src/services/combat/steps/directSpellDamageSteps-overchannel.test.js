@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // spellOverchannel + spellProceedToDamage lane — directSpellDamageSteps.js steps[4]/[5].
 // spellOverchannel ROLLS plain dice (self-damage, CLA-244 RAW: dicePerLevel =
 // max(2, useCount), totalDice = dicePerLevel x spellLevel — source :197-199) and

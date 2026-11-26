@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: NPC_FORM_HANDLERS → runMonster merge path ONLY (createNpcClickHandler.js:36-38,
 // npcClickFormHandlers.js runMonster :179-221): a monsterIndex runtime combatant merged onto
 // its bestiary block, opened exactly once. This is the family's only runMonster pin —

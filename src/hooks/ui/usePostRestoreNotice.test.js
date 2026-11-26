@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit-level owner of the usePostRestoreNotice contract (per the coverage split
 // declared in App.post-restore.test.jsx): notice parsing/consumption from
 // sessionStorage, consumeRestore gating, and one-shot banner drop.

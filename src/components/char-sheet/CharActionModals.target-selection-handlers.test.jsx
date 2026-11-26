@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Handler wiring tests for target-selection modals routed through CharActionModals.
 // Each test pins one modalKey → mounted modal → handler-prop line: clicking the
 // modal's confirm invokes the feature handler with the selection flowing through

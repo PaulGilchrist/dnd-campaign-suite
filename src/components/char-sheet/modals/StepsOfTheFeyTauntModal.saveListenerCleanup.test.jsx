@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Leak-ledger pins for the save-result window listeners in StepsOfTheFeyTauntModal
 // (⚠ defect, maintenance ledger run2 #257, test-maintain-bugs.md:283). Pre-fix the
 // taunting/dreadful confirm lanes registered anonymous 'save-result' handlers that

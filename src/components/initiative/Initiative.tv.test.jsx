@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Phase 1 TV-mode lane (Initiative CONTAINER): proves the presentation toggle
 // (per-client localStorage display setting), the derived up-next strip, the
 // HP-diff floater events (emit on damage, retire via the feedback-done callback

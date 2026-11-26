@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1113: Lizardfolk Shaman "Change Shape (Recharges after a Short or Long
 // Rest)" — formerly a zero-affordance dead prose row (name + description ONLY;
 // live audit: 0 interactive elements in the open .mc-action, 0 popups / 0 log

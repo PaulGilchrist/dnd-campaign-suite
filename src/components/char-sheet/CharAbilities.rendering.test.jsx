@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — baseline layout lane (owner: headers + grid structure).
  * Pins the section/column headers, one row per ability with cells in column

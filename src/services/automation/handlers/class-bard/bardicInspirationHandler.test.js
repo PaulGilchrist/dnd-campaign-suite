@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic: every external dependency (runtime store, combat context, dice
 // expression, expirations, log, executeHandler dispatch) is mocked, so this
 // suite pins the bardicInspirationHandler contract — use-gate refusals, pool

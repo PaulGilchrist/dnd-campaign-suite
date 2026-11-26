@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /* Lane — Load-pool row hover affordance (2026-11-16 WK backlog): the icon-only
  * Rename (pen) and Delete (trash) buttons on encounter-list rows carry an
  * aria-label but historically NO title, so hover gave zero tooltip affordance

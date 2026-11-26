@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Pins telekineticThrustHandler.js's OWN implementation copy (manual thrust row):
 // handle save-delegation, applyTelekineticThrust save flow, applyThrustEffect
 // prone-add + storage.set + own log composition. Does NOT pin the CLA-355

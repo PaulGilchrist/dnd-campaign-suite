@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // SERVICE lane for src/services/rules/spells/postCastRiderService.js (not the
 // postCastRiderHandler terminal-executor lane). The co-located suite
 // (src/services/rules/spells/postCastRiderService.test.js) owns the canonical module

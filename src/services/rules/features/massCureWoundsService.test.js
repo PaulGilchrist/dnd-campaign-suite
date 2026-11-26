@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * massCureWoundsService lane — AoE PRODUCER (multi-target, per-target dice).
  *

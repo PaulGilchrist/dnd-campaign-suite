@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharSpells table suite: column structure per ruleset (headers, prepared
  * column presence, checkbox rows mapped to their spell), table hiding,

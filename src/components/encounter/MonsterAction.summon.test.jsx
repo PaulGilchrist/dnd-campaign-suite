@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // SummonLink chip lane (MonsterAction.jsx:256-268): one press pattern, once.
 // Arms exactly ONE .mc-dice-link-summon per monster_summon row with the exact
 // honest tooltip (options + chance %, constant count when authored, range,

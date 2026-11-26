@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-10-24: 2026-11-17
 // Improve (party-currency chip burst coalescing) + clobber migration: +/- chip clicks
 // used to each fire one full-store snapshot POST (~30/session) and later a 400ms trailing
 // debounce merged bursts into ONE whole-document POST — which let two GM windows silently

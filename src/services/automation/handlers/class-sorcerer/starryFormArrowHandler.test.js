@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // starryFormArrowHandler: Archer-gated Luminous Arrow launch.
 // Deterministic seam: activeBuffs gate → buildStarryFormLuminousArrow →
 // target resolution (turnOrder → campaign lastAttack → null) → log → attack_roll.

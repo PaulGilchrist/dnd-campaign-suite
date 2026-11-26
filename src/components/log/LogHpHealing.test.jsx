@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Healing lane (LogHpHealingEntry.jsx): owned contract = HEALING-side entry CONTENT bytes
 // for both exports — HpChangeEntry player-heal legs ('Healed' label + fa-heart icon,
 // positive '+N HP' delta, current/max remaining bytes, source-paren '(<sourceName>)',

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: direct-module + barrel-import entry-point face of expireStaleEffects
 // with the CLEAR side LIVE (real expireForCreature/expireForTarget/
 // clearExpirationEffects run — no mock on the clear path). Maturity truth

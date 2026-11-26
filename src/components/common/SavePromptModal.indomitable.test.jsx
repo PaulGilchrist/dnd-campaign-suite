@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // CLA-195 regression: SavePromptModal must offer an "Indomitable (+N)" reroll
 // on a failed save for a fighter with the Indomitable save-reroll modifier,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-283 lane: async aura utils MUST be awaited at gridless sync consumers —
 // non-awaited reads of .advantage/.disadvantage off a Promise were always
 // undefined, so Wolf/Lion aura mode never reached forcedMode. Canonical home

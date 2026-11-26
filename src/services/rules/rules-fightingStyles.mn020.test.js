@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MN-020: the Superior Technique style grant must carry the save spec tokens
 // (saveDc:'ability', saveAbility:['STR','DEX']) mirroring the Battle Master major
 // feature automation, so buildSaveDc resolves 8 + STR/DEX mod + PB at prompt time

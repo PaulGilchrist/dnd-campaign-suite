@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  CAST-SEAM FEATURE SUBSCRIBER LANE — execution/index.js +          */
 /*  execution/helpers.js + execution/triggerSpells.js run REAL.       */

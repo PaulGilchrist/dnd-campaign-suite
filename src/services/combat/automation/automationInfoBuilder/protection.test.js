@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── protection.test.js — automationInfoBuilder protection slice (lane #952 template) ──
 // Unit home for the EXACT emitted info bytes of the protection-family builders
 // in reaction.js: `protection` and `shield`. reaction.test.js's

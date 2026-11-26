@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-0751: Fomorian Warping Hex — "The target gains 1 Exhaustion level."
 // exhaustion is LEVEL-based (stackable to 6) and OUTSIDE the canonical
 // CONDITIONS word list (MonsterCardHelpers.js:56), so extractConditionsFromSaveEffect

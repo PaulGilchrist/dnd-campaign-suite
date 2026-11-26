@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1224: Nalfeshnee "Pursuit" reaction row — formerly prose-only with
 // ZERO affordance (live fingerprint 2026-09-25: Reactions census 0 chips;
 // getGatedMonsterReaction nulls the row for lack of automation.effect).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // AOEConditionModal — non-overlay selection lane only (render + selection + skip).
 // Coverage split across the family (verified 2026-10):
 //   save/apply flow & Careful Spell ......... AOEConditionModal.save-flow.test.jsx

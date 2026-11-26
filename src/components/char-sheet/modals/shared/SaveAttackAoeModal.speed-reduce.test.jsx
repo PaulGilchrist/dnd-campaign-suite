@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1530: Steam Mephit Steam Breath cone picker — CON DC 10, 2d4 Fire,
 // 15-ft Cone. Confirms the picker grants the authored fail clause
 // "the target's Speed decreases by 10 feet until the end of the mephit's

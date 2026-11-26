@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for auraOfLifeHandler: all external boundaries
 // (runtime store, expirations, log, combat data, concentration) are mocked at
 // module level, so these tests do not churn when unrelated app code moves.

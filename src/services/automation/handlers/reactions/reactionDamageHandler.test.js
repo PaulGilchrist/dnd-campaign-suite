@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over the stable
+// @maintained-by-ai 2026-10-16: 2026-10-15 — deterministic full-mock lane over the stable
 // handle() trigger-dispatch table, the generic save / no-save paths, the generic
 // damage-application envelope (save-prompt + save-result wiring), resource-cost
 // validation (Focus Points + uses), Physicians' Touch poison fail-rider, Energy

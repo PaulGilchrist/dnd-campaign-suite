@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0218: Ancient Gold Dragon Banish lists damage under Failure ONLY — a
 // successful save must apply ZERO damage. The row authors dc_success:"none"
 // so blockSaveDcSuccess stops defaulting the save context to 'half'; the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Ownership — this file owns ElementalAffinityModal in isolation: exact header
 // and intro copy across all three branches (new choice / change-current /
 // elemental_adept); radio options driven verbatim by action.automation.damageTypes

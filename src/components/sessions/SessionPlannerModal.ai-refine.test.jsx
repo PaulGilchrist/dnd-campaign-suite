@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 /* Lane: Session planner AI refine payload (bug-ai-refine-session-preflight-dead).
  * Raw editor formData always carries the GM-owned lifecycle fields
  * (playedAt/checklist — seeded by getDefaultSessionData) and structured

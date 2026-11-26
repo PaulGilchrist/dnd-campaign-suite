@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-026 lane: the Compelled Duel EXPIRY caller edge on executeSpellCast's damage lane
 // (execution/index.js:643/731 expireCompelledDuelOnHarmfulCast). Raw break rule (5e +
 // 2024 spells.json, identical text): "The spell ends if ... you cast a spell on an enemy

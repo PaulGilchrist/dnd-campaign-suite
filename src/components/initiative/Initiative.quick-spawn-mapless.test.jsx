@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Mapless quick-spawn end-to-end at the Initiative CONTAINER face (roadmap
 // Item 4): mounts with mapName={null} — no active map anywhere — and walks
 // "5 goblins at the door": + Monster → real QuickMonsterSpawn picker (only the

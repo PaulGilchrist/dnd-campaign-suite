@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // GMScreen container: composes the three sections over the shared store
 // (zero WRITES — a fetch spy proves no POST/PUT/DELETE ever leaves the
 // view; the GETs are the two quick-reference JSONs + the spell-overlay

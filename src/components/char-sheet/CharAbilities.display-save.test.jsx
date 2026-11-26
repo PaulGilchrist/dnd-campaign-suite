@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — skill-cell DISPLAY lane: the "(Expert)" suffix and how the
  * skill bonus text is formatted.

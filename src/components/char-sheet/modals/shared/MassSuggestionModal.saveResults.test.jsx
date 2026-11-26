@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Save-result event lane of MassSuggestionModal: how the modal resolves the
 // save-result events answering player save prompts (charmed on fail, record
 // via addTargetResult, close when all prompts resolve, ignore foreign events).

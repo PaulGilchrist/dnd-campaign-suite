@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // ─── Lane: ItemContextMenu — keyboard + focus semantics ───────────────────────
 // OWNED here (backlog 2026-11-16 XC — the menu WAS pointer-only SVG chrome):
 //   role=menu on the container, role=menuitem + tabIndex on every row

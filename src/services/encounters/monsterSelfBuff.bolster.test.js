@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0694: Empyrean "Bolster" legendary self-buff lane on the monsterSelfBuff
 // seam (§165 header-swallow fix: Bolster is a gated child — the shared legendary
 // gate spends upstream in the modal BEFORE arming, the child row authors NO uses).

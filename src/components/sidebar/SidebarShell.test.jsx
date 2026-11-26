@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // SidebarShell gate: renders the sidebar normally, renders nothing while the
 // Initiative tracker broadcasts TV mode (the shell then reclaims the 180px
 // gutter via the .app-body:not(:has(.sidebar)) CSS rule).

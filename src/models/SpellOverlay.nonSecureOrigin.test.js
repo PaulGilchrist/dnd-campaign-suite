@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Regression lock for bug-spell-overlay-placement-broken-non-secure-origin:
 // crypto.randomUUID only exists in secure contexts (HTTPS/localhost). LAN
 // players on http://<ip> had it undefined and EVERY overlay placement died

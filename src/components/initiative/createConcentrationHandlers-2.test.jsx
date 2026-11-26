@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane split for createConcentrationHandlers.js:
 //  - createConcentrationHandlers.test.jsx — handleRollConcentrationSave: early returns,
 //    success/failure flows, static concentration_breaker, advantage-source modes.

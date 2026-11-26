@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Leak pins for the damage-type-choice/skip window listeners in
 // useCharActionsEventListeners (⚠ defect, maintenance ledger run2 #5,
 // test-maintain-bugs.md:82). Pre-fix the effect registered both listeners

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-216 base lane — computeD20Roll GENERIC roll mechanics at the compute
 // seam: d20 selection (normal keeps r1, advantage high-of-two, disadvantage
 // low-of-two), crit/nat boundaries, the context.d20Floor10 consumer, totals

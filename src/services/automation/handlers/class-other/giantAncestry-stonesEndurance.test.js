@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Stone's Endurance steady-state lane (family recipe, hillsTumble main 14→10
 // precedent): the dispatch and direct handlers ride the SAME shared utils
 // (resolveAncestryUses → ancestryNoUsesPopup → stonesEnduranceDamageGate →

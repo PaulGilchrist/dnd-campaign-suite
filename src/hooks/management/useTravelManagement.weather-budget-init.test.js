@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 /*
  * useTravelManagement — budget-at-mount weather seed (improve 2026-10-26-E).
  *

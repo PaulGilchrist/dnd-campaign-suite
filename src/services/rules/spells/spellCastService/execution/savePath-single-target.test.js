@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  savePath.js SINGLE-TARGET lane — module-direct (#1455 lineage)    */
 /*                                                                      */

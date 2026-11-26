@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * PAIR CORE — general enforcement lane of the assertCanAct pair (closer #2069):
  *  - THIS file: turn-lock, enforcement fast path (off/missing both shapes),

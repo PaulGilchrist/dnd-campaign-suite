@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-23
+// @maintained-by-ai 2026-11-12: 2026-11-23
 // Row-level Regenerate-from-stamped-opts lane (VG backlog 2026-11-12; list-envelope
 // data VX 2026-11-12; render-only-when-stamped doctrine owner-ratified 2026-11-23):
 // rows whose LIST envelope carries generationOpts get an ENABLED

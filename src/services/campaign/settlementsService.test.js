@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * settlementsService — client-side fetch contract for the settlements collection.
  *

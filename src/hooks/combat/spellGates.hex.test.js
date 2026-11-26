@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // CLA-107: gateHex must thread the HexAbilityModal chooser selection
 // (metaCtx.hexAbility) onto the pending target-picker state so the chosen
 // ability survives confirm → runHex → executeSpellCast (previously dropped,

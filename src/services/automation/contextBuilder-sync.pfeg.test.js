@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SP-094: attacker-type gate must resolve combatSummary monsterType (not 'npc').
 // Deterministic contract lane: fully mocked buildAttackContextSync, asserts the
 // attacker-type arg to isCreatureWarded (Undead monsterType / Giant / pc fall-through)

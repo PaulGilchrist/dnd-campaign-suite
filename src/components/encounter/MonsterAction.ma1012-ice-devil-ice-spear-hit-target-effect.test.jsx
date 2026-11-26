@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1012: Ice Devil "Ice Spear" — te-only hit lane (MA-0995 #447 te-only template).
 // The row's OWN Hit clause carries the multi-clause rider ("can't take a Bonus Action
 // or Reaction, its Speed decreases by 10 feet, ... move or take one action ... not

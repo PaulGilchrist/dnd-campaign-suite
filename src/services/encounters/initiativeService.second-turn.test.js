@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // CLA-360 second-turn rows at the mount-merge seam: the Thief's-Reflexes
 // "(Second Turn)" transport row is type:'player' by design but its name is
 // suffixed, so the ghost-player name filter must exempt it (bug-initiative-

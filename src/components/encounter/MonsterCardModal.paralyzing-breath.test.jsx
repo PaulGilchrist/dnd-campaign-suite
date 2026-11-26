@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0248 / MA-1469: Paralyzing Breath click-path enforcement for the Ancient
 // Silver Dragon (DC 24, prose-derived 90-ft Cone) and its byte-twin Silver
 // Dragon Wyrmling (actions[3], DC 13, authored 15-ft Cone range).

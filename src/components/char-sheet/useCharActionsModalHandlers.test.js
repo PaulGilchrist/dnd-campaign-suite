@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base lane for useCharActionsModalHandlers: the exact 27-key return contract
 // consumed by CharActionModals' destructure, plus the only three confirm routings
 // no family lane owns (verified by grep 2026-10-17): bulwarkOfForce,

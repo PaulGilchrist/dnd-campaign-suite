@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * Hook-seam lane: which class features actually DISPATCH through the real
  * buildPipelineForAction() wiring of resolveAttackDamage (real steps, mocked

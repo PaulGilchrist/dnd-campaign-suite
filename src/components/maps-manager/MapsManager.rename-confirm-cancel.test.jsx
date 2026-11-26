@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // MapsManager.rename-confirm-cancel.test.jsx — backlog 2026-11-24 BA: the
 // toolbar create field (`New map name...`, Enter CREATES) and the row's armed
 // inline rename editor (Enter commits the rename) were two near-identical

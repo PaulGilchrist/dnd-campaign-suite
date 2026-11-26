@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0781: Ghost "Horrific Visage" (DC 13 Wisdom, 60-foot Cone, 2d6 + 3 Psychic)
 // RAW carries NO half-on-success clause — "Success: The target is immune to this
 // ghost's Horrific Visage for 24 hours." Success pays ZERO. dc_success was ABSENT

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Base lane for createCreatureHandlers.js: HP store writes, death-save resets, initiative/name/
 // target/remove/add/clear contracts, plus the one component-level smoke that proves real Initiative
 // wires GM inputs to these handlers (only face in this suite that does — CreatureCard.*.test.jsx

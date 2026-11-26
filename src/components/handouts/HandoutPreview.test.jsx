@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 print-handout shell contract: the preview portals to document.body
 // (so its print isolation lane — body > :not(.handout-preview-portal) — sees
 // it as a sibling of the app root no matter which host button opened it), the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pins for bug-extra-attack-display-only-never-rolls (chain half):
 // once a press arms an Extra Attack chain, each swing resolves when the
 // sheet's popup host drains, then the NEXT swing's popup is staged — never

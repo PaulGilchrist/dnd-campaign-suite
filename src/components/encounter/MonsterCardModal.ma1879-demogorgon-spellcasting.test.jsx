@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1879 data lock: Demogorgon Spellcasting rode the MA-0421/MA-1850 twin
 // markup-gap template. Pre-fix the WHOLE description was plain text —
 // extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Producer-lane unit tests for contactPatronHandler (Contact Patron free-cast latch):
 // depleted-path no-write guard, decrement pinned to the exact runtime key
 // (_<FeatureName>_freeCastCount, spaces → underscores), usesMax/null fallback,

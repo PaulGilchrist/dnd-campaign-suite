@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * mazeHandler MAIN lane — THIRD of the maze TRIO (spells/), closes the family:
  *

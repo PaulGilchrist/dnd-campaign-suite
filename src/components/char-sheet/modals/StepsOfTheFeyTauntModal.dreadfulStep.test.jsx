@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Dreadful Step lane only: subview copy + confirm gating, exact save-dispatch
 // payloads (incl. saveDc/featureName pass-through), and the save-resolution
 // damage seam — owned solely here (no sibling dispatches save-result or

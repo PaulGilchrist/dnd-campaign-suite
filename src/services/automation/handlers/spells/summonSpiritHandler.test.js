@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MAIN LANE #1978 (trio close) — summonSpiritHandler orchestration canonical:
 // handle()/confirmSummonSpirit modal dispatch, SP-015/SP-114 AC-HP ladder,
 // CLA-066 Create Thrall rider, CLA-252 phantasmal free cast, SP-005 refusal +

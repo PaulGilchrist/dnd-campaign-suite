@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1551: Succubus/Incubus "Etherealness" — formerly a zero-affordance
 // plain-bold row (name+description only, all chip gates key off structured
 // fields; exact MA-0780 Ghost Ethereality pre-fix twin). NOW rides the SAME

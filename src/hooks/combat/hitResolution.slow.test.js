@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // SP-109 consumer seam: resolveHit folds context._slowAcPenalty into
 // effectiveAc (hitResolution.js computeEffectiveAc) so the miss/hit boundary
 // moves with the -2 AC the slow spell imposes (public/data/2024/spells.json

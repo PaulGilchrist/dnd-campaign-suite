@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-096 lane: the draconicFlightService.js retirement seam ITSELF —
 // isDraconicFlightBuff matcher identity (exported constants pinned to disk
 // canon) and endDraconicFlightBuff's retire write + FULL END_LOG_TEXT table

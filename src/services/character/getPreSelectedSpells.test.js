@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // getPreSelectedSpells — spells auto-granted by class/subclass, race/subrace, and feats.
 // Fixtures are anchored to the real disk data (public/data/[2024/]classes|races|feats.json)
 // and outputs are pinned exactly, so fabricated rules can never sneak back in.

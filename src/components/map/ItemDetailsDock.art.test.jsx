@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-22
+// @maintained-by-ai 2026-11-22: 2026-11-22
 /**
  * Deferred plan D — ItemDetailsDock token art lane: creature rows (npc/
  * monster) get upload + emoji + Remove art; props/doors never do. Upload

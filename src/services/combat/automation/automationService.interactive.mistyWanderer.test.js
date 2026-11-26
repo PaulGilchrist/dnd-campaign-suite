@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-229 regression: misty_wanderer must be an interactive type so the
 // Special Actions "Misty Wanderer:" row renders clickable and dispatches
 // mistyWandererHandler (previously missing from INTERACTIVE_HANDLER_TYPES, so

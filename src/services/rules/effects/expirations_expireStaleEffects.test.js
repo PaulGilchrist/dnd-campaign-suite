@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: the per-round maturity sweep — expireStaleEffects driving the real
 // expirationQueue (expireForCreature/expireForTarget → processExpirationList).
 // OWNER of the maturity truth table (confirmed by #1294: the round-arithmetic

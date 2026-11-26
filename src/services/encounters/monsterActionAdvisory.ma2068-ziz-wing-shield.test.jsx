@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2068 regression: REACTION-category advisory one-field fix on the Ziz
 // "Wing Shield" row (name/trigger/description-only §60; zero affordance →
 // every MonsterAction chip lane null; no automation.effect → GatedReactionSlot

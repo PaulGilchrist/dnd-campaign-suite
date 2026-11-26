@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // ---------------------------------------------------------------------------
 // isFreeCastAuthorized — GENERIC ORACLE lane of the free-cast family.
 // Ticket lineage: #1510 (cla130 latch consumer), #1511 (cla138 T1/T2 null-coalesce),

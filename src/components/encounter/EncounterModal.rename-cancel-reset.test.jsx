@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /* Lane — transient rename state resets on every dismiss lane
  * (bug-encounter-modal-rename-target-sticky: the Load-mode pen sets modal-local
  * renameTarget while the parent's mode prop stays 'load', and only a SUCCESSFUL

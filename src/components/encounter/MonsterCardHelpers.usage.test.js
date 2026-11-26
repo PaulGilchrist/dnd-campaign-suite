@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0049: structured `usage` objects must render human text, never
 // "[object Object]" (MV-26). OWNER lane: the formatActionUsage full branch
 // truth table lives here — ma1120:12 and ma0305:14 delegate their "At Will"

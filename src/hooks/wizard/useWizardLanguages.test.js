@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // useWizardLanguages is a thin config wrapper over useWizardConfig (whose engine
 // behaviour — validateFn/getDeps invocation, slot resolution, preSelectedKey
 // population, warnings — is owned by useWizardConfig.test.js). That engine is MOCKED

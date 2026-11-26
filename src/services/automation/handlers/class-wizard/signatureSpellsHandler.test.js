@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // signatureSpellsHandler unit tests — class-wizard lane.
 // Deterministic contract tests over handle/onSignatureSpellsSelected (both live: automation/index.js
 // dispatch + CharSpecialActions.jsx confirm handler). Runtime access is routed by exact key (never

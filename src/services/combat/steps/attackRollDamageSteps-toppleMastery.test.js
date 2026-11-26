@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: toppleMastery + masteryDone steps ASSEMBLED via buildAttackRollDamageSteps()
 // (attackRollDamageSteps.js:31-32; steps[21] / steps[22]).
 // Mechanics named from source (buildToppleMasteryStep attackRollPostDamage.js:663-719): post-hit

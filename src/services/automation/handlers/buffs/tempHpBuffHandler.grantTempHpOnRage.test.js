@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Rage-gated temp-HP grant contract (called by combatStanceHandler rage stances).
 // grantTempHpOnRage is a small self-contained guard chain: rage gate → expression
 // guard → evaluate → positive-finite guard → delegate to setTempHp → return amount.

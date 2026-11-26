@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // MapsManager.rename-cancel-error.test.jsx — regression for backlog
 // 2026-11-12 RS: the error banner survived a rename CANCEL (Escape or
 // empty/whitespace blur) and only cleared on the next successful action —

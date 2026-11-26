@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1456 regression: Shadow Dragon legendary rows[0] "Pounce" carried `uses:1`
 // with no header row above it — legendaryHeaderAction() swallowed Pounce as the
 // economy header (name+counter render, zero affordance; MA-0510/§99 header-swallow)

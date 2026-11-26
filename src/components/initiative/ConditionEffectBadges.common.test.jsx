@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Common-lane contract for ConditionEffectBadges: the cross-effect machinery
 // only — exact-label dedupe (first spec wins), stable spec-table ordering of
 // a mixed-kind render (derived counters, activeBuffs, targetEffects, props),

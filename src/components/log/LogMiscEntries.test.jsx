@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MISC LEAF CONTENT lane — owns the bytes rendered INSIDE the seven misc leaf components:
 // RestEntry (LogRestEntry.jsx), AutomationEntry, SaveResultEntry, PsionicSorceryEntry,
 // SummonsEntry, SpellEffectEntry, BuffEntry. Routing and type→component dispatch — including

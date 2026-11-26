@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Improve JT 2026-11-11 — travel-tool/panel PARITY state machine at the hook
 // seam. The desynced faces (pressed=true + panel absent, panel mounted +
 // pressed=false) rode on the two-channel split: the toolbar button read the

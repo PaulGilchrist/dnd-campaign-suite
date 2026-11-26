@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // spellCastHandler .majesty lane (#1967) — owns the Mantle of Majesty seam of
 // spellCastHandler.js: isMantleOfMajestyCast (L370-372) + handleMantleOfMajesty
 // (L75-120). SEPTET SEAM MAP lives in spellCastHandler.damage.test.js header

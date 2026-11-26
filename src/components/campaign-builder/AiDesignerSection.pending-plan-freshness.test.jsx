@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Designer pendingPlan freshness contract (backlog 2026-11-22): every save —
 // debounced edit, explicit clear, and the unmount flush — echoes the savedAt
 // stamp the tab loaded, so a second GM tab's newer save can be refused 409

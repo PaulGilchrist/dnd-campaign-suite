@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-020: poller/rider prompt legs rebuild their own action — the raw 'ability'
 // save token + STR/DEX saveAbility must survive the rebuild so the save resolves
 // 8 + STR/DEX mod + PB (DC 17 for a STR +3 PB +6 host), never DC 10/14.

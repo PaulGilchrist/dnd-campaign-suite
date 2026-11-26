@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Hill's Tumble (CLA-169): deterministic contract lock over the shared giantAncestry
 // lane (resolveAncestryUses → ancestryNoUsesPopup → attackerRollGate → exact-key use
 // spend → applyHillsTumbleEffect → logs). Dispatch owns the exact-string refusal table

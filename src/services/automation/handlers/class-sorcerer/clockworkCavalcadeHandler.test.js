@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic uses-ledger / heal-pool / popup-composition contract of
+// @maintained-by-ai 2026-10-15 — deterministic uses-ledger / heal-pool / popup-composition contract of
 // clockworkCavalcadeHandler with every collaborator mocked; popup strings are full-string
 // own-composition pins. Dispelling internals are owned by clockworkCavalcadeDispel.test.js
 // (this file pins delegation only). Consumer modal-wiring lives in useCharActionsModalHandlers.*.

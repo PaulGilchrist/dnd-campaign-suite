@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0889: Goblin Boss Scimitar/Shortbow advantage-rider METADATA SPLIT —
 // "Hit: 5 (1d6 + 2) … damage, plus 2 (1d4) … damage if the attack roll had
 // Advantage." The rider is discriminated by authored `secondary_condition:

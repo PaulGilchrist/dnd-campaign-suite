@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // rules.getPlayerStats TRUNK-ORCHESTRATION lane: owns the call-ORDER and
 // integration seams of rules.js getPlayerStats (:431-569) as observable bytes —
 // NOT the segments. Segment ownership (cite, never re-run):

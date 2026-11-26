@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 // Backlog 2026-10-26-C — weather persistence lane. Unlike the sibling HexMap
 // container tests (which no-op useTravelToolSync for determinism), this file
 // runs the REAL hook: it is the only place the tool-mount → weather-generation

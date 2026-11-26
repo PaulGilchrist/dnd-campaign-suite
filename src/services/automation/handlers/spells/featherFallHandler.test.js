@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-315 lane companion: Feather Fall reaction — retroactive undo of a stamped
 // trigger:'falling' lastAttack (heal through the applyHealingToTarget chokepoint)
 // behind a reaction-economy latch (`_Feather_Fall_negatedStamp`, latch-before-write).

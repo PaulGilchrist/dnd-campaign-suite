@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Initiative cell visitor face (backlog 2026-11-11 LZ): a read-only (LAN) tab
 // must NEVER mount the permanently-disabled `initiative-input` shell — the
 // cell renders a plain text value instead, mirroring CardName's visitor span.

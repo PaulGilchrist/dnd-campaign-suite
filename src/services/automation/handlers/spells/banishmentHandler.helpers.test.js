@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * banishment QUINTET lane #1873 — GAP-complement over the two exported predicates
  * of banishmentHandler.js. Canonical homes for predicate internals are the

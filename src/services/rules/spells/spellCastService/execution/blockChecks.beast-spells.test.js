@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-404: Beast Spells (Druid lv18 passive) — lane: blockChecks.js BEAST-FORM
 // BLOCKING face. Disk identity (#1362, read 2026-10-21): BOTH catalogs carry the
 // row — public/data/classes.json class_levels[17].features[0] and

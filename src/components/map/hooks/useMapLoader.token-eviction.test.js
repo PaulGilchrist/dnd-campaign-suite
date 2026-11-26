@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 /**
  * Backlog 2026-11-13 CF: the indoor mount-time players-reconcile silently
  * EVICTED doc `players` whose names miss the campaign roster (hand-seeded or

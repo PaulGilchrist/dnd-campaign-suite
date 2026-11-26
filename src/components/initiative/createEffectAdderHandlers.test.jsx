@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // createEffectAdderHandlers base lane: GM add-effect tab dispatch (effects/conditions/
 // concentration), the canonical early-return guard battery, exact te append bytes,
 // per-tab log shapes, and unknown-tab fall-through semantics.

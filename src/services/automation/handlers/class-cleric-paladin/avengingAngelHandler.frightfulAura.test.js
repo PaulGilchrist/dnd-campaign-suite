@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit lane for resolveFrightfulAura() save/apply via handle(): creature filtering,
 // NPC auto-saves, player save-prompt branching, aura-target storage, rejection handling.
 // Activation state machine lives in avengingAngelHandler.test.js; pure readers

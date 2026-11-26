@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // combatStanceHandler sextet — lane: APPLY STANCE OPTION (chosen-option activation,
 // the path CombatStanceModal drives after the user picks an option).
 // Owns: option-derived buff fields (flySpeed armor gate, ice_walk/speed_boost/

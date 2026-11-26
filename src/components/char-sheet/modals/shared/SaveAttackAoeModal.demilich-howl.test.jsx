@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0590: Demilich Howl emanation picker — CON DC 19, 20d6 Psychic, half on
 // save. The DATA-marked save_effect ("Failure or Success: The target has the
 // Frightened condition …") arms parseBothOutcomesClause, so SUCCESSFUL saves

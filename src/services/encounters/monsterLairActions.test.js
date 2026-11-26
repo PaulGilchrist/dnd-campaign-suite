@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0024 lair-action gated-row model — service BEHAVIOR lane + whole-DB
 // lair DATA census. This file once carried ~60 per-ticket data-lock
 // describes (587 its); it now verifies the service contract once and drives

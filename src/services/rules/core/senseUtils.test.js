@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // senseUtils apex-guard lane (#204-class half-guarded apexes at applyBlindsightSenses :65-era
 // and applyTruesightSenses :88-era sites): automation?.tolerant array guards already LOUD
 // (console.error + throw immediately below each apex deref), so the file's chosen posture is

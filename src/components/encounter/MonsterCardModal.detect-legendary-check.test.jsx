@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0051: Adult Blue Dracolich "Detect" legendary row — authored
 // ability_check {ability:"wisdom", skill:"perception"} renders a clickable
 // skill-check chip ("Wisdom (Perception) +14") that spends 1 legendary use

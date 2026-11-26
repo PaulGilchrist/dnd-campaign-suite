@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // contextBuilder-sync stored-advantage + condition/grappler lanes — canonical owner of:
 //   consumeStunningStrikeAdvantage (stored _advantageOn_<target> one-shot consume),
 //   countTargetConditionAdvantage (blinded/charmed/paralyzed/petrified/stunned/

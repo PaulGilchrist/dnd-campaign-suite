@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0322 OWNER truth-table for extractFlatHitDamage
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0322 OWNER truth-table for extractFlatHitDamage
 // (MonsterCardHelpers.js:3070-3085): flat prose "Hit: N <Type> damage." with NO
 // damage_dice_primary → constant numeric string; every dice-bearing row stays byte-inert.
 // Disk fixtures BY NAME parsed from monsters.json (#387 — no hand transcriptions).

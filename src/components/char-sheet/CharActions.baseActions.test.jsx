@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Trimmed: single-item and two-item list cases (comma-joining proven by the full-list
 // exact-text case; the ['Dash','Dodge'] render is covered by CharActions.rendering.test.jsx).
 // Strengthened: one test now asserts the full clickable contract — the base-actions row

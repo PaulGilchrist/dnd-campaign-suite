@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1378: Rakshasa "Cursed Touch" — prose carries "If the target is a
 // creature, it is cursed." but the row shipped WITHOUT hit_conditions, so the
 // rider was structurally inert-unauthored (buildHitConditionClause reads

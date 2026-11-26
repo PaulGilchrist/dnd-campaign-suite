@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // handlePlayerSaveDamage targetEffect lane: verifies the handler's resolveTargetSaveContext
 // wiring — activeBuffs-derived flags, strict-=== true runtime flags, the elder champion
 // attacker self-guard, campaign.targetEffects filtering for the target, rider and

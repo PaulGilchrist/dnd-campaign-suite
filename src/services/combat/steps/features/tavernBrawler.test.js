@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Tavern Brawler REROLL-CORE lane. Contract (tavernBrawler.js):
  *   condition: unarmed weaponType + dice damage + automation present (coarse gate).

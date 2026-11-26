@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Silence automation seam map (verified live 2026-10-16):

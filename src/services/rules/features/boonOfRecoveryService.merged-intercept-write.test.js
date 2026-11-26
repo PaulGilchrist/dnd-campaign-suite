@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Network-shape lock for the merged Boon of Recovery (Last Stand) intercept
 // write (backlog 2026-11-15 PW): the drop-to-0 rescue used to fire SIX
 // separate setRuntimeValue legs (currentHitPoints,

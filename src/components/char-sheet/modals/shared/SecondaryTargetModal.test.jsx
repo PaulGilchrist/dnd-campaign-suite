@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Component-level lane for SecondaryTargetModal (the ONLY spec that renders the real
 // component — all CharActionModals/SecondaryTargetModals lanes mock it; host prop
 // mapping, chooser toggles, and distanceBadgeText copy are owned elsewhere).

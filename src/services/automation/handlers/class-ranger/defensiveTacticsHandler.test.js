@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Steady-state handle/applyChoice composition for defensiveTacticsHandler (2024 Ranger).
 // CLA-081 regression lane (cla-081-defensive-tactics.test.js) owns the exact-key read pin,
 // Map-backed round-trip, full-string description pins, and automation/index.js registry wiring —

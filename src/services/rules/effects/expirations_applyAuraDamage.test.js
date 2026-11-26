@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Barrel-facing lane for expirations.js re-exports (verifies the barrel wires
 // consumers to the real services). Owns: applyAuraDamage early-return gates
 // (null summary, non-array creatures, damageValue 0/NaN/negative/undefined),

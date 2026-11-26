@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-002 data ground-truth: Abjure Foes (2024 Paladin lv9) in public/data/2024/classes.json
 // must keep the automation shape that feeds conditionHandler's Channel Divinity seam.
 // The original defect was in the DATA (missing resourceCost:'channel_divinity', which left

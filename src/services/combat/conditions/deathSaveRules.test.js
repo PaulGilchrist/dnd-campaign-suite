@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Rules lane: deathSaveRules.js — the ONLY owner of death-save state-machine math.
 // 5e thresholds (source hand-read 2026-10-19, no 2024 twin exists):
 //   nat20 (or 18 when treat18AsNat20 — "Defy Death"-style passives) wakes at 1 HP

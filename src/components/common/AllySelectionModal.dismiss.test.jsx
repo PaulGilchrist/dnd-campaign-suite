@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Lane: AllySelectionModal dismissal (backlog ZA 2026-11-23). The sp-overlay
 // allies editor used to answer ONLY its Cancel button, so an Escape-left-open
 // modal kept intercepting clicks on the board behind it. OWNED here: Escape and

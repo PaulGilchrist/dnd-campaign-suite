@@ -4,7 +4,7 @@
 // and applyFlurryOfBlows recompute) + the CLA-143 rolled-total honesty in
 // buildFlurryAbilityDesc. Healing/Harm lanes live in the cla144 sibling;
 // generic handle/apply mechanics in the main bonusAttacksHandler.test.js.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../encounters/combatData.js', () => ({

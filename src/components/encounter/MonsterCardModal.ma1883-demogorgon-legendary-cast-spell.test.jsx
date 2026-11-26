@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1883 modal seam: Demogorgon legendary_actions[3] "Cast a Spell (Costs 2
 // Actions)" — pre-fix the single "Expend Legendary" chip press spent 1 and
 // rolled a zero-payload save (MA-1874 CAN-route shell, "DC Unknown" popup).

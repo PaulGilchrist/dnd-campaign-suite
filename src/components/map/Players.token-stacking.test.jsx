@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Same-cell stacking on the PLAYER token layer (backlog GA 2026-11-10): a
 // token buried under another token must render visibly offset (transform on
 // its group) so its painted circle is a distinct, grabbable surface; single

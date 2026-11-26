@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // SP-105: the popup/log payload must forward the resolver's authoritative
 // effectiveAc (+2 Shield of Faith, +5 Shield — public/data/spells.json) so
 // computedHit can never flip a resolved MISS into a damage-applying HIT.

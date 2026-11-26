@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Regression ledger — sneak-cycle degradation (bug-sheet-nick-mastery-hit-
 // drops-damage-stage). Pipeline seam of "cycle 2 after a completed cycle 1
 // in the same tab load": the Devious Strikes chooser must be offered again

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-315: Slow Fall — 'falling' matcher arm (matchesTrigger), gateFallingReaction,
 // and the _Slow_Fall_usedRound reaction latch lane of the damageReduction quint.
 // Lane map (handle() flow in damageReductionHandler.js):

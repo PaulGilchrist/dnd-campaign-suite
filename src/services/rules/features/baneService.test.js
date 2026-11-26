@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Bane base lane: trigger spell-envelope construction + save-prompt wiring for
 // applyBaneEffect. buildSaveDc stays MOCKED here as the isolation boundary — the
 // composed caster DC producer, explicit-numeric merge order, and lv2 wrapper level

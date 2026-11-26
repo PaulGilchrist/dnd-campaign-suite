@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: createNpcClickHandler.js lines 40-45 — external getMonsterData fallback ONLY
 // ("fallback hit + no-statblock no-op", per the cite map in createNpcClickHandler-early-return.test.jsx:9).
 // Cite map (siblings own the rest — do not duplicate here):

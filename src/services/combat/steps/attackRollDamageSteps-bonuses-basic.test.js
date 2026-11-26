@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // attackRollDamageSteps-bonuses-basic lane: owns steps[8..10] built by attackRollDamageCalc.js
 // (buildTwoWeaponFightingStep / buildTargetEffectsStep / buildSuperiorityDieBonusesStep).
 // Names, index order, and the subscribe/emit chain are pinned by attackRollDamageSteps.test.js;

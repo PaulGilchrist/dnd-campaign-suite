@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0930: Grick "Tentacles" grapple-rider fix — prose carries "If the target is a
 // Medium or smaller creature, it has the Grappled condition (escape DC 12) from all
 // four tentacles" but the row shipped WITHOUT hit_conditions/escape_dc, so the

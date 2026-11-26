@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // HL 2026-11-17 class-gate on the pendingCombatSuperiorityPrompt stamp
 // (storeRollContextAndSuperiorityPrompt, attackPostProcessing.js): Combat
 // Superiority is a fighter class feature, yet the write was unconditional — a

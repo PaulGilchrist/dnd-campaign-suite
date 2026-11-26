@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── restoreBalance.test.js — CLA-295 Restore Balance lane ──────────────────
 // There is no restoreBalance.js module. The feature spans three sources and each
 // lane pins only the faces this file owns:

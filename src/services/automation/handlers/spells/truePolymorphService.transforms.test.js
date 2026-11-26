@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // truePolymorph HEPTAD lane #1986 — .transforms (FINAL lane, closes the family).
 // Subject: truePolymorphService.js. Seam map: truePolymorphHandleModes.test.js header
 // (#1980–#1986). Siblings closed: #1980 handleModes 5, #1981 handler 29, #1982

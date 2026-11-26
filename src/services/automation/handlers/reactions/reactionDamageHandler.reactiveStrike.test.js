@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over the stable
+// @maintained-by-ai 2026-10-16: 2026-10-15 — deterministic full-mock lane over the stable
 // FT-103 gate/latch/economy contracts; no churn expected as the app moves.
 // FT-103: Polearm Master Reactive Strike reaction lane — clickable GM-armed
 // reach-entry adjudication: equipped-polearm gate (playerStats.inventory.equipped,

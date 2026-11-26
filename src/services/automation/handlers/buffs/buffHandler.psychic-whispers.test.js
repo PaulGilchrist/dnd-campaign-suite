@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-276 Psychic Whispers (Soulknife lv3, 2024): multi-target telepathic
 // speech with psionic energy die cost + free first use after Long Rest.
 // Pins the psychic-whispers lane of buffHandler: multiTarget routing to the

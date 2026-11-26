@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — selection-routing seam contract for the giant
+// @maintained-by-ai 2026-10-15: 2026-10-15 — selection-routing seam contract for the giant
 // ancestry family: handle()/handleDirectType() entry switches in
 // giantAncestryEntryPoints.js plus the confirm/selection/options utils. Fully
 // mocked runtime, strict routing table, exact-key pins and full-string own-composition

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: CANONICAL owner of getMonsterImageUrl / getMonsterData resolution — the
 // custom-vs-bestiary lookup seam (@app invariant: npcs.json is CUSTOM NPCs only;
 // pre-made monsters resolve from monsters.json — the two lanes stay byte-distinct #1022).

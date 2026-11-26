@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 /**
  * Quick-create lock disclosure + lock-aware prefill (backlog 2026-11-22 QQ,
  * sharpened by the seed-prefill-lock-aware improve): when GET

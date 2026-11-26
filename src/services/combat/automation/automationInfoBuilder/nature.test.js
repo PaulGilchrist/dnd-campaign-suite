@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── nature builder unit (automationInfoBuilder family #2110) ────────────────
 // Canonical home for the two Druid nature-lane builder envelopes, verbatim on
 // disk: nature_sanctuary + nature_sanctuary_move. Disks:

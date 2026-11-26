@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-237 lane: Nature's Ward compute-time merge inside rulesFactory.getPlayerStats
 // (rulesFactory.js:148-176) ONLY. Host feature: "Nature's Ward" 2024 Druid Circle of
 // the Land lv10, public/data/2024/classes.json:3943 (straight-apostrophe byte 0x27

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // Lane: manager-open SSE key contract (regression for
 // bug-map-editor-sse-key-mismatch-json-suffix).
 //

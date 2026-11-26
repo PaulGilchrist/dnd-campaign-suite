@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: 2024-only getProficiencyChoiceCount ("Choose N" string parsing + majors
 // schema). Pair split with proficiencyUtils.test.js: the 5e class.proficiency_choices
 // and subrace lanes live there — not duplicated here.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── regenerate QUARTET lane #1949 .test — handle() orchestration (closes family) ──
 // Seam map: regenerateHandler.active.test.js header (#1946). Lanes:
 //   #1946 .active — load guard; isRegenerateActive predicate DEAD, export flagged

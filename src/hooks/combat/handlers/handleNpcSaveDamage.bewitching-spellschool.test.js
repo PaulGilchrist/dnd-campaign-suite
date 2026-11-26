@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-037: the NPC save-damage lane must stamp spellSchool into the campaign
 // lastAttack (lowercased, or null when the cast context carries none) so the
 // manual Bewitching Magic row gate can ever pass for spell casts.

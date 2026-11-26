@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract suite for protectiveFieldHandler (Psi Warrior protective field):
 // psionicEnergy spend gate, die+INT reduction normalisation, defender healing via
 // findLastAttack/getCombatContext, resource-tracking display, popup/log composition.

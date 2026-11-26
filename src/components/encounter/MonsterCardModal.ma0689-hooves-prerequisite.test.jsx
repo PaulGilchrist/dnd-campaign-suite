@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0689 regression: Elk Hooves prone-target prerequisite on the ATTACK chip.
 // Twin of MA-0687 (Elephant Stomp, #662 lane): the row authors target_prerequisite
 // {conditions:["prone"]} (MA-0019 byte-shape minus by_attacker — RAW prone

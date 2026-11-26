@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1146: Merfolk Spear versatile "or 4 (1d8) piercing damage if used with
 // two hands to make a melee attack" had NO authored damage_dice_two_handed
 // transport field — buildTwoHandedVariantOffer returned null

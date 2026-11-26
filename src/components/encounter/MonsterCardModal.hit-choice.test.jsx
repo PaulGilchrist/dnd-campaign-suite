@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0855 MODAL lane: GM-adjudicated CONDITION CHOICE on the monster attack HIT
 // popup (monsters.json hit_choice — Githzerai Psion Psychic Warp, Charmed-or-Prone).
 // Once-per-branch modal seams only: chip-click ctx byte pass-through (offer

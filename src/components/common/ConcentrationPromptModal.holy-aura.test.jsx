@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // ConcentrationPromptModal — Holy Aura concentration advantage (SP-067)
 // "Advantage on all saving throws" includes concentration checks for aura targets.

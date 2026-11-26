@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1673/MA-1674: Vrock "Spores" and "Stunning Scream" (both DC 15
 // Constitution, 20-ft Emanation) ride the SaveAttackAoeModal picker via the
 // MA-0590 emanation parse with the FIX DATA dc_success:"none" — success pays

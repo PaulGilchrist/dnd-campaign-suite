@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Seam unique to this file: CharSheet threading whatever useSharedPopup carries
 // into renderPopup at the sheet level — branch selection per popup payload type.
 // Handler dispatch bodies live in CharSheet.actionHandlers/modalConfirmHandlers,

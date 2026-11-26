@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0711: Faerie Dragon Euphoria Breath — the inline block-save seam fix.
 // The row is shapeless ("within 5 feet" prose, no range field) so
 // breathAoeShape is null and SaveAttackAoeModal never opens — MA-0087's

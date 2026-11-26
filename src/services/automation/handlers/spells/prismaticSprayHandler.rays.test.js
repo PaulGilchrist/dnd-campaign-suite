@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // prismaticSpray SEXTET (#1940-#1944) — lane #1942 .rays: the PRISMATIC_RAYS table itself.
 //
 // SEAM MAP lives in prismaticSprayHandler.damage-regression.test.js — READ FIRST.

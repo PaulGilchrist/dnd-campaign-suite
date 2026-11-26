@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // Shared refine echo-detection (backlog echo-no-op-audit): the client's
 // no-change notice and the server's no-op audit row must agree — this
 // predicate is their single source of truth. Shapes mirror the AiRefineButton

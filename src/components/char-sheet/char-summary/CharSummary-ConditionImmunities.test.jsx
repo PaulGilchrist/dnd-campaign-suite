@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership: the condition-immunity sources of the "Immunities:" row
 // (charSummaryCalc.js computeResistances) — NOT the aura source.

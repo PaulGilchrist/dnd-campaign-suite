@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0503: Cockatrice Regent Petrifying Bite — row-unique lock ONLY (the fewest
 // tests that still guard this disk row): actions[1] byte-shape (DC 14, attack +7,
 // 2d8+4 Piercing, dc_success:"full" + staged_petrify 24 hours) and

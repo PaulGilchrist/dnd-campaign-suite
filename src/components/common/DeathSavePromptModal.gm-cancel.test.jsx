@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // DeathSavePromptModal — GM-only pre-roll Cancel (improve 2026-11-14
 // death-save-dismiss-for-accidental-arms)
 //

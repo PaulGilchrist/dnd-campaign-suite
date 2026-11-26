@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // §9.3 — AI director panel: hidden unless live+localhost+living-NPC turn; exact
 // director request bytes; suggest confirm gate; autopilot auto-stamps safe intents
 // at the turn seam (deduped per creature+round, no timers); advisory/needs_human

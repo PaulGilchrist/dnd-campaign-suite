@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * powerWordStunService lane — ZERO-STORE ENVELOPE FORWARDER (powerWordStunService.js L3-28).
  * Sole export triggerPowerWordStun, LIVE: sole production caller

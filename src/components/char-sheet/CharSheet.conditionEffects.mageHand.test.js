@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-218 lane — Mage Hand Legerdemain advantage GATE at the char-sheet compute
 // level. The conditional_advantage saveModifier (target ability_check, abilities
 // DEX, condition mage_hand_legerdemain) must only reach the rules engine while

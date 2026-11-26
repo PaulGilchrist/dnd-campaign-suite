@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Save-ability badge lane for ConditionEffectBadges: exact label/title bytes
 // for the derived save/advantage counters and the ability-list suffix join
 // ('Adv Save', 'Save Disadv (dex, con)', 'Check Disadv (str, dex)',

@@ -11,7 +11,7 @@
 // .test.js. Near-miss giggling subtract-die POSITIVE bytes are owned by the
 // MA-0093 subtract-die lane (only its null-negative against this regex's
 // prefix anchor lives here).
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { describe, it, expect } from 'vitest';
 import { parseWeakeningBreathClause } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';

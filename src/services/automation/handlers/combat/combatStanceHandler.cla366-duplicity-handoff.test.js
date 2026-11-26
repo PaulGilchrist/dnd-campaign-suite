@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-366 regression: at Invoke Duplicity creation the creation-time auto
 // swap offer handed TeleportModal a FLAT automation object, so
 // `action?.automation` resolved to {} and the generic Rage teleport chooser

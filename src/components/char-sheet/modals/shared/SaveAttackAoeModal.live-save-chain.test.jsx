@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // SaveAttackAoeModal picker-lane LIVE save chain (bug-aoe-live-save-stamped-reload-lapse).
 // A fully-live, same-page AoE save resolution used to write a contradictory
 // log cluster: SavePromptModal's Done seam ran resolveConsumerlessSavePrompt,

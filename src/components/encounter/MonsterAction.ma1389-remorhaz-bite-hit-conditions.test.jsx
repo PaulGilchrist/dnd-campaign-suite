@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1389: Remorhaz "Bite" — prose carries "If the target is a Large or
 // smaller creature, it has the Grappled condition (escape DC 17), and it has
 // the Restrained condition until the grapple ends" but the row shipped WITHOUT

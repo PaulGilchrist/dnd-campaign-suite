@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Regression: bug-away-initiative-roll-no-notice-rendered — processInitiativeRoll
 // (hooks/combat/initiativeProcessing.js) refuses to stamp the tracker for an AWAY
 // PC but threads awayNote on the popup payload. This lane pins the RENDER half:

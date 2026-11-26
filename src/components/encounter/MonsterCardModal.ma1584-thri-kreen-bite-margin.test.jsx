@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1584: Thri-Kreen Bite — save_effect carried the deep-band word
 // "paralyzed" AND the repeat-save prose ungated, so extractConditionsFromSaveEffect
 // (§1105 whole-prose harvest) sprayed poisoned AND paralyzed on EVERY failed

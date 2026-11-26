@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // WM-003/WM-008 seam owner: canonical weapon→mastery recognition at row level through
 // the REAL collectWeaponMastery kind gate (unmocked) inside getAttacks'
 // resolveOffHandActionType. Two one-call faces:

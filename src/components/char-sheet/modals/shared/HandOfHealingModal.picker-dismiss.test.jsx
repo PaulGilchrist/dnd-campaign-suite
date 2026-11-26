@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // improve hoh-picker-skip-semantics (LC 2026-11-14 backlog): the HoH picker's
 // `Skip` button did NOT dismiss — it self-healed the monk through the real

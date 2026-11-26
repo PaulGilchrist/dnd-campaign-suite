@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for the relentless_endurance
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for the relentless_endurance
 // manual-activation handler (runtime-store reads/writes + popups only). Stable;
 // re-run only if the handler's guards, state keys, or popup copy change.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

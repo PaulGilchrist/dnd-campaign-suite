@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * movementBudget.js — pure movement-cost math lane (L5-002 §7.3).
  *

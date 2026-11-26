@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Unit tests for the Death Ward zero-HP interceptor consumed via applyDamage's
 // ZERO_HP_INTERCEPTORS table. The cast/arming lane (buff application, target-selection
 // popup, isDeathWardActive) is owned by src/services/automation/handlers/buffs/

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MN-014 lane — Precision Attack MISS die math (handlePrecisionAttackMiss +
 // precisionMissDieValue). Owns: consumed-die preference (executor dieValue, never a
 // phantom re-roll), the fallback chain (dieValue → rollExpression → evaluateAutoExpression),

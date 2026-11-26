@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0024 modal lane ONLY. Data locks, clickable/affordance classification,
 // per-monster lair parse/te/condition-extraction census, and resolveLairRow
 // handler routing (incl. every young-*/adult-*/mummy-lord chip press cited

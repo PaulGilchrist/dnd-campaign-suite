@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Arrival toast lane (backlog 2026-10-25 pm: "travel panel closes silently on
 // arrival"). ARRIVAL flips travel-mode inactive and TravelPanel unmounts, so the
 // completion must surface via the display-only .travel-toast rendered by HexMap.jsx

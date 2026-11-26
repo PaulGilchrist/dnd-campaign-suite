@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Regression lock for bug-monster-attack-lane-never-consults-rage-auras:
 // monster-card attack rolls (handleAttack → rollAttack) must consult the Lion
 // rage aura (getLionDisadvantageAgainst) and fold its Disadvantage into the

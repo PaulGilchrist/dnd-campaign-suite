@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-324 Spell Resistance (Abjurer lv14) — owner of the SPELL-ORIGIN seam at applyDamage:
 // which arms fire the categorical 'Spell' reduction (options.isSpellDamage, campaign
 // lastAttack spell-save / isSpellDamage stamps), which arms stay silent (non-holder,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // useZoomPan — square-map transform lane. Distinct from hex-map zoom lane (#807):
 // this hook mirrors zoomValueRef/panValueRefs via effects, so sequential wheel events
 // compound with no hex zoomRef staleness quirk — feed inputs, pin output bytes.

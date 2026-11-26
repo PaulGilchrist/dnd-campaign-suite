@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic unit tests for the circleOfPowerHandler
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic unit tests for the circleOfPowerHandler
 // public contract (handle popup, applyCircleOfPower writes/registrations, isCircleOfPowerActive).
 // registerTargetEffect update/append semantics are covered directly in
 // targetEffectDefinitions.test.js — here we only pin the handler's call shape.

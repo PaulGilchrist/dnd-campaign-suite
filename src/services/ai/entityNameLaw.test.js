@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // The shared AI entity name law (bug-designer-draft-accepts-kind-word-entity-
 // name): the designer prompts advertise namingRule() — never the kind word,
 // never a placeholder — and this predicate is the enforcement both the server

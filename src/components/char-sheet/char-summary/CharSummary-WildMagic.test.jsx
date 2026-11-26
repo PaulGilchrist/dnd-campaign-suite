@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Owns: WildSurgeBadge rendering in CharSummary —
 //   - one list item per surge effect, "#roll — effect" format

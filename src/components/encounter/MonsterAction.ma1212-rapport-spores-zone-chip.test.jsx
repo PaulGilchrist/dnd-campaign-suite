@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1212/1217/1220: Myconid rapport family (Adult actions[2] / Sovereign
 // actions[4] / Sprout actions[1]) — save-less telepathy-grant zone rows.
 // Authored junk attack_bonus:0 rolled bogus "+0" to-hit attacks (live

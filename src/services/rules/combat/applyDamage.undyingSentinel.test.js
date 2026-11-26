@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: Undying Sentinel (Paladin feature) zero-HP interception through applyDamageToTarget.
 // Owns the Sentinel-unique contract: the drop-to-0 intercept return bytes (incl. interceptedFeature
 // identity from the ZERO_HP_INTERCEPTORS dispatch order, applyDamage.js :595-614), the heal formula

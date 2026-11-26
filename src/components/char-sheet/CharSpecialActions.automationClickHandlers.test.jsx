@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions automation-click lane:
 // - brew_poison delegated click (useBrewPoison guards + success mutation) — unique to this file;
 //   clicking brew_poison must short-circuit via AUTOMATION_CLICK_DELEGATES, never executeHandler.

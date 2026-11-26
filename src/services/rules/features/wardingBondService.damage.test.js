@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LANE: this file owns ONLY HP arithmetic (service :22-30/:81-83) and the full
 // hp_change numeric envelopes (:37-46) on both caster-HP read paths (:77-80).
 // #1425 split table, verbatim: ".damage.test.js — HP arithmetic (:22-30), full

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Lane: EFFECTS-TAB EXIT AFFORDANCES (2026-10-29-Y "effect-adder-effects-tab-no-cancel").
 // The Effects tab used to render no Cancel on either of its two views — the only
 // exit was switching to a sibling tab (exit trap). Owns: browse-pane .ea-actions

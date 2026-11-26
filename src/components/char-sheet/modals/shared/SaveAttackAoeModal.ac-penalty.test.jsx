@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MA-0115 ac-penalty lane: Adult Green Dragon Noxious Miasma sphere picker
 // (CON DC 17, 2d6 Poison, dcSuccess none) grants the authored "−2 penalty to
 // AC until the end of its next turn" clause as the registered ac_penalty te

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // ─── Lane: seed-lane PUT body vs the server map-PUT guards ──────────────────
 // bug-erase-guard-breaks-seeded-campaign-create: `persistDungeonMap()` POSTs a
 // full indoor doc (type/gridSize/walls/placedItems all armed on disk) then

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Fixture-contract tests for createBaseProps (shared by ~24 CharActionModals test files).
 // Only the non-tautological contracts are covered here:
 //  1. The prop shape the component consumes — every prop must exist as the right type

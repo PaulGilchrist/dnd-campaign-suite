@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0427 save-path SECONDARY damage lane (saveProcessing.js applySecondarySaveDamageLeg,
 // :1436). Fixture is the authored Brazen Gorgon "Smelting Charge" row (monsters.json:
 // DEX save DC 16, damage_dice_primary "2d8 + 4" Piercing PLUS damage_dice_secondary

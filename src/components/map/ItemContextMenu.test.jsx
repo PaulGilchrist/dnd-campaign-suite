@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ─── Lane: ItemContextMenu — GM context menu on placed map items ─────────────
 // OWNED here: menu open content (exact ordered label census by item state) and
 // action dispatch (each entry click → consumer callback, exact args, exactly once).

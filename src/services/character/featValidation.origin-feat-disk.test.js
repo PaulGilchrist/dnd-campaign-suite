@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Regression for bug-alert-missing-origin-type-quickbuild-self-warns (2026-11-19):
 // the 2024 quick-build draft pre-selects the background-granted feat "Alert"
 // (Guard/Criminal in backgrounds.json), and the feats-step Origin validator used

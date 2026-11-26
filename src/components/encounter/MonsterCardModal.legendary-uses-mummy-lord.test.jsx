@@ -1,4 +1,4 @@
-// @maintained-by-ai — audited + trimmed 2026-10-18: 325L/14 tests → 5 behavioral
+// @maintained-by-ai 2026-10-18 — audited + trimmed 2026-10-18: 325L/14 tests → 5 behavioral
 // tests (BY-name data locks #387, mount affordance, save-chip owner lane
 // :171-190 = MA-0676 twin cited by #629, delegated-attack click §432).
 // Dead-mock purge bisected green; lane ranges above are this file's post-trim lines.

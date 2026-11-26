@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // executeManeuver.js save/condition lane — the processManeuverSaveResult
 // branches reached through the pending-prompt executor: prone (condition write
 // via applyConditionToTarget→addCondition), goad (taunting_step te), frightened

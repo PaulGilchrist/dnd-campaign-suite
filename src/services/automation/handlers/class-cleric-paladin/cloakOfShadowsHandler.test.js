@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Unit lane for the Cloak of Shadows handler (monk Way of Shadow, 3-focus toggle).
 // Pins the toggle semantics: activation deducts 3 focus (runtime focusPoints takes
 // precedence over class_levels.focus_points, with getClassFeatures().maxFocusPoints

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0104: Adult Gold Dragon Banish authored failed-save demiplane-transport
 // grant — distinct te `banished_demiplane` on the target (not the PC spell
 // `banishment`, whose concentration/permanent semantics would misfire its

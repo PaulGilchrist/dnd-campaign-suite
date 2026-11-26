@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: usePlayerDragging — mapData.players token-drag contract (Map.jsx).
 //   down  → stop/prevent + setPointerCapture + drag-ghost state bytes (offset/start cell/unconstrained)
 //   move  → snapped, clamped ghost-cell bytes via setMapData; runtime writes deferred to commit

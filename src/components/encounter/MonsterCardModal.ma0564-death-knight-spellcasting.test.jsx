@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0564 data lock: Death Knight Spellcasting rode the MA-0421/MA-0532/
 // MA-0552 twin markup-gap template. Pre-fix ONLY the tier headers carried
 // <strong>; Command/Phantom Steed/Destructive Wave (Necrotic)/Dispel Magic

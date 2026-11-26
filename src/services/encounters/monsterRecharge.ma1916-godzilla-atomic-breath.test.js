@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1916 head — recharge ticket lane (family: jormungandr #1924 → quetzalcoatl
 // #1970 @#1112:23-49 → scylla #1978 @#1113:22-36, twin byte-shape this file owns).
 // Godzilla "Atomic Breath (Recharge 5-6)": save core live-verified EXACT

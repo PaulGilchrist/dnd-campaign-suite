@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Lane: creatureControl.js controller resolution (Phase 2). Precedence table:
 // explicit assignment > player-sourced summoned te > form sources > summonedBy
 // (player caster only) > null. Owned elsewhere: assignment writes + logging

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SP-074 hook-seam contract: useCharacterWizard must invoke endMageArmorOnDonning
 // with (original, saved, campaign) AFTER a successful character save, and never when
 // the save fails. Wiring only — strip logic itself lives in mageArmorService.test.js;

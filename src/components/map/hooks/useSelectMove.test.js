@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useSelectMove — GM select+move over walls/placedItems (Map.jsx, select tool).
 // Interaction-tools matrix: ruler owns measurement (see useRuler.test.js — this hook only
 // guards tool !== TOOL_SELECT and skips); token-drag commits live in #905 (items) and

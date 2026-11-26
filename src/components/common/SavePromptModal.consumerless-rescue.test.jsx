@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // SavePromptModal — consumerless-replay rescue wiring
 // (bug-shieldbash-save-resolved-after-reload-is-a-dead-end). The row-writing
 // + FT-082 restore contract lives in savePrompt.js

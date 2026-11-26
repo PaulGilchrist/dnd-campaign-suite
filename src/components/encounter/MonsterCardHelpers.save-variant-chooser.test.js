@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1436: Satyr Revelmaster Fey Melody choose-one variant — row disk lock +
 // parseSaveVariantChooser unit truth table (this file is the parser's
 // canonical arm/inert owner). Pre-fix the row carried both song variants in

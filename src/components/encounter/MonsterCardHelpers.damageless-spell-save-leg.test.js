@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0348 OWNER truth-table for spellDamagelessSaveCondition /
+// @maintained-by-ai 2026-10-18 — MA-0348 OWNER truth-table for spellDamagelessSaveCondition /
 // spellConditionDurationNote / spellSaveLegOutcome (MonsterCardHelpers.js:480, :512, :522).
 // Damageless spell save-leg helpers: Bandit Deceiver Hold Person — damageless
 // spells.json entry (dc WIS, dc_success none, no damage) whose failed-save

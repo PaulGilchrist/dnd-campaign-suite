@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1883 unit lane: Demogorgon legendary_actions[3] "Cast a Spell (Costs 2
 // Actions)" (`delegates_to:"Spellcasting"`) — TWO defects, both fixed here.
 //

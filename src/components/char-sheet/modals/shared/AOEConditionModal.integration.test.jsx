@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Integration lane for AOEConditionModal: the Heightened Spell metamagic end-to-end
 // path — radio rendering and the disadvantaged save roll flowing through
 // resolveNpcTarget into conditions + log entries. Radio/heighten behavior is not

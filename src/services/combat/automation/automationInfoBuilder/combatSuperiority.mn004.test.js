@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // MN-004: Commanding Presence reaction row never rendered — DISPATCH had no
 // combat_superiority_commanding_presence_reaction entry, so the collector's
 // `if (!info) continue` dropped the feature before it reached automation.reactions.

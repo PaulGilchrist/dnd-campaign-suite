@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Regression (bug-round-reuse-after-clear-drops-once-per-turn-riders): the
 // once-per-turn latches stamp the BARE combatSummary.round number, and the
 // round-wrap re-arm only ever expires a stamp via the `currentRound > stamp`

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0780: Ghost "Ethereality" — formerly a zero-affordance inert row, NOW
 // rides the MA-0655/0658 monster_self_buff seam: automation:{type:
 // "monster_self_buff", effect:"ethereal", rounds:4800} (8 hours, §37

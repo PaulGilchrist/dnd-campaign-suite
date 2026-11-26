@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // LANE: CreatureCard.noDcBadgeClick — locks the click-gate fix
 // (bug-condition-badge-no-dc-auto-success-removal). The EffectAdder Conditions
 // tab promises "No saving throw — the badge shows no DC unless you type one."

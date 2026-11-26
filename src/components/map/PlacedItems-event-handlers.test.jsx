@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // PlacedItems event-lane contract: DOM events on GM hit areas transport
 // exact bytes to the callbacks received as props.
 //

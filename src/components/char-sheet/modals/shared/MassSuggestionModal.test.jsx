@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Base render / NPC-resolution / dispatch lane of MassSuggestionModal: chooser rendering,
 // skip-to-close, the confirm dispatch trail (storeSpellLastAttack, ability_use log, local
 // NPC save resolution incl. charmed dedup, persistAndNotify), and player prompt dispatch.

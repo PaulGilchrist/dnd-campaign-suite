@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // EncounterBuilder lane: residual interaction wiring NOT owned by sibling files.
 // This lane uniquely owns: the Join-button selection gate (visibility only — the Join
 // dispatch with exact log/initiative payloads is #399 additional-interactions), the

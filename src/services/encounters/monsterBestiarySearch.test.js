@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Shared bestiary search/filter/cap helpers (moved verbatim out of
 // EncounterBuilder.jsx by the quick-monster-spawn feature). These are the ONE
 // narrowing lane both the Encounter Builder table and the tracker's

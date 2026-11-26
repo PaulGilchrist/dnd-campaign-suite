@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit tests for the sacredWeaponHandler.js public contract
+// @maintained-by-ai 2026-10-15 — deterministic unit tests for the sacredWeaponHandler.js public contract
 // (handle / applyDamageTypeChoice / cancelSacredWeapon). Every side-effect seam (runtime
 // store, expirations, log service) is mocked, so the suite is stable as the app moves.
 // CLA-301 prose assertions pin the specified activation-log content by design.

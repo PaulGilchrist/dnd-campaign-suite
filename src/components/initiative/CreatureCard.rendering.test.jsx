@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CreatureCard base render contract — card-hosted display bytes only.
 // Owned here (render lane):
 //   card skeleton section census + exact name byte (jsx:625-665)

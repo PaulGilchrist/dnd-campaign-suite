@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic: all dependencies mocked at module
+// @maintained-by-ai 2026-10-15 — deterministic: all dependencies mocked at module
 // boundaries, exact-string popup pins for this handler's own composition
 // (slot expenditure, weapon-attack rider, 'No spell selected.'), no
 // timers/DOM; no churn required when the app changes.

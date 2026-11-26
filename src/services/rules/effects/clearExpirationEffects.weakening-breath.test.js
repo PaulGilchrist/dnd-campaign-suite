@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * MA-0102 lane: weakening_breath_auto_success expiration type ONLY — the
  * Weakening Breath 1-minute clock's expiry leg (RAW "After 1 minute, it

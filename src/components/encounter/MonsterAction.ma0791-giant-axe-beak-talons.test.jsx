@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0791: Giant Axe Beak "Talons" — prose carries "If the target is a
 // Large or smaller creature, it has the Prone condition" but the row shipped
 // WITHOUT hit_conditions, so the condition rider was structurally inert

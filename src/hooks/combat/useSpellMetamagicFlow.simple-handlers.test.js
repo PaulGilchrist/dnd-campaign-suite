@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-10-15: 2026-11-15
 // Flow-wiring lane for SIMPLE_SPELL_SPECS (useSimpleSpellHandlers.js): one shared
 // table drives both sweeps of the createConfirmHandler/createSkipHandler contract:
 //   gate → pending armed → confirm dispatches the spec's apply/trigger fn exactly

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * ElementalAttunementModal — PHASE-FLOW lane (the element→targets→processing→summary→close
  * state machine, proven through observable UI: each transition asserts the previous phase's

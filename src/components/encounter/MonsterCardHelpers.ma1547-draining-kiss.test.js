@@ -102,4 +102,4 @@ describe('MA-1547 block-save context threading (buildAbilitySaveRollContext)', (
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-216 — Halfling Lucky attack lane: plumb ce.autoRerollForAttack → ctx.autoReroll
 import { describe, it, expect } from 'vitest';
 import { applyAttackFeatureContext } from './CharActions.attackFeatureContext.js';

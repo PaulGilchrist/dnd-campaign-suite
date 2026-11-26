@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharConditions — SP-109: store hydration safety and Slow ending on itself.
  *

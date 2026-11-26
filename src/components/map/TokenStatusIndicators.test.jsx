@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: TokenStatusIndicators (roadmap Item 6 — token status rings). Rides
 // the REAL runtime store (seeded like the GM-Screen lane) so the live-SSE
 // subscription behavior is proven, with the tokenStatus service wrapped in a

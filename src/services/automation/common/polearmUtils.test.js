@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the pure isPolearmWeapon utility:
 // hardcoded weapon names, Heavy+Reach property detection, fetch caching,
 // and error handling. Only touch these if the polearm detection contract

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1680: Warrior Commander "Longbow" — the row's OWN Hit clause carries
 // the Speed-decrease rider ("Hit: 18 (3d8 + 5) Piercing damage, and the
 // target's Speed decreases by 10 feet until the end of the target's next

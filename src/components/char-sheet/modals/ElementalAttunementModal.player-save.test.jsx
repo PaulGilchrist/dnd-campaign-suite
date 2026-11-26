@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * ElementalAttunementModal — PLAYER SAVE RESOLUTION lane (queuePlayerSavePrompt dispatch +
  * the 'save-result' window listener contract: captured listener dispatched directly, unique

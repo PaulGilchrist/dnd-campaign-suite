@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // materialComponents.js — behavior pin suite.
 // Role in the component domain: name-keyed MATERIAL_REGISTRY (33 consumed-material
 // spells, service-authored literals — NOT disk verbatim, see #1407 revivify precedent),

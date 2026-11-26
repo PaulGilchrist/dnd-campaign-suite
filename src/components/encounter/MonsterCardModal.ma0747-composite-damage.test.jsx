@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0747: composite "Hit: 1 Piercing damage plus 5 (2d4) Poison damage." rows
 // (flying-snake/Bite + scorpion/Sting byte-twins, no authored damage_dice_primary)
 // previously resolved autoDamageFormula to null, so buildAutoDamage

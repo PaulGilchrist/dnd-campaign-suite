@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // LANE: Initiative.effectAdder-second-turn — locks the phantom-bucket fix
 // (bug-effectadder-secondturn-phantom-bucket). A Thief's-Reflexes `(Second Turn)`
 // row is synthetic transport: it is retired at the round wrap and no component ever

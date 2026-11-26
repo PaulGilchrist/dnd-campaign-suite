@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — Dark One's Blessing damage-trigger CONSUMER seam: applyDamage.js:1082 reaches
 // checkDarkOnesBlessing (darkOnesBlessingService.js:79-84 grant) after HP lands. This lane owns
 // the kill-trigger gating, the THP grant tuples, and the log bytes. The rider NEVER touches

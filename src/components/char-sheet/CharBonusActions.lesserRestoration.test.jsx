@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharBonusActions host wiring for the Lesser Restoration bonus-action lane:
 // the armed TargetSpellPopups mount, the host-owned two-step target→condition
 // state, and confirm/skip routing. Shared popup internals (condition filtering,

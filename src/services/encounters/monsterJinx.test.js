@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0895 lane: Goblin Hexer "Jinx" (reactions[0]) — press the gated chip over the
 // attacker's pending HIT popup before Done (parry §235 window). Press order census:
 // round-latch → uses → pending-identity → save-spec gates FIRST (refusals LOG-ONLY,

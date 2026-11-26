@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Steady Aim (bonus action): blocked after moving (legacy stamp or authoritative
 // engine turnState when enforcement+movementBudget are on), toggles a speed_zero
 // latch, and grants next_attack_advantage via targetEffects. Roving Aim

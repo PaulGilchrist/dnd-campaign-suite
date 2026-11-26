@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-044 regression: Brutal Strike effect clauses must grant registered
 // targetEffects (speed_reduction / push) on the live sheet-attack lane,
 // replace stale hamstring te, anchor one expiration clock, log grants,

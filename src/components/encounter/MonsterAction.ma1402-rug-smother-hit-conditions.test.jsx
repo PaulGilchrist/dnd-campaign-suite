@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1402: Rug of Smothering "Smother" — RAW grapples ON HIT (escape DC 13,
 // +Restrained+Blinded), NO hit-save exists, and ZERO immediate on-hit damage
 // (the 2d6 + 3 is target-turn-start DoT). Pre-fix the row shipped

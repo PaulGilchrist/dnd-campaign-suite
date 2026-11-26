@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: tacticalMaster step ASSEMBLED via buildAttackRollDamageSteps() (attackRollDamageSteps.js:30, steps[20];
 // source buildTacticalMasterStep attackRollPostDamage.js:590).
 // Mechanics named from source (:570-627): post-hit mastery resolution — reads campaign lastAttack,

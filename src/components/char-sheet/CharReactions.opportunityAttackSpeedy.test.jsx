@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // bug-speedy-oa-disadvantage-inert: the 2024 Speedy feat (Agile Movement —
 // "Opportunity Attacks have Disadvantage against you") was consulted at OA
 // resolution against the combatSummary creature ROW, which carries no

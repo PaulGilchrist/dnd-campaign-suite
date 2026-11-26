@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1720: Will-o'-Wisp "Invisibility" (will-o-wisp|actions|Invisibility) —
 // formerly a prose-only inert row (name + description ONLY, zero affordance;
 // §60/§114 inert-row fingerprint — SelfBuffLink short-circuits without the

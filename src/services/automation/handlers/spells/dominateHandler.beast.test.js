@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // #1901 dominateHandler.beast — canonical home for dominateHandler.handle internals.
 // FIRST of the dominate TRIO (#1901 beast / #1902 monster / #1903 person, back-to-back),
 // and the trio is ONE spell-name-driven module, NOT charm-shell-style (#1883) config

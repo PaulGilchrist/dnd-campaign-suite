@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Generic temp_buff tracked-uses lane of buffHandler.handle: the
 // gateTrackedBuffUses / gateBuffUses / consumeBuffUse / resolveBuffUsesMax
 // contract (Psychic Veil once-per-long-rest gate, psionic-energy-die escape

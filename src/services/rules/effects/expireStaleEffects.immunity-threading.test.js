@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Lane: END-TO-END zone-save immunity threading (Option A landing,
 // bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23). This file
 // runs the REAL expireStaleEffects sweep over the REAL zone handlers with the

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-28
+// @maintained-by-ai 2026-10-28: 2026-10-28
 // Regression lock for improve 2026-10-28-T: the Quests lane must share the
 // NPC reload-discard guard (ba51c25ee → shared useReloadGuard) — with the
 // editor open and DIRTY under a 409 banner, "Reload list" NAMES the discard;

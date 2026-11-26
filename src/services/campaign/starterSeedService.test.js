@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Starter-seed client lane: GET unwraps { seed } → value-or-null; PUT sends the
 // { seed } envelope the route expects and surfaces server error text.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

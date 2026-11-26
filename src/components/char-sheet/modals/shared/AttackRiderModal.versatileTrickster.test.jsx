@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Versatile Trickster lane only — base selection/apply/result and Stalker's
 // Flurry flows live in AttackRiderModal.test.jsx; handler internals live in
 // services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.test.js.

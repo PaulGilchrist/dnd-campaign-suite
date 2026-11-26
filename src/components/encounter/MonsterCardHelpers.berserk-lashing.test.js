@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0516 helper lane: Berserk Lashing attack-reaction truth-table owner —
 // attackReactionIdentityRefusal (MonsterCardHelpers.js:2481), attackReactionGate (:2501),
 // attackReactionSlamRow (:2523), attackReactionFoldCheck (:2528, fix#39 strict-presence

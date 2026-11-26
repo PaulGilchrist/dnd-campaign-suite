@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // suggestionService lane — lv2 enchantment mind-affecting FORWARDER (single-target Suggestion).
 // triggerSuggestion is the cast seam invoked LIVE by triggerSpells.js handleSuggestion (:177-182),
 // which spreads { ...metaCtx, spellSaveDc } where spellSaveDc comes from computeSpellStats

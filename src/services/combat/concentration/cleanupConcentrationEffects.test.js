@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 //
 // CLEANUP lane — concentration family map (first map):
 //  - concentrationRules.test.js ....................... pure dice rules (save total, dragon clamp, disadvantage, DC)

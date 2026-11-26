@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Player quest board contract: reads ONLY the two whitelisted board lanes via
 // plain GETs (zero POST/PUT/DELETE on mount — the board is presentation, not
 // new access), groups Active → Completed → Failed, never renders GM `notes`

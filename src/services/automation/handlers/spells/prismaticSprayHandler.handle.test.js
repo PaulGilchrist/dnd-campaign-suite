@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // #1940 .handle lane — core handle() orchestration for prismaticSprayHandler.js.
 // SEXTET seam map lives in prismaticSprayHandler.damage-regression.test.js header.
 // Owns: combat-context refusal popups, target selection (fallback + metaCtx

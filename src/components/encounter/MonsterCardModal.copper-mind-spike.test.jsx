@@ -96,4 +96,4 @@ describe('MA-0087 Adult Copper Spellcasting Mind Spike cast level', () => {
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

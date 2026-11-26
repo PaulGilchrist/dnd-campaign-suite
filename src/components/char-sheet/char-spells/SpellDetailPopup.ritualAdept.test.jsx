@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-299 regression: SpellDetailPopup Ritual Adept channel (2024 Wizard lv1).
 // Eligibility runs through the REAL isWizardRitualAdeptSpell service — only the
 // runtime store and the sanitizer are mocked, so class/ruleset/spellbook/ritual-tag

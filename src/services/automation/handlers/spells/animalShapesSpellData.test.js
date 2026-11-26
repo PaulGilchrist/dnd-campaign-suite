@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // LANE: public/data rows the animalShapes family runs on (#1861 — third of the
 // animalShapes trio, trio closes here). Pure data-contract lane over checked-in

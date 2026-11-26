@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0610: repeatSaveService — the GENERIC turn-END repeat-save roller, and its
 // MA-0048 failed-save arm grant. Consumes te descriptor `te.repeatSave =
 // { saveType, dc, condition }`. Live disk rows that front here:

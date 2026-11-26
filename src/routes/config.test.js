@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests over the static view config in ./config.js.
 // Property/convention checks (not hard-coded lists), so adding or removing
 // views that follow the conventions requires no churn here.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /* Lane — 2026-11-16 WK backlog: EB toolbar buttons carried icon-leading-space
  * labels (" Save"/" Load") plus overriding aria-labels ("Save encounter"), so
  * getByRole(name, exact) could not resolve the visible words. Fixed: toolbar

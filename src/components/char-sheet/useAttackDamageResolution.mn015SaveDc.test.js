@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MN-015 lane — handleAttackRiderManeuverUse save-DC forwarding + size-gate refusal.
 // Owns the exact executeAttackRiderManeuver consumer args: the combat_superiority
 // action payload is forwarded verbatim (numeric DC passthrough vs 'ability' token

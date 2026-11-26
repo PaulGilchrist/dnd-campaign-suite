@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  Gate-mechanics lane for handleGenericAutomation (triggerSpells.js */
 /*  :453-:469), called DIRECT — REAL module, zero vi.mock (#1475      */

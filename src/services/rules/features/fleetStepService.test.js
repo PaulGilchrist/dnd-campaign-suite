@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-405: Fleet Step grant service — producer-lane tests. Gate opens on the REAL
 // disk row public/data/2024/classes.json:6900 ("Fleet Step", Warrior of the Open
 // Hand, level 11, prose-only, no automation key): "When you take a Bonus Action

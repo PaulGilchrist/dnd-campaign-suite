@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18 (10→7 tests): kept BY-name extraction
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18 (10→7 tests): kept BY-name extraction
 // + gate map, strip-tags markup diff, save_dc seam e2e, distinct bytes per
 // spellcasting template (#645-#652). Counter-render text folded into the two
 // cast e2es (template counter class already owned by MA-0500 :628 / #275).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane: Disappearing Step mode-specific render + accept dispatch exact payloads.
 // Consolidated 3 tests → 2: the free-cast decrement test shared the same click
 // path as the accept test (decrementCount() runs inside applyDisappearingStep),

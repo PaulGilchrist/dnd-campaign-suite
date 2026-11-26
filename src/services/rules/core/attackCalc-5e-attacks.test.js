@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 import { readFileSync } from 'fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getAttacks } from './attackCalc.js';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MA-0303: Arch-hag Crackling Wave cone picker — DEX DC 22, 5d12 Lightning,
 // half on save. The authored "Failure or Success:" tail names cursed +
 // can't take Reactions, so SUCCESSFUL saves must land the cursed

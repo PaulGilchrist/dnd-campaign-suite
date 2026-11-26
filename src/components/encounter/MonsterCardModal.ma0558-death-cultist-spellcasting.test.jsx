@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0558 data lock: Death Cultist Spellcasting rode the MA-0524/0532
 // markup-gap twin template. Pre-fix ONLY the tier header carried <strong>;
 // Speak with Dead/Thaumaturgy were plain text — extractSpellNamesFromSpellcasting

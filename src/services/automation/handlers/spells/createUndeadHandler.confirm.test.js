@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * createUndead TRIO lane #1898 (confirm main) — shares createUndeadHandler.js with
  * createUndeadHandler.test.js (#1899 handle) and createUndeadHandler.confirm.storage.test.js

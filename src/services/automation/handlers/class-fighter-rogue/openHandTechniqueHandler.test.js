@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Open Hand Technique — core lane (modal/popup dispatch, save-path prone/push,
 // option lookup + null-target guards, pendingRiderChoice clear, log-error swallow).
 // Owned elsewhere: addled instant option + noOpportunityAttacks→Addled producer

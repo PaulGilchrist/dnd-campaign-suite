@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // seedInput.test.js — shared seed-field parsing for the twin map generate
 // modals (SD backlog 2026-11-12): a typed seed must be a real whole number;
 // NaN from a bad parseInt used to flow into the generators and silently

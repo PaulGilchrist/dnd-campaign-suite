@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // useWizardResistances is a thin config wrapper over useWizardConfig (whose engine
 // behaviour — validateFn invocation and warning population, re-validation on dep change,
 // slot/preSelect resolution, getFn error handling, setWarnings — is owned by

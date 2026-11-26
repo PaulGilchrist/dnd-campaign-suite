@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup paid-cast slot lane for NON-upcastable spells (single
 // damage tier at base level). The popup pays a slot at the spell's FIXED
 // base level: the runtime counter takes precedence over the spellAbilities

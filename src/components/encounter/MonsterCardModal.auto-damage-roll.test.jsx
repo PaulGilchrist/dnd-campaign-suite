@@ -301,4 +301,4 @@ describe('MonsterCardModal - autoDamageRoll seam', () => {
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

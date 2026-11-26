@@ -4,7 +4,7 @@
 // buildTwoHandedVariantOffer yields the offer with BOTH formulas (two-handed
 // swap formula + one-handed base/default); select-log records each choice;
 // sibling drider rows without the field stay byte-inert.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // OWNER LANE (generic two-handed): the offer-shape, byte-inert null-offer, and
 // two-vs-one select-fork tests below are cited by sibling MA lanes (#523 ma0871,
 // #525 ma0959, #526 ma0965, #527 ma0989, #528 ma1063, #529 ma1100, #531 ma1146,

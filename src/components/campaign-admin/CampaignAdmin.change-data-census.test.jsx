@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 /**
  * Change-Data Census section of CampaignAdmin (backlog 2026-11-17 CD): the
  * Admin panel surfaces top-level change-data keys the server does NOT

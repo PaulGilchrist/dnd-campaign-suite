@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // SaveAttackAoeModal damage-resolution lanes (picker route).
 // Family roles kept distinct from siblings:
 //   - creature-selection.test.jsx  → picker rendering / metamagic

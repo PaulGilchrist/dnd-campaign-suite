@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Canonical home for the evictCharacterStores contract (useRuntimeState.js) —
 // the campaign-CHANGE character-scope rescope (bug-character-store-ghost-keys-
 // survive-campaign-switch, sibling of the 'campaign'-store fix d25431cab).

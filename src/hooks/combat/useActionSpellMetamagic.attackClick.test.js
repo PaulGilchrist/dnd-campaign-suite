@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // handleSpellAttackClick lane only. The shared showCastPopup routing, confirm
 // payment/metaCtx semantics, and skip lane are covered by the sibling lanes
 // (castClick / confirm / skip / modalRouting / aoeClick) — this file owns the

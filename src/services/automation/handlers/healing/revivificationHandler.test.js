@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Deterministic unit contract for the revivification handler (dead/0-HP target restore
 // via rage spend). Module boundaries fully mocked; exact-key + full-string own-composition
 // pins. Registry internals belong to targetEffectDefinitions.test.js; reaction rendering

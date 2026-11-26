@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // combatSuperiorityHandler.js barrel — executeActionManeuvers.js executor contracts.
 // This suite is the ONLY executor lane for the bonus-action die-size fallback
 // (rollExpression null → die size pays) and both executeSkillCheckManeuver

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: composition contract of buildDirectSpellDamageSteps() ONLY — structural owner
 // of this pipeline (#1039 VERBATIM-template twin, attackRollDamageSteps.test.js).
 // Golden-shape census + wiring bytes. Zero mocks (#937): the factory is a pure

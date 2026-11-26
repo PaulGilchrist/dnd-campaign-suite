@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Async confirm-handler wiring in CharActionModals (host 1) and
 // CharActionModals.SecondaryModals: modal confirm click → handler called with
 // the documented args → setPopupHtml/setModalState with the handler result.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet — lane: BRANCHES OF THE TREE (effect
 // 'teleport_and_slow' — 2024 Path of the World Tree lv6 Barbarian Reaction,
 // live from public/data/2024/classes.json:1066, dispatched via

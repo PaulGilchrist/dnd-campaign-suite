@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Longstrider handler: pure, fully-mocked automation handler. Tests pin exact popup
 // payloads, activeBuffs stamps, expiration payloads, and campaign log entries
 // (AGENTS.md requires logging on every automation). Deterministic contract — no churn.

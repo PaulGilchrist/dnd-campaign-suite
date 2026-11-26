@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // TOOLBAR lane — Log.jsx toolbar + note-add chrome presence contracts only.
 // Not owned here: add-note submit/keyboard/short-circuit dispatch (#885 LogNotes),
 // note/roll/etc entry content and container loading/empty states (#876-#887,

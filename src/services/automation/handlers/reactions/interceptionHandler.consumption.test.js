@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // interceptionHandler sextet — lane: REACTION CONSUMPTION (one Reaction per round latch).
 //
 // Six-lane seam map (each lane owns what it pins; do not duplicate across lanes):

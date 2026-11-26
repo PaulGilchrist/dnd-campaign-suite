@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // class-wizard lane — CLA-252 Phantasmal Creatures handler contracts.
 // Deterministic pure behaviour over mocked runtime accessors: no timers, no DOM,
 // no registry internals. Handler stays live via HANDLER_MAP registration in

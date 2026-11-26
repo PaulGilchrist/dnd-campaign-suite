@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // ── EH 2026-11-13 cs-row-staleness fix — chooser HP source + unchanged gates ──
 // SUBJECT: collectTouchTargets (healingHandler.js) as reached through the

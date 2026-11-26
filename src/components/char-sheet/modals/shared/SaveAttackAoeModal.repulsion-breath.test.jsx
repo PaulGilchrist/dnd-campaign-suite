@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0079: Adult Bronze Dragon Repulsion Breath picker adjudication — damageless
 // STR DC 19 cone. This lane owns the CONDITION + push combination path: failed
 // saves grant Prone via the MA-0063 canonical applySaveFailConditions path

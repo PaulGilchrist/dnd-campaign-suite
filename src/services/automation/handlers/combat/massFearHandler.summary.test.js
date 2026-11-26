@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: popup/summary text composition (exact strings), buildSaveDc auto-object
 // saveDc/saveAbility defaults, condition-label capitalization, and the exact
 // defaulted single-target createSaveListener config for resolveMassFear.

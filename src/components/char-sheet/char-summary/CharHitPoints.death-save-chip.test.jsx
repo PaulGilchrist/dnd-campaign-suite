@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Regression (bug-death-save-terminal-roll-chip-never-renders): the per-roll
 // death-save result chip must mount on EVERY roll — including the life-ending
 // ones. It used to live inside DeathSavingThrows, where the terminal isDead /

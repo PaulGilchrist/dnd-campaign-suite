@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Panel chrome-click feedback lane (backlog 2026-11-11 JU): the floating
 // TravelPanel overlaps the grid's lower-left and silently absorbed
 // destination clicks. While HexMap flags the panel as awaiting a destination

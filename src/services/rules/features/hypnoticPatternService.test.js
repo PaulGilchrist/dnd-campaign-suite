@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // hypnoticPatternService lane — PRODUCER + damage-break lane (enchantment family #1343-#1348/
 // #1354-#1356/#1374). triggerHypnoticPattern is the cast seam invoked live by
 // spellCastService/execution/triggerSpells.js handleHypnoticPattern (:130-132), which spreads

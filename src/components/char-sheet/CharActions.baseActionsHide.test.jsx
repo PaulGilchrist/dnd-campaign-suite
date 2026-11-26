@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Component-level click-lane coverage for CharActions' Hide & Dodge buttons:
 // rendered buttons must reach their handlers with props wired (cannotAct gate,
 // conditionEffects pass-through) and drive runtime-store reads/writes + logs.

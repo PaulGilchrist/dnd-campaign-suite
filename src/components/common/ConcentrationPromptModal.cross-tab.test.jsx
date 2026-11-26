@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // ConcentrationPromptModal — cross-tab resolution (bug-concentration-prompt-stale-cross-tab-double-roll)
 //
 // Locks the resolution contract for passive clients: once any client answers a

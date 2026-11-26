@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the authoritative modalName → modal-state key map for the cast lane:
 // exhaustive coverage of every key in MODAL_STATE_KEYS (useSpellCastExecutor.js,
 // the same map routeCastModal shares with useActionSpellMetamagic).

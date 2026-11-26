@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-15
 //
 // ── reviveTargetHp.js — revive-family pre-payment invariant ──
 // Verdict table shared by the three revive lanes (revivifyService

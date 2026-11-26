@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Divine Order is an info-only automation: handle() echoes the action into an
 // automation_info popup, falls back to "Divine Order" for falsy descriptions, and
 // ignores playerStats/campaignName/mapName (pure, no side effects). This suite pins

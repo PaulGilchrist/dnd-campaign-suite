@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Tests for CharActionModals.jsx close/confirm wiring:
 // - attackRiderModal generic close (clears modal, refreshes target effects,
 //   does NOT resume the attack pipeline for non-resuming actions)

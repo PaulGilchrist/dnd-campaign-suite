@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // CLA-087 regression: Disciplined Survivor reroll must thread the real
 // campaignName/characters into doReroll so the save bonus (+10 all-saves-prof

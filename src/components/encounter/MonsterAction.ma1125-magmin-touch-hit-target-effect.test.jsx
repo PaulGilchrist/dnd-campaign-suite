@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1125: Magmin "Touch" — te-only hit lane (MA-0995 #447/#448 te-only template).
 // The row's OWN Hit clause carries the burning rider ("If the target is a creature
 // or a flammable object that isn't being worn or carried, it starts burning") but

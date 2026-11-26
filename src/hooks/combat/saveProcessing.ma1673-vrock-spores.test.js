@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1673: Vrock "Spores" on the processSaveRoll seam — this row's unique
 // clause contract at both lanes (NPC inline + player prompt). monsters.json
 // row (vrock.actions "Spores": Constitution DC 15, dc_success:"none",

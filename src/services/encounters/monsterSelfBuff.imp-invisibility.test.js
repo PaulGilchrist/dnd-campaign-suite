@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1019: Imp "Invisibility" — formerly a zero-affordance prose-only row;
 // NOW rides the MA-0655/MA-0919 monster_self_buff seam: automation:{type:
 // "monster_self_buff", effect:"invisible", rounds:600}.

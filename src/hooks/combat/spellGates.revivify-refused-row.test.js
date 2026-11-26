@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-15: 2026-11-15
 //
 // PX 2026-11-15 improve (gate-revive refusal asymmetry): gateRevivify's zero-corpse
 // clean denial must write EXACTLY ONE revivify_refused audit row to the campaign log,

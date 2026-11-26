@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1203 Mummy Lord "Whirlwind of Sand" (+ MA-1681 Counterattack / MA-1686
 // Warrior Veteran Parry twins): disk rows were prose-only = getGatedMonsterReaction
 // null, zero affordance (MA-0869 twin). Fix authors the MA-0341 parry byte-shape

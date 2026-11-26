@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2079: Zmey Gorynych "Wing Buffet (Costs 2 Actions)" shipped delegates_to
 // "Triple Fire Breath (Recharge 5-6)" with NO own save/damage fields — the gated
 // press spent 2 legendary uses honestly (MA-1883 name-parse) then rode the MASTER

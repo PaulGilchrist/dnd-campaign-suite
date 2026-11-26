@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // METAMAGIC / HEALING_POOL / ABILITY_USE CONTENT lane — owns the entry bytes rendered by
 // MetamagicEntry (LogSpellEntry.jsx), HealingPoolEntry, and AbilityUseEntry. Routing and
 // type→component dispatch (including the metamagic/metamagic_use shared-alias leg and the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // spellPreparationService.arity-unify.test.js — STRUCTURAL family-consistency lock
 // (owner unify call, ledger test-maintain-bugs.md batch #217 ⚠ entry #1512/#1513/#1514).
 //

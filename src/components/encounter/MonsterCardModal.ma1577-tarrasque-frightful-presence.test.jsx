@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1577: Tarrasque "Frightful Presence" (actions row, DC 17 Wisdom, frightened).
 // The FIX was pure data: the row gained structured
 //   success_immunity:{effect:'frightful_presence_immunity',duration:'24_hours',duration_minutes:1440}

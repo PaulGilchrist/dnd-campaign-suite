@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base lane for ShortRestModal: initial render/state, hit-dice roll UI, class-feature
 // gating/display, closing behavior, and the primary completion flow (onComplete, exact
 // Sorcerous Restoration writes, CLA-011 Arcane Recovery merged batch + refusal).

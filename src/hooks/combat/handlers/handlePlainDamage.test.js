@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Plain-damage BASE lane: core dispatch (entry → applyDamageToTarget → combined
 // damage-roll log → hp_change essentials + primary-leg invisibility), threshold
 // stamping, crit log formatting, storeDamageLastAttack, and the ray-of-enfeeble

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  helpers.js BASE lane — shared direct-unit residuals only.         */
 /*                                                                    */

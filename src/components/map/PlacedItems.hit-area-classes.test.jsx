@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Shared hit-area class contract (backlog 2026-11-01 BB): every GM right-click
 // hit shape across the four placed-marker lanes carries the ONE shared class
 // `placed-hit-area` IN ADDITION TO its lane-specific anchor, so automation can

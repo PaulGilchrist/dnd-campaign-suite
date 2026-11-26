@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /**
  * musicConfig lane — GM ambient-music mood catalogue (INLINE literal config;
  * no disk JSON: nothing under public/ named music/audio, so the shipped

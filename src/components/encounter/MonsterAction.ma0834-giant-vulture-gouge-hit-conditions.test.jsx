@@ -10,7 +10,7 @@
 // HIT_CLAUSE_ROWS table (handlePlainDamage.hitClause.test.js:224-282), so
 // this file is the row's only lane — disk fingerprint + chip press, exact
 // bytes, nothing else. No escape_dc, no save fields, no escape clause.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';

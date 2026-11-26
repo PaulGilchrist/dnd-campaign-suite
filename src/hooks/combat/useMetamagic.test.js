@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Authoritative unit tests for useMetamagic.js — the shared sorcery-point
 // state helpers (spend / read / max / log). Sibling lanes (useActionSpellMetamagic,
 // useSpellMetamagicFlow, automation handlers) mock this module, so only here is

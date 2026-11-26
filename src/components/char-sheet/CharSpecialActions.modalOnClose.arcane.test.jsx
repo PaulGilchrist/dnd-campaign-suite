@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // modalOnClose quartet seam map (#76-79):
 //   arcane (this file)  — Signature Spells / Spell Mastery / Savant: Close-dismiss (no selection)
 //                         and confirm -> selection handler -> close, for the two wizard spell-choice

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0756: Galeb Duhr Avalanche Slam — the two fields fixed by 7736aeba7:
 // hit_conditions:["prone"] + conditional_damage (2d6 Bludgeoning charge rider)
 // authored on monsters.json actions. Distinct lane content = the row bytes and

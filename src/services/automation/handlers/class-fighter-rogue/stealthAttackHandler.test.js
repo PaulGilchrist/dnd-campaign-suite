@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit tests for the pure stealth_attack handler:
+// @maintained-by-ai 2026-10-15 — deterministic unit tests for the pure stealth_attack handler:
 // modal/popup payload contracts consumed by StealthAttackModal and the exact-key
 // runtime pin ('stealthAttackCost'). No timers, no real I/O (mocked at the boundary).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

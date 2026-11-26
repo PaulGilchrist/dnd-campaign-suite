@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // LANE: BonusActionChoiceModal economy CHARGE (bug-action-economy-chooser-modal-never-charges).
 // The chooser is a deferred lane: useCharActionsAutomation gates the row at click
 // ('modal' results defer their L5-002 charge to the apply seam, plan §7.2), and this

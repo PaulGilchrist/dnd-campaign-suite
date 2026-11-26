@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-356 regression: Telekinetic Master (2024 Psi Warrior lv18 Fighter).
 // A Fighter has NO spellcasting table for a Psi Warrior (the disk class_levels
 // spellcasting rows are gated required_major 'Eldritch Knight'), so the persisted

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Service-direct lane for auraDamageService.js: internal branch logic that the
 // consumer-mock lanes cannot reach.
 //

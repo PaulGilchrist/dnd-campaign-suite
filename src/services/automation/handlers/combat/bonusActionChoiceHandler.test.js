@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical lane for bonusActionChoiceHandler (Cunning Action via bonus_action_choice,
 // PLUS the live apply-side for Fast Hands: fastHandsHandler.handle opens the shared
 // bonusActionChoice modal whose Apply calls applyBonusActionChoice — applyFastHands has

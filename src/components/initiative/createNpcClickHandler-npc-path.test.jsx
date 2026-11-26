@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: createNpcClickHandler.js :22-28 campaign-NPC hit + :22 lookup-miss skips —
 // the plain-NPC popup path (no monster twin, no form) and its fall-INTO-fallback seam.
 // The chain under test is NOT mocked (#791/#841 discipline): NPC_FORM_HANDLERS runs its

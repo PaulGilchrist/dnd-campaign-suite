@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Lane: TurnEconomyStrip GM-movement ADVISORY (owner decision 2026-11-10 —
 // "GM moves are free by design", advisory only, zero enforcement change).
 //

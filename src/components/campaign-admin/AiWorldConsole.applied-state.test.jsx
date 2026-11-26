@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Backlog 2026-11-01 (AV) — applied-state copy on world proposal cards: a
 // SUCCESSFUL apply keeps the card mounted and swaps the Apply/Log row for an
 // "Applied" badge naming the proposal, leaving no affordance to re-fire the

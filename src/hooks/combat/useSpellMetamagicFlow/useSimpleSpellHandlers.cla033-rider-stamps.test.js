@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // CLA-033 handler-side stamping seam (useSimpleSpellHandlers): the onExecute
 // runners (runHex / runAnimalFriendship) reach runPostCastTriggers downstream,
 // so they must stamp pending.postCastTriggersRan — the confirm-lane seam in

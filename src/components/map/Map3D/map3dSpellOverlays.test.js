@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: overlay SHAPE -> exact 3D scene-graph bytes using REAL THREE (geometry,
 // material, outline, group transform of one createOverlayGroup call).
 // Distinct seams: useSpellHandlers #913 (2D draft + shapeParams bytes),

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1563: Swarm of Poisonous Snakes "Bites" save transport — the DC-chip
 // press routes ActionSaveRoll → saveChipPlan.formula → executeBlockSaveRoll →
 // buildAbilitySaveRollContext → saveProcessing.applySaveDamage, which rolls

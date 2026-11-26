@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-405 (CharBonusActions half): the "Step of the Wind (Fleet Step)" row
 // surfaces ONLY when the holder-keyed grant latch matches the current combat
 // round for an eligible character, and its click consumes the grant BEFORE

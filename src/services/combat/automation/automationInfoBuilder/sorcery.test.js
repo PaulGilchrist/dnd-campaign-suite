@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── sorcery.test.js — automationInfoBuilder sorcery slice (lane #952 template) ──
 // Unit home for the EXACT emitted info bytes of sorceryHandlers (sorcery.js):
 // sorcerer sorcery-point / metamagic-adjacent feature automation rows →

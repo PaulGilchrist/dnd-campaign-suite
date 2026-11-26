@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // HypnoticPatternModal unique lanes: the overlay-target guard and
 // unmount-safety while a player save prompt is pending. NPC save resolution
 // lives in .npc-saves.test.jsx, player save resolution in .player-saves.test.jsx,

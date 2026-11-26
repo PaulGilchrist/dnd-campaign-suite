@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // compulsionEffect lane — the multi-target CONFIRM side of the Compulsion family:
 // gateCompulsion → pendingCompulsion → handleCompulsionConfirm → applyCompulsionEffect
 // (wiring into this export is pinned by confirm-payloads.test.js, which mocks it wholesale;

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1931: King Kong "Grab" compound attack+save row — DATA fix pinned on the
 // REAL on-disk monsters.json row (programmatic disk-bytes, never transcribed
 // prose, #1086-#1088 class; ground-truth verbatim #993). The shipped row was

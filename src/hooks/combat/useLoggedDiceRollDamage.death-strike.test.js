@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Authoritative save-face death-strike suite: createLogDamageAndShow → plain lane →
 // handlePlainDamage.resolveDeathStrike (CON prompt → save-result → CLA-080 delta leg,
 // log, popup, te consumption). Attack-side producer lives in hitResolution;

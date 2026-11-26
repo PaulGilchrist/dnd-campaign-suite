@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-20
+// @maintained-by-ai 2026-11-20: 2026-11-20
 /* Lane: owner-teardown release (bug-music-owner-window-gone-claims-playing-elsewhere).
  * When the ONLY tab holding the .yt-music-frame reloads or closes, React's
  * unmount lane never runs, so the shared 'music' key used to keep

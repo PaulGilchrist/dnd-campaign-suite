@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * LANE (family seam map in 2024-immunities.test.js header): getSenses only —
  * computePassiveSkills merge, darkvision/tremorsense trait regex, Feral

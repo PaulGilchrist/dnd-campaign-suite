@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // massSuggestionService lane — AoE compulsion FORWARDER (enchantment family #1343-#1348/#1374/
 // #1378). triggerMassSuggestion is the cast seam invoked LIVE by triggerSpells.js
 // handleMassSuggestion (:169-175), which spreads { ...metaCtx, spellSaveDc } — spellSaveDc may

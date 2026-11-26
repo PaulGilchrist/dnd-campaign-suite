@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * vicious mockery #1987 — SINGLE spells lane on viciousMockeryHandler.js
  * (59 lines, read fully 2026-10-16). Baseline 8 tests; trimmed by merging the

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-089 Power Word Kill slot handling on the Words-of-Creation second-target gate
 // (useSpellMetamagicGates.js spendPowerWordSlot / openPowerWordTargetModal).
 // Data authority — public/data/2024/spells.json: Power Word Kill is level 9 Enchantment,

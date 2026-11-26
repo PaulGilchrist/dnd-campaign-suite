@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1898 + MA-1901: Garmr DATA fingerprints (one byte-pinned row each).
 // MA-1898 "Corpse-Fire Breath (Recharge 5-6)" (actions, aoe-save): core
 // cone/save/full-half math live-verified EXACT but the recharge gate never

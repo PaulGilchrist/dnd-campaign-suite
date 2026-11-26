@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 /* Backlog 2026-11-21 FFF (write-recap-disabled-when-ai-off): with AI off the
  * server 403s POST /ai/recap, so an enabled button burned a click before the
  * honest banner. The planner modal now probes GET /ai/status on mount (the

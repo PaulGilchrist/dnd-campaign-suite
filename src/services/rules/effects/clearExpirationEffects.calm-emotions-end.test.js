@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * Lane: the 'calm_emotions_end' expiration handler (SP-020 B5) in
  * clearExpirationEffects.js, dispatched via the public clearExpirationEffects

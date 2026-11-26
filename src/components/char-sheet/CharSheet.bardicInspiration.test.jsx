@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSheet UI lane: runtime-driven injection of synthetic Bardic Inspiration
 // features into the playerStats handed to CharSpecialActions / CharReactions.
 // Grant/eligibility state machine: services/combat/auras/bardicInspirationState.test.js

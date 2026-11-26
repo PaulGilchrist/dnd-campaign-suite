@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 6→3 to cataclysm-distinct lanes: BY-name #387
+// @maintained-by-ai 2026-10-18 — trimmed 6→3 to cataclysm-distinct lanes: BY-name #387
 // data locks through the resolvers (header resolves at index 0 — the
 // swallowed-child fingerprint — Eruption→Elemental Burst delegate bytes,
 // Rumbling Movement byte-invariance) + ONE effect-distinct click (Eruption

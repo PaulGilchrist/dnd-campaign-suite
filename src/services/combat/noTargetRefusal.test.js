@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // 2026-11-18 sheet-attack no-target refusal: single-owner lane tests. The
 // chip-default builder copies stay byte-identical (the monster-side exact
 // templates are pinned in MonsterCardHelpers.usage.test.js through the

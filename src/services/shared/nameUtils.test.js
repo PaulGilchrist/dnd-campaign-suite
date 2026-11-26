@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // LANE: src/services/shared/nameUtils.js — pure name-normalization helpers (zero deps, zero mocks, no timers).
 // EXPORTS + CALLERS (grep 2026-10-24):
 //   stripParenthetical  -> featFinder.js:6 (findFeat fallback strip), featValidation.js:200 (normalizeBackgroundFeatName).

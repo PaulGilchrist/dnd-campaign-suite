@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: lastProcessedKey dedup contract of useWizardFeatAbilityChoices —
 // reprocess only when the rules|feats key changes. Sibling suites own
 // grouping, initialization, migration, rollback, choice, and modechange behaviour.

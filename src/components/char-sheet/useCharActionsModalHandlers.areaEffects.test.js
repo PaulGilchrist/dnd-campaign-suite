@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: AOE/area-effect modal confirms in useCharActionsModalHandlers.
 // Pins gate refusals, exact service-call payloads (including mapName arity for
 // Nature's Sanctuary), setPopupHtml on result.payload only, and modalState clears.

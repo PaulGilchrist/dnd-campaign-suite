@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 /**
  * App-level contract for the player mapsView self-heal (backlog 2026-11-05
  * CV — App.jsx handleBackFromMap blank-state branch):

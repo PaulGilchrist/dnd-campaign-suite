@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Lane: createCreatureHandlers.js control delegation (Phase 2).
 // Owned here: the assign/release write to the combatSummary row, the campaign-log
 // audit entry (repo "every automation must log"), the GM-only guard, the player-row

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SAVE-ENGINE lane of conditionSaveService (base canonical owner): getCreatureSaveBonus
 // resolution (:13-30, incl. Wild Shape CON shortcut :15-16) and rollConditionSave
 // orchestration (:70-99) — bonus/aura composition, advantage-channel routing

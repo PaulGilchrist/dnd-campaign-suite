@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Regression lane for bug-initiative-hp-input-no-range-clamp: the GM HP input on
 // Initiative creature cards used to write ANY parsed int straight into combatSummary
 // (HP 99/7, HP −3/7 — un-dead monster, broken readout, zero hp_change audit rows).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Locks the zone-distinctive chip identity (backlog 2026-11-08 EQ): with 2+
 // active zones every chip must name WHICH zone it belongs to via its origin
 // cell — "Sphere (12,8)", not the bare shape name — on its visible label,

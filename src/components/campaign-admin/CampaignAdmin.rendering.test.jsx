@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Rendering smoke tests for CampaignAdmin: what the admin view looks like
  * on load, before any interaction. One render per behavioral contract:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CombatSuperiorityModal — BASE lane. Owns selection-mode headers/instructions, the
 // initial render contract (exact group headings + role-scoped checkbox set), header
 // variants per the shared ownership map, and the selection/use happy-path tuples.

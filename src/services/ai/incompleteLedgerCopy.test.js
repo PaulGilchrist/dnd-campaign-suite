@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Backlog 2026-11-22 (OOO) — incomplete-face pill copy pin: ONE all-lowercase
 // label style (npcs/settlements/factions/quests), enumerated in lane order,
 // built by the exported pure function the component renders verbatim.

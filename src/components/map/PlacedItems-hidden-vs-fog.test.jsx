@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-11
+// @maintained-by-ai 2026-11-11: 2026-11-11
 // ─── Lane: GM hidden-vs-fog tier differentiation ─────────────────────────────
 // Backlog 2026-11-11 (IE): on the 2D GM board a visible:false item (dimmed to
 // HIDDEN_MARKER_OPACITY) read identically to a fogged-but-visible item (full-

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-234 regression: SpellDetailPopup for a Nature Speaker ritual-only spell
 // (Path of the Wild Heart Barbarian, lv5 slots EMPTY at every test).
 // The popup delegates authorization to the REAL isFreeCastAuthorized service

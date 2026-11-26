@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions crafting lane (seam map #68): the Replenishing Meal and
 // Bolstering Treats CONFIRM/DISTRIBUTE contract — per-target grants, crafter
 // stock decrement, campaign log, confirmation popup, and capping grants at the

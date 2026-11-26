@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // MN-002: Bait and Switch (movement) / Tactical Assessment (skill_check) were
 // structurally inert — buildAttackInfo's DISPATCH had no combat_superiority_movement /
 // combat_superiority_skill_check entries, so the collector dropped them at

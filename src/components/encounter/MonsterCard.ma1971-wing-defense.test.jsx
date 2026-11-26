@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1971: Quetzalcoatl "Wing Defense" reactions[0] — DATA-fix lane (disk is
 // unique to this row; no sibling lane touches it). Defect 2 FIX (shipped):
 // dc_success:"none" — RAW "succeed … or take 7 (2d6) Thunder damage" ⇒

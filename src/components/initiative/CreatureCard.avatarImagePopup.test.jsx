@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Visitor (LAN) monster-avatar zoom (improvement 2026-11-16): a read-only tab
 // cannot open the GM-private stat modal, so an imaged monster/NPC avatar click
 // opens the shared full-size AvatarModal popup — same lane as the character

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1563: Swarm of Poisonous Snakes "Bites" — the save leg shipped with the
 // attack pool only (damage_dice_primary "2d6" piercing), so every DC-chip
 // press rolled/logged 2d6 piercing instead of the RAW 4d6 Poison pool quoted

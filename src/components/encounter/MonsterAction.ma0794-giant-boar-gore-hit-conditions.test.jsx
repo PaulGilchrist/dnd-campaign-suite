@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0794: Giant Boar "Gore" — prose carries "the target ... has the Prone
 // condition" but the row shipped WITHOUT hit_conditions, so the condition
 // rider was structurally inert (buildHitConditionClause reads

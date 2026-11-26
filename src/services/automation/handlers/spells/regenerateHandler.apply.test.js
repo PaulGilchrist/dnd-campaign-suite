@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── regenerate QUARTET lane #1947 .apply — applyRegenerateEffect application ─────
 // Seam map lives in regenerateHandler.active.test.js header (#1946). Lanes:
 //   #1946 .active — load guard (isRegenerateActive DEAD export removed there).

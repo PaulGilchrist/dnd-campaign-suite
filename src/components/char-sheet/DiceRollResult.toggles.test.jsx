@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // DiceRollResult — advantage/disadvantage toggle lane + psi-knack + console.error paths.
 //
 // Seam ownership map (consolidated per the DiceRollResult.rendering.test.jsx and

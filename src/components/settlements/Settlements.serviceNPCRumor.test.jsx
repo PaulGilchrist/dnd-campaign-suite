@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // This lane owns the service/NPC/rumor row-linking contract in the settlement
 // modal: rows add with their type-specific defaults, every field edit binds to
 // the correct row by index, removal targets the clicked row, and re-added rows

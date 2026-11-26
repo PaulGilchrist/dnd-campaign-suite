@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic hook-contract suite: encountersService is fully mocked, so this
 // file verifies the hook's state wiring (list/modal/loading state, service
 // delegation, error propagation) with no network, timers, or randomness.

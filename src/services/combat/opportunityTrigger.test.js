@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // L5-003 §8.4 — opportunity-attack trigger engine tests.
 // Lane: trigger predicate + per-defender reaction consumption. Defender-detection internals are
 // OWNED HERE — consumer hooks (usePlayerDragging/useSelectMove/useItemDragging) mock this module

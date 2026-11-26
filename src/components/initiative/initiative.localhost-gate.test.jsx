@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // GM-only initiative gate (bug-player-clients-can-hijack-initiative): live 2026-10-24 a LAN
 // player tab clicked Next → and the FULL turn-turnover cascade wrote server-side
 // (POST /combatSummary ×2 + /activeCreatureName + /__initiative__ +

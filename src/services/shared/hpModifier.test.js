@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 //
 // Unit pins for src/services/shared/hpModifier.js — the canonical dead-detection
 // and HP-adjustment chokepoint. Both exports are LIVE (dead-export hunt, none dead):

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // SP-045 regression: Fear cone saves must resolve the caster's spell save DC
 // (data automation saveDc 'spell_save_dc' -> buildSaveDc -> DC 17), never the
 // DC-10 fallback (CLA-277 / SP-082 / SP-042 Eyebite sentinel precedent).

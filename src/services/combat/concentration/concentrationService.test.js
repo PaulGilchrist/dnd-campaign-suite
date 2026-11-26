@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 //
 // BASE CANONICAL lane — concentrationService orchestration (family map, all five lanes closed):
 //  - concentrationRules.test.js ....................... pure dice math truth-tables (#991) — rules are MOCKED here,

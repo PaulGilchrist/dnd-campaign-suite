@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // HypnoticPatternModal — dismiss-softlock regression (save-dismissed sweep
 // family, 2026-11-05). The cast parks on pendingPrompts drained only by
 // save-result; the GM's un-rolled Dismiss never dispatches one, stranding the

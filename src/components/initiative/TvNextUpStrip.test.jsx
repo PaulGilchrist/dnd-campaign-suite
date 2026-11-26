@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Per-item contract for the up-next strip (QA backlog ZA 2026-11-23): every
 // creature row carries a stable `tv-next-up-item` class token alongside the
 // legacy `tv-next-chip`/type tokens, plus `data-name` verbatim, so tests and

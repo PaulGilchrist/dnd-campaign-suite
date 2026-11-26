@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // SavePromptModal — header honesty across faces (backlog QE 2026-11-19).
 // The ARMED face (Roll Save/Dismiss) keeps the existing "Saving Throw Required"
 // copy and the legitimate "(x of N)" queue counter unchanged; the RESOLVED

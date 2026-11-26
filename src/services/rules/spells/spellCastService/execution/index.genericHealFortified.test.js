@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  executeSpellCast GENERIC-HEAL lane (:337 gate) — FT-012 face      */
 /*  (span :336-:486 + rider merge :716-:720; fix commit 676a4c8ae)   */

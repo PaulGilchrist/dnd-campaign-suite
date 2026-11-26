@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Wrapper-lane lastAttack seam for createLogDamageAndShow — only the stamping
 // paths not owned elsewhere. Plain-damage store/merge and the skip guards
 // (rolls/damageType absent) are authority in handlers/handlePlainDamage.test.js

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // elementalEpitomeHandler.handle — attunement gate + modal-open lane
 // (sibling elementalEpitomeApplyResistanceChoice.test.js owns the applyResistanceChoice
 // writer lane — activeBuffs / epitomeResistanceType stamp shapes; do NOT re-pin those here).

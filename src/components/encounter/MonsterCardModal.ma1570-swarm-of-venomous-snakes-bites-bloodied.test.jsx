@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1570: Swarm of Venomous Snakes "Bites" — inert prose Bloodied variant
 // fixed on monsters.json swarm-of-venomous-snakes actions[0] via
 // conditional_damage riding the live MA-0007 GM-adjudication seam

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — dominate-repeat damage-trigger CONSUMER seam: handleWardedDamageEvents
 // (applyDamage.js:808-813) finds the domination and routes the dominated target
 // through handleDominateRepeatSave (:1091-1180) INSTEAD of the generic

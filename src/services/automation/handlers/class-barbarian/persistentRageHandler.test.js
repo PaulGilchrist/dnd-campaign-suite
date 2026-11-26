@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // persistentRageHandler.handle — deterministic contract tests for the
 // Barbarian "Persistent Rage" passive rule: validation branches (no rages
 // at level, already at max, already used since long rest), the successful

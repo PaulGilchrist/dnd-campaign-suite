@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // Save-dismiss leak pin for saveOnlyHandler's raw 'save-result' listener
 // (save_only producer family: Stunning Strike / Color Spray / Entangle /
 // Grease / Arms of Hadar / Dominate Monster). The listener used to be removed

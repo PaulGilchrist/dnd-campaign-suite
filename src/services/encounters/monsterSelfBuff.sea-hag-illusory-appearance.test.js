@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1449: Sea Hag "Illusory Appearance" — formerly a FAIL(a) MISROUTE row:
 // the caster's "spell save DC 13" (a CON caster stat) was transcribed into
 // row-level save_dc/save_type, arming a real "DC 13 Constitution" chip that

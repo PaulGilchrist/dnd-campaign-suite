@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 /**
  * Contract tests for the unified CreatureBadge leaf component (#826).
  *

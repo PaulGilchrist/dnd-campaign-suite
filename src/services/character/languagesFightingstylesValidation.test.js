@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 

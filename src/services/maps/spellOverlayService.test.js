@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: spell-overlay service — AoE overlay resolution + map distance badges for the
 // spell-target UI. SOLE OWNER (verified by consumer census) of: GET /spell-overlay
 // transport, overlay-target prefix resolution, active-map context assembly

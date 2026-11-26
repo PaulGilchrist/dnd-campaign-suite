@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-05
+// @maintained-by-ai 2026-11-05: 2026-11-05
 // Regression (bug-unregistered-placeditem-type-invisible-ghost): placedItems
 // rows whose `type` the app does not know (the map API and AI-Dress `add
 // item` ops accept ANY non-empty string) fell through PlacedItems.jsx's

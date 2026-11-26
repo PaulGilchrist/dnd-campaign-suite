@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 /**
  * Lane: [2026-11-07 clock-expiry audit] — a fired pendingExpirations clock
  * that strips an ACTIVE condition writes exactly ONE `condition removed`

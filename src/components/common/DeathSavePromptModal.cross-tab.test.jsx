@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // DeathSavePromptModal — cross-tab resolution (bug-death-save-prompt-stale-cross-tab-double-roll)
 //
 // Locks the passive-client resolution contract mirrored from the

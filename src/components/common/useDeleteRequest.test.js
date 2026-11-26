@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Lane: useDeleteRequest — the shared pendingDelete staging mechanics
 // (backlog 2026-11-01 BA extraction of the 37112c75b inline seam). OWNED
 // here: arm stores the descriptor (state + ref), cancel is fully inert (the

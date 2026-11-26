@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Deterministic contract tests for gloriousDefenseHandler: guard popups, the
 // CHA-adjusted hit/miss verdict, counterattack side effects (rollback, uses
 // decrement, log), and the hasGloriousDefenseActive predicate.

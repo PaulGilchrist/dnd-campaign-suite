@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-130 Faithful Steed (2024 Paladin lv5): free-cast latch auth + consume in
 // spellPreparationService — the preparation-phase half of the fix ("free cast never
 // recharges on Long Rest"). Disk-faithful fixtures: classes.json /class_levels[4]

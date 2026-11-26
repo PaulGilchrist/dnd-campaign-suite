@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SEARING VENGEANCE HEAL SEAM (quad file 1/4). Canonical home of:
 // - getRealMaxHp runtime-truth: combatSummary player entries are 1/1 placeholders,
 //   runtime hitPoints is max-HP truth; healAmount = floor(maxHp/2); targetMaxHp payload pin.

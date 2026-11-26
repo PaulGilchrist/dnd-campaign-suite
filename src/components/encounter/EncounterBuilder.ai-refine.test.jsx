@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 /* Lane: AI-refine on a SAVED encounter (campaign-authoring Phase 6 residual).
  * The proposal lands in the working draft — selected monsters re-resolve from
  * the bestiary, description updates, and NOTHING is persisted: the toolbar

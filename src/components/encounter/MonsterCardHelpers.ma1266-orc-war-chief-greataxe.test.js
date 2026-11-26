@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 3→2 tests: no-additive guard (secondary/two_handed
+// @maintained-by-ai 2026-10-18 — trimmed 3→2 tests: no-additive guard (secondary/two_handed
 // ABSENT + null transport) folded into the disk lock; parser plus-split behavior +
 // '+'-joined grammar guard kept intact. Distinct from MA-1267 spear twin (actions[2],
 // "1d6 + 4 plus 1d8", two-handed variant): grep shows this row's "1d12 + 4 plus 1d8"

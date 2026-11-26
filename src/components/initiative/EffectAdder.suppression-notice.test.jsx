@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // EffectAdder CLA-019 suppression-notice lane: an immunity-suppressed condition add
 // keeps the modal OPEN with a visible inline notice naming the condition + immunity
 // source (mirrors the CLA-011/232 "refusal must be visible" rest doctrine), while a

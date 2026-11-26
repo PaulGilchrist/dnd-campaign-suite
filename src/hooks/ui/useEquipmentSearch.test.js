@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the pure useEquipmentSearch hook. All data loading
 // is mocked; assertions cover the stable filter/select contract and should not
 // churn as the app UI evolves.

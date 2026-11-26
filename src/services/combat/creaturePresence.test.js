@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Split-party presence core (plan initiative-split-party): the away-flag
 // predicate, the end-of-round rejoin slot, board sort (away rows LAST), and
 // the shared presence mutation both the card toggle and the bulk modal ride.

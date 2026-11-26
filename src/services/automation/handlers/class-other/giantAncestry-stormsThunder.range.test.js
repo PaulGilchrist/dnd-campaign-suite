@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-337 regression: 60-ft isWithinRange gate wired + ability_use spend log + honest option text
 //
 // RANGE SEAM LANE. Selection lane (giantAncestry-selection.test.js) pins a live SEAM

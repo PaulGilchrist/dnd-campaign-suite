@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1157: Mezzoloth "Claws" — prose carries the grapple rider "If the
 // target is a Large or smaller creature, it has the Grappled condition (escape
 // DC 14) from two of four claws, and it has the Restrained condition until the

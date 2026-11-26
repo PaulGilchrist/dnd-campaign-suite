@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0147 regression: Adult White Dragon Frightful Presence (legendary_actions[2])
 // previously authored only name/description/save_dc/save_type — no save_effect —
 // so extractConditionsFromSaveEffect → [] and the MA-0017 damageless-save seam

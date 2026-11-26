@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-25
+// @maintained-by-ai 2026-11-25: 2026-11-25
 /**
  * ambiencePlayer.js — dead-track queue-exhaustion lane
  * (bug-music-dead-track-infinite-skip-loop; Item 3 made the queue

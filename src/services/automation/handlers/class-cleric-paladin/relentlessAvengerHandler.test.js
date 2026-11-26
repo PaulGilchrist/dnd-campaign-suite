@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Unit lane for the Relentless Avenger handler (paladin Oath of Vengeance reaction).
 // Pins the full contract of handle(): the ability_use log entry (exact description,
 // with ' against <target>' suffix or bare when no target), the campaign targetEffects

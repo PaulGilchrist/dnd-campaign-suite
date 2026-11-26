@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical home for versatileTricksterHandler.applyVersatileTrickster's own
 // behaviour: popup/log composition, inline size-order guard, targetEffects
 // append, CLA-376 secondary-target DEX save, and no-side-effect guards.

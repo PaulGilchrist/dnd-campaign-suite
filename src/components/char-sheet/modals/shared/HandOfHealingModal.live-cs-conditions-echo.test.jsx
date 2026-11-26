@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // KB 2026-11-14 improve — HoH result-stage display ignores cs-row condition
 // edits. PhysiciansTouchSection previously subscribed the target's

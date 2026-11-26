@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-20
+// @maintained-by-ai 2026-11-20: 2026-11-20
 /* Lane: local-stop frame unmount (improve 2026-11-20 backlog).
  * The remote-adoption lane has always torn the frame down on a FOREIGN stop
  * (ambiencePlayer.stop + setPlayerMounted(false) → mount-effect cleanup

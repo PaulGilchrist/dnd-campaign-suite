@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Blocking-effects lane for SaveAttackAoeModal: the component-local trap blocking truth
 // table (TRAP_BLOCKING_EFFECTS / trapEffectBlocksAttack applied via buildEligibleTargets,
 // SaveAttackAoeModal.jsx:523-541) driven through the REAL CreatureSelectionModal picker

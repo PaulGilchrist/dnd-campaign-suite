@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-23 (phantom-authoring gate); 2026-11-25 (Item 5:
+// @maintained-by-ai 2026-11-23: 2026-11-23 (phantom-authoring gate); 2026-11-25 (Item 5:
 // visitor-owned tokens gained a COSMETICS-only opener — see the third case).
 // ─── Lane: Players — visitor-origin context-menu gate ─────────────────────────
 // bug-visitor-map-token-menu-phantom-authoring: a LAN-visitor tab could

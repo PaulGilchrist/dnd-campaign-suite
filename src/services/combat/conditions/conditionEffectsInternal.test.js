@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Internal lane: the direct predicate matrix of saveModifierApplies and the
 // loop/skip/guard contract of applySaveModifiers — the ONLY faces the engine
 // censuses cannot reach: combatContext pairs (this is the only test file in

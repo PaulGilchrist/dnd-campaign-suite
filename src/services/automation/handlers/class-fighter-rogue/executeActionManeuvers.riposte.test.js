@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // MN-017: Riposte trigger gates — gated arm-then-row (CLA-297/CLA-310 house standard)
 // Canonical riposte executor suite: gates, latches, economy, no-side-effect refusals.
 // Popup copy is canonically pinned in combatSuperiorityUtils.test.js — assert fragments here.

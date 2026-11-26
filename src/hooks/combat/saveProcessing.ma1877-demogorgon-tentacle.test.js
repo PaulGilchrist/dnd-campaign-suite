@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1877: Demogorgon Tentacle — the save-FAIL-face max-HP-reduce consumer
 // (§388 code-gap fix, MA-1847 §511 fail-face grant seam precedent). The row
 // (monsters.json demogorgon actions[1]) now authors save_dc 23 +

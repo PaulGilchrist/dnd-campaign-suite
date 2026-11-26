@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-053 lane: conditionEffects ENGINE consumer of the `clairvoyant_combatant`
 // te key — LATE handler (conditionEffects.js:467, LATE_TARGET_EFFECT_HANDLERS
 // opened :428) plus the combineAttackModes consumer (:854). This is NOT the

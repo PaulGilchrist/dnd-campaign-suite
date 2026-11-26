@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Render/selection lane for SaveAttackHealModal: the pre-apply selection screen —
 // instruction text (save type/DC/range, damage preview, heal preview), the checkbox
 // list built from combatSummary (attacker excluded), count + apply-button gating

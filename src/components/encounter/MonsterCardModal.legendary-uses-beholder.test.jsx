@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to beholder-distinct lanes: by-name data locks
+// @maintained-by-ai 2026-10-18 — trimmed to beholder-distinct lanes: by-name data locks
 // (header uses:3, Chomp→Bite delegate, Glare eye_rays advisory) + one
 // effect-distinct click per lane (delegated roll ctx, advisory record,
 // exhausted refusal). Generic gate/spend/latch/regain units and modal

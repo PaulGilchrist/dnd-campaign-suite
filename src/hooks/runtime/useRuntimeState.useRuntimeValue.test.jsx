@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical home for the useRuntimeValue HOOK contract (subscription, equality
 // guard, prop switching, lifecycle, falsy guards). Non-hook store API lives in
 // useRuntimeState.core.test.js; setRuntimeObject lives in

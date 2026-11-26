@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // save_result attribution ledger (bug-save-result-rows-attribute-character-unknown):
 // the generic save_result row emitted by createSaveListener's logSaveOutcome takes
 // `characterName` from config.attackerName — the modal's save-result dispatch

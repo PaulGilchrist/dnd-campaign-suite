@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Regression tests for the 2026-11-10 improvement: buildRuntimeConditions must
 // never crash on a malformed activeConditions row. GB incident: one object
 // entry (key.charAt is not a function) froze the ENTIRE Initiative view to

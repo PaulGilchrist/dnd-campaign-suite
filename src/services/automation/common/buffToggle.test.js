@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Pure-function contract tests over the runtime store: stable key mapping,
 // exact-name matching, array guards. Deterministic; no app churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

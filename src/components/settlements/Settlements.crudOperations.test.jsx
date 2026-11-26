@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Row-level CRUD lives in sibling lanes: serviceNPCRumor (row add/remove),
 // modalActions (open/close + prefilled edit), saveDelete (save/delete flows),
 // duplicate-name (name guard). This file retains only the unique behavioral

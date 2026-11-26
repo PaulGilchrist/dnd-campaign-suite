@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Handler-only lane for Elemental Affinity (2024 Draconic Sorcery): the damage-type
 // choice modal payload, the valid-type guard, chosenType store + "set to"/"changed to"
 // log copy, and the Fiendish Resilience DELEGATION pins (fiendishResilienceHandler.test.js

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Lane status (backlog aoe-overlay-lane-disposition, 2026-11-05): LIVE — producer
 // live-proved as the PC sheet cast of a non-AoE damage save spell with an
 // `overlay-<id>` target armed on the caster's initiative card (CharSpells

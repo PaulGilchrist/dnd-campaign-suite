@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // FT-104: Dual Wielder dedicated bonus-attack lane — single off-hand attack,
 // own-turn gate, once-per-turn latch, refusal logs, no Flurry multi-fire.
 // Deterministic contract suite: mocks the four seams (runtime store, damageUtils,

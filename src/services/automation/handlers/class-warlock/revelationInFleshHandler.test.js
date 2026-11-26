@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the Revelation in Flesh warlock automation handler.
 // Pure branch/payload contracts over mocked runtime/metamagic seams, full-string
 // composition pins owned by this handler, turn-based only (no timers), one CustomEvent

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Backlog 2026-11-01 AZ2 + 2026-11-22 PPP: designer-chat raw-JSON replies.
 // The chat lane sends no response_format by design, so any misbehaving model
 // can answer in JSON. Faces: a whole-message JSON object with a non-empty

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // fearHandler.handle lane (#1911) — closes the fear pair with
 // fearHandler.saveDc.test.js (#1910); PAIR seam map lives in that file's
 // header. #1910 runs the REAL buildSaveDc and owns DC derivation, sourcing

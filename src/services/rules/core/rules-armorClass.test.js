@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // 5e canon rows of rules.getArmorClass (src/services/rules/rules-armorClass.js).
 // 2024 divergences live in rules-armorClass-2024.test.js (which cites several of
 // the VERBATIM test names pinned here); the mage_armor runtime-buff lane lives in

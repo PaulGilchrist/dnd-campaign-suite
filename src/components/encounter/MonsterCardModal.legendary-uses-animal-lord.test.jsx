@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0277 regression: Animal Lord legendary_actions[0] carried "Legendary
 // Action Uses: 3" ONLY as name-text — no numeric `uses` field — so
 // legendaryHeaderAction() returned null, the card rendered the UNGATED branch

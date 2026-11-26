@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-096 lane: the TURN-START incapacitated face of Draconic Flight.
 // applyTurnStartEffects dispatches endDraconicFlightIfIncapacitated
 // (turnStartEffects.js:102-115) for the ACTIVE creature at its turn start:

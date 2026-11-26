@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // handle() is a deterministic entry guard: one runtime read of
 // elementalEpitomeActive → automation_info popup (falsy) or destructiveStride
 // opener modal (truthy). No writes, no timers, stable contract.

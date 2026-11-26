@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Ram-attack lane ONLY: context.ramActive (Power of the Wilds buff scan) +
 // isMelee + resolved applyResult → Prone via maybeApplyRamProne in
 // handlePlainDamage.js. Size gate: Large-or-smaller (MA-0553 ladder).

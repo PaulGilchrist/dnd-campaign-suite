@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-018: HIT-triggered attack-rider riders must NOT be offered on a MISS,
 // the miss-triggered rider must STILL be offered on a miss, and the per-trigger
 // filter must never default-true for unknown triggers.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-138 FIX-LANE (no-concentration lock) — Fey Reinforcements' arm-time
 // "Skip Concentration" choice rides the modified-spell stamp (_noConcentrationChoice)
 // set by spellPreparationService (producer lane: spellPreparationService.cla138).

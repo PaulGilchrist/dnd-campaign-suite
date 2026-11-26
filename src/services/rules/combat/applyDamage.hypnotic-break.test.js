@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — SP-069 applyDamage CONSUMER seam only: applyDamageToTarget must route
 // real damage through the REAL breakHypnoticPatternOnDamage producer BEFORE the
 // generic condition reads (applyDamage.js:546-557 "single owner per fact"), and

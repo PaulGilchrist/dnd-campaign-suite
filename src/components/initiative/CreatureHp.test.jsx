@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CreatureHp leaf contract — HP display bytes + input commit semantics (props-in/callback-out).
 // Owned here (input lane):
 //   status badge thresholds DEAD/BLOODIED/OK vs effective max (jsx:66-67, 89)

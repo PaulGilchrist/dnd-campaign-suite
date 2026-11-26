@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // MN-018: executeSweepingAttack must re-use the ORIGINAL attack roll vs the
 // SECOND creature's AC, gate on 5 ft of the original target, apply REAL damage
 // with the REAL damageType via applyDamageToTarget, and consume the pending stash.

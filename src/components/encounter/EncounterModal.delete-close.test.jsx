@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* Lane — close-on-success for the Load-mode delete leg (QA 2026-10-24 backlog: EB
  * Load-modal stayed open after a successful in-modal Delete — row vanished, modal
  * persisted; the quest-edit-modal twin was fixed in 752a00c43, this surface missed).

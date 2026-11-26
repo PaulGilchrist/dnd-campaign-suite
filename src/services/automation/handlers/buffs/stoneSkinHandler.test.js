@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owner of the Stone Skin automation handler contract: target-selection popup shape,
 // activeBuffs/stoneSkinDamageTypes runtime writes, buff replace/append semantics,
 // expiry registration, concentration save-DC sourcing, and logging. Fully mocked and

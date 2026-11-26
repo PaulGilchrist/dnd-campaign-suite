@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Activation sub-lane of the beguilingDefenses pair: covers handle()'s
 // activation flow — uses gate (incl. Pact Magic recharge), heal, save-prompt
 // creation, popup composition, and the activation ability_use/hp_change logs.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: ROUTING DECISIONS of buildPipelineForAction (index.js) ONLY — which builder is
 // assembled for which action shape, and the no-write pin for the removed SSE
 // milestone lane.

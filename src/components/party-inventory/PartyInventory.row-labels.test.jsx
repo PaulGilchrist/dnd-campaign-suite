@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-11-17: 2026-11-24
 // Improve (backlog 2026-11-17 CD): every From Players `To Party` button was an
 // undifferentiated `.pi-move-btn` (row identified only by ancestor text) and the item
 // stepper pair was UNTITLED while sharing its class with the currency chips, so

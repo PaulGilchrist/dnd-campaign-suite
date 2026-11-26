@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic: mocks the runtime-state and combat-context seams at module
 // boundaries, no timers/DOM/network. Pins the stable applyTargetChoice
 // contract (empty-target guard popup; vowOfEnmityTarget / vowOfEnmityCostPaid /

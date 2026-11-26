@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical base suite of the contextBuilder-sync cluster. Owns the core output
 // contract of buildAttackContextSync: basic field shapes (target/attacker names,
 // damageType fallback, isMelee, isWeaponAttack, isPsychicBlade, hitBonus ?? 0),

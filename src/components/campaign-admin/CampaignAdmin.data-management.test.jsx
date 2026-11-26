@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Data Management flows of CampaignAdmin: Clear Change Data, Clear Campaign
  * Log, and Full Reset. QA backlog 2026-11-24: the trio's native

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-118 regression: the sheet Speed line must fold in the Elfish Lineage
 // ladder grant (Wood Elf speedBonus 5 from races.json) — race JSON alone
 // renders Wood Elf at 30 ft.

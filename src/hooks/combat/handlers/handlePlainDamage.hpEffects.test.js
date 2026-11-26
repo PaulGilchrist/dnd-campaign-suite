@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Plain-damage lane HP-effect contracts (writePlainHpResults): player currentHitPoints
 // writes, hp_change log shape, unconscious boundaries, NPC runtime-write guard.
 // Death-save init is covered by useLoggedDiceRollDamage.death-saves.test.js,

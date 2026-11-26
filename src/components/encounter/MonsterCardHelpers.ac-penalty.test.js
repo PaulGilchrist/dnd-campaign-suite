@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0115 OWNER truth-table for parseAcPenaltyClause
+// @maintained-by-ai 2026-10-18 — MA-0115 OWNER truth-table for parseAcPenaltyClause
 // (MonsterCardHelpers.js:226), the ac_penalty te parse lane. Branches:
 // guard (non-string) → null; regex match /[\u2212-]\s*(\d+)\s*penalt(?:y|ies) to AC/i
 // → {effect:'ac_penalty', value:N}; no clause → byte-inert null. Disk fixtures

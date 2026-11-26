@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-22
+// @maintained-by-ai 2026-11-22: 2026-11-22
 /**
  * Deferred plan A — DenialExplainer: classification lane only (the card
  * family itself is GMCopilot's own suite). Mocks the shared SSE client to

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  BASE noDamage first-chain lane — index.js :278-:315 (per #1472    */
 /*  split; noDamage-healing.test.js owns :316/:318-:320, :328-:332,   */

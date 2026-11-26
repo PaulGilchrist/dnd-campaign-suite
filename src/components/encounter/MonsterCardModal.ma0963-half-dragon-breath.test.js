@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0963: Half-Dragon "Dragon's Breath" (BY-name disk lock #387 family) — the
 // save row was damage-less on BOTH legs: it authored NO damage_dice_primary/
 // damage_type_primary, so the save/picker route (saveChipPlan.formula ->

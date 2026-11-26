@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // HypnoticPatternModal metamagic lane: Heightened Spell (note + radio wiring and
 // the disadvantage roll on the marked target) and Careful Spell (ally badges,
 // NPC auto-success resolution, player prompt skip). Overlay guard + teardown live

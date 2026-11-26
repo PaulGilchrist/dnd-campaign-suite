@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0855 helper lane: hit_choice condition-choice rider (Githzerai Psion
 // Psychic Warp — "the githzerai's choice of (A) Charmed … or (B) Prone").
 // hitChoiceArmed/buildHitChoiceOffer arm the HIT-popup chooser; unlike the

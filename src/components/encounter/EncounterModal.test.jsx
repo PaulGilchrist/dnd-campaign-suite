@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /* Lane — EncounterModal internals: open-gate, save/load render surfaces, name input →
  * local state, Enter-submit, load-list sorting, delete-confirm seam from the MODAL side,
  * exact onSave/onLoad/onDelete payloads. The REAL formatEncounterName runs under test

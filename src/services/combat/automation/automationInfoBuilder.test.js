@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── FAMILY SPLIT MAP (automationInfoBuilder family) ─────────────────────────
 // automationInfoBuilder.js (flat) is a PURE FACADE: it spreads 21 domain
 // handler maps into DISPATCH and routes on feature.automation.type

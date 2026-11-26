@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-05
+// @maintained-by-ai 2026-11-05: 2026-11-05
 // ─── Lane: unregistered-type ghost row on the mounted board ──────────────────
 // bug-unregistered-placeditem-type-invisible-ghost: the map POST/PUT and the
 // AI-Dress `add item` lane persist ANY non-empty item.type, but the

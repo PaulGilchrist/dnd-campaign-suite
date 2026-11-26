@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0694 empyrean lane, trimmed to empyrean-distinct
+// @maintained-by-ai 2026-10-18 — MA-0694 empyrean lane, trimmed to empyrean-distinct
 // seams: BY-name data lock (header uses:1 + Bolster self-buff automation +
 // Shockwave numeric DC 23 save + Smite→Divine Ray delegate) + the LIVE
 // modal-only lanes: header/"(1 left)" render with the swallowed-header

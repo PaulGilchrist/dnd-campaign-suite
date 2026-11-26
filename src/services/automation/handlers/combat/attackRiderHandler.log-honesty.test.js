@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // attackRiderHandler LOG-HONESTY lane (bug-attack-rider-log-claims-applied-on-
 // declined-or-saved): rider-save log rows must state what actually happened.
 //  - Shield Bash pre-chooser outcome row stays OUTCOME-NEUTRAL on the fail leg

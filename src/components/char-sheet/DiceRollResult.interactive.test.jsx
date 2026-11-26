@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // DiceRollResult — interactive click-dispatch seam tests.
 //
 // Seam ownership map:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Attack-rider maneuver dispatch lane (Fighter superiority): the hook-side seam
 // between resolveAttackDamage's pause, handleAttackRiderManeuverUse/Skip, and the
 // rider service — dispatch result shapes, die→damage folding, ledger flush, popup

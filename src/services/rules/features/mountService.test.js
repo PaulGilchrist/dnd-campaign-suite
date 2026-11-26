@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-107 Mounted Combatant (2024) — PRODUCER lane audit.
 // Disk identity: public/data/2024/feats.json feat row "Mounted Combatant"
 // (benefit "Mounted Strike"); NOT a spell — the affordance is the char-sheet

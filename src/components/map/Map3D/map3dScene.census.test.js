@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 /* global HTMLCanvasElement */
 // Lane: the dev-only scene census (Map3DScene.getCensus) — the machine-readable
 // proof handle for per-mesh assertions (backlog 2026-11-10 HD). Built on the

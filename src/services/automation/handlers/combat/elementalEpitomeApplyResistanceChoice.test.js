@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // elementalEpitomeHandler.applyResistanceChoice — resistance-selection writer lane
 // (sibling elementalEpitomeHandle.test.js owns the handle() gate/modal lane).
 // Contracts pinned here are read downstream and must stay exact-key/exact-shape:

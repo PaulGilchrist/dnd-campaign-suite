@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Dialog-semantics pin for HealingPoolModal (backlog 2026-11-10 HD follow-on):
 // every top-level shell borrows .short-rest-modal for a NON-rest flow, so each
 // one now carries the ShortRestModal tier (bc409413d): role="dialog" +

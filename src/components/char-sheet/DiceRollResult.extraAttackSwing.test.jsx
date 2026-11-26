@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // ZB 2026-11-23 affordance pins: during an Extra Attack chain each swing's
 // `.popup-modal` face carries an in-chain ordinal ("Swing N of N") so the GM
 // can tell which swing a Done commits. The ordinal renders ONLY when the

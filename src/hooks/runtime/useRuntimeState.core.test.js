@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Core runtime-store contract tests: the raw store API of useRuntimeState.js
 // (get/set/seed/clear, listeners, key queries). Pure in-memory behaviour with
 // mocked fetch — deterministic, no timers, no DOM.

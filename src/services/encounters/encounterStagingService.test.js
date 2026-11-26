@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 // Staging-map lane (backlog 2026-10-26 run E): accepted travel events reuse
 // ONE map per campaign instead of spawning a per-event arena. This file owns
 // create-once / reuse-wipe-and-reseed / cover-tier semantics. Routing

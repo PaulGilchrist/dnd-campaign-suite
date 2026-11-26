@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // HypnoticPatternModal NPC-save lane: local NPC save resolution (conditions,
 // expiry, result logging, persist), stubbing rollNpcSave at its seam so the
 // fail/pass branch is driven deterministically without Math.random games.

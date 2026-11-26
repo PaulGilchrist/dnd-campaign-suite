@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // animalFriendshipHandler lane (#1858). DISTINCT spell from animalShapes (#1859-#1861) —
 // charm/friend here, polymorph family there; no shared coverage.
 // Pins this handler's delegation contract only: savePrompt, damageRollback, expirations,

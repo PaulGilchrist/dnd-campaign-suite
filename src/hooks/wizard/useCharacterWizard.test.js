@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Fetch-level contract for useCharacterWizard: wizard visibility toggles, create/edit
 // HTTP calls (POST/PUT URL + body incl. rename filename sanitization), runtime
 // lineage/legacy stamp wiring on subrace change (CLA-118/CLA-139, one merged write),

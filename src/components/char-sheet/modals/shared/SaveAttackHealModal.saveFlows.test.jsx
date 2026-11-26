@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Save-routing lane for SaveAttackHealModal: NPC auto-resolve vs player prompt routing,
 // NPC save arithmetic (lowercase saveBonuses key, total = roll + bonus vs DC, honest
 // half-on-success / full-on-failure mocks), pending-player UI, save-result event

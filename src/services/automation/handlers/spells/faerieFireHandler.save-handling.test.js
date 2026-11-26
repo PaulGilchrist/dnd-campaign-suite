@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * faerieFire TRIO lane #1908 — save-handling OUTCOMES (faerieFireHandler.js).
  * Canonical TRIO SEAM MAP lives in faerieFireHandler.handle.test.js header (#1907).

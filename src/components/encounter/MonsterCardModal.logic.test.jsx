@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Audit + trim (8 → 7): combat-context load/skip faces collapsed into one
 // unmount-based test (same :2124 guard); dead _rollAbilityCheck/_rollSkillCheck/
 // _rollInitiative/_quickRollPlayerSave export channels purged (hook-object

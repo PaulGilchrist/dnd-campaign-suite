@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // CharSummary test lane: ally-modal data source + confirm happy path, and
 // click-to-roll initiative (advantage ternary + exhaustion penalty).

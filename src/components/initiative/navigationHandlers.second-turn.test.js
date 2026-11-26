@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // LANE: navigationHandlers.second-turn — locks the turn-economy ST-seam fix
 // (bug-secondturn-seam-starves-holder-economy-phantom-turnstate). A (Second Turn)
 // row IS the holder's extra turn (owner ruling 2026-11-09; the gate lane c076dfdf1

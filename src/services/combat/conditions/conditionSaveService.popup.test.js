@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // POPUP lane of conditionSaveService (owned here): buildConditionPopup production
 // envelope bytes (:175-192) — the popup payload the consumer builds after a rolled
 // condition save. Pins every field byte-exact incl. bonus fields other lanes missed:

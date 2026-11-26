@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Focus-retention regression (bug-roll-result-popup-escape-inert-when-opened-over-stat-modal):
 // a roll-RESULT face opens over the monster stat modal; the roll commit's SSE
 // echo bumps runtimeStateTick, the initiative card re-keys (key

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-075 (git 46d041dbb 'Magic Missile (2024) upcast level dropped in MM lane'):
 // executeMagicMissile derives dart count and log spellLevel from metaCtx.slotLevel —
 // pins that the upcast level threaded by the confirm lane (CLA-312; confirm-side

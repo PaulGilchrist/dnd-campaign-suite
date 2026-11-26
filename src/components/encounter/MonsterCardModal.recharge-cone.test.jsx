@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0031: Abominable Yeti Cold Breath (Recharge 6) — the recharge CONE lane of
 // MonsterCardModal. This file owns the row-specific click lane only: fresh press
 // spends at picker-open (CLA-384 convention) and routes the "30-foot Cone" save

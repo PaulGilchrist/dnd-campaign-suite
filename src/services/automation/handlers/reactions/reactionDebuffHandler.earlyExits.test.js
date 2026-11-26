@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet — lane: handle() FRONT-DOOR GUARDS (the generic
 // early returns BEFORE EFFECT_ROUTES dispatch; automation/index.js:338
 // `reaction_debuff` → handle). This file owns, in guard order:

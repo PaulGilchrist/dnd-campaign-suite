@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Composite coverage only: registration-before-prompt ordering (race guard),
 // the CLA-324 isSpellDamage prompt marker, and simultaneous advantage +
 // disadvantage with a custom attacker. Per-field payload, logging, popup,

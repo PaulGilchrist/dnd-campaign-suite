@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Handler suite for survive_and_heal dispatch lane (automation/index.js → handleBoonOfRecovery,
 // fed by 2024 feats.json "Last Stand"). Pins this handler's own execution composition:
 // direct currentHitPoints write (no applyHealing / no shared heal util), latch key

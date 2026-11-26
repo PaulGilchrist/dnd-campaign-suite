@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // L5-003 §8.2 lane — combat/lineOfSightGate.js: the enforcement-mode GATE WRAPPER for
 // ranged attacks/casts (master switch campaign.enforcement.lineOfSight, consulted at the
 // attack/spell seams). Distinct from the §8.3 cover CHANNEL, owned by coverService.test.js

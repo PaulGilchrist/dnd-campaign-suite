@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-301 collector seam (family #2087): the temp_buff + effect 'sacred_weapon' fingerprint in
 // SPECIAL_AUTOMATIONS must push the passive_buff marker that the live consumer
 // steps/features/sacredWeapon.js:10 gates on (passives.find(p => p.name === 'Sacred Weapon'

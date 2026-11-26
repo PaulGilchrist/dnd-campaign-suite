@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 import { describe, it, expect, vi } from 'vitest'
 import { healingHandlers } from './healing.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'

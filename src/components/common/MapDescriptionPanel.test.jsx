@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-26
+// @maintained-by-ai 2026-10-26: 2026-10-26
 // Lane: read-only map description panel (backlog 2026-10-26). Self-gates on
 // empty/missing description so both editor roots (Map.jsx indoor, HexMap.jsx
 // outdoor) mount it unconditionally. Markdown rendering itself (marked +

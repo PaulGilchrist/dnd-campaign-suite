@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions gnomish-lineage sheet seam (lane #69): clicking the
 // "Gnomish Lineage:" row dispatches executeHandler, opens the REAL
 // GnomishLineageModal with all lineage options from the dispatched payload,

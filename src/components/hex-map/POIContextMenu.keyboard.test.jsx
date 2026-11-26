@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // ─── Lane: POIContextMenu — the keyboard tier the hex menu was MISSING ────────
 // bug-hex-poi-menu-no-keyboard-rove-or-focus-first: 77ef39387 shipped the
 // full ARIA menu tier (open-focuses the first entry, Arrow/Home/End rove

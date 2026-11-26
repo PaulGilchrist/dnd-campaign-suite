@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic hook-contract tests for useLog: initial load + MAX_LOG_ENTRIES
 // cap, reloadLog/addEntry delegation (logService is mocked at the boundary),
 // SSE log-event handling via the REAL shared sseClient, and subscription

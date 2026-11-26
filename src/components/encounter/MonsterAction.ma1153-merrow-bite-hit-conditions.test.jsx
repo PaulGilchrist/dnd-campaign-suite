@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1153: Merrow "Bite" — prose carries "the target has the Poisoned
 // condition until the end of the merrow's next turn" but the row shipped
 // WITHOUT hit_conditions, so the Poisoned rider was structurally inert

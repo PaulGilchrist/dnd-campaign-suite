@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // auraOfProtection primitives lane — canonical home (folder lane map in
 // auraComboEffects.test.js) for the saving-throw aura primitives and constants.
 // auraComboEffects re-runs hasAuraOfProtection/hasCannotActCondition/getAuraRangeFromStats

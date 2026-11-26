@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-311 Share Spells share-chain lane: owns ONLY the service->handler seam bytes — the disk-fronted
 // 2024 Ranger/Beast Master Share Spells passive -> service-built action -> real handler propagating the
 // caster's self-spell targetEffect onto the companion (exact write order, full envelopes, disk-driven range).

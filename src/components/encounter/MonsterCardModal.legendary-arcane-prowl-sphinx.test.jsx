@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1494 regression (by-name disk + live-seam owner: sphinx-of-lore Arcane Prowl):
 // Sphinx of Lore legendary_actions[0] was the Arcane Prowl CHILD with uses:1 —
 // legendaryHeaderAction() (monsterLegendaryUses.js rows[0].uses != null) swallowed it

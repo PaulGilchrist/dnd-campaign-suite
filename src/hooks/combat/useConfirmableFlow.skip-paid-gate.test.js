@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-15: 2026-11-15
 // SKIP PAY-STATE GATE (bug-revivify-chooser-skip-rollback-inflates-unspent-slot):
 // The gated chooser family arms pending UNPAID (spellGates → makePending never
 // spends; createConfirmHandler pays via prepareSpellCast at CONFIRM). The old

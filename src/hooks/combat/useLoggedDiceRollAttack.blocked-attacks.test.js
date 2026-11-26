@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the blocked-attack lane of createLogAndShow: the real attackBlockers.js
 // unblockers (popup + log content, roll aborted), attacker-side Sanctuary end,
 // Compelled Duel expiry, Resilient Sphere auto-miss, and the starryDragon.js

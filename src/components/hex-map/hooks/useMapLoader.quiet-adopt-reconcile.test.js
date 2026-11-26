@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * useMapLoader — quiet-adopt stale-bytes window (backlog 2026-10-27-M).
  *

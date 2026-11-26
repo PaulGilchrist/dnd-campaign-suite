@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0467 heal-lane owner: Celestial Spirit (Defender) Healing Touch — self-initiated
 // touch heal reaction (2024 PHB: reaction, touch, target regains 2d8+spell level).
 // Owns: healReactionDice branch table, healGate RAW truth table (round/uses/dice/

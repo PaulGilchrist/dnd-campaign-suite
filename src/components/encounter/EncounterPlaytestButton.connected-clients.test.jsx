@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Playtest confirm connected-clients heads-up (backlog 2026-11-25): the
 // confirm step asks the hub how many OTHER SSE clients are connected
 // (fetchOtherConnectedClients — the GM-only /api/sse-clients lane, whose

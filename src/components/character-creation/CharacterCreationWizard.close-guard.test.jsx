@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /**
  * Close-guard lane for CharacterCreationWizard — pins the unsaved-changes
  * toll on the three close paths (footer Cancel / header × / Escape, F11):

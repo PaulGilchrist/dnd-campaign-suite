@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1111: Lizardfolk Shaman "Bite" — description carries "7 (1dlO + 2)
 // piercing damage in crocodile form" (OCR defect family §23) plus the grapple
 // rider "Ifthe lizardfolk is in crocodile form and the target is a Large or

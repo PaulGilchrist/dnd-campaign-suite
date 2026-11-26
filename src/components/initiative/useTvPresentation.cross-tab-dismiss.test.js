@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Lane: useTvPresentation victory-banner CROSS-TAB dismissal (bug-victory-dismiss-not-retired-in-sibling-tab-same-context).
 // Law: the dismiss stamp lives in localStorage, i.e. per browser CONTEXT. When a
 // sibling tab of the same context dismisses the banner, its write fires a

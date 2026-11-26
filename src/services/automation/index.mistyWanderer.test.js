@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-229 regression: Misty Wanderer declares automation
 // [free_spell, misty_wanderer]. executeHandler's actionable scan must NOT
 // let automation[0] (free_spell → handleSpellCast) shadow the companion-carry

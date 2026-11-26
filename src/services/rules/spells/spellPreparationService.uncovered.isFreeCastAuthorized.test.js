@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // spellPreparationService.uncovered.isFreeCastAuthorized.test.js — LOOP-MECHANICS
 // lane of the free-cast family. Routed VERBATIM by the oracle sibling

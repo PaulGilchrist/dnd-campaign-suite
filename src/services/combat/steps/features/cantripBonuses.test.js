@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Dedicated lane for src/services/combat/steps/features/cantripBonuses.js —
 // closes ledger rec "modal-interrupt branch pinned by NO lane" (pass #298).
 // The step-internal branch: applyCantripDamageBonusOption -> grantCantripTempHp

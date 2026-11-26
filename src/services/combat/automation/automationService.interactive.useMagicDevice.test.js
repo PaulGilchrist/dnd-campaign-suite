@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-374 regression: use_magic_device must be an interactive type so the
 // Special Actions "Use Magic Device:" row renders clickable and dispatches
 // through executeHandler to handleUseMagicDevice (previously missing from

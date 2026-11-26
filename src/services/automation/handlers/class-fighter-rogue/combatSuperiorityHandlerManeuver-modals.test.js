@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // executeManeuver.js modals lane — the pending-prompt executor's own
 // builder/response branches: baitAndSwitchChoice + rallyChoice modals and the
 // rally no-allies popup (private buildBaitAndSwitchModal/buildRallyModal in

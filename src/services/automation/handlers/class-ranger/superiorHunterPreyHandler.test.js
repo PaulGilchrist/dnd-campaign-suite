@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit contract for superiorHunterPreyHandler: an info-only popup
 // handler with three branches (no combat context / no Hunter's Mark concentration
 // / active rules recap). getCombatContext is a stable module seam; each test sets

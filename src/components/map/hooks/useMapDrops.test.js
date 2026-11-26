@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useMapDrops — EXTERNAL drop-target contract (side-panel palette → map SVG, Map.jsx onDrop).
 //   Drag/drop split (do not duplicate here): useItemDragging.test.js owns placedItems pointer-drag
 //   (#905, onTokenMoveLanded commit); usePlayerDragging.test.js owns mapData.players pointer-drag;

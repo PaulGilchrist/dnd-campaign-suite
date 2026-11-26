@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (per family delegation): AC totals and the acPenalty badge lane.
 //   - The displayed Armor Class NUMBER (computeArmorClassValue lives ONLY in

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /**
  * CappedRows overflow disclosure (backlog RG 2026-11-19): the "+N more" fold
  * used to be a dead <span> — with a spell-heavy draft a REMOVED spell name

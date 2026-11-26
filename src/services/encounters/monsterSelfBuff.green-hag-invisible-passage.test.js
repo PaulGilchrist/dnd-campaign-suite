@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0919: Green Hag "Invisible Passage" — formerly a zero-affordance inert
 // row; NOW rides the MA-0655/0658 monster_self_buff seam with the row's
 // own gate economy: automation:{type:"monster_self_buff", effect:"invisible",

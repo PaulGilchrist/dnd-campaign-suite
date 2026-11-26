@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic handler-contract tests: volatile deps (buffToggle, expirations,
 // runtime store) are mocked; this file pins buffAllyHandler's own stable contract
 // (uses math, key derivation, popup shape, expiration registration).

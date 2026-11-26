@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // attackWeaponUtils BODY lane (fix#362, ledger :1253 rec #1234): byte-pins for
 // the three pure helpers previously covered only transitively through the
 // attackCalc builders — parseDamageDice (:34-39), pickHighestDamageWeapon

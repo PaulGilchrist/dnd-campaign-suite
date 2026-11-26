@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit tests for the damageRollback.js public contract.
+// @maintained-by-ai 2026-10-15 — deterministic unit tests for the damageRollback.js public contract.
 // All I/O (runtime store, combat context, healing, log, conditions) is mocked, so these
 // tests exercise stable pure selection/arithmetic behaviour that does not churn with app changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

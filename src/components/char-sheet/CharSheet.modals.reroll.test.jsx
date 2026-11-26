@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-195 regression: renderPopup must wire popupHandlers.onReroll into the
 // AttackResultPopup (DiceRollResult) when popupHtml.autoReroll is set, so
 // sheet save rerolls consume resources. Seam unique to this file: the

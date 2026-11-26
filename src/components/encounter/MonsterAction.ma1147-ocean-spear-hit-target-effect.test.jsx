@@ -13,7 +13,7 @@
 // lock; slot position is twin-byte-pinned by MA-1680 :61-62 but the VALUE
 // by name is not. Secondary 1d4 Cold leg rides combined_damage_roll,
 // unchanged by the fix. Returning-spear clause stays pure flavor (MA-0905).
-// @maintained-by-ai — trimmed 8→2 tests: byte-slot fingerprint BY NAME
+// @maintained-by-ai 2026-10-18 — trimmed 8→2 tests: byte-slot fingerprint BY NAME
 // (folded: numerics, prose, clause-arm) + chip dispatch identity only.
 // Pruned with owners (verified by grep 2026-10-18):
 //   registry/def pin → targetEffectDefinitions.test.js:280-308 ('speed_reduction'

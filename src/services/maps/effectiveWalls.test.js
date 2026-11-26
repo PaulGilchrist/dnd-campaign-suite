@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: secret-door wall-derivation (SOLE OWNER — verified by consumer census).
 // Consumers of computeEffectiveWalls: coverService.js, maps/reachability.js,
 // spellOverlayService.js, components/map/Map.jsx, useFogOfWar.js, Map3D.

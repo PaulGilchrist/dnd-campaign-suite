@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-231 regression: Mystic Arcanum spells (class.arcanums) are slotless free
 // casts and must survive the "no spell slots at this level" filter in
 // spellCalc2024.getSpellAbilities. Warlock Pact Magic slots cap at lv5, so

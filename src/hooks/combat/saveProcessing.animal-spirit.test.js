@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0275 Animal Lord Animal Spirit variant trio (monsters.json row: DC 20
 // Dex, 4d10+6 Radiant half-on-success, "Failure or Success: one of the
 // following"). The GM-chosen variant rides the save context from the

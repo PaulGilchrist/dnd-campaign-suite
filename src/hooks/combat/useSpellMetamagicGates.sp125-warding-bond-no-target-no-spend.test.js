@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-125 no-spend family (§CLA-208 pay-no-effect) gate-wiring lane: after
 // gateWardingBond declines (its own refusal contract lives in
 // spellGates.wardingBond.test.js — never re-run the chooser here),

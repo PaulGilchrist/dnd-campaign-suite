@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ─── Lane: Map container PLAYER context-menu wiring ──────────────────────────
 // OWNED here (delegated by Map-context-menus.test.jsx #920 header:
 // "player remove flow → Map-handlers.test.jsx"):

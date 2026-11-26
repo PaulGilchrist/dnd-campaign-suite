@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-22
+// @maintained-by-ai 2026-10-22: 2026-10-22
 // SP-011 bless/bane twin-spec lane (#1340): the bless spec (useSimpleSpellHandlers.js:288)
 // must forward the paid slot level exactly like its bane twin (:287) —
 // `level: p.metaCtx?.slotLevel || p.spellLevel` (stampPaidSlotLevel / CLA-086 seam).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Audit hygiene (2026-11-14 MM bullet, follow-up to bug-hoh-negative-heal-stale-
 // snapshot-clamp): the sign of the written delta is the truth for the isHealing
 // stamp (healingRoll.js:88 law). massHealUtils.healMassTarget clamps

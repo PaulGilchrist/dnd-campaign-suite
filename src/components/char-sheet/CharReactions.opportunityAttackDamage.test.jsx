@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // bug-sheet-oa-hit-deals-no-damage: both PC sheet OA press lanes (pending-
 // trigger marker lane + legacy free-press lane) rolled the attack WITHOUT the
 // autoDamageFormula/autoDamageName/damageType trio the damage stage in

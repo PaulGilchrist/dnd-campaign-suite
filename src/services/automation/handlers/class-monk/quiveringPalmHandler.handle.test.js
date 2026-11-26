@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // handle() edge-case lane for quiveringPalmHandler: resource/cost RESOLUTION defaults —
 // `auto.cost?.amount || 3`, `auto.cost?.resource || 'kiPoints'`, `?? maxResource` fallback,
 // resourceLabel ternary, and monkFocusPointMax's optional-chain crash guard.

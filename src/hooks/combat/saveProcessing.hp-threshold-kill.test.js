@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0352 HP-threshold-kill seam on the SAVE path (saveProcessing.js
 // maybeApplyThresholdKillLeg → applyHpThresholdKill). Failed-save seam ONLY:
 // victim currentHp ≤ threshold → lethal clamp to 0 via the canonical

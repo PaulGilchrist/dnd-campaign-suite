@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2067: Ziz "Solar Flare (Recharge 5-6)" — fingerprint #13 recharge
 // name-text trap (MA-0663/1916/1924/1948/1987/1996/2017/2041/2051/2059
 // family): row authored with recharge ONLY in the name, no flat recharge

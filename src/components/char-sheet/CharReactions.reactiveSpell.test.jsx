@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // FT-099: Reactive Spell picker must render clickable rows (not be swallowed
 // by the generic automation_info popup), the cast leg must route through the
 // real reaction cast machinery (gateMetamagic), and refusals must spend nothing.

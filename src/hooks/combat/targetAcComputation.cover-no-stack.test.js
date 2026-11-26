@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-21
+// @maintained-by-ai 2026-11-21: 2026-11-21
 // RAW no-stacking law (PHB 2024 "Cover": "when a target has cover from more
 // than one source, only the greatest degree applies") across the COVER
 // CHANNEL INTERSECTION: the §8.3 enforcement-zones stamp (campaign

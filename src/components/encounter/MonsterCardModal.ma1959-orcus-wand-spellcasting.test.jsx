@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1959 data lock + chip+shell fork lock: Orcus "Wand Spellcasting" rode a
 // HALF-live fingerprint — the generic ActionSaveRoll shell was LIVE ("DC 18
 // Wisdom" adjudicated on both faces) while the five spell names were plain

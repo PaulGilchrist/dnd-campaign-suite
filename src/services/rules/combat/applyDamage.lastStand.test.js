@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: Boon of Recovery (Last Stand) zero-HP interception through applyDamageToTarget.
 // Owns the last-stand-unique contract: the drop-to-0 intercept return bytes (incl.
 // interceptedFeature identity from the ZERO_HP_INTERCEPTORS dispatch order), the full

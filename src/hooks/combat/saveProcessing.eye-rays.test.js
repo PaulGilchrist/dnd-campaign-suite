@@ -5,7 +5,7 @@
 // dispatcher, so the zombie legs are folded into the shared tests below.
 // Rays/DCs/types are derived from monsters.json — never hardcoded.
 // Byte-inert for rows without context.eyeRay.
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import monsters from '../../../public/data/monsters.json';
 

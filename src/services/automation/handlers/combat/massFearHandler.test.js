@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: target selection (targetNames inclusion/exclusion, caster exclusion,
 // no-creature / caster-only popups) and range parsing + default range 10 for
 // resolveMassFear. The handle() export was deleted from coverage as dead — it

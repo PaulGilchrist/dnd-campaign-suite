@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (per family delegation):
 //   - Class-based unarmored movement in the Speed row: Barbarian (fixture-driven

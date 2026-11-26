@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // attackRiderHandler.buildRiderEffect REPEAT-SAVE DESCRIPTOR lane
 // (bug-devious-strikes-poison-repeat-save-never-fires): options authored
 // `repeatingSave: true` (Devious Strikes Poison/Knock Out, Cunning Strike

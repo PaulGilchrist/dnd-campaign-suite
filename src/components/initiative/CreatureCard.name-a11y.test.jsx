@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // CreatureCard name accessible-name census (backlog 2026-11-08 EQ): one stable
 // probe must resolve the creature name on EVERY initiative card type. The
 // rename lane on GM npc rows is a live feature (handleNameChange → renameNpc

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic unit tests for the holyAuraHandler
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic unit tests for the holyAuraHandler
 // public contract (handle popup, applyHolyAura writes/registrations, targets store,
 // isHolyAuraActive). registerTargetEffect update/append semantics are covered directly
 // in targetEffectDefinitions.test.js — here we only pin the handler's call shape.

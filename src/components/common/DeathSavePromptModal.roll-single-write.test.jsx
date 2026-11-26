@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Regression (fix-run 2026-11-19, sibling of the sheet-lane pin
 // DeathSavingThrows.roll-single-write.test.jsx — bug-death-save-prompt-modal-
 // roll-lane-sequential-bucket-posts): handleRoll used to fire up to FOUR

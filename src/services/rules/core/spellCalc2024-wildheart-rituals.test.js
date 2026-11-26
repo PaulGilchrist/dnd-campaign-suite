@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-234 regression: Path of the Wild Heart Nature Speaker / Animal Speaker.
 // Commune with Nature / Beast Sense / Speak with Animals are castable ONLY as
 // Rituals (no spell slot) with WISDOM as the spellcasting ability. getSpellAbilities

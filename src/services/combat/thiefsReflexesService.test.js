@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: Thief's Reflexes (2024 Thief 11) SECOND-TURN GRANT service.
 // Family map — this file owns only the grant/resync decision + store bytes:
 //   - opportunityTrigger.test.js #1018 owns attack-trigger gating (distinct lane).

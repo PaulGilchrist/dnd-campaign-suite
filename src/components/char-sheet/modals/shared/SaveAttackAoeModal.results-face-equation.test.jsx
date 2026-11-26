@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Results-face save-equation law (bug-spell-results-face-save-total-contradicts-saved-verdict).
 // The per-target rows used to print ONLY the raw d20 in `(rolled M)` while the verdict
 // and the halving were adjudicated on the hidden TOTAL (d20 + save bonus), so a Saved

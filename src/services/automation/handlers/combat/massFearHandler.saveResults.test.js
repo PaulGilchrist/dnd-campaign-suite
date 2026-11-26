@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: save-prompt emission config + saveResults processing (condition writes,
 // dedupe, expiration, mixed results) for resolveMassFear.
 // Sibling lanes: massFearHandler.test.js owns handle() + target selection;

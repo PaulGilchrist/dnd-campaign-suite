@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // TvExitButton (QA backlog 2026-11-08 TV escape hatch): mounts ONLY while the
 // per-client TV pref (localStorage `initiative-tv`) is ON, re-arms reactively
 // when the pref flips from ANY side (in-tracker toggle via saveTvPref or this

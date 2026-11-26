@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0014/MA-0015 unrollable-damage lane: rows whose damage formula fails
 // canRollExpression (dynamic tokens "spell level"/"spell attack modifier"/
 // "spellcasting modifier"/"WIS modifier", empty/null) must render as static

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // bug-initiative-mount-merge-empty-roster-clobbers-board — roster-settled mount guard.
 // A second GM tab that opened Initiative before its character-roster prop settled
 // (async rules-engine enrichment still in flight, `characters` = []) ran the mount

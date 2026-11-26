@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Lane: usePlayerDragging — L5-002 movement-budget enforcement on the token-drag
 // persistence race (bug-movement-budget-snap-logged-but-token-not-repositioned).
 //

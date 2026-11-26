@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // LANE: this file owns ONLY the concentration-DC stamp in shareWardingBondDamage —
 // wardingBondService.js:78-98 (`if (concentration && sharedDamage > 0)` → player leg
 // clone-write setRuntimeValue(casterName,'concentration',{...concentration,dc},campaign)

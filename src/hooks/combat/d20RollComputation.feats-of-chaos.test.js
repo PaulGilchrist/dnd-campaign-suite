@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-134 — Feats of Chaos (Wild Magic Sorcery): the armed latch
 // featsOfChaosActive must fold into forcedMode:'advantage' at the
 // computeD20Roll roll seam and be CONSUMED there (single owner:

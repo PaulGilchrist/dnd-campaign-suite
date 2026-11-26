@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0068: Adult Brass Dragon Sleep Breath — the staged-breath face of the
 // DUAL-FACE sleepService (SP-107 Sleep spell owns the defaults; the breath
 // rides the SAME seams via options: CON repeat save, concentrate:false, no

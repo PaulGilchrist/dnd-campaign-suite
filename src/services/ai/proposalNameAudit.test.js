@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Backlog 2026-11-01 (AV) — quest_draft accept-scrutiny scrubbing lane:
 // unknown proper names are named by the advisory, ledger-known names stay
 // silent, and an empty/missing ledger degrades gracefully (never guesses).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // MA 2026-11-18 backlog: the Charge chooser radios rendered aria-label=null
 // while the sibling ShieldBashChoiceModal radios carry `aria-label="<Option>
 // <target>"` (7357a6689 tier) — cross-chooser role/accessible-name probes could

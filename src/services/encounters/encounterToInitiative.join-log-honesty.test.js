@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Lane: EB join/load initiative-row HONESTY (improve eb-join-dangling-roll-row,
 // 2026-11-18). The join seams used to emit a bare `roll | <Monster>` row — a
 // type:'roll' entry whose characterName is a monster and which lacks

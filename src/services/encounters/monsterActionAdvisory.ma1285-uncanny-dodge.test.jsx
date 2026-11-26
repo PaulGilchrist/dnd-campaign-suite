@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1285/1290/1309/1313 reaction-category advisory twins — FAIL(b) zero-
 // affordance rows (name/trigger/description-only §60) fixed via the SAME
 // Option A one-field advisory seam: advisory:"monster_<name>", advisory_message

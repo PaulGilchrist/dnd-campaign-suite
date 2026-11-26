@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // natural20 + celestial lane: owns attackRollDamageSteps.js steps[12]/[14] (buildNatural20-
 // BonusesStep / buildCelestialRevelationStep, attackRollBonuses.js:387/:426).
 //

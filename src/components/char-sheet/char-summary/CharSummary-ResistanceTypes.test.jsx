@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation): runtime-store-driven damage
 // types on the "Resistances:" row (charSummaryCalc.js computeResistances) —

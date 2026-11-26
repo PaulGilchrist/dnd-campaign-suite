@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Regression pin for bug-event-chance-label-ignores-mods: the TravelPanel readout
 // and shouldTriggerEvent must share ONE formula. These rows pin the shared
 // effectiveEventChance/eventChanceBreakdown math AND the roll's agreement with

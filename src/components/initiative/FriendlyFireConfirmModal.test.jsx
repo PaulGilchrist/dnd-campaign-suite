@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 // Lane: FriendlyFireConfirmModal — the copy/chrome layer for the initiative
 // friendly-fire overlay (backlog 2026-11-04 CQ, replaces the retired native
 // window.confirm in createCreatureHandlers.handleTargetChange). OWNED here: the

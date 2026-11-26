@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane split for createConcentrationHandlers.js (this file is the CANONICAL base lane):
 //  - THIS lane — handleRollConcentrationSave ONLY: no-op early returns, exact success/
 //    failure persist-popup-log bytes, static concentration_breaker disadvantage incl.

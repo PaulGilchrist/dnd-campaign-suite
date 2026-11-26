@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // ─── Lane: seeded-campaign orchestrator (arena-starter plan §2/§3/§6) ───────
 // The orchestrator must RE-USE the existing generators/services, so every
 // collaborator here is spied: assertions cover WHICH lane each seeded entity

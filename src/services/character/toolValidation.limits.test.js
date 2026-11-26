@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // toolValidation LIMITS lane (pair opener #2061): getToolLimitsByCategory aggregation of
 // background/class/feat tool grants + validateTools category-overflow & Skilled-pool warnings.
 // PAIR SEAM MAP (siblings cited, never re-pinned here):

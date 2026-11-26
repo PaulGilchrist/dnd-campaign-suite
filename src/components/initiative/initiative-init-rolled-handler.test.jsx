@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: Initiative.jsx 'initiative-rolled' window-event listener (Initiative.jsx) —
 // the GM-side initiative seam. Owned contract (per-creature seam law, owner
 // ruling 2026-11-10 — a roll signals new combat ONLY for the creature that

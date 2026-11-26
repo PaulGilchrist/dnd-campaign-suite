@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: PlayerContextMenu — Item 5 cosmetics section ───────────────────────
 // OWNED here: the ownership/origin GATING of the menu's cosmetics section
 // (GM any token: author rows + cosmetics; visitor own-token: cosmetics only,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 /* Lane: bounded bestiary render (EN backlog 2026-11-08 — ~640 monster-checkbox
  * rows rendered unfiltered behind the search box). Locks the two faces:
  *   • bounded-empty-state face: with an empty search and no narrowing filter,

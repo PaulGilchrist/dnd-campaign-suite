@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 //
 // HELPERS lane — #1402 DEAD-EXPORT CENSUS BATCH (2026-10-23): the pure-function
 // exports evaluateHealExpression and getRuntimeUsesKey were DEMOTED to module

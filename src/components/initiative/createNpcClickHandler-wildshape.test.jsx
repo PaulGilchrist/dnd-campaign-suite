@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: NPC_FORM_HANDLERS → runWildShape ONLY (npcClickFormHandlers.js :96-126, guard :224).
 // Family finale — all 7 lanes of the npcClick family are now maintained.
 // Wildshape-lane distinguishing bytes vs the polymorph/shapechange siblings:

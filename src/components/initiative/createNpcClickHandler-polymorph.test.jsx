@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: NPC_FORM_HANDLERS → runPolymorph ONLY (npcClickFormHandlers.js :128-152, guard :225).
 // Polymorph-lane distinguishing bytes vs the shapechange/wildshape siblings: type='beast'
 // hardcoded override (:136 — wildshape retains the caster's race type via fetchRaceData,

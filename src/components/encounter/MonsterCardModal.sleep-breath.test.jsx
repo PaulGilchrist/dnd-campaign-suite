@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0068/MA-0179 Brass Dragon Sleep Breath click lane — the staged-sleep
 // CONE producer seam of MonsterCardModal. This file owns the disk-row byte
 // locks (adult: recharge '5-6' + authored dc_success 'none' + staged_sleep

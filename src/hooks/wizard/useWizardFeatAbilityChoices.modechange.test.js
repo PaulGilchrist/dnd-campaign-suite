@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Sole owner of handleFeatAbilityModeChange coverage for useWizardFeatAbilityChoices.js:
 // single<->dual mode switching preserves saved assignments, defaults dual to the group's
 // first option when no dual array is saved (defaultDualAbilities non-single branch),

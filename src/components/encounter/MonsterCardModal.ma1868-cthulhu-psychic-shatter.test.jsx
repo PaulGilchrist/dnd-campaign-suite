@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1868: Cthulhu "Psychic Shatter" once-per-turn gate on the REGULAR
 // save-chip lane. The row (actions[3], numeric save_dc → "DC 24 Intelligence"
 // chip) resolves through handleSaveRoll and NEVER reaches expendLegendaryUse,

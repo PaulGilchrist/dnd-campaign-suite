@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Search/size filtering behavior only. Intentionally NOT duplicated here
 // (covered in sibling files):
 //   - search control aria names, keyboard handling, clear-search button, and

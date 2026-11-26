@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1492: Sphinx of Lore "Mind-Rending Roar" (actions[2], DC 16 Wisdom,
 // "300-foot Emanation" → MA-0590 radius picker, 10d6 Psychic, recharge 5-6)
 // RAW authors NO success clause — Failure pays damage + Incapacitated,

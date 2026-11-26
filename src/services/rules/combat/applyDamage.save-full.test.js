@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0367: dc_success 'full' math — the Infernal Glaive save gates ONLY the
 // wound clause, so the attack damage stands FULL on success AND failure, and
 // Evasion never halves it (there is no half-damage outcome to halve).

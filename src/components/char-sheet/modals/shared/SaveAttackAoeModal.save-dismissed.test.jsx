@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // SaveAttackAoeModal — dismiss-softlock regression (save-dismissed sweep
 // family, 2026-11-05, playbook §66 named suspect). The picker lane parks on
 // pendingPrompts drained only by save-result; the GM's un-rolled Dismiss

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1100: Lizard King/Queen Trident versatile "or 7 (1d8 + 3) piercing
 // damage if used with two hands to make a melee attack" had NO authored
 // damage_dice_two_handed transport field — buildTwoHandedVariantOffer

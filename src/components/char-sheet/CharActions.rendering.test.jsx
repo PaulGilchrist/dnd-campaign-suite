@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharActions: section rendering + attack-name click contract.
 // Deliberately NOT covered here (pinned by siblings):
 // - base-actions row text/clickables → CharActions.baseActions.test.jsx

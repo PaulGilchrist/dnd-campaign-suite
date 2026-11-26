@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Contract tests for the living_legend activation handler: popup shape,
 // runtime-store write, campaign-log entry, already-active guard, and the
 // setUnerringStrikeUsed pass-through. Deterministic — boundaries fully mocked.

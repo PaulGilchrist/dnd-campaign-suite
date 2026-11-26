@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1301: Piercer "Drop" (actions[1], DC 11 Dexterity, 3d6 Piercing) RAW
 // carries NO half-on-success clause — "Failure: 10 (3d6) Piercing damage",
 // success pays ZERO. dc_success was ABSENT → engine half-default paid half on a

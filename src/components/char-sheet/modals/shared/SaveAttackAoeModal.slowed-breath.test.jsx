@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0087 lane: damageless "slowed" rider picker (Adult Copper Slowing Breath
 // shape — CON DC 18, dc_success none, no damage formula). Given an authored
 // slowedClauses prop, the picker shows the Slowed rider copy (never null-null /

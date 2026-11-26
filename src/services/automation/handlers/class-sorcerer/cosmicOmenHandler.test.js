@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Producer-lane unit tests for cosmicOmenHandler: uses gate, omen parsing,
 // popup composition, uses-decrement, and campaign logging — all behind mocked
 // runtime/dice/log deps (deterministic). Canonical pending-store routing and

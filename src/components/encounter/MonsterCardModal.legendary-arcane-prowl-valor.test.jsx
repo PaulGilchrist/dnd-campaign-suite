@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-1507 audit/trim pass (2026-10-18): 12→6 tests.
+// @maintained-by-ai 2026-10-18 — MA-1507 audit/trim pass (2026-10-18): 12→6 tests.
 // Valor distinct lanes kept: header+children data lock, prowl≡lore-row equality +
 // valor Claw +12/4d6+6 delegate seam, WoY disk byte-lock (+ MA-1508 facets folded,
 // vacuous Number(save_dc)>0 / extractConditions / parseExhaustion re-reads dropped),

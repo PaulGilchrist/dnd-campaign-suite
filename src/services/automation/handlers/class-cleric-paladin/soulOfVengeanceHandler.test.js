@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the Soul of Vengeance reaction handler.
 // All side-effecting dependencies (runtime store, log service, attack lookup)
 // are mocked, so this suite pins the handler's input→output contract

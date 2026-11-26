@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0294: recharge gate on ATTACK-roll rows — Ape Rock (Recharge 6).
 // This lane owns ONLY the handleAttack press seam (the fix commit e8b221e55:
 // the gate/spend previously lived only in executeBlockSaveRoll). Press legs,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // FW 2026-11-09 improve — BOARD ORDER LAW: display order == walker order.
 // The card row IS the turn tracker, so every path that produces the live board
 // must store the SAME initiative-sorted array the Next-walk steps through

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CreatureCard interactions lane — card-owned click/commit dispatches only.
 // Cut, with owners: badge removal dispatches → CreatureCard.badgeRemoval.test.jsx (#848);
 // badge render census → CreatureCard.badges.test.jsx (#849); condition/concentration breaks

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit contract for the 2024 Spell Mastery automation handler:
 // selection-state modal/popup payloads, eligibility predicate branches, and
 // runtime-key writes (SpellMastery_level1/2). Both exports are live:

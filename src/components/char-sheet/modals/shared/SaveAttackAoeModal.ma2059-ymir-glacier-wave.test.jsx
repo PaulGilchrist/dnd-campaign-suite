@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-2059: Ymir "Glacier Wave" picker-lane consumer unit — the two-field fix
 // (recharge:"5-6" + save_effect Restrained) on the LIVE Line picker seam
 // (SaveAttackAoeModal, MA-2033 lane: press opens "120-ft Line (GM positions

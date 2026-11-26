@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Spell Thief reaction handler (CLA-325). Fully mocked runtime/log/save-prompt/
 // combat-context — deterministic, no timers, pure handler behaviour. Own composition
 // pins (popup + log strings, runtime key layout, CLA-325 gate branches, rollback

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // toolValidation MAIN lane (#2065): the direct-unit lane for normalizeCategory — the module's
 // smallest pure contract: falsy guard (identity shape) + table lookup + trim fallback.
 // SEAM MAP (siblings cited, never re-pinned here):

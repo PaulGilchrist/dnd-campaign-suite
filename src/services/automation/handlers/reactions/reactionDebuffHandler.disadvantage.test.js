@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet — lane: WARDING-FLARE ROUTE GATE + IMPROVED
 // WARDING FLARE tempHp TAIL (effect 'disadvantage_on_attack_roll' →
 // EFFECT_ROUTES → handleWardingFlare + logWardingFlareTail →

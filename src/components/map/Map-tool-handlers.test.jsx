@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ─── Lane: Map container composite event-handler ROUTING (dispatch bytes) ───
 // OWNED here: Map.jsx's SVG + toolbar dispatchers. Click tool button →
 // active-tool byte → EXACTLY ONE tool handler receives the pointerdown with

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Main lane: steady-state wild magic surge behaviour — roll-mode modals, autoSurge
 // bypass, once-per-turn latch, and use-marking/consumption happy paths.
 // CLA-389 gate-vs-chooser orderings (armed flag/passive meeting a gate MISS, the

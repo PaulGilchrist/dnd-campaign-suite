@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // FT-106 + CANONICAL UNIT HOME for the Cunning Strike validators
 // (cunningStrikeUtils.js): validateCunningStrikeOption full gate matrices
 // (Charger push / Trip size gates incl. relative-vs-absolute discrimination,

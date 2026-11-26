@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // FT-094: Telekinetic Shove (2024 Telekinesis feat) — once-per-turn latch
 // (_Telekinetic_Shove_usedRound refusal), DC ability derived from featAbilityChoices,
 // telekinetic_movement te mirror on push, real attackerName on the save prompt.

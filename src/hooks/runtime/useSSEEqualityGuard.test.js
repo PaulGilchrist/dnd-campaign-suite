@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Pure contract tests for useSSEEqualityGuard (AGENTS.md gotcha: "SSE re-render loop").
 // Deterministic: no timers, no network, no server. Covers ONLY the guard's
 // valuesEqual semantics and functional-update handling.

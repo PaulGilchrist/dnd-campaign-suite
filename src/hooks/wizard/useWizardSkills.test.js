@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // useWizardSkills is a thin config wrapper over useWizardConfig (whose engine
 // behaviour — validateFn invocation and warning population, slot resolution,
 // preSelect getFn/merge invocation, deps-based re-validation, setWarnings —

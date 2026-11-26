@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit contract for handle()'s resource-cost
+// @maintained-by-ai 2026-10-16 — deterministic unit contract for handle()'s resource-cost
 // consumption and variable damage/shape resolution (channel divinity & wild shape
 // refusal popups, optionDetails merging, area-effect expiration). Pure logic
 // through module-boundary mocks; stable unless runtime keys, popup copy, modal

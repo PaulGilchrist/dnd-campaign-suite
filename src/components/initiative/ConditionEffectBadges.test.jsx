@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Base lane for ConditionEffectBadges: empty-state canonical (cited by auras
 // #828 / pass-without-trace), plus the base counter/flag faces the sibling
 // lanes explicitly delegate here (save-ability, no-oa-speedy #827): the

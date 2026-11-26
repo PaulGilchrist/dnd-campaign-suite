@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // CLA-033: the gated confirm lane bypasses executeSpellCast, so Beguiling
 // Magic's post-cast rider never fired. createConfirmHandler must fire
 // triggerPostCastRiderSaves (and CLA-037's triggerBewitchingMagic) after

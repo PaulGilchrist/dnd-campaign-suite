@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // SaveAttackAoeModal picker lane — same-effect charm survival (bug
 // beguiling-song-own-damage-strips-its-charm).
 // Family roles kept distinct from siblings:

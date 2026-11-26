@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * App-shell contract for the log-decoded audio cue lane (roadmap Item 10,
  * owner ruling 2026-11-20): CombatCues mounts ONCE at App level, so every

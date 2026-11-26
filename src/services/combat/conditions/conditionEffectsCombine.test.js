@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Owner lane: attacksOtherDisadvantageSource gating in combineAttackModes
 // (the compelled_duel / taunting_step field, conditionEffects.js :378/:381
 // consumed at :864). Split vs #998 base canon (conditionEffects.test.js

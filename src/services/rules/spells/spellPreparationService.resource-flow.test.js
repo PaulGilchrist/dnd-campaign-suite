@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // RESOURCE-FLOW lane — generic slot/SP payment ledger of spellPreparationService.prepareSpellCast.
 //
 // Lane split vs the 8 maintained siblings (headers+test names read from disk 2026-10-21):

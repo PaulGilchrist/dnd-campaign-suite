@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // ── #1813 tacticalShift lane — healingHandler.js triggerTacticalShift ─────
 // SUBJECT: the CLA-353 rider in healingHandler.js — maybeTriggerTacticalShift /

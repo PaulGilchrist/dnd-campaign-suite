@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions inline modal-host lane: the mount/dismiss/confirm seams of the
 // grid-hosted inline modals — what each feature-row click mounts (title, prompt,
 // confirm label), what Skip/No dismisses WITHOUT side effects, and which handler each

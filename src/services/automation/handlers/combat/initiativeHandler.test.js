@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit lane for initiativeHandler.handle — the MANUAL initiative_action
 // execution lane (routed via automation/index.js :314). All collaborators are mocked at
 // module boundaries; pins the four effectHandlers contracts (classes.json-backed).

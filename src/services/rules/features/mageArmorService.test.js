@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-074 donning-strip SERVICE lane (mageArmorService.endMageArmorOnDonning — the ONLY
 // export, live at useCharacterWizard.js:76; hook wiring is pinned by
 // useCharacterWizard.donning.test.js, which cites this file as strip-logic owner).

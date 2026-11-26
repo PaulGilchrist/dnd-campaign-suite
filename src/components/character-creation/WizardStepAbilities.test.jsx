@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Generic lane for WizardStepAbilities: header/cap descriptions, ability-card
 // rendering, error display, 2024 background panel (render + local validation),
 // feat ASI cards, feat/racial badges, empty-abilities fallback.

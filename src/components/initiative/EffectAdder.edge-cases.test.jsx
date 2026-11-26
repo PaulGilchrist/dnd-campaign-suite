@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: EffectAdder overflow mount edge cases — ONLY the unowned malformed-input /
 // default-tab paths, asserted at modal-open level.
 // NOT owned here (cited): tab-bar existence + overlay/modal clicks →

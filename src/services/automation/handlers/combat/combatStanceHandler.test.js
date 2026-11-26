@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // combatStanceHandler sextet — lane: MAIN (per the seam map in
 // combatStanceHandler.activation.test.js). Owns: handle() deactivation
 // (wasActive) — the full popup envelope + '${action.name} ended' template

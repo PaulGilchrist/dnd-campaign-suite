@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // Stroke-of-luck seam: AttackResultPopup owns WHICH miss→hit converters
 // (Stroke of Luck, Boon of Combat Prowess) get wired to its host callback,

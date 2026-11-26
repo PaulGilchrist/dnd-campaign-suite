@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // HexMap travel lane — travel-tool destination selection (arm → click payload, every guard,
 // right-click) and exact advance-log bytes (advance / advance_with_event / arrived /
 // day_exhausted / extreme_weather / silence, incl. branch precedence).

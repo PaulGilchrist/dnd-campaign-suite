@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" Cube picker THP grant lane.
 // Unique seam: SaveAttackAoeModal armed by the tempHpGrant prop (threaded by
 // MonsterCardModal.ma0875-cube-shape) must grant the ATTACKER 10 THP via the

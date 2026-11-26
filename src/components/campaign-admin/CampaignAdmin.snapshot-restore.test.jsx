@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /**
  * Per-snapshot Restore rows of the "Available Snapshots" list: one aria-
  * labelled Restore button per row, the shared .ct-modal-overlay ConfirmModal

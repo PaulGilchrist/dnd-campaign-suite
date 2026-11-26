@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // beaconOfHopeService lane — envelope builder + gate only (no healing mechanics here).
 // Live dispatch: spellCastService/execution/triggerSpells.js:163 calls
 // triggerBeaconOfHope(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Destructive Stride — applyTargetChoice lane (second of quad; siblings cover
 // handle / applyDamageTypeChoice / skipTargetChoice in their own files).
 // Deterministic handler-contract tests over stable seams: target validation

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 import { describe, it, expect } from 'vitest';
 import classes2024 from '../../../../public/data/2024/classes.json' with { type: 'json' };
 import { buildStarryFormLuminousArrow } from './starryFormDamage.js';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Gated monster reaction COMPUTATION owner (MA-0006 feather_fall archetype, MA-0013
 // counterspell, MA-0341 parry gate + MA-0681 elemental_absorption): trigger identity,
 // actor, round latch (initiative seam, never a wall-clock timer), uses arithmetic,

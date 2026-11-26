@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // attackRollDamageSteps-weaponHitBonuses lane: the TWO positive-option legs of
 // buildWeaponHitBonusesStep's guard weaponHitChoiceSkips (attackRollBonuses.js:273-278) —
 // the repo's only falsifiers of "chosen option contains 'strike' → bonus applies".

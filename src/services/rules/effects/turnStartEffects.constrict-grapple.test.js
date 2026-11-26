@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-1842 seam lock: applyTurnStartEffects dispatches the Constrict grapple
 // ongoing-damage tick (constrictGrappleService) at the ACTIVE creature's turn
 // start BEFORE the playerStats guard, so it fires for monster victims (EB) as

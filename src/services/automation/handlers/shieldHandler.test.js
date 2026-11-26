@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Shield spell reaction handler: toggleBuff seam + rollbackNegatedAttack guard
 // ladder (each guard branch pinned once). Helper internals owned by
 // buffToggle.test.js / damageRollback.test.js — mocked here as delegation only.

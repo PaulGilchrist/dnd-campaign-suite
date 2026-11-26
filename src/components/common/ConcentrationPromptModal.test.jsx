@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // ConcentrationPromptModal — queue management, roll submission, and result display.
 //

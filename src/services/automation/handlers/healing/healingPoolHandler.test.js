@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic mocked-seam lane: runtime store, logService,
+// @maintained-by-ai 2026-10-16 — deterministic mocked-seam lane: runtime store, logService,
 // combat context, and rangeCheck are all mocked at module level. Expression utils
 // (automationExpressions) and rangeToFeet run REAL — they own suites elsewhere
 // (automationExpressions.test.js, rangeValidation.test.js). No timers: turn-based

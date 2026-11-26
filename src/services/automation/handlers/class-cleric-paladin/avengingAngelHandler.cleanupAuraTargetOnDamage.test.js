@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit lane for cleanupAuraTargetOnDamage (aura tracking-list removal + log on damage).
 // Condition removal itself lives in applyDamage.js; the applyDamage call-site
 // (cleanupAvengingAngelAuras) is covered by applyDamage tests, not here.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 /**
  * CharConditions — character-switch stale-state guard
  * (bug-sheet-open-rebake-evicts-prior-session-conditions).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // SIGNATURE UPCAST-PAYMENT lane — CLA-312 (2024 Wizard lv20 'Signature Spells'), PAYMENT face of
 // spellPreparationService: which EFFECTIVE cast levels ride free (exactly lv3, once per spell) and
 // which PAY a slot (every higher level). Authorization oracle, generic slot ladder, Mastery side,

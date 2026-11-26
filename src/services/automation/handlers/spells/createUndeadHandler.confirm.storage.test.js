@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * createUndead TRIO seam map — all three lanes share createUndeadHandler.js:
  *  - #1898 confirm (main)       — confirmCreateUndead guards (falsy ghoulCount default,

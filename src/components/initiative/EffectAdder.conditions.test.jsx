@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // EffectAdder conditions-TAB UI lane: registry census by name, field defaults,
 // DC sanitizer bytes, selection → exact dispatch payload, cancel zero-write.
 //

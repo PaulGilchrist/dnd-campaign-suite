@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1652: Vampire Spawn "Bite" (actions[2], DC 14 Constitution, 1d4 + 3
 // Piercing plus 3d6 Necrotic) — FAIL(a)/DATA fixed at the data layer by
 // byte-mirroring the live MA-1639 vampire save-lane twin:

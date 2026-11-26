@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Lane: canonical combat-data cache seam — src/services/encounters/combatData.js.
  * Pins the in-memory per-campaign combatSummary cache, the transport load via

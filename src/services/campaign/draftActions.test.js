@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Campaign-authoring plan Phase 3 — approve/reject must ride the EXISTING
 // per-kind services (approve = same-lane save minus the draft field; reject =
 // normal delete). These tests pin the service contract the Campaign Builder

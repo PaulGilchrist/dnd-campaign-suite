@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SP-052: Foresight/Blur attacker-side Disadvantage on the PC popup lane.
 // The deferred resolver lane (hasBlurOrForesightWithoutCounter) accumulated
 // dis++ but buildAttackContextSync never converted it — attacker rolls were

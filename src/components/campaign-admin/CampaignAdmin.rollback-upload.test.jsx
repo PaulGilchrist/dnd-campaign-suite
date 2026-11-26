@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Rollback & Upload flows of CampaignAdmin: the destructive confirmation gate
  * (one full-lifecycle test per flow — campaign-naming warning copy, danger

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // SavantHandler unit tests — deterministic pure-function coverage of the two LIVE exports:
 //   handle            (live: automation/index.js PASSIVE_RULE_EFFECTS via makeSavantHandler)
 //   onSavantSelected (live: CharSpecialActions.jsx SavantModal confirm)

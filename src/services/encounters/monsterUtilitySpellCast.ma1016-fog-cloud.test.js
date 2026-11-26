@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1016 fog lane: resolveUtilitySpellCastRow — the uses/innate axis the
 // recharge origin lacks. Ice Mephit "Fog Cloud" is the BY-NAME disk row
 // (monsters.json verbatim: Charisma, NO spell_save_dc, NO recharge, MA-0633

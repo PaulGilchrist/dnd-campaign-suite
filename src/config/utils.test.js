@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Unit tests for the character-creation validation utils (src/config/utils.js).
 //
 // Seam policy:

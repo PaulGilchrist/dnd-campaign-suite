@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Regression tests for CLA-189 — Improved Duplicity: granted ally Advantage must reach PC attack rolls.
 // Owns the getDuplicityAdvantageAgainst no-map lane of buildAttackContextSync (the create_illusion
 // activeBuffs lane is owned by contextBuilder-sync.buffs.test.js; ordering contracts live in

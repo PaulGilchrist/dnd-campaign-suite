@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CLA-291 regression — CharAbilities CLICK lane for the Reliable Talent gate.
  * makeCheckContext stamps reliableTalent ONLY for proficient skill/tool checks:

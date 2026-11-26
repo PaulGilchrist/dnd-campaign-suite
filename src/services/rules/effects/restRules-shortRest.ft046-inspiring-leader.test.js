@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FT-046: Inspiring Leader (Bolstering Performance) once-per-rest latch re-arm seam
 // (restRules-shortRest.js). Mechanism: UNGATED generic null-latch — SHORT_REST_NULL_FLAG_KEYS
 // (:81) is applied by addShortRestFlagResets (:485), OUTSIDE the skipAutoRecovery gate (:453,

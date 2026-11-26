@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 //
 // SP-110 gateSpareTheDying lane (spellGates.js) + isSpareTheDyingTarget
 // (spellGateHelpers.js). Rules checked against spells.json (5e + 2024):

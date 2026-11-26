@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: confirm/skip seam of celestialResilienceHandler.js only.
 // grant.test.js owns grantCelestialResilience (patron gate, self temp HP, ally
 // collection, grant-side defaults); handle.test.js owns handle (null-map popup,

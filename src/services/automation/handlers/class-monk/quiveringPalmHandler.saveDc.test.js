@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-277: shockwave CON save must use the Monk's Focus save DC (8 + WIS + PB),
 // built data-driven via saveDc:'ability' + saveAbility:'WIS' in classes.json.
 // Real-buildSaveDc lane: siblings mock buildSaveDc (DC 15); only this file runs

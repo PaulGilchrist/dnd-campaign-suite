@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // Regression: bug-new-initiative-roll-pendingoa-drop-never-fires — the pendingOAs
 // drop law ("a new initiative roll retires every pending trigger marker") lived
 // ONLY in Initiative.jsx's `initiative-rolled` listener, while addNPCToInitiative

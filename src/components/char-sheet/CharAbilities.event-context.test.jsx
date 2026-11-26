@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — event-context roll lane (`internal-skill-check` window event).
  * Verifies the event handler's routing contract and the bonus/context it derives

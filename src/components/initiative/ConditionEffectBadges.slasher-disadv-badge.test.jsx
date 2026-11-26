@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // FT 2026-11-09 golden lane for the slasher_enhanced_critical badge valence:
 // the targetAttackDisadvantageCount channel (conditionEffects :318 →
 // combineAttackModes attackerEffects side) is the BEARER's own attack rolls

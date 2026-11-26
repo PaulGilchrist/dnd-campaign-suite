@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharActions integration tests — the CLICK-WIRING seam only.
 // Branch logic of handleAutomationAction (cannotAct gate internals, featureChoice
 // modals, logEntries dispatch, onBuffsChange branches, null results) is covered

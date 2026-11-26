@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic CLA-155 contract suite for guardedMindHandler (Fighter Psi Warrior lv10):
 // spend gate, condition-entry normalisation, merged-write, meta purge, logging.
 // All runtime reads route through mockRuntime (key-routed, read-order independent);

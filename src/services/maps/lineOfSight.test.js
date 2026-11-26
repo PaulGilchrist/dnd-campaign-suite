@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: LOS ray + visibility scan (SOLE OWNER of bresenham cell sequences and
 // computeVisibility blocked/clear outcomes — verified by consumer census).
 // Consumers cite here, never re-drive ray math:

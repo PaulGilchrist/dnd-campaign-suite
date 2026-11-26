@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // LANE: Initiative.effectAdder-away-gate — owner ruling 2026-11-10
 // (improve gate-away-condition-add): the GM manual door never opens for an
 // AWAY row. The card itself hides the Add affordance (pinned by

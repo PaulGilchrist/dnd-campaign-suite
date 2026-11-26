@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * imprisonment PAIR lane 1/2 (helpers) — partner: imprisonmentHandler.test.js (#1928).
  *

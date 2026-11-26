@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // rules-helpers lane: the rules-helpers.js helper surface (ruleset precedence,
 // Fey/Shadow runtime seed, rules-type writer, GENERIC merge contract) plus the
 // string-row/guard ownership cited by four neighbors. Incoming-cite map (old -> new):

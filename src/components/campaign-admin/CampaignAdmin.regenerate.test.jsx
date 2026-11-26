@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 /**
  * Regenerate-Adventure gate of CampaignAdmin (starter lane).
  *

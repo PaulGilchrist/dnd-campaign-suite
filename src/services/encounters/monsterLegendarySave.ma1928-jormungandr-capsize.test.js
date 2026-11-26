@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1928: Jormungandr legendary "Capsize (Costs 2 Actions)" shipped as a
 // save-prose row delegating to Tail — the press adjudicated the delegated
 // ATTACK pool (+19 vs AC, live smoking gun lastAttack.saveDc:null) while the

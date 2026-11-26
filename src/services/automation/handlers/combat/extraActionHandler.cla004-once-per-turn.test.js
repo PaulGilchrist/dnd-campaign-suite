@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-004 regression lane: the once-per-turn latch round threading in
 // extraActionHandler's gateOncePerTurn seam. getCurrentCombatRound() without
 // campaignName resolved the cs cache lookup to undefined -> null and pinned

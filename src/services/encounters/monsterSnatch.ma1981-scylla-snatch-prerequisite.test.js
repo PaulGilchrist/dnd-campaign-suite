@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1981: Scylla "Snatch" legendary shipped a prose-only prerequisite ("One head
 // lunges at a Grappled or Restrained creature") with NO structured
 // target_prerequisite — parseTargetPrerequisite (MA-0019, Helpers:979) returned null

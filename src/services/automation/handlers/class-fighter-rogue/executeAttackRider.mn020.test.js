@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-020 downstream DC lane for executeAttackRiderManeuver: the Trip Attack save
 // must resolve at prompt time via the REAL buildSaveDc (8 + STR + PB = 17 for a
 // STR +3 PB +6 host), never the build-time baked DC 14 / DC 10 fallback, and the

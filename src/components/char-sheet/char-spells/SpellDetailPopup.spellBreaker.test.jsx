@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-322: Spell Breaker — spell detail popup casting-time display.
 // Scope: this file owns ONLY the popup's "Casting Time:" meta row.
 // Related CLA-322 coverage lives elsewhere — do not duplicate it here:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 /**
  * App-level pins for the blocking loading overlay (2026-11-12 OP backlog:
  * `.loading-overlay` had ZERO CSS, so the "Loading party stats" enrichment

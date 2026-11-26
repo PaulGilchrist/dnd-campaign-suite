@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // BUG (MA-1966 infra): getCombatContext PREFERRED the baked combatSummary.activeCreatureName
 // over the live top-level activeCreatureName (patching only when absent), so the boundary
 // stamp consumed by legendaryExpendGate froze mid-round and every fresh-boundary legendary

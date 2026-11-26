@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: rules-actions.js getActions2024 vs the 5e twin (same file, getActions5e).
 // #1435 CLOSED: both arms now share requireArray (rules-actions.js:12-19) and the
 // player-first uniqBy order, so this lane pins 2024-side PARITY of the guard table:

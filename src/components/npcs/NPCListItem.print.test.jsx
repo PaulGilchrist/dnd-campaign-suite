@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4: the NPC row earns a labeled Print Card button next to the
 // initiative verb. It must (a) never be gated — lore-only NPCs print a
 // clean roleplay card too, (b) stop the row click from ALSO opening the

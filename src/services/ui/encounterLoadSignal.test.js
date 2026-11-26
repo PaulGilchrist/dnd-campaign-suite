@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /* Lane: encounter-load signal (backlog 2026-11-11 KW) — single-shot pending
  * flag + synchronous window event, the two seams the builder consumes. */
 import { describe, it, expect, vi } from 'vitest';

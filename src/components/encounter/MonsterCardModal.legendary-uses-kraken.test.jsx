@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1057/MA-1058 Kraken legendary lane — canon kraken BY-name data locks +
 // the two effect-distinct gated clicks, once each.
 // MA-1057 (harder-zero §99): pre-fix Storm Bolt was legendary_actions[0] and

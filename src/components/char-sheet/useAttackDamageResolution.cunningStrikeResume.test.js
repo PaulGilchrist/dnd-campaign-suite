@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Cunning Strike (Rogue 2024) resume-after-choice seam — CLA-188: a hit with
 // sneak dice available pauses the REAL pipeline at _pausedStep:'cunningStrike'
 // (the modal is opened by the step via setAttackRiderModal; the hook must hold

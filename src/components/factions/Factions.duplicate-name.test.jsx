@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Live duplicate-name validation lane: the error must appear WHILE TYPING
 // (before Save), disable Save with zero write attempts, clear immediately when
 // the name is fixed, and exempt the faction being edited (case-insensitive,

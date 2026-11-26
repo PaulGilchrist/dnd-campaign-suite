@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Pins the unarmed param face (backlog 2026-11-09 ER): with zones on the board
 // the controls panel mounts in manage-only mode, but with the spell tool NOT
 // armed (isActive=false) nothing may invite a placement click — the shape

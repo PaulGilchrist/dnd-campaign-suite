@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0984: Hill Giant "Trash Lob" — the row's OWN Hit clause carries the
 // Poisoned rider but the row originally authored it in the WRONG slot: a
 // save_effect decoy with NO save_dc (§118 decoy fingerprint — save consumers

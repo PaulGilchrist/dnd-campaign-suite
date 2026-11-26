@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet #8 (uses) — lane: USES/BUDGET ACCOUNTING on the
 // DEFAULT (bardic) route: resolveUsesBudget → currentUsesFor → buildBardicStampPatch
 // spend keys (automation/index.js:338 `reaction_debuff` → handle →

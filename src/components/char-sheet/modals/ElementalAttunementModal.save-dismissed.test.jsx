@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // ElementalAttunementModal — dismiss-softlock regression (save-dismissed sweep
 // family, 2026-11-05). The 'processing' view (Resolving saves… / Waiting for
 // save roll…) renders NO BUTTONS AT ALL, and the modal only advances when

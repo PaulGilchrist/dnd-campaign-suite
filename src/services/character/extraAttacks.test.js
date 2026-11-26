@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pins for bug-extra-attack-display-only-never-rolls: the press
 // lane must consume the SAME Extra Attack count the sheet summary advertises,
 // read from the canonical tables (public/data/classes.json — value nested

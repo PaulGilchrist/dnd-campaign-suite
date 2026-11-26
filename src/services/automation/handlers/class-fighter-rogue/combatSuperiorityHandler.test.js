@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // combatSuperiorityHandler.test.js — the ONLY lane that calls handle() (the
 // dispatchers.js router barrel). Owns the routing-table contract: maneuverName
 // short-circuit, ACTION_TYPE_DISPATCH / REACTION_TYPE_DISPATCH / TRIGGER_DISPATCH

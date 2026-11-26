@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Sole owner of handleFeatAbilityChoice coverage for useWizardFeatAbilityChoices.js:
 // fixed assignment, single/dual choice assignment, ability-increase recompute via
 // the choice handler, and unknown-group-id guard. All deterministic (buffs fully

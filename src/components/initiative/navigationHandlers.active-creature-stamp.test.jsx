@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1966 infra lane: the persisted combatSummary.activeCreatureName MIRROR must move on
 // EVERY tracker step (Next and Previous). Pre-fix, createNextCreatureHandler persisted a
 // cloneDeep of the summary whose activeCreatureName never moved (only the top-level storage

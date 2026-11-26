@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 /**
  * Post-delete success notice on the campaign-selection page (backlog
  * CP 2026-11-04): CampaignAdmin's typed-name delete stores a one-shot

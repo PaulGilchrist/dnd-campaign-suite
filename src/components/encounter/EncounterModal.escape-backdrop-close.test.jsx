@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 /* Lane — overlay dismissal for the Save/Load EncounterModal (2026-11-02 BF
  * backlog: the full-screen z-1000 .ct-modal-overlay swallowed EVERY
  * click incl. sidebar nav and ignored Escape until × was clicked). The modal

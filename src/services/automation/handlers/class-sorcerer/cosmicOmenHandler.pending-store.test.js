@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-065 integration regression: producer (cosmicOmenHandler) and consumers
 // (d20RollComputation attack/check/initiative lane + save lanes) must share
 // ONE canonical runtime store — characterKey 'cosmicOmen', propertyName

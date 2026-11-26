@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 /* Lane: NPC editor AI refine payload (bug-ai-refine-npc-form-preflight-dead).
  * Raw editor formData always carries the GM-owned avatar upload trio and
  * string-typed HP/AC; npcSchema is additionalProperties:false with

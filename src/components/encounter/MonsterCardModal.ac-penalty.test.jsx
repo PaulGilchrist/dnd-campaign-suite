@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0115 modal seam (fused single lane): the Adult Green Dragon gated Noxious
 // Miasma row renders the "DC 17 Constitution" save chip; the first click spends
 // one legendary use (store used 0→1) and routes to the radius picker with the

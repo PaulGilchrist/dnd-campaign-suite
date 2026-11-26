@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // FT-101 Sentinel (Halt) coverage for the handlePlainDamage OA-hit seam
 // (applySentinelHalt) — rules-validated against public/data/2024/feats.json
 // Sentinel: "When you hit a creature with an Opportunity Attack, the

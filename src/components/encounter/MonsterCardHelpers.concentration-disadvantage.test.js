@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0038 OWNER truth-table for parseConcentrationDisadvantageClause (MonsterCardHelpers.js:63).
+// @maintained-by-ai 2026-10-18 — MA-0038 OWNER truth-table for parseConcentrationDisadvantageClause (MonsterCardHelpers.js:63).
 // Clause parse arms the registered concentration_disadvantage te (targetEffectDefinitions.js:43) via the
 // MonsterCardModal save context (MonsterCardModal.jsx:1797, :1840) onto the saveProcessing te producer
 // (saveProcessing.js:928). Consumers echo cite-skip — own lanes: saveProcessing.concentration-disadvantage.test.js,

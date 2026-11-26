@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // ── CLA-159 standalone Hand of Healing lane — healingHandler.js seams ─────
 // SUBJECT: handleMonkHealing / performMonkHeal / applyMonkHeal / collectTouchTargets

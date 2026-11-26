@@ -1,4 +1,4 @@
-// @maintained-by-ai — pure handler over two mock boundaries (runtime store, logService);
+// @maintained-by-ai 2026-10-15 — pure handler over two mock boundaries (runtime store, logService);
 // deterministic guard/selection/side-effect contract, stable unless the Expert Divination rule changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

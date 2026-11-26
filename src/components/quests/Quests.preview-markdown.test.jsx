@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // QA 2026-10-13 backlog: quest list row previews printed RAW markdown
 // (`**bold**`, `[link](…)`). Row preview now renders sanitized markdown
 // via MarkdownPreview (the Notes-list pattern), clamped by CSS; the open/

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0079: Adult Bronze Dragon Repulsion Breath click lane — damageless
 // Recharge 5-6 STR DC 19 30-ft Cone. This file owns the modal producer seam
 // only: the full disk-row identity lock (recharge '5-6', authored dc_success

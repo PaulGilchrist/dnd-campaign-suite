@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-244 consumer lane: with overchannel context present, SaveAttackAoeModal rolls the
 // tagged damage formula through the REAL maximizer (diceRoller stays live) and delegates
 // backlash ONCE, verbatim, to handleOverchannelSelfDamage. The useCount dice gate is owned

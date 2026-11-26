@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // AOEConditionModal — dismiss-softlock regression (save-dismissed sweep family,
 // 2026-11-05, playbook §66 "Eyebite family / AoE modals need the DivineSpark
 // opt-in"). The processing view renders "Waiting for save roll..." rows and

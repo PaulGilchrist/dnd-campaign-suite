@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — event-driven roll context lane.
  * Owns the `internal-skill-check` window-event contract (routing, bonus math,

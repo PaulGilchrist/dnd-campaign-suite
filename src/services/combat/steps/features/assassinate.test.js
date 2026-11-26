@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Feature-decision lane: steps/features/assassinate.js (CLA-016 fix).
  * Owns the assassinate decision bytes: the first-round sneak window

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Generic-gates lane for extraActionHandler (extra_action / Action Surge),
 // dispatched via automation/index.js `extra_action: handleExtraAction` and
 // fed by thiefsReflexesService-style extra_action infos. Owns: oncePerCombat,

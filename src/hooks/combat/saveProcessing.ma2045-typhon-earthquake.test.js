@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2045: Typhon legendary_actions[3] "Earthquake (Costs 2 Actions)" — DC 25 Dexterity,
 // 6d8 Bludgeoning, "Failure: ... knocked Prone. Success: half damage and not Prone."
 // The row authored save_dc/save_type/damage_dice_primary + hit_conditions:["prone"] BAIT

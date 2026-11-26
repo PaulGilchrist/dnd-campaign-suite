@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /* global HTMLCanvasElement */
 // Creature-token art lane (backlog 2026-11-11 IE): 3D _buildNpcs must follow
 // the SAME precedence law as 2D PlacedItems.jsx:215 —

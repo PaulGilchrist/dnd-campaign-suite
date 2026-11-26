@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0885: Goat Ram — two-field DATA fix: damage_dice_primary "1" (flat base,
 // MA-0322 constant dice-less resolve) + modifier-less conditional_damage
 // {dice:"1d4", damage_type:"Bludgeoning"} authored on monsters.json actions[0]

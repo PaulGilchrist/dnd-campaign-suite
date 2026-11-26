@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /**
  * Regression lock for bug-hex-poi-enter-deleted-map-phantom-resurrect (indoor
  * producer lane): a REJECTED load (deleted map, 404 "Map not found") fell

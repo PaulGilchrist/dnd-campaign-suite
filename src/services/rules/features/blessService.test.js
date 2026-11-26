@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // blessService lane contract — two live lanes, one file, no duplication elsewhere:
 // 1) triggerBlessSpell: gate + envelope forwarder. Live dispatch:
 //    spellCastService/execution/triggerSpells.js handleBless (:153) spreads

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Initiative lane of getPlayerStats: pins computeInitiative() numeric composition and
 // Alert/Gloom Stalker flags (rules.js:556 calls it unmodified). Facade invocation of
 // getPlayerStats is owned by rules.getPlayerStats.test.js; the dread_ambush_initiative

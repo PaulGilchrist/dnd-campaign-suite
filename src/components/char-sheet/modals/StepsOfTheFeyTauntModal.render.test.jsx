@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base-render lane for StepsOfTheFeyTauntModal: chooser header title/featureName
 // fallback, prompt copy, four step-card labels/descriptions, and mode-driven skip
 // button labels — all rendered with uses available. Zero-uses gating is owned by

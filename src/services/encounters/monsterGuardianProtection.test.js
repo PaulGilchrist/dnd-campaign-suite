@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1463: Shield Guardian "Protection" (reactions[0]) — gated defender reaction on
 // automation{type:"reaction", trigger:"attacked_by_hit", effect:"guardian_protection",
 // acBonus:5} + usage:"At Will"/uses:999 authored on disk. Press: round-latch gate

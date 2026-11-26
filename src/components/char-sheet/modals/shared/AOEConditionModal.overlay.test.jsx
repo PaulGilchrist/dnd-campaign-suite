@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 //
 // Overlay lane: the early-return render switch in AOEConditionModal.jsx
 // (targetName starts with 'overlay-' AND activeOverlay set → AreaEffectTargetModalBase)

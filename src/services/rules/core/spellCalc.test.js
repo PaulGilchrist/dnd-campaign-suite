@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Base spellCalc coverage: the spellcasting gate, DC math, race traits, subclass
 // cantrip/school adjustments, class prepared rules, catalog population, sorting and
 // the feat/race fallback. Subclass-prerequisite, passive-gate and spell-thief

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── automationModifiers.test.js — collectSaveModifiers modifier-row lane ──
 // Unit home for MODIFIER APPLICATION SEMANTICS of collectSaveModifiers
 // (automationModifiers.js): roster normalization, SAVE_MODIFIER_BUILDERS

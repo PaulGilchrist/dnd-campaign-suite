@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Stable data-loading contract for the character wizard: deterministic mocked
 // fetch of static JSON paths with pure mapping to hook state. Update only if
 // the hook's URLs, output shape, or ruleset branches change.

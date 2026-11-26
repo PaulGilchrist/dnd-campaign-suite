@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0711: Faerie Dragon Euphoria Breath — the MA-0087 slowed-rider clause
 // ("can't take reactions" → registered te no_reactions) was picker-only; the
 // shapeless inline block-save row (no range, picker never opens) left ZERO

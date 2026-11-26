@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18 (11→6 tests): kept BY-name extraction
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18 (11→6 tests): kept BY-name extraction
 // + exact gate map (not.toContain/toBeUndefined subsumed by full toEqual, #576
 // precedent), spell_save_dc/spellcasting_ability data pins (DC arithmetic
 // restatement dropped, #652 precedent; no save_dc seam e2e — all four spells are

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: arcane-ward lifecycle seam — onArcaneWardDestroy (full reset to inactive/0/0),
 // onArcaneWardLevelUp (max = 2 × level + INT, proportional current-HP scaling on level-up,
 // capped at new max), and onAbjurationSpellCast (ward creation on first Abjuration cast,

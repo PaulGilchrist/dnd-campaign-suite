@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Interception builder lane. The partial-key defaults/name/passthrough/throw
 // matrix lives in reaction.test.js (registerStandardTests('interception')) and
 // the executor behavior lives in automation/handlers/interceptionHandler.*.test.js —

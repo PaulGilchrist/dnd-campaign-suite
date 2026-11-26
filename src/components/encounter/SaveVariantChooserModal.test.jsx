@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1436 chooser-modal UI seam — the offer/select/skip fork, canonical owner per
 // MonsterCardHelpers.save-variant-chooser.test.js:17. Props-in/callback-out leaf,
 // zero mocks: arms render exact-order, each arm click emits that exact disk variant

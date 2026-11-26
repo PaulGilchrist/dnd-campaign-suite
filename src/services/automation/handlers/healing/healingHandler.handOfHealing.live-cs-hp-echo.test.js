@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // ── LC 2026-11-14 improve (picker-stage echo) — GATE leg ──
 // SUBJECT: monkHealTargetAtFullHp (healingHandler.js, reached through the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // GM Screen party table contract: every cell derives from PlayerStats
 // (fixtures) + the runtime store (seeded via getStore, the same shape SSE
 // echoes adopt). Pins the lookup acceptance bar: all six saves, AC and the

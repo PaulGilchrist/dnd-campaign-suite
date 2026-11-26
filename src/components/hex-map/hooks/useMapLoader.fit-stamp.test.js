@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /*
  * useMapLoader — mount-fit stamp lane (fitVersion law, YG backlog 2026-11-16,
  * owner Option B: the STORED view is CANONICAL).

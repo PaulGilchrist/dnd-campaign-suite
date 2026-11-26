@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Regression (bug-clear-latch-eviction-resurrects-stamps): clearCombatLatches
 // used to null each latch key with its OWN setRuntimeValue call — one
 // whole-bucket snapshot POST per key, dispatched back-to-back. HTTP/1.1

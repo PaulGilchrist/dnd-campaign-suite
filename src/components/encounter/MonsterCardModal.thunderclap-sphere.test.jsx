@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0084: Adult Bronze Dragon "Thunderclap" (legendary, DC 17 CON, 3d6
 // Thunder, dc_success 'none' authored byte) authors a "20-foot-radius
 // Sphere … within 90 feet" point-placed area. breathAoeShape (

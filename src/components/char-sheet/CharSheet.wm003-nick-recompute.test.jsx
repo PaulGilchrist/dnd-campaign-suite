@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // WM-003 sheet seam only: CharSheet's compute effect subscribes to the Nick latch
 // (_Nick_UsedRound) and the weapon-kind mastery bucket
 // (_Weapon_Kind_Mastery_chosenWeapons). Stamping either key must re-run

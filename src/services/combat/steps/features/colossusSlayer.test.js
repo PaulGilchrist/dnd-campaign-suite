@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Feature-decision lane: steps/features/colossusSlayer.js (Hunter's Prey choice).
  * Owns the colossusSlayer decision bytes: the "_Hunter's_Prey_choice" (with

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0687 regression: Elephant Stomp prone-target prerequisite on the ATTACK
 // chip (fix c5bdc4a27). This lane keeps MA-0687-distinct legs only:
 //  1. BY-name monsters.json Stomp row bytes — target_prerequisite {conditions:

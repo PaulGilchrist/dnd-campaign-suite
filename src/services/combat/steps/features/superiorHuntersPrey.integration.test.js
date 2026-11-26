@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Integration lane — superiorHuntersPrey.js spread-damage wiring with REAL collaborators.
  *

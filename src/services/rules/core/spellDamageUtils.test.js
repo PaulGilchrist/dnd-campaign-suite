@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Damage-formula resolution lane owner (cited by spellCalc2024-circle-of-land.test.js and
 // useSpellUpcastFlow.cla050-fixed-level.test.js): this file is the ONLY unmocked coverage of
 // spellDamageUtils.js — CharActions/CharReactions/CharBonusActions and the spellCastService

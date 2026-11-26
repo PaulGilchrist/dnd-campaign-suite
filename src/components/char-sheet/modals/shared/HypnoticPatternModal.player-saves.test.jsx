@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // HypnoticPatternModal player-save lane: prompt dispatch for player targets
 // (issuePlayerSavePrompt payload + pending bookkeeping, no local resolution) and
 // window 'save-result' event resolution (fail: conditions/expiry/logs/record/close;

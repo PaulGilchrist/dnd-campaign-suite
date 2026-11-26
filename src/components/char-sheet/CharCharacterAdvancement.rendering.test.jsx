@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Rendering lane for CharCharacterAdvancement (siblings: .options.test.jsx owns
 // automation.options display/highlight/click, .coverage.test.jsx owns the live
 // sanitizeHtml wiring — do not duplicate those here. CharSheet.* tests mock this

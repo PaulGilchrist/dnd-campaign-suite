@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Base lane for useLoggedDiceRollSaves.createSaves: the quick-roll save seam
 // (pending guards → roll → damage threading → sendSaveResult → pending removal →
 // popup) and the Glorious Defense counterattack outcome routing.

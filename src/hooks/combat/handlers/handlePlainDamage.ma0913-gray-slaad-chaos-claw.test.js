@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0913 Gray Slaad Chaos Claw: disk data-lock + disk→runtime wiring of the
 // d4 rider. Runtime mechanics (face mapping, meta source, anchor clock, gates)
 // are lane-generic and covered by handlePlainDamage.hitConditionRoll.test.js.

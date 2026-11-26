@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1014 modal seam: handleSpellCast forks the spell_save_dc-only utility
 // row (Ice Devil "Ice Wall") to resolveUtilitySpellCastRow BEFORE the
 // invisibility ender and BEFORE the block-save fork — routing the save seam

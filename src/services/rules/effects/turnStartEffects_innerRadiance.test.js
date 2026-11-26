@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-198 — Inner Radiance recurring Radiant tick at the turn-start seam.
 // THIS lane owns, at applyTurnStartEffects level:
 //  1. The `inner_radiance_turn_start` consumer dispatches EXACTLY ONE

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-11-24: 2026-11-24
 // Hook-contract suite for useReloadGuard (improve 2026-10-28-T backlog;
 // QA backlog 2026-11-24 native-dialog sweep): the dirty-check the six .ct-*
 // CRUD lanes share. Seed/clear bookkeeping drives the deep draft comparison,

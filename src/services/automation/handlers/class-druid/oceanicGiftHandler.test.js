@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the Oceanic Gift automation handler: pure control
 // flow over fully-mocked runtime/log/combat boundaries. Pins the exact server-first
 // runtime keys and full popup/log strings that form the stable contract consumed by

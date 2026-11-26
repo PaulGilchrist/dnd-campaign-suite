@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // HypnoticPatternModal SP-069 lane: description/note rendering (30-foot Cube
 // regression pin, interpolated save + DC) and the CLA-101 re-entry latch — a
 // mixed NPC+player cast with repeated confirm clicks must run the save lane

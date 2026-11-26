@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * Lane: getResistances (5e.js) per FAMILY SEAM MAP in 2024-immunities.test.js
  * and 5e-immunities.test.js headers (cited, not edited) — CONSTANT-driven channel

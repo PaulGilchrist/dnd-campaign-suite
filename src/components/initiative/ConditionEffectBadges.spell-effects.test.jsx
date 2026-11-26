@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Spell-effect badge lane for ConditionEffectBadges: the te-driven spell
 // badges this file owns (taunting_step, compelled_duel, sanctuary, silenced,
 // bane_penalty, ray_of_enfeeble_debuff, resistance_damage_reduction,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // CharSummary-FixtureContract — render-lane counterpart of the contract suite
 // embedded in CharSummary.test-mocks.test.jsx. That fixture module must stay

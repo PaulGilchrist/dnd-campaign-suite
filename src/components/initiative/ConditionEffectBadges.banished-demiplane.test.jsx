@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0104: banished_demiplane te renders its own badge (monster legendary
 // Banish, Adult Gold Dragon) — honest non-concentration tooltip, distinct
 // from the PC spell `banishment` badge. GM removal filters only this te and

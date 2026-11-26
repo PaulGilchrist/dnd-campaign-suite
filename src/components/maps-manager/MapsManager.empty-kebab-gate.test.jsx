@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // MapsManager.empty-kebab-gate.test.jsx — regression for
 // bug-map-name-empty-kebab-undeletable-dotfile (client half).
 // Create/rename inputs must inline-reject names that kebab to an empty file

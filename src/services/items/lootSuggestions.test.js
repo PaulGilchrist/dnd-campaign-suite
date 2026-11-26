@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Generation-internals lane of the loot-generator family (#1161/#1162/#1165 cite this file as
 // the loot RNG owner): generateLootSuggestions ONLY — CR-tier gating, treasure-frequency gate,
 // the four roll buckets (currency <0.65 / gems 0.65-0.82 / equipment 0.82-0.94 / magic >=0.94),

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1673/MA-1674/MA-1689: honest dc_success canon for three block-save rows —
 // Vrock "Spores" (actions[2], DC 15 CON, 20-ft Emanation, 1d10 Poison, Poisoned
 // fail-only), Vrock "Stunning Scream" (actions[3], DC 15 CON, 20-ft Emanation,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * faerieFire TRIO lane #1909 — faerieFireSummary template + runtime-store fallbacks
  * (faerieFireHandler.js). Canonical TRIO SEAM MAP lives in faerieFireHandler.handle.test.js

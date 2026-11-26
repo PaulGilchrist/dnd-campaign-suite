@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // useCharActionsCleave hook seam: the two user-facing handlers plus the dismiss.
 // - handleCleaveAttack: cleave second-target attack/miss resolution, modifier-free
 //   damage, and byte-exact campaign logs.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0367 seam lock: applyTurnStartEffects invokes the Infernal Wound bleed
 // tick for the ACTIVE creature's turn start BEFORE the playerStats guard, so it
 // fires for monster victims (EB) as well as PCs — the same pre-guard shape as

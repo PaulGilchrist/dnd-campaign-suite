@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0093 lane — generalized subtract-die roll-time COMPUTATION at the
 // computeD20Roll seam: any te on the roller carrying subtractDie
 // (giggling_magic_debuff 1d6) rolls its own die and folds the negative

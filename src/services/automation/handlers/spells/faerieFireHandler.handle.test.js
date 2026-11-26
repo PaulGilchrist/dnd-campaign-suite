@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * faerieFire TRIO lane #1907 — handle() orchestration (faerieFireHandler.js L150-228).
  * TRIO SEAM MAP (this header is the trio's canonical map; siblings back-to-back):

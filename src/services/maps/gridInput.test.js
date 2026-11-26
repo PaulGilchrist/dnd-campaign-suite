@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // gridInput.test.js — shared grid-size-field validation for the twin map
 // generate modals (TE backlog 2026-11-12): the Terrain twin's silent clamp is
 // retired in favour of the dungeon modal's block-with-inline-error law, with

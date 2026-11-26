@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Evasive Footwork / bonus-action executor lane — direct-import suite for
 // executeBonusActionManeuver (executeActionManeuvers.js) happy path: exact-key
 // runtime pins (baitAndSwitch* trio, superiorityDice expend), bait_and_switch_clear

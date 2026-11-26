@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0305: Arch-hag "Tongue Twister" reaction was prose-only inert (no
 // automation metadata → getGatedMonsterReaction null → zero affordance).
 // DATA fix byte-mirrors the live MA-0300 Arcanaloth template. RAW note:

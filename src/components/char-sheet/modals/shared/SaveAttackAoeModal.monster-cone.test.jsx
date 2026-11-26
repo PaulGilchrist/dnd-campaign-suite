@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0031: monster cone rows reuse the PC-spell AoE area picker — each
 // picked creature rolls its OWN save at DC 18; fail = full, success = half
 // (existing per-target math untouched); attacker excluded via excludeNames;

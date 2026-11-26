@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0016 heal-block owner lane: healingBlock.js gate truth table + the REAL
 // refusal shapes of both consumer helpers (applyHealingToTarget +
 // applyHealingDirectly — the only place these run the un-mocked gate).

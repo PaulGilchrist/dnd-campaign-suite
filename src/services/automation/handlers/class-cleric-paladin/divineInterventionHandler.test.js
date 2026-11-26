@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, onSpellSelected } from './divineInterventionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

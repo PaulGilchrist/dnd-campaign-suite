@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharActionModals integration-rendering gaps covered nowhere else:
 //   - inline Clockwork Cavalcade repair overlay (InlineChoiceModals): the
 //     repair-confirm click lives in inline-modals.test.jsx; the title and

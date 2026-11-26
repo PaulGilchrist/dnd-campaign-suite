@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1814 data lock: Yuan-ti Abomination Spellcasting rode the MA-0421 /
 // MA-1742 markup-gap family — plain-text spell names (zero affordances, row
 // inert) while the save_dc 15 + save_type Wisdom pair sat byte-present and

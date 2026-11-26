@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane #1054 — hexDamage (attack-step): Hex's Curse damage bonus on a weapon hit.
 // Hex-family map:
 //   - #1051 eldritchStrikes pins the Hex Strike latch-key derivation ('_Hex_Strike_usedRound',

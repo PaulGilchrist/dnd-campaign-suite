@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // ---------------------------------------------------------------------------
 // Wild Shape chooser lane regression (bug-wild-shape-chooser-cancel-leaves-ghost-buff).
 // Locks the two halves of the zero-write Cancel contract at the sheet seam:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Regression lane for bug-charsheet-stale-body-minimal-payload: a rejected
 // rulesFactory.getPlayerStats (character file missing sections the engine
 // requires — rules-magicItems / class & race lookups throw) MUST surface an

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane owner: rules.getPlayerStats speed passthrough (applyElfisLineageSpeed +
 // applySpeedIncreasePassives, cited by #1254/#1255) and the computeSenses -> senseUtils
 // chain (Third Eye / Umbral / Truesight / Blindsight) for both rulesets.

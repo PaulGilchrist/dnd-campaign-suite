@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-016 Rally lane for executeActionManeuvers.js ONLY — the executeBonusActionManeuver
 // temp_hp path: gateRallyAllies refusal (popup + refusal log, zero roll/spend/stamp),
 // buildRallyModal payload (allyOptions, extraHp via extraHpExpression, totalHp), the

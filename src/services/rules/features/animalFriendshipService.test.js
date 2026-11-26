@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // animalFriendshipService lane — triggerAnimalFriendship is the cast seam invoked by
 // spellCastService execution/triggerSpells.js handleAnimalFriendship (metaCtx carries
 // targetNames + spellSaveDc + slotLevel). Downstream dispatch internals belong to

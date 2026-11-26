@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-052: Foresight confirm lane — the runner must resolve the RADIO SELECTION
 // (result), and the cast log's confirmTargets must report ONLY the selection.
 // The allTargets default stamped every combatant with creatureTargets[0]

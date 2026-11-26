@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit tests for clairvoyantCombatantHandler.handle()'s
+// @maintained-by-ai 2026-10-15 — deterministic unit tests for clairvoyantCombatantHandler.handle()'s
 // own contract: uses/pact-recharge gating, popup composition (exact strings), modal payload
 // shape, and the CLA-053 delegation of saveDc through buildSaveDc. buildSaveDc's internal
 // arithmetic (numeric passthrough, 'ability' math, CON default) is owned by

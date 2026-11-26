@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0300 component lane: the Counterspell reaction rows (REAL monsters.json
 // "At Will" + uses:999 sentinel shape) must expose exactly one gated-reaction chip whose
 // label carries NO counter (At Will sentinel → monsterReactionUsesRemaining null,

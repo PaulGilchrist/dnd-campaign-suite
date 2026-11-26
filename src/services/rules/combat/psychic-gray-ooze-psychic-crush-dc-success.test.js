@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1353: Psychic Gray Ooze "Psychic Crush" (actions[1], DC 10 Intelligence, 3d8
 // Psychic) RAW carries NO half-on-success clause — "Failure: 13 (3d8) Psychic
 // damage.", a successful save pays ZERO. dc_success was ABSENT → engine half-default

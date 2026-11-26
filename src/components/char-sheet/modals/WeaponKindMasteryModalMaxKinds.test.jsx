@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // maxKinds computation lane for WeaponKindMasteryModal: the derived cap rendered in the
 // instruction copy and the Selected counter across prop variations (numeric override,
 // class_level_scaling derivation, missing-class fallbacks, singular/plural boundary).

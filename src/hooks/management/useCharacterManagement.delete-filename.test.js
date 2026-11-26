@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Regression pin for bug-character-delete-sanitizer-mismatch (live-reproved
 // 2026-10-28): UI Delete of "QA RunV Wizard" fired
 // DELETE /api/campaigns/test-campaign/qa-runv-wizard.json → 404 because the

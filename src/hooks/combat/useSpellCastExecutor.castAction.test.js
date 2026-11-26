@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useSpellCastExecutor.castAction — the cast TRIGGER seam. Owns what the
 // executor DISPATCHES at the chokepoint: exact executeSpellCast payload (spell,
 // metaCtx, options incl. extraMeta spread and cachedPosRef positions), the

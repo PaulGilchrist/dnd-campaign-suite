@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: step-BODY behavior of all three attack-roll chooser riders in attackRollRiders.js —
 // CLA-188 Cunning Strike chooser, FT-022/023 Charger chooser, and the Superiority
 // maneuver hit/miss chooser. Gates, suppression, prompt

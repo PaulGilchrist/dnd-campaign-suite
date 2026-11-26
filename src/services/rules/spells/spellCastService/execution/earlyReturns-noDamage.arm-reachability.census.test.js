@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* ------------------------------------------------------------------ */
 /*  fix#355(a)/(c) — noDamageTriggers ARM-REACHABILITY CENSUS +      */
 /*  healRidersRun STAMP-CHAIN AUDIT PINS (execution/index.js)        */

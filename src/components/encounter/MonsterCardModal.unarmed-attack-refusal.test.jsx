@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // TA-1116 (2026-11-16): an attack chip pressed on a monster card with NO armed
 // target used to roll real dice, log a dangling `roll attack` row missing
 // targetName/hit, and pop a verdict-less panel (isAutoMiss:false). The press

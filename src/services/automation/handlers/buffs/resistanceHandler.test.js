@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit coverage of resistanceHandler.js: popup payloads,
+// @maintained-by-ai 2026-10-15 — deterministic unit coverage of resistanceHandler.js: popup payloads,
 // runtime-store keys, and delegation to registerTargetEffect / expirations / concentration / log.
 // Exact payloads over contains-matchers; guards assert no side effects.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

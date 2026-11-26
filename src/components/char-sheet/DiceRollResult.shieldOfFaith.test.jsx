@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // SP-105: popup must show the effective AC (+2 Shield of Faith) and its
 // recomputed computedHit must agree with the authoritative hit on boundary
 // rolls — a resolved MISS never renders Done, so Done cannot apply damage.

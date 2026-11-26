@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-19
+// @maintained-by-ai 2026-10-19: 2026-10-19
 // MN-017 lane (clearRiposteDieOnMiss, attackPostProcessing.js:167-189): an armed
 // pendingRiposteDieValue proves a Riposte press rides this attack — the damage
 // pipeline consumes it on HITS only (attackRollDamageSteps-bonuses-basic pins that

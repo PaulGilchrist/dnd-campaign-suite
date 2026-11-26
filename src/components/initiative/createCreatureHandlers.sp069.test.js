@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SP-069 unit lane: handleCreatureHpChange → breakHypnoticPatternOnDamage wiring only.
 // A GM HP-input reduction is adjudicated damage (source: createCreatureHandlers.js `if (delta < 0)`);
 // this table pins each distinct branch once: npc-card lane fires, player-runtime lane fires

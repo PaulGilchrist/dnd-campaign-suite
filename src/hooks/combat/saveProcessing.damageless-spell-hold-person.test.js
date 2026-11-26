@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0348: Bandit Deceiver Hold Person save leg downstream — the routed save
 // context (saveDc 14 authored on the row, saveType WIS per spells.json
 // hold-person, saveConditions ['paralyzed'], concentration durationNote)

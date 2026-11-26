@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // spellLimits.js contract suite — REAL disk slot tables (both rulesets) served through
 // the fetch mock; expectations are literal bytes so every assertion is falsifiable.
 // FIXED #1509 (fix lane, 2026-10-22) — three spellLimits.js defects corrected, pins flipped:

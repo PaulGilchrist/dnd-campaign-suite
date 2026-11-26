@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-011 lane — applyManeuveringAllyGrant() direct contracts ONLY (the sole
 // direct coverage of this function; every other suite mocks it at the caller):
 // exact-key runtime flag writes on the ally (maneuveringStepGranted /

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 /**
  * App-level contract for the deactivated-map advisory (backlog 2026-11-05 CW):
  * while a player's map view is OPEN and the campaign's active map (the

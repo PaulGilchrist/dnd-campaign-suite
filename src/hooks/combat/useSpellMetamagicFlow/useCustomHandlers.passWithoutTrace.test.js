@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-085: Pass Without Trace confirm previously bypassed prepareSpellCast — no slot
 // spent, no concentration tracked. This file is the PWT custom-handler confirm lane:
 // it pins the FIVE-POSITIONAL-arg contract of applyPassWithoutTraceEffect (the

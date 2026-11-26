@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: isActive reader (pure). Activation via handle() lives in avengingAngelHandler.test.js;
 // isAuraTarget and cleanupAuraTargetOnDamage have their own sibling suites.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

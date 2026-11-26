@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Copy pin for the shared rejected-load notice (backlog map-fresh-fallback-
 // silent): both loaders and the acceptance criteria key off these exact
 // bytes — "Could not load" + the quoted map name + the fresh-copy

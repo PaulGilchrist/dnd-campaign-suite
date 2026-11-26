@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // clearDeathSavePrompt mirror gate (backlog 2026-11-14 death-save-prompt-evict-404-noise):
 // after a transient HP-0 that never armed a prompt (external full-store POST,
 // sheet-editor drop), the recovery clear-leg used to DELETE a key that was

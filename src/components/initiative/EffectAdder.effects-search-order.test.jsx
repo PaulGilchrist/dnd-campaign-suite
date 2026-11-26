@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Lane: EFFECTS-TAB SEARCH — token-AND word-order semantics of the search
 // filter (QA backlog `effect-adder-search-word-order`): each whitespace token
 // must appear (case-insensitive substring) in the effect's combined searchable

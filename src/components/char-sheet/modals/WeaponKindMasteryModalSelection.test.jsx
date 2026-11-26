@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Selection lane for WeaponKindMasteryModal: click select/deselect at the cap, pre-selection
 // from the `existing` prop, exact applyWeaponKindMastery call (weapons in click order,
 // playerStats, campaignName), and backdrop-click guard.

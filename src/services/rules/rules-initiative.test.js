@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // rules-initiative apex-guard lane (#204-class half-guarded apex at computeInitiative's
 // :10-era `?? []` site): the file is automation-TOLERANT (:10 `?? []` survives) but the
 // playerStats apex was bare. Posture: LOUD — this function's entire contract is WRITING

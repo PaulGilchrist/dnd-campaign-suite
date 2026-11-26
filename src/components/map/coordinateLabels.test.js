@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 import { describe, it, expect } from 'vitest';
 import { buildCoordinateLabels, ROW_LABEL_BASELINE } from './coordinateLabels.js';
 import { CELL_SIZE } from '../../config/mapConfig';

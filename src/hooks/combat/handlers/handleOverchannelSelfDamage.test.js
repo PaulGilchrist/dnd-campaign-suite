@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-244 regression: Overchannel backlash dice count — dicePerLevel = max(2, useCount),
 // scaled by slot level; use #1 deals no damage; IRV-ignore note preserved.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

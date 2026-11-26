@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 // WRITE_REJECTED lane (GC improve 2026-11-10, audit legibility split): the
 // server's key-validator refusals (server/routes/campaigns-changedata.js) log
 // their own row type so the gameplay-lane enforcement_denied filter never

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * FAMILY SEAM MAP — race-rules cluster (5e half; mirrors ./2024.js lane #2041).
  * Lane ownership by aspect (see 2024-immunities.test.js header, cited not edited):

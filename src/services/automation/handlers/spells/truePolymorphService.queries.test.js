@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // truePolymorph HEXAD lane #1984 — .queries (FIFTH lane). Subject: truePolymorphService.js.
 // Seam map: truePolymorphHandleModes.test.js header (#1980–#1986).
 // Siblings closed: #1980 handleModes 5, #1981 handler 29, #1982 resolveMaxCR 33

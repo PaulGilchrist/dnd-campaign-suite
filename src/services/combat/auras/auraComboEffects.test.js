@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // auraComboEffects lane — the aggregate seam: membership/range gating + per-passive
 // appliers producing the {speedBonus, immunities, resistances} envelope consumed by
 // applyDamage.js:777, auraConditionImmunity.js (delegates here) and CharSheet.jsx:574.

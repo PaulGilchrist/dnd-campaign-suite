@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * confusion TRIO lane #1891 — confusionTurnStartHandler.js (distinct module; trio
  * seam map lives in confusionHandler.saveResults.test.js header).

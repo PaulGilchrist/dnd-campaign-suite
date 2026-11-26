@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-19
+// @maintained-by-ai 2026-10-19: 2026-10-19
 // CLA-050 lane — the fixed-level clamp in buildUpcastLevels ONLY: rows stamped
 // _circleOfTheLandFixedLevel offer exactly ONE picker row at the stamped level
 // (no free ladder), formula resolved at the fixed level with precedence

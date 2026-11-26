@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Unit lane — superiorHuntersPrey.js decision bytes with MOCKED collaborators.
  *

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0904: Gorgon "Petrifying Breath" 30-ft Cone picker — the MA-0501
 // staged-petrify ladder (cockatricePetrifyService, ONE shared ladder, no
 // fork) rides the cone picker via the stagedPetrify PROP (parse/transport

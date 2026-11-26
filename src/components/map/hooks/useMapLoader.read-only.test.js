@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /**
  * Regression lock for bug-player-clients-clobber-fog-reset: a read-only
  * (network) client that mounts <Map> must issue ZERO map-document writes.

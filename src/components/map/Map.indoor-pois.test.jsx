@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // ─── Lane: indoor POI render + manage lane ────────────────────────────────────
 // bug-ai-dress-poi-invisible-on-indoor-maps: AI Dress `add poi` ops on an
 // INDOOR map persisted to the map document (server dressMap.js stores

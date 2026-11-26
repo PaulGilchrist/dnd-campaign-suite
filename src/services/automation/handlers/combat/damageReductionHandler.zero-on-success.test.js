@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // damageReductionHandler — ZERO-ON-SUCCESS (Intervene Shield) lane of the damageReduction quint.
 // Owns handle() dispatch into handleZeroOnSuccess, the handleZeroOnSuccess-internal shield
 // gate, the interveneShieldTriggerRefusal gate table, the floor(rawDamage/2) heal maths, and

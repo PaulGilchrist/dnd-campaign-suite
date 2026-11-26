@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Live-sync contract for the NPCs manager: every npcs-list-<campaign> SSE
 // event (per server/routes/npcs.js: created/updated/deleted/replaced) must
 // re-fetch and re-render the list, events for other keys are ignored, and

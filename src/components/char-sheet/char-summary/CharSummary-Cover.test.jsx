@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation):
 //   This file is the ONLY owner of the AC-row cover badges — the

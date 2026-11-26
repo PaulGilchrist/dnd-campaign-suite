@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // elfishLineageHandler — unit seam map.
 //
 // This file OWNS:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: EFFECTS config view — the form mounted after selecting an effect badge.
 // Owns: selection→config header bytes + Back→browse (:215-220, :292),
 // field-conditionality matrix (fields render iff the registry def declares them,

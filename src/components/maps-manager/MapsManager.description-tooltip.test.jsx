@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-26
+// @maintained-by-ai 2026-10-26: 2026-10-26
 // Lane: read-only surfacing of map descriptions in the manager list
 // (backlog 2026-10-26). Every row whose saved description is non-empty
 // carries a hover `title` attribute containing the description; empty or

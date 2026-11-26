@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // spellPreparationService.test.js — BASE lane (the domain root) of the
 // spellPreparationService family. Face ratified VERBATIM by the resource-flow

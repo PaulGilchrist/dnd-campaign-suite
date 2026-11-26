@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: useSpellOverlay hook (map) — ownership contract for the hook instance itself:
 // mount-load adoption via spellOverlayService, local mutation immediacy, outbound
 // POST transport exact URL+body, debounce window semantics, and the handleSSEEvent

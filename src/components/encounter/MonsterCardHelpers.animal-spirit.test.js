@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0275 owner lane: parseAnimalSpiritVariants truth-table (#497 helper-lane canon).
 // Downstream behavior is owned elsewhere — grants: saveProcessing.animal-spirit.test.js
 // (applyAnimalSpiritVariantGrant), te consumers: conditionEffects.animal-spirit.test.js,

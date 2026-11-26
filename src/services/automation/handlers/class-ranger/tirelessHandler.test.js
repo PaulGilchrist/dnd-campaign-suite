@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic pure-behaviour contract for tirelessHandler: all boundaries
 // (runtime store, dice, log) are mocked; pins are exact strings/values.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharRaceFeatures — which race-tracked resource rows render, and with what
  * label / store key / max / player / campaign wiring.

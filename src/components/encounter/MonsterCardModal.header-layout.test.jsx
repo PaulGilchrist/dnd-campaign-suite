@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /**
  * Layout contract for the monster stat-modal header (bug 2026-11-16).
  *

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // SP-125 attack-lane AC-fold authority: createLogAndShow reads the wardee's
 // warding_bond acBonus (+1 AC per public/data/spells.json) via the mocked
 // getWardingBondAcBonus getter, stamps ctx._wardingBondAcBonus, and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CreatureCard's OWN feature badges (jsx:566-578) — removal dispatch per kind.
 // Owned here (de-facto badge-mechanics owner; CreatureBadge leaf has no direct tests):
 //   card-badge × remove → exact dispatch payload per removal lane.

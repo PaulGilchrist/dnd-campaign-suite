@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1020: monster Shape-Shift chip — COMPONENT lane FOLD HOST over the FOUR
 // live disk rows that resolve to ONE registry def. ShapeShiftLink
 // (MonsterAction.jsx:321) arms one .mc-dice-link-shapeshift chip off the

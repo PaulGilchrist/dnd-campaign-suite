@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-299 regression: spellPreparationService Ritual Adept lane (2024 Wizard lv1).
 //
 // Reported-bug identity (git 5d4cbafc9, VERBATIM):

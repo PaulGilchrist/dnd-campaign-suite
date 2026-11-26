@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-14: 2026-10-24
 /**
  * L5-001 — EnforcementSection behavior: master switch label/state, sub-flag
  * gating (disabled until enforcement is ON), merged writes through the

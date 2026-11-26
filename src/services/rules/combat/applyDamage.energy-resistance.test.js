@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // FT-009 regression: Boon Of Energy Resistance (2024 Epic Boon) — CONSUMER seam.
 // The multi-choice chooser stamps the runtime key `_Energy_Resistances_chosenTypes`
 // (producer = boonOfEnergyResistanceHandler via choiceStorage name "Energy

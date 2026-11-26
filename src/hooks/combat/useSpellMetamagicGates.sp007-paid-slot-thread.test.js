@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-007 gate lane: handleNonSorcererCast's stampPaidSlotLevelOn threads the paid
 // upcast level onto BOTH metaCtx carriers — the caller metaCtx and prepareSpellCast's
 // snapshot result.metaCtx (copied BEFORE any caller-side stamp) — so generic automation

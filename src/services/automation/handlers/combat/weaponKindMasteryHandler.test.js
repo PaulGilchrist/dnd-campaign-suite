@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Deterministic unit tests for weaponKindMasteryHandler.js (weapon_kind_mastery modal lane:
 // handle() → payload for WeaponKindMasteryModal, applySelections() → runtime write + log).
 // Distinct module from the weaponMasteryHandler.* quint (nick/push/postDamage riders) —

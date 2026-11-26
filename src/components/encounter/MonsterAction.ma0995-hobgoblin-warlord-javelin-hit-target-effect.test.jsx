@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0995: Hobgoblin Warlord "Javelin" — target-effect-ONLY hit lane. The row's
 // OWN Hit clause carries the Speed-decrease rider ("Hit: 11 (2d6 + 4) Piercing
 // damage, and the target's Speed decreases by 10 feet until the start of the

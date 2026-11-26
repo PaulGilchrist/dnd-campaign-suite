@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // WM-008: the Vex next_attack_advantage te (with vexTarget) is consumed by the NEXT
 // attack ROLL only. Damage-phase ctx rebuilds (proceedWithDamage / buildContext /
 // cunningStrike) pass { consumeAttackTe:false } so they never erase the te that the

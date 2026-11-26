@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0268 BASE lane: the generic staged-roar engine in roarService.js on the
 // Androsphinx-canonical path — hardcoded ROAR_STAGES default-table bytes
 // (DC 18 ladder), the stage parser (roarStageNumber), stage swap/escalation,

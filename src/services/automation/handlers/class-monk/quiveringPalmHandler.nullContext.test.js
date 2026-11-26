@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unique lane: the ONLY suite exercising the cs === null short-circuit of
 // `cs ? getTargetFromAttacker(cs, playerName) : null` (handler line 57) —
 // handle.test.js covers the other ternary arm (cs non-null, target null).

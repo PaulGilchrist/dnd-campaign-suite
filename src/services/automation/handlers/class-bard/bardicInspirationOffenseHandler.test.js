@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for bardicInspirationOffenseHandler.handle — the sole
 // execution coverage for the 'bardic_inspiration_offense' automation (dispatched via
 // src/services/automation/index.js registry; damageRollback lane). All deps are mocked:

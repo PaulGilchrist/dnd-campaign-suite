@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic mocked-seam lane; runtime store, combat
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic mocked-seam lane; runtime store, combat
 // summary, storage, dataLoader and logService are all module-mocked; assertions pin the
 // handler's own contract (popup shapes, runtime keys, caster-folded creature rows, log
 // automationTypes). Real dice only for valid formulas with totals unpinned. No timers.

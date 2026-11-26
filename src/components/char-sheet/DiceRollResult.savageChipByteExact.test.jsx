@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // NB 2026-11-18 backlog (popup-footer leading-space family, sibling of
 // 2da7466dd): the Savage Attacker chip that rides the damage-result popup face
 // (DamageFeatureTriggers 'savage' — the dwell/commit face keeps the trigger

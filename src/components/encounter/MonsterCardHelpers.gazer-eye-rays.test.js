@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0765/MA-0768 gazer FIXTURE lane: Gazer "Eye Rays"
+// @maintained-by-ai 2026-10-18 — MA-0765/MA-0768 gazer FIXTURE lane: Gazer "Eye Rays"
 // launcher rays[] was ABSENT (parseEyeRays → null, fire gate never opened,
 // zero affordance, §154/§88 fingerprint). Pins only the gazer-distinct map:
 // ray set dazing/fear/frost/telekinetic, die = len(rays) = 4 vs owner d10,

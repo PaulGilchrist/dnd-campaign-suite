@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-0548 regression: Cyclops Sentry Limited Foresight — pre-roll cloud
 // reaction (recharge "6"). GATED_MONSTER_REACTIONS `limited_foresight` arms
 // the chip; the resolver gates on campaign lastAttack identity (parry

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // assertCanAct split-party read: the denial reason surfaces through the loud
 // enforcement sinks (popup + enforcement_denied audit row) when the acting
 // PC's combatSummary mirror row carries away===true. Fast-path (enforcement

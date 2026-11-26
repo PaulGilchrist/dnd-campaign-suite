@@ -175,4 +175,4 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

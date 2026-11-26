@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: createNpcClickHandler.js line 20 guard truth table ONLY.
 // Cite map (siblings own the rest — do not duplicate here):
 //   guard blocked  (!isLocalhost && !allowNonLocalhost, incl. omitted-options default) → THIS FILE

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ─── Lane: Map CONTAINER — availability + composition seam ──────────────────
 // OWNED here (only the container can prove):
 //   • null-mapData honest empty container (loading/unresolved map)

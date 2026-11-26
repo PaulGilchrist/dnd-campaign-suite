@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-008: Aura of Life RAW — "your Hit Point maximums can't be reduced"
 // while in the aura. Topic face ONLY: the preGate protection seam of the
 // shared hp-max-drain core (hpMaxReduceService.js:152-162) — MA-1489

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Weapon-list lane for WeaponKindMasteryModal: rows rendered from the fetched equipment list
 // (meleeOnly filter, alphabetical sort, invalid-row filtering), row metadata copy including the
 // "no mastery" dash, toggle ↔ Select-button ↔ Selected-counter gating, and disable-at-cap

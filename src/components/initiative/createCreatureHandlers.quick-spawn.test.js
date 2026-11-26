@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // createCreatureHandlers.handleQuickSpawnMonster (roadmap Item 4) — the
 // tracker-side mirror of an ACCEPTED quick spawn. The board bytes themselves
 // are the shared join lane's contract (quickMonsterSpawn.test.js + the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // tashasHideousLaughterService lane — lv2 enchantment MODAL-FRONT (Tasha's Hideous Laughter).
 // IDENTITY (#1360/88 method): source is 18 lines, exports exactly ONE symbol
 // triggerTashasHideousLaughter (source :1); live-caller evidence: triggerSpells.js:388 is the ONLY

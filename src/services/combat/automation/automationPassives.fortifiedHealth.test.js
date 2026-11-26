@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: Fortified Health RUNTIME consumption — healingPassiveContribution's
 // fortified leg, fortifiedHealthLatchBlocks round-scoping, and
 // markFortifiedHealthUsedIfGranted owner-store writes in automationPassives.js.

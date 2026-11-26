@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1352 hit-side producer for the ABILITY axis of the Psychic Gray Ooze
 // Pseudopod rider — the ability-scoped wiring the generic hit-clause mega
 // lane cannot cover (no mega-lane row carries hit_target_effect_ability, and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0530: Cultist Ritual Sickle flat "plus 1 Necrotic" rider — authored flat_damage_secondary: 1
 // rides the MA-0426 autoDamageSecondaryFormula transport as the dice-less constant formula "1" (Necrotic);
 // dice-bearing twins (MA-0426/0427) stay byte-identical. CLA-281 constant/crit locks owned upstream

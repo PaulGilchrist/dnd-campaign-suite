@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * foresightService lane — the TRIGGER-STAMP OWNER (foresightService.js L3-77).
  *

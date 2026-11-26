@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // telekineticLeapHandler — Psionic Shift: Telekinetic Leap (sorcerer lane).
 // handle() is the automation/index.js registry entry for type 'telekinetic_leap';
 // applyTelekineticLeap() is a direct export currently referenced ONLY by this

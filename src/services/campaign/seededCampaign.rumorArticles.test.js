@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // ─── Lane: rumor-composer article dedupe (backlog 2026-11-03, CK) ───────────
 // The starter settlement rumor hardcodes a sentence-initial "The" onto the
 // first service name; the shop/guild banks ship ~1400 names already leading

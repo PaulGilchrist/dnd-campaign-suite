@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 /**
  * App-level contract: the shared change-key SSE lane keeps the module-level
  * combatData cache (getCombatSummary readers) in sync with server board

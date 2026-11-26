@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-eb-join-empty-combatsummary-silent-fail — a corrupted,
 // creature-less combatSummary (the store holding `{}` — truthy but with no
 // `creatures` array) made addMonstersToInitiative die on

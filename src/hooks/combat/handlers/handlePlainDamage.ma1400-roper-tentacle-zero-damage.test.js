@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1400: Roper "Tentacle" damageless hit-clause consumer proof — the row
 // authors ZERO damage, so the whole rider rides the resolved hit through the
 // dice-less '0' auto-damage arm (MonsterCardModal.buildAutoDamageOptions).

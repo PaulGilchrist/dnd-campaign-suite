@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Deterministic contract suite for aidHandler (handle popup + applyAid writes).
 // All deps mocked; pins popup payload shape, runtime-store key writes, buff
 // composition, expiration delegation, and log payloads. Stable with the app.

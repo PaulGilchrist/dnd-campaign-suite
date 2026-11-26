@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Turn-start orchestration owner: dispatch contract of applyTurnStartEffects
 // (via the expirations.js barrel) — guard returns, effect-type → handler
 // routing in array order, and the hasInspiration / CLA-307 / umbral_sight /

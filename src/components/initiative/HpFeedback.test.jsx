@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Roadmap Item 10 (sensory cues) — HpFeedback is the floaters' render seam AND
 // the heal cue's audio twin. playCue is the only seam mocked. Pins the
 // floater skin (glyph/class per direction + big-number law), the heal cue on

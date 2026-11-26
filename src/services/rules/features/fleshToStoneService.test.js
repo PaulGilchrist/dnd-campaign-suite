@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Flesh to Stone CAST-lane constructor contract (triggerFleshToStone).
 // Owner boundary: this file pins ONLY the action envelope this service builds
 // and hands to executeHandler (dispatch: automation/index.js:534

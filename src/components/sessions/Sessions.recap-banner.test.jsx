@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 /* Backlog 2026-11-21 GGG (recap success feedback asymmetric): a successful
  * Write recap left only the transient toast — once it faded, the OPEN planner
  * modal held zero witness that the recap landed. Success now rides the SAME

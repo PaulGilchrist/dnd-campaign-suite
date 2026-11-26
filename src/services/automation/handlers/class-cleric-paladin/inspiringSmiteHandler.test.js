@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // inspiringSmiteHandler unit lane: gate checks (lastAttack Divine Smite by the
 // caster), temp HP roll wiring (resolveDiceExpression → rollExpression), target
 // building (map / selectedAllies / no-map lanes, cap at 10, isWithinRange

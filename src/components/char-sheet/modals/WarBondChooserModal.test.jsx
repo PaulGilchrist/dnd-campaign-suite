@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Modal UI lane for CLA-379 War Bond chooser: rendering/instructions, selection
 // semantics (replace vs cap, existing-seed), confirm payload + result popup → Done,
 // and cancel via Skip. Handler internals (pairing, persistence, log entries) are

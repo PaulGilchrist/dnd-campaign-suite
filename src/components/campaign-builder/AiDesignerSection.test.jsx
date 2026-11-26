@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Campaign-authoring Phase 4 — designer section lanes: AI-off hint, chat
 // round-trip, plan proposal → editable counts → generate → draft summary,
 // honest failure surfacing, and the pending-plan persistence added for the

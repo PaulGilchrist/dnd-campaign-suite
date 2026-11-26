@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-10-29: 2026-11-17
 // Improve (2026-10-29-AB pre-await log-row audit): the item-delete lane wrote its
 // `Removed "X" from party inventory` row alongside the fire-and-forget persist
 // queue, so a rejected save left the durable campaign log claiming a

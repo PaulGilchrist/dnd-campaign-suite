@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Composition-contract lane for the rules.js facade and rules-core.js module selection.
 // This file pins ONLY wiring that sub-modules cannot see (bundle identity, passthrough
 // identity, dispatch seams). Sub-module math is owned elsewhere and is NOT re-executed

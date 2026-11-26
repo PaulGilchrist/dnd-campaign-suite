@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1957 lane: Orcus "Conjure Undead (1/Day)" (actions[4]) — monster_summon with
 // a 25% wight attempt, chance-less skeleton fallback (zombie is a third, never-
 // picked option — the resolver takes the FIRST chance-less option), count dice

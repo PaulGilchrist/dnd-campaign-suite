@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1881: legendary Gaze CHILD (`delegates_to:"Gaze"`) inherit-of-variants —
 // PURE-FUNCTION lane: pins what legendaryDelegateChooserAction
 // (MonsterCardModal.jsx :723-742) COPIES onto the child and its byte-inert

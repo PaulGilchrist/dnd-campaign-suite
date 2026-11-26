@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 // Live-sync contract for the Notes manager: every notes-list-<campaign> SSE
 // event (per server/routes/notes.js broadcast hook: replaced/deleted) must
 // re-fetch and re-render the list, events for other keys are ignored, and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (bug: imageless avatar armed a hidden showAvatarModal flag that

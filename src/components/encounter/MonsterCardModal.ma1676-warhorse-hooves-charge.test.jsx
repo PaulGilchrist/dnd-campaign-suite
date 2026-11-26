@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1676 (Warhorse Hooves) + MA-1699 (Wereboar Tusk): one-field DATA fixes —
 // conditional_damage {dice:"2d4"|"2d6"} authored on monsters.json rows
 // (MA-0007 charge-bonus seam, MA-0885 goat Ram byte-shape placement: dict after

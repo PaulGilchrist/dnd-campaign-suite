@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-11-24: 2026-11-24
 // Stale-save (409) face for the item EDIT lane (QA backlog 2026-11-24: the
 // native alert "…was deleted elsewhere — this window now shows the current
 // list; your edit was NOT saved." is retired onto an IN-MODAL error banner

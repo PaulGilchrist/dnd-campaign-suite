@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Lane: bare "+NPC" placeholders vs the victory bank + the Clear seam
 // (backlog 2026-11-18). Law: a bookkeeping placeholder must NEVER pollute the
 // shared `lastCombatResult` stamp — a real 6-kill win went banner-less because

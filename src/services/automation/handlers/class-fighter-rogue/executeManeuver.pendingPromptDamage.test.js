@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-012 lane — executeManeuver.js applyDamageBonusRider landing path with
 // lastAttack SET (the ONLY place in this cluster that arms lastAttack through
 // executeManeuver): hit-landing exact-call pin, the miss guard, the no-target

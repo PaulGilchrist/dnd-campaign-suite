@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Degenerate-input lane for 2024 getAttacks: the proficiency ladder and the
 // fallback unarmed strike (no weapons / spells-array ignored / missing ability).
 // Real builders end-to-end per the cla225 pattern — ONLY combatData is stubbed

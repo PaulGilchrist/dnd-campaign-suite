@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: WM-001 Cleave once-per-turn LATCH at the cleaveMastery step (attackRollPostDamage.js).
 // This lane owns the latch wiring only — the two seams where the latch meets the step:
 //   OFFER gate (handler entry): unset→offer, same-round→refuse+block-log, round-wrap→re-arm,

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-16
+// @maintained-by-ai 2026-10-16: 2026-10-16
 //
 // SP-110 spareTheDyingHandler EXECUTION lane — automation/index.js registry
 // `spare_the_dying` (handle → automation_info picker) and `spare_the_dying_apply`,

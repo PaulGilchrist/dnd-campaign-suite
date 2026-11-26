@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1581: Tarrasque legendary "Move" was plain text with zero affordance
 // (FAIL(b)/DATA). Fix = advisory child stamp {advisory:"movement",
 // advisory_message} after name, before description — the §MA-1456 /

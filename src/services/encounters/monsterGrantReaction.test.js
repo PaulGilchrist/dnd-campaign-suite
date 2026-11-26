@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0882 service lane: monsterGrantReaction resolver — Gnoll Pack Lord "Incite
 // Rampage" chip click (automation {type:"monster_grant_reaction", effect:
 // "incite_rampage", range_ft:60}; formerly an inert row with cosmetic (5-6) text

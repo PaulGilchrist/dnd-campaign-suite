@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 /**
  * Starry Chalice heal-handoff tier law (sibling-key audit of
  * bug-victory-stamp-not-sse-adopted-missing-campaign-key).

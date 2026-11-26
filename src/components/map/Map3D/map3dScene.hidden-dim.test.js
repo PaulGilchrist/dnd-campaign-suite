@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // ─── Lane: 3D GM hidden-marker dim ───────────────────────────────────────────
 // _setDimmed is the 3D mirror of the 2D GM hidden dim (backlog 2026-11-01
 // AZ2: the lanes had drifted to 0.5 vs 0.4 — now ONE shared

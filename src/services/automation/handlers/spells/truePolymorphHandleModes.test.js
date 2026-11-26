@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // truePolymorph HEXAD lane #1980 — .handleModes: mode DISPATCH inside handle().
 // Owns: which automation.mode routes to which popup builder + the exact payload
 // shape each mode branch emits (the payload-shape table below is canonical HERE).

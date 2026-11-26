@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Split-party presence at the initiativeService seam: navigation skips away
 // rows (incl. the away-active seam + degenerate board), isPreviousDisabled
 // compares against the first PRESENT creature, and the mount merge preserves

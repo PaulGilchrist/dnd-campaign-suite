@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Stonecunning activation handler: uses resolution (proficiency_bonus / numeric
 // uses / usesMax / default 1), long-rest stored-uses tracking, the CLA-334
 // BUG-1/2/3 regression contracts (single merged store write, already-active

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Pending-OA marker drop law at the initiative turn seam (bug-monster-oa-
 // resolution-auto-missed-by-melee-range-gate, criterion 4). A marker lives
 // only until its defender's next turn is TAKEN (new active creature) or ENDED

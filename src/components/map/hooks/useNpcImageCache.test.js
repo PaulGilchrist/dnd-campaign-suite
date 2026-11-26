@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // useNpcImageCache lane. Transport fake: getMonsterImageUrl is Consumers-exact —
 // the hook calls (item.name, null, campaignName) (owner contract: monsterUtils.test.js).
 // Honest pins as authored: despite the name, every dependency change re-fetches ALL npc

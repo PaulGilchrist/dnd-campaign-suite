@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-27
+// @maintained-by-ai 2026-10-27: 2026-10-27
 // Regression lock for bug-ct-sessions-settlements-409-recovery-loop-and-no-reload-button
 // (settlements twin of Sessions.conflict-reload.test.jsx): the 9cee7bfa2
 // close-consumes-stale machinery and the ee4f9f177 one-click "Reload list"

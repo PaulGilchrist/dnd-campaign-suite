@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-124/CLA-125 + CLA-211: shared evasion eligibility helper — mirrors
 // resolveSaveEvasion (saveProcessing.js:332) gate order: own evasion gated on
 // NOT Incapacitated + dcSuccess 'half' + save-type match; shared Leading

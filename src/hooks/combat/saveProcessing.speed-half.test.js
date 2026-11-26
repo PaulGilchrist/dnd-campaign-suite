@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-0073: Adult Brass Dragon Scorching Sands — the failed-save speed_half te
 // PRODUCER seam in saveProcessing (grantSpeedHalf): registry te on the target
 // sourced from the attacker, duration until_end_of_next_turn with the rounds:2

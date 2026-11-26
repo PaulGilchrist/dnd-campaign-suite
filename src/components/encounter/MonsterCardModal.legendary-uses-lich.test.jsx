@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1089 regression: Lich "Frightening Gaze" (legendary_actions[2]) was a
 // prose-only "casts Fear" row — MA-0510/0696 silent-burn shape: the Expend
 // chip spent the legendary use, then resolveLegendaryRowMechanic hit the

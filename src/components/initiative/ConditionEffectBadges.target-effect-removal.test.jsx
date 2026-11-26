@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Canonical owner of the generic removeAction:'target_effect' click→store
 // removal dispatch (jsx:20-27 removeTargetEffect via REMOVE_HANDLERS:537).
 // Cited here by pass-without-trace.test.jsx:13-14, banished-demiplane:15,

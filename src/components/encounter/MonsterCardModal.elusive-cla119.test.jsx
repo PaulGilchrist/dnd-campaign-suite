@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Trim pass (2026-10-18): sole REAL-combineAttackModes owner for the CLA-119
 // Elusive fold — conditionEffects.js/elusiveFeature.js stay UNMOCKED here
 // (mirrors the real adv=0 fold at conditionEffects.js:868-870 that the

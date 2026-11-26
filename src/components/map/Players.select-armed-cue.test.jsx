@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Lane: the Select-tool marquee exclusion cue on player tokens (backlog
 // RH 2026-11-24). The marquee (useSelectMove) selects WALL CELLS +
 // placedItems ONLY — players[] tokens are the documented lane split handed

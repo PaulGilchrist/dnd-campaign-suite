@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Split-party gates in the enforcement pair: the pure awayDenial (runs after
 // the mode master-switch, before the condition gate) and assertCanAct's
 // combatSummary-row read. Base lanes live in canTakeAction.test.js /

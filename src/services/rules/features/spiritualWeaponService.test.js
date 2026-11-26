@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-112: Spiritual Weapon force record + combat-scoped expiry (#1420) + later-turn move/attack.
 // Producer-vs-forwarder: this lane PRODUCES a persisted force-record buff and an
 // attack DESCRIPTOR; dice rolling belongs to the attackCalc lane (consumed via

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-079 pay-at-confirm family (§CLA-208) gate lane: for Mass Suggestion the gate
 // OPENS THE CHOOSER UNPAID — handleNonSorcererCast short-circuits before
 // prepareSpellCast/consumeMaterial/addEntry and stamps _deferChooserSlotPayment +

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Unit-canonical home for src/services/ui/sseClient.js — REAL module, never mocked here.
 // Contract: ONE shared EventSource per campaign, fan-out to all handlers, native
 // EventSource auto-reconnect (NO hand-rolled reconnect loops, NO timers — every

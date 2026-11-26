@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions uncovered-handler lane — Celestial Resilience.
 //
 // Family ownership map (do not re-pin here):

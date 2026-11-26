@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useItemDragging — placedItems token drag contract (Map.jsx / PlacedItems.jsx).
 //   down  → guard-then-capture (guards fully validate first; capture only when the
 //           drag actually starts — #883) + drag-ghost state bytes (offset/start cell/mover identity)

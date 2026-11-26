@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-274 Psychic Blades second-blade action-economy gating (attack-row owner):
 // pins the gatePsychicBladeAttack seam in useCharActionsAttackHandlers.js — the
 // Attack-action blade row stamps `_PsychicBlade_attack_round`; the second-blade

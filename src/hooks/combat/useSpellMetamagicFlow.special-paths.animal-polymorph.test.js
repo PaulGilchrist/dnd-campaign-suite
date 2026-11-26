@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-10-15: 2026-11-15
 // Special-path skip lanes for useSpellMetamagicFlow — branches no sibling suite pins:
 // - Foresight / Protection from Evil and Good skip: UNPAID dismisses — zero writes,
 //   zero log (2026-11-15 pay-state gate, bug-revivify-chooser-skip-rollback-

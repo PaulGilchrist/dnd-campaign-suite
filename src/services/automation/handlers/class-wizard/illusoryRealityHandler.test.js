@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit tests for illusoryRealityHandler (Wizard illusion feature: make one inanimate object real).
 // Deterministic: runtime store, combat context, and log IO are all mocked; tests pin branch
 // behaviour, runtime-key wiring, and full-string popup composition. No timers — turn-based only.

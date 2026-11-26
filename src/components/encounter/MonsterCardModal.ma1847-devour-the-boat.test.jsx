@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1847 modal seam: the Apep "Devour the Boat (Costs 2 Actions)" row renders its
 // OWN "DC 26 Constitution" save chip riding the shared legendary gate (MA-0567 twin).
 // OWNED HERE (modal accept/refuse lane): chips-on-card wiring through the modal

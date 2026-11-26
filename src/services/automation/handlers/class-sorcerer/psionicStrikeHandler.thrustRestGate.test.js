@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-355: Telekinetic Thrust once-per-rest uses gate + rest re-arm registration.
 // Owns the telekineticThrustUses sub-lane in both lanes: the psionicStrike
 // chain (resolveThrustChain) and the manual thrust row (telekineticThrustHandler

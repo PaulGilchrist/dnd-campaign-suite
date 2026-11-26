@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ─── Lane: Map container context-menu wiring ──────────────────────────────────
 // OWNED here — the container seam only: how Map.jsx reacts to right-clicks.
 //   - right-click item → ONE menu, anchored at the right-clicked item's exact

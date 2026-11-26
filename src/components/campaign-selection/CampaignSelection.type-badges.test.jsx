@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Type badges on the campaign list (campaign-meta lane): Arena/Starter rows
 // are visually distinct BEFORE opening, standard rows stay unbadged. Service
 // lane itself is covered by campaigns-meta.test.js + campaignService reads.

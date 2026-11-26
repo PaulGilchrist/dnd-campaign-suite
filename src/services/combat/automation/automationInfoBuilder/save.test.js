@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── save.test.js — automationInfoBuilder save slice (lane #952 template) ──
 // saveHandlers builder contract: census guard + exact BARE default envelopes +
 // full-custom verbatim passthrough (all customs ≠ defaults, #954) + saveDc

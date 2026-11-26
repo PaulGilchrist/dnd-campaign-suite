@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Wiring lane for CharActionModals secondary-target modals: verifies that each
 // modalState key routes to the correct handler prop with the correct payload (and
 // correct skip behavior) when mounted deep through CharActionModals → SecondaryModals.

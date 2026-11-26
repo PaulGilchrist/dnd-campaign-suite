@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // Regression (bug-party-inventory-desc-autofill-wrong-key): handleNameChange and showItemPopup
 // read `match.desc`, but every equipment.json entry stores authored text under `description` —
 // the advertised "picked from equipment.json when the name matches" autofill was inert for all

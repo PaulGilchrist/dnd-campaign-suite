@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * ray of enfeeblement — SINGLE spells lane on rayOfEnfeeblementHandler.js
  * (197 lines, read fully 2026-10-16). Baseline 41 → trimmed here.

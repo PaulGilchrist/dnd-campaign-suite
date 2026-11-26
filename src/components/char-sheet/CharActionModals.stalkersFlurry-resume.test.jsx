@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Regression tests for CLA-326: closing the Stalker's Flurry choice modal in
 // CharActionModals must resume the attack pipeline paused at featureRiders, so
 // the triggering attack's weapon damage always resolves. Cancel (no option chosen)

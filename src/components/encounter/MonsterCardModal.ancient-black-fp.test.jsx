@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0163 regression: Ancient Black Dragon Frightful Presence (legendary_actions[2])
 // previously authored only name/description — the header uses:3 gate (MA-0161) made
 // the "Expend Legendary" chip live, but the row still spent a use into the

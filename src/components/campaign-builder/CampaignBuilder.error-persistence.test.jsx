@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Regression (backlog 2026-11-01 AT: approve-race banner self-erase): when an
 // approve 409s "was modified in another tab … it was NOT saved", runAction
 // surfaces the banner AFTER its error-path reload — but the other tab's

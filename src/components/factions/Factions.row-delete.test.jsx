@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Row-level delete affordance + shared DeleteConfirmModal tier (backlog
 // 2026-11-16 XD): every faction row carries a `Delete "<name>"` aria-button
 // (MapsManager chip pattern) that arms the role="dialog" confirm WITHOUT

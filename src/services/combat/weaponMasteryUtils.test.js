@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // weaponMasteryUtils lane — pure resolver: 2024-ruleset gate + baseMastery || attack?.mastery precedence.
 // Mastery family map: collector internals → automationPassives.test.js / .wm008-kindgate.test.js (#969/#970);
 // mastery step lanes → steps/attackRollDamageSteps-{cleave,topple}Mastery.test.js (#1031/#1037);

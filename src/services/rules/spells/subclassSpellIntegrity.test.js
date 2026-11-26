@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Durable rules-data pin for subclass spell references (2026-11-19).
  *

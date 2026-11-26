@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Regression wiring (bug-round-reuse-after-clear-drops-once-per-turn-riders):
 // Initiative "Clear" is the board-wide new-combat seam (CLA-100) — the ONLY
 // lane that resets combatSummary.round to 1 — so it must evict the closing

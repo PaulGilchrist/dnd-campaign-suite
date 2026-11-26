@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Barkskin handler contract: selection popup shape, AC<17 gate, activeBuffs
 // registration, rounds clock, and log entries. Fully mocked and deterministic.
 // AC-floor arithmetic lives in targetAcComputation.test.js (which points back

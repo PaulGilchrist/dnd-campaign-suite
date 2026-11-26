@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: NPC_FORM_HANDLERS → runShapechange ONLY (npcClickFormHandlers.js :154-177, guard :226).
 // Shapechange-lane distinguishing bytes vs the polymorph/wildshape siblings: type is NEVER
 // touched (:154-177 has no type assignment) so the form's bestiary type survives verbatim —

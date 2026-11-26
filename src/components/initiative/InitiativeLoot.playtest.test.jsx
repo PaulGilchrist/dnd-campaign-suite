@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // InitiativeLoot playtest soft gate (plan 2026-11-25): while the campaign
 // carries an active `playtest` stamp the Generate/Award CTAs disable with
 // the cause in their title. Generation/award HANDLERS are owned by

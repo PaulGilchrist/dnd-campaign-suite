@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // DeathSavePromptModal — terminal finality summary rows
 // (death-save-modal-terminal-no-finality-row)
 //

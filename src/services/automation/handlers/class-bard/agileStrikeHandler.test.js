@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic: every external dependency (combat context, dice, damage, log,
 // runtime store) is mocked, so this suite pins the handler's contract —
 // early-return popups, hit/miss resolution, die-size selection, attribute

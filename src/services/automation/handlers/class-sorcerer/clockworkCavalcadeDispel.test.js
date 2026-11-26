@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic dispel-implementation contract (level<=6 cut,
+// @maintained-by-ai 2026-10-15 — deterministic dispel-implementation contract (level<=6 cut,
 // exact-key runtime writes, null-safety); loadSpells is mocked so real spell data can drift freely.
 // Seam: clockworkCavalcadeHandler.test.js mocks dispelSpellsOnTarget (delegation only);
 // this file owns the implementation.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0524 data lock: Couatl Spellcasting rode the MA-0454 double-defect
 // template (markup + row save fields). Pre-fix the row marked ONLY the tier
 // headers plus prose emphasis "**Concentration**" / "**Temporary Hit

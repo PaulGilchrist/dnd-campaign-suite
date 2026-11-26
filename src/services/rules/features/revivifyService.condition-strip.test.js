@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-15: 2026-11-15
 // Revive-crossing `unconscious` strip — Revivify SPELL-LANE end-to-end pin
 // (improve 2026-11-15, QY backlog). The lane commits through the CLA-092 heal
 // choke (applyHealingToTarget), whose oldHp<=0 -> newHp>0 branch now folds the

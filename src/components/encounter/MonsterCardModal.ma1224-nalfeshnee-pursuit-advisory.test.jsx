@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1224 modal press seam: Nalfeshnee "Pursuit" REACTION-row advisory chip
 // → resolveMonsterActionAdvisoryRow (DATA-only fix, zero code — reactions[]
 // already route through the MonsterCardBody generic section carrying

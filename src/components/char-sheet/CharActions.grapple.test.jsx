@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharActions grapple CLICK integration — owns only the component wiring lane:
 // span click → useCharActionsBaseActions invoked with the component's props/mocks →
 // observable popup + runtime-store write. All handleGrappleAction internals

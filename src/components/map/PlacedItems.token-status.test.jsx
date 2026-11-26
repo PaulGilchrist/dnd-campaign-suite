@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: the placed-creature-token lane after the chip hoist (backlog
 // RG 2026-11-19 occlusion fix). Monster/NPC status chips moved to the shared
 // hoisted TokenStatusLayer (chip laws + visibility/ghost cull pinned by

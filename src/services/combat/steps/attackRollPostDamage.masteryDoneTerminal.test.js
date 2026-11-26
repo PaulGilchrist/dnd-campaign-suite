@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // Lane: masteryDone terminal-marker FIRING POINT (attackRollPostDamage.js:711-726) through the
 // REAL event-chain runner (actionPipeline.js createPipeline). The runner is SINGLE-PATH:
 // run() → steps.find(s => s.subscribe === eventType) selects exactly ONE subscriber per event

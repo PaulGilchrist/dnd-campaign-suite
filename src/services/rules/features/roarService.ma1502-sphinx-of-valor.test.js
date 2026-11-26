@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-1502: Sphinx of Valor "Roar" launcher — row-authored staged roar payload.
 // Pre-fix the row was ['name','description','uses'] ONLY with uses:"3/Day"
 // STRING (Number()=NaN → no gate) and no staged_roar key → byte-inert prose

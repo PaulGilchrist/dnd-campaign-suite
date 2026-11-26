@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0079: parsePushFeetClause — Adult Bronze Dragon Repulsion Breath
 // authored "pushed up to 60 feet" clause parse (MA-0073 parse shape). Feeds
 // the picker push marker te grant; null for every clauseless row (inert).

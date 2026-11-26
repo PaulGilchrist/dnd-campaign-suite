@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-315 falling te chip producer lane (createEffectAdderHandlers, effects tab).
 // Contract pinned here: 'falling' is a ONE-SHOT chip — the chip IS the event.
 // It delegates once to produceFallDamage with the exact payload and performs ZERO

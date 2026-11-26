@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Rules lane: PURE decision math behind the concentration service (save roll →
 // clamp → total → pass/fail; damage → DC). The service lane owns break/roll/popup
 // orchestration (concentrationService.test.js mocks these rules — no duplication);

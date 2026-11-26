@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1344: Primal Companion (Beast of the Sea) "Beast's Strike" — prose
 // carries "the target has the Grappled condition (escape DC = 8 +
 // Proficiency Bonus + WIS modifier)" but the disk row shipped WITHOUT

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Roadmap Item 10 (sensory cues) — the audio playback lane contract.
 // Lanes: the asset census (every referenced WAV exists on disk with an honest
 // length), the gesture-unlock gate (locked → SILENT no-throw, nothing

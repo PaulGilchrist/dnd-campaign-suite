@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Lane: arm-target signal (backlog 2026-11-24 run BA) — the sheet refusal's
  * "Arm a target" button arms a NAME-matched, single-shot focus request that
  * survives the sheet→Initiative navigation seam. Sibling shape of

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CoronaEnemySelectionModal — thin wrapper over shared/CreatureSelectionModal.jsx.
 // Caller/mount: CharActionModals.SecondaryModals.jsx (EnemySelectionModals) renders it
 // from modalState.coronaEnemySelectionModal { creatureTargets }.

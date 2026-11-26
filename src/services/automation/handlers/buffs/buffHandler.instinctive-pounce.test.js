@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-201 lone-lane contract for buffHandler's rage_bonus_movement gate: the
 // standalone Instinctive Pounce row never stamps a buff — refuse outside Rage,
 // advisory-remind while raging with the canonical half-speed, both logged.

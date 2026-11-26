@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0115: Adult Green Dragon Noxious Miasma failed-save AC-penalty clause
 // — "the target takes a −2 penalty to AC until the end of its next turn".
 // The single-target save seam arms context.acPenaltyClause (MA-0073 shape);

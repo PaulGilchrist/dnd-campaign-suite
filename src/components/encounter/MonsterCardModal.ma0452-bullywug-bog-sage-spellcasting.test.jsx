@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0452 data lock: Bullywug Bog Sage Multiattack "replace any attack with
 // Spellcasting to cast Ray of Sickness" rode the Spellcasting-row chips
 // (MA-0223), but the row wrapped ONLY "Vitriolic Sphere" in markup — Ray of

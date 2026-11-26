@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-066 Create Thrall temp-HP lane. Deterministic handler composition: feature-marker
 // detection (including the flat 2024 majors/subclass shapes), keyword expression math
 // (canonical: warlock level + CHA modifier), aberration companion lookup, and this

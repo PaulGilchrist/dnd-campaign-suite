@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation SEAM MAP — this file = PUBLIC FAÇADE expertise lane (#2056): getExpertiseLimits
 // imported through the skillValidation.js re-export, counting class/subclass expertise from
 // VERBATIM disk rows (fabricated-vs-disk drill: no invented feature shapes).

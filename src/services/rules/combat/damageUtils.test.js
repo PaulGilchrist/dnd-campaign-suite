@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Base unit lane for damageUtils.js: damage-type extraction/formatting, resistance
 // notices, change-data envelope handling (falsy campaign / URL encoding / not-ok /
 // missing summary), creature+target lookup, and AC math.

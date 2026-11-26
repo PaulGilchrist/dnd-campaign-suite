@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // §9.4 — confirmed world proposals: narrative → log, quest_draft → CRUD lane.
 // Pure dispatcher over a stable KIND_APPLY table with service boundaries mocked;
 // deterministic contract, no churn expected when the app changes.

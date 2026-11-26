@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Integration lane: genuine cross-step seams only — overlay-click close behavior
 // spanning choice→result (non-interactive copy hosts are asserted, never clicked —
 // pass #261 rec), the null freeCastCountKey guard on the decrement lane (text renders

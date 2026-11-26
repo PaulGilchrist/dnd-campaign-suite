@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // MA 2026-11-18 backlog: the Charge Attack chooser rendered "Push 10 ft— Push 10 ft"
 // (description echoed the label). Every option row must read `label — distinct
 // explanation`; the explanation derives from the Charger feat rules text

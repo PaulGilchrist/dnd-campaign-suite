@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1582: Tarrasque legendary "Chomp (Costs 2 Actions)" was plain text with
 // zero affordance (FAIL(b)/DATA). Fix bytes: one DATA field
 // `delegates_to:"Bite"` after name, before description — the MA-0375 beholder

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0801: Giant Crocodile "Bite" — prose carries "If the target is a Large
 // or smaller creature, it has the Grappled condition (escape DC 15). While
 // Grappled, the target has the Restrained condition" but the row shipped

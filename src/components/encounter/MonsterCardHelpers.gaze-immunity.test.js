@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0030 regression: Abominable Yeti Chilling Gaze — authored success
 // immunity ("Success: immune to this yeti's Chilling Gaze for 1 hour").
 // A target carrying the gaze_immunity te sourced from this monster must

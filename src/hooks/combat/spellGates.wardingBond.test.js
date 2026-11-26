@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // SP-125: Warding Bond (2024) targets ANOTHER willing creature at touch range.
 // Previously casts fell through to the generic paid lane, burning the lv2 slot
 // on the handler's no-target refusal and never setting metaCtx.wardingBondTargetName

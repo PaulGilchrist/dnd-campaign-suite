@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1732 grant leg: Wyvern "Sting" poisoned rider. One-field DATA fix
 // hit_conditions:["poisoned"] (MA-1723 Winter Wolf / MA-1726 Wolf lane,
 // Ettercap byte-twin) arms buildHitConditionClause →

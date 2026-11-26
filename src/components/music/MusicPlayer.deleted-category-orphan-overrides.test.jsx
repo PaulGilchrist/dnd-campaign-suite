@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-13
+// @maintained-by-ai 2026-11-13: 2026-11-13
 // Regression lock for bug-music-deleted-category-orphan-overrides: deleting a
 // custom category while its editor lane held `editMood` never reset the mood,
 // so reopening the editor re-seeded the dangling key — the controlled mood

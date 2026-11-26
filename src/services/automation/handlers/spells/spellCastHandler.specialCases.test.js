@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // spellCastHandler .specialCases lane (#1971) — owns the named-feature special-case
 // intercepts + shared plumbing fall-throughs of spellCastHandler.js:
 // activateWarGodsBlessing (L122-137), the perSpellTracking reset block inside

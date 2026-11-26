@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: useSSESync = the map's handleSSEEvent input->output contract, bytes pinned here
 // (key filter, field dispatch, setMapData merge semantics, guarded echo suppression).
 //

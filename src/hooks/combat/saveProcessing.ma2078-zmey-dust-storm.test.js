@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2078: Zmey Gorynych "Dust Storm" legendary save — DC 23 Strength, 2d6
 // Bludgeoning, "Failure: Blinded until the end of its next turn". The row
 // authored conditions:["blinded"] BAIT (buildHitConditionClause is attack-lane

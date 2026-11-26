@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Handler-contract lane for SP-074 Mage Armor (registry keys mage_armor /
 // mage_armor_apply in automation/index.js). Pins the exact popup payloads of
 // handle() and the exact activeBuffs stamp / addExpiration clock (§38 hours×600)

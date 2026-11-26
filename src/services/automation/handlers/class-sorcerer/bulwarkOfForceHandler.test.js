@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { handle, activateBulwarkOfForce } from './bulwarkOfForceHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';

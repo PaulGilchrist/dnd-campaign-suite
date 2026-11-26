@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-07
+// @maintained-by-ai 2026-11-07: 2026-11-07
 // Lane: campaign-specific music categories (improve 2026-11-07). DJs (GM or
 // delegated player) can create custom categories that start EMPTY and gain
 // YouTube tracks via the existing editor; custom categories (and only they —

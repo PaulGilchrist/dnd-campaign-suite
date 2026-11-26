@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Same-cell stacking on the PLACED-item creature-token lane (backlog
 // GA 2026-11-10): tokens on a crowded cell swap their 40×40 transparent cell
 // rect for a circle matching the token art (barrel precedent), and buried

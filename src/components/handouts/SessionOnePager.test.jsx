@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 session one-pager contract: the GM screen on paper reads the saved
 // row + link expansions — linked encounters annotated with their saved XP,
 // linked notes expanded in full (the rumour lane), the auto/custom prep

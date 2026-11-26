@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Material-component / reagent gate seam of the useSpellMetamagicFlow lane.
 // gateMetamagic (useSpellMetamagicGates.js) checks consumed materials BEFORE
 // spellGates, multi-target, maze/warding-bond refusals, and the sorcerer

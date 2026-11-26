@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Lane: EB-join species-series renumbering law (owner decision 2026-11-09).
 // Once a SECOND creature of the same species joins, ALL rows of that species
 // are numbered consecutively — the former plain row becomes '<name> 1' (every

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-217 lane: owns attackRollBonuses.js buildWeaponHitBonusesStep's ROUND PLUMBING for
 // the Lunar Form rider — the bug itself: the once-per-turn gate called getCurrentCombatRound()
 // WITHOUT campaignName, combatData returned null, the round resolved to a permanently-stale

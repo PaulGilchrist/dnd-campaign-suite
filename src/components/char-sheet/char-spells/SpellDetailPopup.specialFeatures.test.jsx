@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-322 Spell Breaker and Psychic Spells damage-type override — cast-payload behavior.
 // Casting-time display is covered in SpellDetailPopup.spellBreaker.test.jsx;
 // the registry helper in services/ui/spellSectionUtils.spellBreaker.test.js;

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: bonus-action restore seam — onArcaneWardBonusActionRestore auto-selects the LOWEST
 // available spell slot, restores 2 HP per slot level (capped at ward max), consumes the slot.
 // Sibling lanes (do not duplicate here):

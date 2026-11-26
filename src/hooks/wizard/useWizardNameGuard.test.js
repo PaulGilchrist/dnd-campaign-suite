@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Contract test for useWizardNameGuard: the touched-gated required hint, the
 // live duplicate check, the guard-owned-error-only write discipline, and the
 // (field, value) pass-through of the wrapped change handler. Deterministic

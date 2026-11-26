@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // BUG CLA-099: uses economy, SP restore/refusal lanes, rounds clock, retract.
 // Handler-only lane: activation economy, 0-uses SP gate/refusal, the ONE rounds
 // clock registration, and the retract DELEGATION pin. Service internals

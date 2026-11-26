@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-200 regression — row-activation modal flow at the service level.
 // A clickable Special Actions "Inspiring Smite:" row dispatches through the
 // REAL executeHandler dispatcher (CharSpecialActions.handleAutomationClick's

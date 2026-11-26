@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // H3 (§17): turn-END zone-damage repeat consumer — engine lane tests.
 //
 // ENGINE IDENTITY (sole-owner lane; three-engine discrimination):

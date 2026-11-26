@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-231 lane — Mystic Arcanum PREPARATION-PHASE per-level counter key select:
 // a lv7 arcanum cast reads/consumes/restores mysticArcanumLevel7, never a lower
 // counter. Owned HERE: authorize key-select, prepareSpellCast consume census,

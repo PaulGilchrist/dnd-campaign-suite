@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // ── #1812 secondWind lane — healingHandler.js handleSelfHealing ───────────
 // SUBJECT: the generic self_healing branch of handleSelfHealing in

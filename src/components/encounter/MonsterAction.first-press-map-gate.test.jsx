@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Component unit lane for the 2026-11-20 CCC backlog improvement "Modal
 // first-press mapData race": while the modal's active-map fetch is pending
 // (spatialGatePending), the ATTACK-roll chip renders as an inert busy

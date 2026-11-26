@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane (per createConcentrationHandlers-2.test.jsx header): MA-0038 te-driven
 // disadvantage (concentration_disadvantage) on handleRollConcentrationSave ONLY.
 // Two distinct decision branches exist for the te at this call site (source line

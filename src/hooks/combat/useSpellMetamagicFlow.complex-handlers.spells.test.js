@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Complex-spell routing table for the sheet-confirm metamagic flow.
 // Owns: per-spell execute payloads for the area lane (Globe / Antimagic Field),
 // the save-DC lane (Stinking Cloud / Confusion), the single-target heal transport

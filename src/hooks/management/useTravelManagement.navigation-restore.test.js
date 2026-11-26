@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 /*
  * useTravelManagement — trip survives view navigation (backlog 2026-10-26-E,
  * owner design decision: clicking away mid-trip stays FREE and must never

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Backlog 2026-11-08 EL: repeat-save prompt provenance chrome. The turn-END
 // repeat-save PC prompt must carry `sourceName` (the te row's `source` +
 // effect label) so SavePromptModal's existing `.sp-source` "Source:" row

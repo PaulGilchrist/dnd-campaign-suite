@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: conditionUtils direct-helper canon (pure helpers, zero mocks).
 // Every consumer test (EffectAdder, CharConditions, SavePromptModal*,
 // conditionSaveService*) vi.mock's this module, so the REAL behavior of

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // AUTHORITATIVE generic failed/success save-condition contract for
 // saveProcessing: MA-0017 damageless condition grants (player + npc lanes,
 // success face, damage+condition rows applied-once) and MA-0020 N/Day spend

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: onArcaneWardRestore — explicit-slot restore arithmetic authority:
 // restoreAmount = Number(spellSlotLevel) || 1, then × 2; newHp = Math.min(max, current +
 // restoreAmount); `?? 0` defaults for unset ward HP/max; NO slot scan, NO slot consumption

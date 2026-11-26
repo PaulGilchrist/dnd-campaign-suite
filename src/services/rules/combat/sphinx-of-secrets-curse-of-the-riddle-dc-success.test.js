@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1498: Sphinx of Secrets "Curse of the Riddle" (actions[2], DC 15
 // Intelligence, range 60 feet, 6d6 Psychic + Cursed on fail) RAW authors NO
 // success-pays clause — "Failure: 21 (6d6) Psychic damage, and the target is

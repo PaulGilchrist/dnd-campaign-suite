@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * LANE: turnState.js — the CANON pure per-creature turn-economy STATE MATH
  * (L5-001/002, §18 D1/D2). State only, no wall-clock: every seam is driven by

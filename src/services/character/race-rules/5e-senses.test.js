@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * LANE (family seam map in 5e-immunities.test.js header, cited not edited):
  * getSenses only — computePassiveSkills merge, Darkvision trait grant,

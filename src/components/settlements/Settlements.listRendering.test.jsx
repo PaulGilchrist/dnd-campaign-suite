@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // List rendering details only: size badges, population, service counts, tags,
 // and description previews. Intentionally NOT duplicated here (covered in
 // sibling files):

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1000: Homunculus Bite — the save leg gates a CONDITION rider only
 // ("Failure: Poisoned … Failure by 5 or more: Poisoned … While Poisoned, …
 // Unconscious, which ends early if the target takes any damage"), but the

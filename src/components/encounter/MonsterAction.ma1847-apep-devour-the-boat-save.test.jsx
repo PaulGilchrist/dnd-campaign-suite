@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1847 fused-2 save lane: Apep "Devour the Boat (Costs 2 Actions)" legendary
 // child shipped as a delegates_to:"Constrict" prose row — DC 26 never enforced,
 // grapple prerequisite ungated, no-heal clause inert. DATA fix: the row stops

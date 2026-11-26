@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // Campaign-authoring residual item 2 — the AI Dress row affordance: instruction
 // → validated op PREVIEW (nothing saved), GM Apply → the pre-validated merged
 // document goes through the normal map save lane and logs the applied dressing.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit tests for the Death Ward automation handler (popup builder, buff applier, active-check).
 // Deterministic: only stable service boundaries are mocked (runtime store, log, combat summary,
 // range parser, map resolver) and the handler is pure over them. Other suites (contextBuilder-sync,

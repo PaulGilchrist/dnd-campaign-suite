@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0871 OWNER: Gnoll Spear two-handed versatile disk lock + row wiring (trimmed 6→2)
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0871 OWNER: Gnoll Spear two-handed versatile disk lock + row wiring (trimmed 6→2)
 // MA-0871: Gnoll Spear versatile "or 1d8 + 2 if used with two hands" was
 // misfiled into damage_dice_secondary — the MA-0426/0531 ADDITIVE combined
 // transport auto-rolled BOTH pools on EVERY hit (FAIL(a) double-charge: RAW

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * HurlThroughHellModal — base lane: info-screen rendering (all three ternary arms with
  * their exact notes), overlay/Cancel/Done close contract, and confirm side effects

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // LANE: createRollConditionSaveHandler.second-turn — locks the holder-remap fix
 // (bug-secondturn-badge-click-synthetic-name). The (Second Turn) row card
 // DISPLAYS the holder's conditions (CLA-360 buildDisplayCreature resolves via

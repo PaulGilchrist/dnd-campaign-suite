@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: sseHandlers-overlay — createOverlayHandler BODY: setOverlays semantics for
 // spell-overlay SSE events (sseHandlers.js:10-45), behind the app's ONE shared SSE
 // connection (#app mandate). Owned elsewhere: delegate/routing byte + excluded-keys

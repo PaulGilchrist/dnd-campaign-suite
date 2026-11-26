@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Cover-aspect home for the attack-row audit message in src/services/ui/logService.js
 // (REAL module, never mocked here — logService.test.js is the canonical whole-file
 // home; this file locks the 2026-11-21 DDD backlog fix only). Bug: a covered attack

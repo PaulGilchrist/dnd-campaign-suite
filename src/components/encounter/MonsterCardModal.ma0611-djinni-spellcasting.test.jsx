@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0611 data lock: Djinni Spellcasting + the MA-0421/MA-0524/MA-0532/MA-0576
 // markup-gap template family (19 extension rows committed onto this byte-shape).
 // Pre-fix every row was plain-text names with only tier headers carrying

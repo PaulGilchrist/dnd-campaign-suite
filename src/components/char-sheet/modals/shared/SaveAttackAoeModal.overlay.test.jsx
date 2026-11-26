@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // SaveAttackAoeModal OVERLAY lane: the branch at SaveAttackAoeModal.jsx:1972
 // (`isOverlayTargeted && activeOverlay`) is the only place in the family that
 // mounts AreaEffectTargetModalBase — so the base is mounted LIVE here (its own

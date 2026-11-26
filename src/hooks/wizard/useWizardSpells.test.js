@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for useWizardSpells'
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for useWizardSpells'
 // dependency-array recomputation, ref identity, and rejection handling.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

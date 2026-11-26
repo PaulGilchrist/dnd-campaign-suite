@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Save-disadvantage lane: owns the corona/elder-champion/targetEffect aura →
 // save-roll seam as it flows through createLogDamageAndShow into the NPC save
 // handler (roll flags + forcedMode propagation). Handler-owned resolution

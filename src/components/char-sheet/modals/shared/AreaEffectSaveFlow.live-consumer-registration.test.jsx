@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Condition-AoE modal save-prompt hooks + the page-local live registry
 // (bug-aoe-live-save-stamped-reload-lapse, shared-hook lane).
 // issuePlayerSavePrompt arms player saves for the condition AoE modals

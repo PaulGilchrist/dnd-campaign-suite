@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * heroismService lane — PRODUCER of the cast-time stamps for 'Heroism'
  * (Concentration, up to 1 minute); per-turn grant, expiry dispatch and

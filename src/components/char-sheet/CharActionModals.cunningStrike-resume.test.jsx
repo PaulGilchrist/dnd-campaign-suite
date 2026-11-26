@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Regression tests for CLA-188 + the IJ 2026-11-18 decline-latch alignment:
 // closing the Cunning Strike rider modal in CharActionModals must resume the
 // paused attack damage pipeline, and a Cancel with no option applied must

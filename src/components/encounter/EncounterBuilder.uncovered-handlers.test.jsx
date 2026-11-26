@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /* Lane — builder↔server delete/rename dispatch seam (EncounterBuilder.jsx:435-441,
  * REAL EncounterModal wired at :654-662).
  * OWNED HERE (per lane map #407/#409 — "KEEP those strongest"): the builder-level

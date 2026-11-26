@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // Duration/dismiss pins for the shared map-notice channel (backlog
 // 2026-11-03 CN: OA enforcement advisories auto-hid at 4000ms while their
 // log row is permanent — producers now pass { sticky: true } and the toast

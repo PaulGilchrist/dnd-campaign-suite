@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Return-value contract + cachedPosRef identity/lifecycle seam for the executor hook.
 // The castAction clearing matrix (success / reject / falsy non-promise) is owned by
 // useSpellCastExecutor.castAction.test.js; useCallback dep sensitivity lives in

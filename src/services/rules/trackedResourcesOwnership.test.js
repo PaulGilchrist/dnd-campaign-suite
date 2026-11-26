@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // OWNERSHIP-CLASSIFICATION lane for src/services/rules/trackedResources.js
 // (improve tracked-resource-ghost-keys, 2026-11-14 pass — completes the
 // 03e419d35 Pool gate). Three acceptance faces:

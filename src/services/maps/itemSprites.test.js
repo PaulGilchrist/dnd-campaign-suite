@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // Lane: itemSprites registry contract — the gate between the Blender sprite
 // lane (public/images/items/<type>.png, rendered by PlacedItems/ItemsPanel via
 // image href) and the legacy inline SVG <use> fallback. Owned elsewhere: the

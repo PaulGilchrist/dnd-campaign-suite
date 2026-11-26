@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Hermetic unit suite for powerWordFortifyHandler: all deps mocked, no timers/network/server state.
 // Pins stable contracts — slot-level substitution precedence, dice/arith expression evaluation,
 // eligible-target filtering, guard refusals (zero side effects), confirm popup/log payloads.

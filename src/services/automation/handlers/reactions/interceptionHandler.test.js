@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // interceptionHandler sextet — lane: MAIN / EARLY-RETURN GATES (gate behavior only;
 // envelope shape, description text, damage math, logging, consumption latch owned elsewhere).
 //

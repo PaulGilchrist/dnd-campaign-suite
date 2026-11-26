@@ -6,7 +6,7 @@
 // The FT-102 fresh-turn-gate conjunction branch lives in bonusActionAttackHandler
 // .ft102-turn-gate.test.js; the automationInfoPopup payload shape lives in
 // src/services/shared/popupResponse.test.js.
-// @maintained-by-ai: 2026-10-15 — deterministic: every dependency (runtime store,
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic: every dependency (runtime store,
 // lastAttack, polearm util, combat context, popup, log) is module-mocked; the
 // handler is a pure dispatch/refusal ledger that needs no churn when the app changes.
 // @schema-version: 1

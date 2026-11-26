@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0068: Adult Brass Dragon Sleep Breath picker behavior — sleepStaging
 // arms the SP-107 staging seams on a failed save (first fail = Incapacitated
 // staged, NOT Unconscious; zero damage; roll + condition-applied logs).

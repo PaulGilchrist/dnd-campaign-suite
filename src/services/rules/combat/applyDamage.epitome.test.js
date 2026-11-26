@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — CLA-113 Epitome of Magic CONSUMER seam: applyDamage folds the chosen
 // type stamped on activeBuffs by the producer LIVE at hit-resolution.
 // Cite table (bytes consulted, owners cited not re-driven):

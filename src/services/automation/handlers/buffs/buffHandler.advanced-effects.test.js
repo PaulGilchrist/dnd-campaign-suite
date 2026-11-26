@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Generic buff lane contract for buffHandler.handle: willing-target resolution,
 // toggle popup copy, temp-HP side effects, invisible/see_invisibility/haste
 // branches, and adrenaline restore. Fully mocked and deterministic.

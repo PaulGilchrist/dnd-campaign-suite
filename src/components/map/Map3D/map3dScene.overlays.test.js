@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /* global HTMLCanvasElement */
 // Lane: map3dScene sub-layer semantics with REAL THREE objects but a headless
 // scene (no WebGLRenderer — jsdom can't create one). Locks the 2026-10-30

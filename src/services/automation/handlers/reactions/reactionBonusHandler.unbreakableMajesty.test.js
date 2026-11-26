@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionBonusHandler.js UNBREAKABLE MAJESTY lane — canonical home of the
 // handle() `miss_on_failed_save` dispatch and handleUnbreakableMajesty: strict
 // `=== true` toggle gating, activation popup full-string composition, CHA save-DC

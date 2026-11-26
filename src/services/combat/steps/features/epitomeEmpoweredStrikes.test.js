@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Feature-decision lane: steps/features/epitomeEmpoweredStrikes.js (2024 monk
  * Elemental Epitome — Way of the Four Elements analogue; Empowered Strikes die

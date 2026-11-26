@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Component lane of the failed-delete inline roster error: Sidebar must render
 // a dismissible role=alert line naming the character (with "still in the
 // roster" semantics) when deleteErrorName is set, keep the roster link

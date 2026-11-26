@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Contract pin: index.js dispatches automation type `font_of_magic` to this
 // handler; useCharActionsAutomation.js routes the returned modalName
 // `'fontOfMagic'` to open the Font of Magic modal (2024 sorcery resource hub).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /**
  * Rejected-load notice wiring (backlog map-fresh-fallback-silent, hex view):
  * HexMap hands the loader a 4th-argument callback that rides the existing

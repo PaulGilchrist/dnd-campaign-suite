@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SP-112 lane: owns ONLY the spell/weapon DISCRIMINATOR of buildWeaponHitBonusesStep —
 // isSpellAttackContext (attackRollBonuses.js:313-319). Consulted bytes census (#967):
 // ctx.autoDamageSchool || attack.weaponType==='spell' || attack.attackType==='spell' ||

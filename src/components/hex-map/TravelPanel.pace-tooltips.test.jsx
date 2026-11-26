@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Regression pin for bug-travel-pace-odds-fields-inert: the Slow/Fast pace chip
 // tooltips read "Cautious movement, easy to spot threats and stay hidden" /
 // "Rapid travel, harder to notice threats or stay hidden" while the three

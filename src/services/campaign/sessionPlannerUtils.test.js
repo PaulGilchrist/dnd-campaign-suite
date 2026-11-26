@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * sessionPlannerUtils is a PURE data-shaping module (no fetch): GM session
  * drafts, link-bucket normalization (links.quests lives here per #2006),

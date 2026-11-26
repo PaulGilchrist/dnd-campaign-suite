@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: CreatureCard save-tracking prompt rendering + response dispatch (prompts).
 // Owned here: prompts appear only under live save-request state (exact text bytes),
 // localhost-only gate, no-request absence (falsifiable), underscore-normalised store

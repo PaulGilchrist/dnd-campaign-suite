@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Trimmed (#623/#624): 21→11 tests. Generic legs owned elsewhere — turn-latch/
 // own-turn/exhausted gates + regain: services/encounters/monsterLegendaryUses.test.js
 // (:86/:93-97/:99-103/:145-156); modal latch/exhausted template:

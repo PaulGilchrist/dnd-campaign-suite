@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic: mocks the runtime-state, combat-context, and log seams at
 // module boundaries; no timers/DOM/network. Pins the stable handle() entry
 // contract: no-charges guard popup, target-selection modal (null combat

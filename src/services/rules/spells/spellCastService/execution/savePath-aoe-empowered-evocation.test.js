@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-120 AoE payload lane — savePath.js:152-171 (fix git 9f4a06ba6, cited verbatim:
 // 'CLA-120 = Empowered Evocation: INT modifier added TWICE per damage roll (duplicate
 // folds + per-target AoE fold)'; #1468 delegation table: 'AoE payload ->

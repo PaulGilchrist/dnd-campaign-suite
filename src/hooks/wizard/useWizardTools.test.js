@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Seam (test-suite trim, 2026-10):
 // - Engine `useWizardConfig.test.js` owns generic config behaviour (slot state,
 //   warnings, preSelect auto-merge mechanics, error logging).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharAbilities tool-entry cells: which inventory tools appear, under which ability
 // row, and with what computed bonus (proficiency, exhaustion, negative formatting).
 // Click-to-roll behavior for tool entries is covered in reliableTalent /

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0102 lane — STR-te disadvantage PRODUCER at the computeD20Roll seam:
 // any te on the roller carrying the generic strCheckDisadvantage flag
 // (weakening_breath from Adult Gold Dragon Weakening Breath; the generalized

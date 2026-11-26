@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Pure-derivation contract for the GM Screen party rows: every formatter
 // reads exactly the PlayerStats fields the rules engine computes (abilities
 // with save/skills, skillProficiencies/expertise, race speed).

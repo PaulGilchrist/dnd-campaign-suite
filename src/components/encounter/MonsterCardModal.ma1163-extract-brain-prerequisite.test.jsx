@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1163 regression: Mind Flayer Extract Brain grappled-target prerequisite on the
 // SAVE chip. The save row authors target_prerequisite {conditions:["grappled"]} —
 // MA-0019 byte-shape MINUS by_attacker (Tentacles provenance unestablished, source-

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1522: Sprite "Invisibility" — formerly a plain-text inert row (name +
 // description ONLY, zero affordance; §60/§114 inert-row fingerprint, unarmed
 // per the MA-1369 invisibility census). NOW normalized onto the LIVE

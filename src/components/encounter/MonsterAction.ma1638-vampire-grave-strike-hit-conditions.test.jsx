@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1638: Vampire "Grave Strike" — prose carries "If the target is a
 // Large or smaller creature, it has the Grappled condition (escape DC 14)
 // from one of two hands" but the row shipped WITHOUT hit_conditions/

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-201 lane — owns applySpeedIncreasePassives and resolveHalfSpeedFeet as pure units.
 // Bug this lane pins: the automation-layer playerStats may carry no speed (the sheet's
 // canonical Speed is derived from the race JSON at the display layer), so a 2014-saved

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ConditionEntry render contract (#862 polarity oracle): condition log entries render
 // exact bytes per entry shape. Producer payload bytes are owned/cited in their lanes
 // (logConditionEvent producers: saveResultHandlers.js:44, createRollConditionSaveHandler.js:34,

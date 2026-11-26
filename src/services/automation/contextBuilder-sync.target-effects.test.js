@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Target-axis targetEffects → forcedMode contract for buildAttackContextSync:
 // one-shot consumption (distracting strike), unconsumed adv/dis forced modes,
 // sundering-blow inertness (applied downstream), and Death Ward disadvantage.

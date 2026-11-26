@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-099 / CLA-130 rule lock: the once-per-Long-Rest uses counter
 // (`dragonWingsUses`, spent to 0 by dragonWingsHandler) and the active stamp
 // (`dragonWingsActive`, cleared to false by dragonWingsService on retract /

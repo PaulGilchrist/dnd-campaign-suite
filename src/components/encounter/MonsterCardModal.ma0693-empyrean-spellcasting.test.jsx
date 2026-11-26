@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0693 data lock: Empyrean Spellcasting authored the phantom spell name
 // "Pass with Trace" — findMonsterSpell exact-match missed both spell DBs
 // (canonical "Pass Without Trace"), so the chip cast logged a junk zero-

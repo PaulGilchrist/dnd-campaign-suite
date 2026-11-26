@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /* Lane — Load-row close-on-action (QA backlog 2026-10-28-S: the Load modal
  * stayed OPEN after a `Load "<name>"` row click and intercepted the toolbar Save
  * via .ct-modal-overlay pointer-events, while the generator Apply lane

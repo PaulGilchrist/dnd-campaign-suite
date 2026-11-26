@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Roadmap Item 10 (sensory cues) — weather ambience lifecycle. startLoop/
 // stopLoop are the only seams mocked. Pins: the loop starts when a mounted
 // hex map lands overlay-bearing weather (GM roll OR SSE echo — same prop

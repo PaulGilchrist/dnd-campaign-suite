@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: EffectAdder concentration-tab UI seam — form render/defaults, DC sanitiser,
 // Apply disabled state-machine bytes (never click-blocked), exact onSubmit payload once,
 // zero-write cancel. NOT owned here (cited): dispatch handler branches, exact service

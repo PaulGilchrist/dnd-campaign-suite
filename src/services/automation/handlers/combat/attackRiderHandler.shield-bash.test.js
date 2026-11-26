@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // attackRiderHandler.handleShieldBash prerequisite-refusal lane: shield equip
 // check (hasEquippedShield — armor_category / equipment_category / magic
 // base-name via the real parseMagicItemName), the full lastAttack guard

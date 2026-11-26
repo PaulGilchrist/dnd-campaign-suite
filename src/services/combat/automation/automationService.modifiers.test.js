@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── MODIFIERS LANE: automationService-local evasion + save-proficiency rows ──
 // Family split (automationService.*, #971-#978):
 //   • THIS FILE — the ONLY owner of the transform bytes of the two local entry

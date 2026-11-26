@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * L5-001 coverage guard — action-gate WIRING registry (source-text lane).
  *

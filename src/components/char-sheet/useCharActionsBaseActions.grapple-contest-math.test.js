@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // BA-002 regression lane: grapple CONTEST MATH at the hook seam — the attacker's
 // check-bonus channels (listed skill bonus vs STR+PB derivation, Jack of All Trades
 // half-bonus rules, exhaustion penalty) and the target's higher-of-Athletics-or-

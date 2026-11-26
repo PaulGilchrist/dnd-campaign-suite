@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /**
  * storage.js — server-first HTTP transport for runtime game state.
  *

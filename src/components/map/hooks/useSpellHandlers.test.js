@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: map spell-tools interaction core (#904-#912 series; ruler #911 / select-move #912 / drag #905+#910).
 // Owner of the pointer -> state contract of useSpellHandlers: instant placement (sphere/cylinder),
 // press-drag drafts (cone/cube/line), drag/rotate gesture lifecycles on existing overlays, exact

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane: Turn Undead semantics in SetConditionModal only — the featureName→turnUndead
 // eligibility wiring (via this modal's dispatch of the base filter), the TU empty state,
 // and the turn-undead-result event contract (exact payload, silence on all-saves, and

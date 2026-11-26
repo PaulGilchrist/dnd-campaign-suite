@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1489: Specter "Life Drain" HP-max-drain lane — the fix that made the
 // HIT clause "its Hit Point maximum decreases by an amount equal to the damage
 // taken" LAND (was FAIL(a) zero-state, §947: hpMaxReduction consumers

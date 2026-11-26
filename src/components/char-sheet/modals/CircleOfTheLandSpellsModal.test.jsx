@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Caller seams: opened from CharSpecialActions.jsx ('circleOfTheLandSpells' action →
 // setCircleOfTheLandSpellsModal) and mounted by CharSpecialActionsModals.jsx with
 // { playerStats, campaignName, onClose: () => setCircleOfTheLandSpellsModal(null) }.

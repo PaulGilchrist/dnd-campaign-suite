@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  noSavePath.js module-direct lane — REAL internals, sole runner    */
 /*                                                                    */

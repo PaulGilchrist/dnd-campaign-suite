@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-044 gate lane: the once-per-turn Brutal Strike latch semantics on the
 // handleAttackClick chooser path ONLY — a spent latch held by this creature
 // refuses the chooser (refusal log, zero spend, attack still rolls), while an

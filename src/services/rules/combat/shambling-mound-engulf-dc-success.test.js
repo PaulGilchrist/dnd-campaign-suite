@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1460: Shambling Mound "Engulf" (actions[2], DC 15 Strength, shapeless
 // "" range → inline auto-save, 3d6 Lightning) RAW success = unaffected — the
 // 3d6 is recurring-only (start of victim's turns, §70 sustained-grapple

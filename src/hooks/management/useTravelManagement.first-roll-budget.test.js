@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * useTravelManagement — first-travel auto-roll seeds the weather-modded budget
  * (bug-hex-first-roll-unseeded-budget).

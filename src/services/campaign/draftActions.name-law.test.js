@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // Regression (bug-designer-draft-accepts-kind-word-entity-name): Approve is the
 // last gate before an AI draft becomes LIVE campaign data — the bug's live face
 // was Approve persisting an NPC row literally named "npc" with zero warning.

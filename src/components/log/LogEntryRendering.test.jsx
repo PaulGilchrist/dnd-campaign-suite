@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CONTAINER DISPATCH lane — owns type→component routing for Log.jsx ENTRY_COMPONENTS.
 // This lane proves WHICH component each entry type resolves to (root-class marker
 // bytes only), never WHAT the leaf says. Leaf content is owned by the leaf lanes:

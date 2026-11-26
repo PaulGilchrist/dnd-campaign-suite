@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // uncovered.prepareSpellCast.test.js — the CONSUME side of
 // spellPreparationService.prepareSpellCast: post-authorization decrement

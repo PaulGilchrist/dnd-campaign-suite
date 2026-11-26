@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // SavePromptModal — LIVE mid-prompt save-bonus breakdown (DG 2026-11-06 header lie).
 // A mid-prompt activeBuffs change (e.g. stamping a warding_bond saveBonus on the
 // victim's runtime bucket) used to be read only at roll time while the header

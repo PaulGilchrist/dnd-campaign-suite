@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SPELL CAST ENTRY lane — owns every byte SpellEntry (LogSpellEntry.jsx) renders for a
 // type:'spell' CAST event: header (wand icon, caster, exact 'Cast {spellName}', the
 // targetName and targets targeting legs, timestamp) and details (authored spell-level

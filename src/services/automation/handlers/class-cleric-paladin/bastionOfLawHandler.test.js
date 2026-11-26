@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Unit lane for the Bastion of Law handler (sorcery-point-funded ward cast on an ally).
 // Pins the runtime-key write contract (exact keys: bastionOfLawActive/WardDice/WardSource/
 // WardUsed/LastAttackDamage/WardTarget), modal/popup shapes, SP clamp/deduct semantics,

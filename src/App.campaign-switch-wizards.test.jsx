@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Campaign-select seam — wizard open-state reset (2026-11-20 reattach bug).
  *

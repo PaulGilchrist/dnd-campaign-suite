@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // attackRiderHandler.handleRiderSave SAVE-GATED EXPIRY lane
 // (bug-devious-strikes-daze-never-expires): a FAILED save that grants a
 // round-scoped condition (Daze dazed / Obscure blinded) must register ONE

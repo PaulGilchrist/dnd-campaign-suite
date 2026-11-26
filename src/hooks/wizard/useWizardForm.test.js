@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Stable contract suite for useWizardForm: a pure form-state hook (useState/useCallback)
 // with no network, SSE, timer, or DOM coupling. Deterministic by construction; defaults
 // are asserted against DEFAULT_FORM_DATA itself so content edits need no test churn.

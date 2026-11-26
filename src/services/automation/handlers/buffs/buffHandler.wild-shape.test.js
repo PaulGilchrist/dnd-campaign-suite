@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Dedicated owner of the Wild Shape (shape_shift) lane in buffHandler.
 // Pins the stable handler contract: CLA-391 uses-gate (ON leg gated, OFF leg
 // always allowed to end the form), the zero-write ON leg — the row click only

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" — INLINE block-save THP-grant
 // seam. context.tempHpGrant (parseTempHpGrantClause over the live monsters.json
 // row, forwarded by buildAbilitySaveRollContext) arms grantFailedSaveTempHp:

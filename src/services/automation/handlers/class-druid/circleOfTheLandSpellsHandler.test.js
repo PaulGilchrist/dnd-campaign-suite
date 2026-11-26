@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Pure modal-opener contract: handle() returns exactly
 // { type: 'modal', modalName: 'circleOfTheLandSpells',
 //   payload: { name, description } } and ignores playerStats/campaignName.

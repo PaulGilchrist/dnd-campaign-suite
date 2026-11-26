@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1352: ability-scoped ability_save_disadvantage te on the monster-card
 // save-chip seam. processNpcSave is the auto-roll path for GM-pressed DC
 // chips against NPC victims (live fingerprint: roll save stamps rolls:[d20],

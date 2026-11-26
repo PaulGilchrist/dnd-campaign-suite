@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Handler callback tests for CharActionModals — modal button → handler wiring.
 //
 // Scope — unique behaviors tested here:

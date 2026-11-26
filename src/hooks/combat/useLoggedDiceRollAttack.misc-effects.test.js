@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Ownerless minor effects at the createLogAndShow roll seam: Sundering Blow,
 // Bane/Bless attack folds, target-side Lucky feat, Sacred Weapon labelling,
 // maneuver preload, Bardic Inspiration defense context, Pending Skill Check

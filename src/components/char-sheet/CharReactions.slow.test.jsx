@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // SP-109: a slowed creature can't take Reactions — every reaction row click
 // (feature rows AND reaction-spell rows) is refused with a 'Reaction Blocked'
 // popup and a single 'automation' log entry, with no downstream dice/selection

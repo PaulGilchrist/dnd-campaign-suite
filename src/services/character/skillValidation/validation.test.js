@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation SUBDIR internals lane (#2060): validation.js gate INTERNALS at the mocked
 // limits/expertise seam — warnClassRestrictedExpertise hard/soft arms + null-list short-circuit,
 // warnFeatRestrictedExpertise slot budget, warnSkillsOutsidePools Skilled allowance + the

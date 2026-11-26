@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Shared mock fixture for CharSummary component tests + its contract suite.
 // All ~20 test files in the CharSummary family import mockPlayerStats /

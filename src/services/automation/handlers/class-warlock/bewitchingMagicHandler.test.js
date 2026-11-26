@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic: handle() is pure over mocked
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic: handle() is pure over mocked
 // getRuntimeValue/getCombatContext/addEntry; every test pins a distinct branch
 // (4 manual-gate refusals, auto-lane bypass/refusal, resolveSchool precedence/
 // fallback/case, CLA-037 unlimited payload, no-counter guard, target filter,

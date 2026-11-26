@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: config/tokenCosmetics.js — the ONE palette + canonical row ─────────
 // OWNED here: palette shape (fixed ~8 in-theme swatches, unique ids), the
 // id→class mapping shared by menu + render (no duplicated hex lists), and

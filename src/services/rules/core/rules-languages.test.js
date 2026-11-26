@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: rules-languages.js channel dispatch (2024 class.major vs 5e class.subclass) and
 // disk-backed canonical language assembly through the rules.js facade.
 // Owned elsewhere — NOT re-executed here:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Cross-cutting breadth lane for automationCollector.js — only rows whose HOME is nowhere else:
 // the SPECIAL_AUTOMATIONS pre-router exact row shapes (relentless / arcane_ward / spell_breaker /
 // projected_ward), cantrip_range_bonus regex extraction, and the three collectTurnStartEffects rows

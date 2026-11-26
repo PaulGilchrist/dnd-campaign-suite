@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0554 modal seam only: the Darkmantle Darkness Aura actions[] row arms a
 // ZoneAuraLink chip ("15-ft Aura (1/Day · N left)") and its click routes the
 // row through resolveSelfAuraRow with monsterName + the monsterSpellUses

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // useSpellPositionResolver — RESOLUTION lane: resolvePositions() writes
 // cachedPosRef.current = { attackerPos, targetPos } exactly when attacker +
 // target both resolve on the map WITH FINITE GRID COORDS (hasGridPos canon:

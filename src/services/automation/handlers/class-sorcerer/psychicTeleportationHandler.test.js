@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Handler-lane contract for psychic_teleportation: energy ledger (exact-key
 // runtime pins), dN×10 distance roll (stubbed random), popup/log composition,
 // and the L5-003 §8.1 token-move seam. Dispatch routing is owned by

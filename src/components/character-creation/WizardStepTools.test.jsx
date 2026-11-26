@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // WizardStepTools component lane: disk-faithful tool grid (equipment.json Tools rows are
 // imported VERBATIM and served through the getToolsByCategory seam exactly as prod filters
 // them — 33 rows across the 4 wizard categories, every row has an `ability`, so empty-grid

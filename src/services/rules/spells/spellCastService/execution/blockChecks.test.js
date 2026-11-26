@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // blockChecks.js module-direct lane (BASE): every blocking gate pinned individually.
 // OWNERSHIP (verbatim, #1465): 'beast-spells lane owns: CLA-404 4-quadrant table,
 // Shape-Shift fallback, passthrough quadrant; blockChecks is the single bypass site;

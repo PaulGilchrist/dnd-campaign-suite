@@ -3,7 +3,7 @@
 // Note: the buildSyncCtx fallback inside damageRoll.js shares the same
 // `saveDc || 0` contract as the no-map early return; it is only reachable
 // from the map lane, so its coverage lives in the map file, not here.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

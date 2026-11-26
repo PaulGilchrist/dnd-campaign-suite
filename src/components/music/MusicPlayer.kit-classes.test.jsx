@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 //
 // .ct-* design-kit convergence (tranche 4, FINAL): the Music view arrived as
 // DEAD KIT — .ct-header/.ct-title on the root with no .ct-container ancestor

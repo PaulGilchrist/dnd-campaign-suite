@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-364 BUG-C lane: handlePlayerSaveDamage hardcoded isTranceOfOrderActive:false,
 // so a Trance of Order holder's save-prompt rolls never got the d20-floor-10 leg.
 // Pins the seam (getRuntimeValue(target, 'tranceOfOrderActive', campaign) === true →

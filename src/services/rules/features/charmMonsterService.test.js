@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-219 + producer lane: charmMonsterService rebuilds the Charm Monster action on its way to
 // executeHandler. This is the ONLY lane exercising the REAL service — every hook consumer
 // (useComplexSpellHandlers/useSimpleSpellHandlers lanes) mocks it, and

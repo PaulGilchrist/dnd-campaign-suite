@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1450: Seahorse "Bubble Dash" advisory chip lane in MonsterAction.jsx.
 // Pre-fix disk row carried junk attack_bonus:0 → a clickable "+0" mc-dice-link
 // routed a bogus to-hit. Fix was DATA-only with the FAMILY'S DISTINCT shape:

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-095: Protection from Poison confirm previously bypassed prepareSpellCast — no
 // slot spent. This file is the PFP custom-handler CONFIRM seam: it runs the REAL
 // prepareSpellCast (slot payment + spend log) and pins the FIVE-POSITIONAL-arg

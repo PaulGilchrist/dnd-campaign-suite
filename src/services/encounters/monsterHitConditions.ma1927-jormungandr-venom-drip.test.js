@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1927: Jormungandr legendary "Venom Drip" hit-clause rider — live-verified
 // FAIL(b)/DATA: +17 ranged chip self-resolved exact (nat 18+17=35 vs AC12 HIT,
 // "4d8 + 1" Poison, hp_change −21 unclamped) but the Poisoned rider NEVER

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 //
 // CONFIRM-LANE AUTHORITY — the confirm twin of .skip.test.js (skip 19-row table).
 // Owns the gate → pending → CONFIRM contract for the lanes with no chooser spec table:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  EARLY-MODAL CHAIN LANE — index.js :702-:709 dispatch/consume      */
 /*                                                                     */

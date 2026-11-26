@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Wrapper-level careful-spell lane: owns the createLogDamageAndShow dispatch
 // contract for metamagicCareful on a player save target — forced save success
 // (auto-succeed per 2024 Careful Spell), half damage via dcSuccess 'half',

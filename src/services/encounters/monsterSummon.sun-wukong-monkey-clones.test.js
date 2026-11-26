@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2009 lane: Sun Wukong "Pluck a Hair (1/Day)" (actions[3]) — monster_summon
 // riding the MA-0757 constant-count axis: numeric CONSTANT count 4 (zero count
 // dice), chance-less guaranteed spawn (no d100 flip, no coin-flip log) of the

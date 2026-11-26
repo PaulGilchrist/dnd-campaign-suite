@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // CreatureCard overlay-target option suppression (backlog aoe-overlay-dead-lane).
 // Owned here (target-select overlay lane):
 //   overlay-<id> options render ONLY on player cards — the overlay area

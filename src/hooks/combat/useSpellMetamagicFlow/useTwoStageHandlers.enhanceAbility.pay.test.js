@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-15: 2026-11-15
 // Numeric slot-legality twin for the EA pay-at-confirm seam (slot-owe fix,
 // bug-enhance-ability-stone-skin-confirms-never-pay, owner ruling 2026-11-15):
 // unlike ./useTwoStageHandlers.enhanceAbility.test.js (mocked seam — call shape,

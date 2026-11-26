@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-126: the live Web confirmer must stamp the REACHABLE automation type
 // 'web_area_save' (the pre-fix 'web' stamp fell through executeHandler to
 // null — slot + concentration paid, no saves, no Restrained, no logs).

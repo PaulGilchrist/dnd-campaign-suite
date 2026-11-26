@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-226: Memorize Spell once-per-Short-Rest latch re-arm seam (restRules-shortRest.js).
 // Mechanism: generic null-latch (not a gated-special). Disk canon (2024 classes.json
 // Wizard lv5): "Whenever you finish a Short Rest ... replace one ... prepared ... spell

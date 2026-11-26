@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1818 data lock: Yuan-ti Infiltrator Spellcasting rode the MA-0421 /
 // MA-1742 / MA-1814 markup-gap family — plain-text spell names (zero
 // affordances, row inert) while the save_dc 12 + save_type Wisdom pair sat

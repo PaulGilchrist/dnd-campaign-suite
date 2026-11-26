@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns the statusEffects seam through the createLogDamageAndShow wrapper: the
 // context threading into the NPC failed-save activeConditions write (including
 // lowercase normalization + dedupe, which has no other owner) and into the

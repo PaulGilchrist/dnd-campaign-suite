@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1656: Vampire Umbral Lord "Hunger of Hadar" (actions[3]) save-lane DATA
 // lock. Pre-fix the row was a DC chip shell (save_dc 18 + save_type Charisma
 // ONLY): chip fired, DC enforced, extractConditionsFromSaveEffect(undefined)=[]

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-eb-join-swallowed-network-fail-phantom-row — when the
 // combatSummary board write failed (network abort lane), storage.set swallowed
 // the rejection AND addMonstersToInitiative never awaited it, so the join

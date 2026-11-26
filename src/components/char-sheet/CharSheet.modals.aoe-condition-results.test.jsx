@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // renderPopup routing for the condition-lane Results payload
 // (improve-condition-aoe-results-face, 2026-11-24): the Stinking Cloud
 // sheet-cast runner stamps the handler's resolved `{ type:

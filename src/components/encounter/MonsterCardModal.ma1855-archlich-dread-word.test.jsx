@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1855: Archlich Dread Word (legendary save row) was a stranded save shell —
 // save_dc/save_type authored but NO damage_dice_primary and NO save_effect, so
 // the prose "takes 22 (5d8) Psychic damage" (no Hit|Failure|Success: anchor, §255)

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // autoRerollHandler — attack-roll reroll seam (numeric-bonus lane).
 //
 // 5-way seam map for autoRerollHandler.test.js quint:

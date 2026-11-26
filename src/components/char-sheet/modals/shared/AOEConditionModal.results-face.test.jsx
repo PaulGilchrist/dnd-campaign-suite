@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Results/processing-face save-equation law (bug-aoe-condition-results-row-brace-literal-leak).
 // Both per-target row builders hand-rolled their annotation INSIDE a template
 // literal with `{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''}` — missing `$`, so

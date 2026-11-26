@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applySuperiorityDamageBonuses } from './handleSuperiorityBonuses.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';

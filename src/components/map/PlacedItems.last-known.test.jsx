@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: last-known-position ghosting on the placed creature-token layer
 // (roadmap Item 7) — the RENDER half of the rule. Since the SK 2026-11-19
 // hoist the position-memory oracle runs at MAP level (Map.jsx owns the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Campaign meta client lane (server/routes/campaigns-meta.js twin):
 // getCampaignTypes stays defensive ({}) — a failed list read must never
 // brick the campaign screen. loadCampaignMeta is a PURE read of the server

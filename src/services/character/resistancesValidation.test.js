@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // QUARTET SEAM MAP (resistancesValidation family — don't duplicate across these lanes):
 //   resistancesValidation.test.js           → THIS FILE: validateResistances message contract (ungranted /
 //                                             duplicates / unselected-grants / empty-selection info) + the

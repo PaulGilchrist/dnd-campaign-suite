@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Lane: handleActionSpellDamageClick (spell-damage cast click) in
 // useActionSpellMetamagic — the authority for the showCastPopup result
 // handler (popup vs. CLA-389 modal routing) and the cast paths reached

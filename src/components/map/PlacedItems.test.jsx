@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // PlacedItems structural contracts: type dispatch with GM hit areas and drag
 // highlights, door open/closed shapes, rotation transforms, grid placement,
 // empty input. Owned elsewhere: fog visibility (PlacedItems-fog.test.jsx),

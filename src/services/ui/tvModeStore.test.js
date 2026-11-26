@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // tvModeStore contract: idempotent set, listener notification on change only,
 // unsubscribe stops delivery. The app shell reads this via useSyncExternalStore
 // to hide the sidebar while the Initiative tracker is in TV mode. Plus the

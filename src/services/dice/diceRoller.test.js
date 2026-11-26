@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── diceRoller ENGINE lane ───────────────────────────────────────────
 // This file owns the real dice engine: grammar, RNG consumption counts,
 // keep-highest/lowest selection core (#938: rollAdvantage/rollDisadvantage

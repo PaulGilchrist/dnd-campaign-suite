@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── Lane: buffService SERVICE lifecycle bytes — the ONLY test of the real
 // implementation (consumers mock this module: sorceryHandler, CharBonusActions,
 // charSummaryCalc consumption lanes #949/#932 keep their own call-shape lanes).

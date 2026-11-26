@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0904: Gorgon Petrifying Breath cone-picker threading — the row now
 // authors the MA-0501 structured staged_petrify key (petrified_hours 24),
 // so every fresh click arms SaveAttackAoeModal with stagedPetrify

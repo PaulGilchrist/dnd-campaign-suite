@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /**
  * Durable rules-data pin for the 5e spell-data completeness pass (2026-11-19).
  *

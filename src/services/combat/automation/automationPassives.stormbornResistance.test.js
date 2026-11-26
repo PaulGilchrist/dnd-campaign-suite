@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-336 lane: the type:'resistance' legs of getDamageResistances /
 // gatedResistanceTypes (automationPassives.js) resolve LIVE at hit-resolution.
 // Consulted-byte census — the branch reads ONLY: passive.type,

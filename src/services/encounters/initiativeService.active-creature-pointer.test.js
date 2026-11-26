@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // FW 2026-11-09 improve: the mount merge used to return only {round, creatures}, silently
 // DISCARDING a seeded/baked combatSummary.activeCreatureName — the GM mount POST then
 // wiped the pointer from the server mirror and the fresh board's "active" card contradicted

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1014 origin lane: resolveUtilitySpellCastRow — adjudication behind the
 // Ice Devil "Ice Wall" spell chip (spell_save_dc-only zone/utility row,
 // Recharge 6). Pressing the chip: recharge spends at resolve via the REAL

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SERVICE lane (CLA-037 family): rules/spells/postCastRiderService.js — saves/spreads
 // and school/casting-time gates, NOT heals (postCastHeal twin owns heals, #1452).
 // Split vs automation/handlers/combat/postCastRiderService.test.js (declared in its

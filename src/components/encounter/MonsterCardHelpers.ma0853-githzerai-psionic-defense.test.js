@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0853 OWNER: githzerai-monk Psionic Defense 2/Day disk lock + limit-2 economy
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0853 OWNER: githzerai-monk Psionic Defense 2/Day disk lock + limit-2 economy
 // MA-0853 regression: Githzerai Monk "Psionic Defense" (2/Day) — disk row was
 // prose-only (name/description/spellcasting_ability/uses-string) = gate-null inert,
 // zero affordance. Fix authors the MA-0006 feather_fall byte-shape onto the existing

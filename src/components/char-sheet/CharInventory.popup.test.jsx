@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory popup wording — canonical file for the popup's found/not-found/error
 // text and the findEquipmentItem lookup lanes (seam map in CharInventory.edgeCases.test.jsx):
 //   - found via INDEX when the database name differs (exact-NAME match is pinned by

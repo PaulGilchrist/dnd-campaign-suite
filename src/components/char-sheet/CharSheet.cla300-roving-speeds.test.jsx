@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-300 regression: Roving climb/swim must equal the rules-layer folded
 // Speed (stats.speed), never folded Speed + 10 (double-count fingerprint).
 //

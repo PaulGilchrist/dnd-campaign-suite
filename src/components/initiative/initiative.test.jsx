@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Initiative CONTAINER lane: proves only what the real Initiative.jsx wiring can prove —
 // (1) mount census: exact card set per combatSummary roster, ONE shared Subscriber (app SSE
 // mandate), GM controls + their contract tooltip, onNpcsChange push to the parent;

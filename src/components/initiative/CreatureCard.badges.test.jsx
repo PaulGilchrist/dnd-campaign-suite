@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CreatureCard's OWN badge render census — which badges appear, by exact label,
 // with exact semantic class bytes, under each distinct card state (jsx:524-578).
 // Owned here (render lane):

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — applyDamageToTarget base lane: entry guards, player + monster HP bookkeeping
 // canon, computedStats/static defenses, damage-triggered condition removal, drop-to-0
 // death-save handling, hp_change log + threshold bytes, concentration DC recalculation

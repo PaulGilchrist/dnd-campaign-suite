@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0374/MA-0383/MA-0577 OWNER lane: eye-rays shared-seam
+// @maintained-by-ai 2026-10-18 — MA-0374/MA-0383/MA-0577 OWNER lane: eye-rays shared-seam
 // truth tables for parseEyeRays validation, the len(rays)-sized reroll-if-used
 // picker (d10 Beholder / d4 Beholder Zombie / d10 DC 17 Death Tyrant), single-
 // target synthesis, auto-success, and full-byte popup/log templates (#498 pins,

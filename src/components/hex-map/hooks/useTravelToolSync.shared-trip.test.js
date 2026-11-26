@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 // Regression lock for bug-hex-trip-clobbered-by-second-client.md: a second
 // client opening the outdoor map with a trip ALREADY LIVE elsewhere destroyed
 // it — a Travel-tool press over the foreign trip ran startPlanning()

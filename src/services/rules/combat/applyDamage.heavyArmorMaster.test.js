@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // FT-045 Heavy Armor Master (2024) consumer-seam lane: applyDamage feature
 // reduction → HP → log. Owns applyFeatureDamageReduction (applyDamage.js:397-415):
 // worn-armor truth via inventory.equipped names resolved by the REAL

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // autoEncounterService contract lane: auto-start on GM Accept (§10.2).
 // Encounters family map: THIS file owns the auto-trigger predicate and the
 // full Accept→dispatch request bytes (enforcement gate, roster hydration,

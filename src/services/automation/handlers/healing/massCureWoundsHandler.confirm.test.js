@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Confirm lane of the massCureWounds pair: sibling massCureWoundsHandler.test.js owns
 // handle() opener routing (expression/modifier resolution, modal-vs-popup dispatch).
 // This file owns confirmMassCureWounds() application behaviour via massHealUtils.confirmFn:

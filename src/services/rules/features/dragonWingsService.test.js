@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-099 lane: dragonWingsService.js retirement seam ITSELF — the two
 // exported faces the sibling lanes delegate here verbatim:
 //   dragonWingsHandler.test.js:5-6 — "Service internals (endDragonWingsBuff

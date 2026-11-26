@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-16
+// @maintained-by-ai 2026-10-16: 2026-10-16
 // Press/write side of the Sanctuary lane. handle() is the automation/index.js
 // registry entry for type 'sanctuary' (targetEffects write + expiration anchor,
 // manifest-verified live 2026-10-08); endSanctuary() is the self-break removal,

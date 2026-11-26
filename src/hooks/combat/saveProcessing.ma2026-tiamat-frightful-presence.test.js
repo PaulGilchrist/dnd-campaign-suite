@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2026: Tiamat "Frightful Presence" — exact MA-1997 (Smaug) twin. FP save
 // row (actions index 3) authored ONLY conditions:["frightened"] + save_dc/
 // save_type: the DC 26 Wisdom save adjudicated honestly on the live EB-NPC

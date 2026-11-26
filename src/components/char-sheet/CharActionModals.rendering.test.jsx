@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Rendering tests for CharActionModals.jsx — the host that merges two modal
 // state sources (modalState + spellModalState) and wires derived props into
 // the modals it mounts.

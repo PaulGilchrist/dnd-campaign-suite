@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Know Your Enemy (CLA-286): popup composition, superiority-dice accounting
 // (knowEnemy owns uses_max reading on the maneuver-attack lane), round-keyed
 // relentless latch, and target→IRV display glue. IRV schema resolution itself

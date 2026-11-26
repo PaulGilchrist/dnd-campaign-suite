@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0102/MA-0212 weakeningBreathService lane (producer + bespoke turn-END
 // repeater). Disk canon read PROGRAMMATICALLY from public/data/monsters.json
 // (shared 5e file — 2024/ has NO monsters.json, per #1410): exactly FOUR

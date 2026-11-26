@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // Campaign creation is a GM (localhost-only) affordance. App.jsx threads the
 // isLocalhost flag computed by useCampaignManagement into CampaignSelection;
 // these tests lock both branches: network (LAN) players never see "New

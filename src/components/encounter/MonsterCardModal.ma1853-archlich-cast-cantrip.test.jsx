@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1853 regression: Archlich legendary_actions[1] "Cast Cantrip" authored
 // name+description only — the gated "Expend Legendary" chip spent a use then
 // fall-through'd resolveLegendaryRowMechanic (MonsterCardModal.jsx:715) with

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-08
+// @maintained-by-ai 2026-11-08: 2026-11-08
 /* Lane: TV tracker music transport (improve 2026-11-08 EM backlog). While the
  * full-screen tracker is up, the header shows a minimal Pause/Stop transport
  * whenever a mood is armed — driven through the SAME lanes as the sidebar

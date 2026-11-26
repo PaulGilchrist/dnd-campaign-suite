@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // MapsManager.rename-blur-revert.test.jsx — backlog 2026-11-25 BC: the armed
 // inline rename editor used to COMMIT on blur, so clicking another row's
 // Rename button silently PUT the pending value (live-proved: 'SILENT

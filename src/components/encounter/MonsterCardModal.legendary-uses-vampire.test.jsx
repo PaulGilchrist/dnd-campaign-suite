@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1640 regression: Vampire "Beguile" (legendary_actions[1] post-fix; pre-fix
 // rows[0].uses:1) was swallowed as the economy header (§99 header-swallow):
 // legendaryHeaderAction matched rows[0].uses != null and returned Beguile itself,

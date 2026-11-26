@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // WM-003 Tactical Mastery CHOICE→RESUME COMPLETION lane at the useAttackDamageResolution
 // seam. The tacticalMaster step pauses the REAL pipeline at _pausedStep:'tacticalMaster'
 // AFTER the weapon damage has already landed (proceedToDamage is upstream: damage:applied

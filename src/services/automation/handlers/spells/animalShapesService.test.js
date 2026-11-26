@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // LANE: animalShapesService.js mutation lane (#1860 — second of animalShapes trio,
 // handler lane closed, spellData closes next). This lane owns the service's storage

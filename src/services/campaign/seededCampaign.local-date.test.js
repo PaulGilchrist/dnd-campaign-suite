@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 // localDateStamp — the YYYYMMDD quick-create default must be sourced from the
 // LOCAL date, not the UTC ISO slice (2026-11-04 backlog: `Arena-20261105`
 // offered at 19:01 EST on 2026-11-04).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Regression pin for bug-event-chance-label-ignores-mods: the active Events row
 // used to print the raw EVENT_FREQUENCIES table ("12% chance per hex") while
 // shouldTriggerEvent rolled freq + terrain + weather mods (Rain +10 ⇒ the live

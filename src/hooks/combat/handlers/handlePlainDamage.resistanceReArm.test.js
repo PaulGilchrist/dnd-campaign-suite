@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // SP-099 consumer contract for the plain-damage lane (handlePlainDamage.js
 // rollResistanceReduction): the resistance_damage_reduction te reduces the
 // chosen damage type by exactly 1d4, consumed once per turn via the

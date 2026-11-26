@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  executeSpellCast HEALING-LADDER EDGES (index.js :365-:460) —     */
 /*  the arms index.genericHealFortified.test.js declares OUT OF SPAN */

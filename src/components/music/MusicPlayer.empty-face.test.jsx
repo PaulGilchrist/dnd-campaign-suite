@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Lane: Music empty face (Item 7, audit F14). The mood chip row + transport
  * row left a big dead canvas with zero hint that ＋/pencil build tracks —
  * the audit's only "no empty state at all" view. The stop face now rides the

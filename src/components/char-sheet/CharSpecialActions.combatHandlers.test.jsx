@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions combat-action click handlers seam:
 //   - Destructive Stride: Confirm Target → SecondaryTargetModal handoff,
 //     Confirm Popup branch, and the CLA-113 OBJECT-signature applyTargetChoice call.

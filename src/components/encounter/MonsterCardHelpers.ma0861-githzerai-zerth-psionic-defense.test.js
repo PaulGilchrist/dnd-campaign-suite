@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0861 OWNER: githzerai-zerth Psionic Defense disk-row lock (byte-twin of MA-0853 — press legs cite-skipped to #520)
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0861 OWNER: githzerai-zerth Psionic Defense disk-row lock (byte-twin of MA-0853 — press legs cite-skipped to #520)
 // MA-0861 regression: Githzerai Zerth "Psionic Defense" (2/Day) — disk row was the
 // broken MA-0853 twin (prose-only name/description/spellcasting_ability/uses-string
 // = gate-null inert, zero affordance). Fix authors the MA-0006 feather_fall byte-shape

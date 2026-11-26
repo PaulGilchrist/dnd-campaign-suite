@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation PAIR seam map (this file = feats lane; siblings cite it, don't re-pin):
 //   • feats (HERE): canonical home (#2054) for the feat-granted lanes — Boon of Skill all-skills
 //     short-circuit (getSkillLimits / getPreSelectedSkills all-18), the loadFeatData fallback with

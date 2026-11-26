@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Wild Magic Surge trigger lane (post-cast seam). PRESERVED-CITED-BY:
 // d20RollComputation.feats-of-chaos.test.js:12 — 'wildMagicSurgeService.test.js
 // owns surge triggering and re-arming' — the CLA-134 cast-time-stamp re-arm

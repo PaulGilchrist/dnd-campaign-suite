@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // PC-sheet PENDING-TRIGGER opportunity-attack resolution (bug-monster-oa-
 // resolution-auto-missed-by-melee-range-gate, PC face of the root bug).
 // Pre-fix, a trigger that already charged the reaction (opportunityTrigger)

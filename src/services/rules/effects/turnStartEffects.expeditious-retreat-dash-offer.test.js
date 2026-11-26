@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-128: Expeditious Retreat Dash re-offer at the caster's turn start —
 // the expeditious_retreat_dash_offer turn-start lane (turnStartEffects.js
 // applyExpeditiousRetreatDashOffer) writes exactly two things while the cast

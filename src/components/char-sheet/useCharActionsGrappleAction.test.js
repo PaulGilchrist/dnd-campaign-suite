@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Grapple ACTION lane of useCharActionsBaseActions: enforcement/selection gates
 // (cannotAct, no-target, already-grappled), adv/dis check-context resolution,
 // target contest-modifier fallback CHANNELS with byte-exact popup pins (including

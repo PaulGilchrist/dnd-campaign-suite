@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-321: SaveAttackAoeModal must enforce the Soulstitch Spells stamp on the live sheet AoE path.
 // Three lanes: (1) NPC auto-resolve at confirm (protected zeroed, unprotected normal, stamp consumed
 // once, popup row); (2) PC auto-resolve at confirm (no prompt); (3) stamp applied mid-prompt is

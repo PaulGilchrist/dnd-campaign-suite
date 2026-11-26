@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // bug-turn-start-automation-double-fires-with-second-client — GM-ownership guard
 // on the SSE-mirrored turn START pass. With a GM (localhost) tab and a LAN visitor
 // tab both on Initiative, every Next click POSTs the new activeCreatureName BEFORE

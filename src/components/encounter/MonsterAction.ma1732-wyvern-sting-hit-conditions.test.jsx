@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1732: Wyvern "Sting" — prose carries "the target has the Poisoned
 // condition until the start of the wyvern's next turn" but the row shipped
 // WITHOUT hit_conditions, so the Poisoned rider was structurally inert

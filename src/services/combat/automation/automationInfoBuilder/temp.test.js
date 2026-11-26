@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── temp.test.js — automationInfoBuilder temp slice (lane #952 template) ──
 // Unit home for the EXACT emitted info bytes of tempHandlers (temp.js):
 // temporary-buff / temporary-hit-point feature automation rows → handler-input

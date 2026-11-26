@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // ─── Lane: placed-token DELETE via the item context menu ──────────────────────
 // OWNED here — the end-to-end removal affordance for a placedItems token:
 //   - GM (localhost): right-click token → menu offers Delete → clicking Delete

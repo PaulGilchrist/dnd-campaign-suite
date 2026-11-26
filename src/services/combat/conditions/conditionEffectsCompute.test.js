@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Compute-canon lane: per-te and per-modifier fold math of computeConditionEffects,
 // pinned as EXACT changed-fields diffs vs the engine defaults (folded() — the
 // #998 helper). Any byte a fixture moves beyond DEFAULTS must appear in the row;

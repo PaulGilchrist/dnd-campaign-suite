@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0459 lane (cambion spellcasting bytes + save_dc seam).
+// @maintained-by-ai 2026-10-18 — MA-0459 lane (cambion spellcasting bytes + save_dc seam).
 // Trimmed 9→5 tests: generic chip-click/advisory/spend/refuse lanes cited-skipped
 // to owners (MonsterCardModal.spellcasting.test.jsx #588 — advisory :195, 1/Day
 // spend+refuse+store :281-315, 2/Day spend-to-zero+3rd-refuse :518-533; usage

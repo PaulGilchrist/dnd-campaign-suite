@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 6→2 tests (#523/#535/#537): this lane's DISTINCT
+// @maintained-by-ai 2026-10-18 — trimmed 6→2 tests (#523/#535/#537): this lane's DISTINCT
 // intents are (1) the BY-name disk lock for Tribal Warrior/Spear (#387 — ma1063
 // header explicitly delegates this row here: "1d8 + 1 literal also authors Tribal
 // Warrior/Spear — ma1608 owns that by-name row lock"), folding the Azer/MA-1063

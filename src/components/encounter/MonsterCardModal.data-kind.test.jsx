@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // EO 2026-11-08 backlog: every dice-link chip on a monster card carries a
 // `data-kind` attribute accurate to its row type (save / skill / attack /
 // spell / legendary / lair / ability / initiative / damage / reaction / aura /

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Regression lock for bug-music-editor-wrong-mood-default: the pencil button
 // promises "Edit tracks for this mood", but openEditor always seeded
 // MOODS[0] ('town') regardless of the active mood — misfiling typed tracks

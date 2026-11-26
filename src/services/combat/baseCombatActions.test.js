@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 import { describe, it, expect } from 'vitest';
 import * as baseCombatActions from './baseCombatActions.js';
 

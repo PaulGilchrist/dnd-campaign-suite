@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0909: Graveyard Revenant "Suffocate" grapple-rider fix — row shipped
 // WITHOUT hit_conditions/escape_dc (prose carries "Grappled condition (escape
 // DC 15)"), so the rider was structurally inert. Two-field DATA fix mirroring

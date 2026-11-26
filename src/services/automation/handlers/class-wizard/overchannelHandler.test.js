@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // overchannelHandler: deterministic automation popup handler, pure use-count
 // helpers over the (mocked) runtime store, and the CLA-244 necrotic backlash
 // damage table. No timers, no DOM — stable contract, no churn as the app moves.

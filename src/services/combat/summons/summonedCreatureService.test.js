@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: summonedCreatureService — summoned-creature roster/effects store utilities (SP-114).
 // Family map: sole owner lane — concentrationService, createCreatureHandlers,
 // createConcentrationHandlers, useLoggedDiceRollEventHandlers, applyDamage and the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0812: Giant Octopus "Tentacles" grapple-rider fix — hit_conditions
 // ["grappled","restrained"] + escape_dc 13 after damage_type_primary
 // (DC 13 = 8 + STR 3 + PB 2, description authority).

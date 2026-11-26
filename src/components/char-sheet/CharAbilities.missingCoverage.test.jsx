@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — modifier-stacking & runtime-store roll lane.
  * Owns behaviors no sibling lane covers:

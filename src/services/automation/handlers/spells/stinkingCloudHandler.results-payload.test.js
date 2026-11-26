@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // Condition-lane Results-face payload (improve-condition-aoe-results-face,
 // 2026-11-24): the sheet-cast Stinking Cloud chain used to close SILENTLY after
 // the last save prompt — handle()'s summary popup was dropped by the chooser

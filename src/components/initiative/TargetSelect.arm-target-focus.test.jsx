@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Lane: TargetSelect honors the "Arm a target" deep link (backlog 2026-11-24
  * run BA). The sheet refusal's button arms a name-matched, single-shot focus
  * request (armTargetSignal); the matching card's select takes focus on its

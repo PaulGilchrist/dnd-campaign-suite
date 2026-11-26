@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Pure, deterministic contract test for the infoPopup() helper:
 // builds an automation_info popup and Object.assign()s extraProps onto the
 // TOP-LEVEL result (never into payload; automation is passed by reference).

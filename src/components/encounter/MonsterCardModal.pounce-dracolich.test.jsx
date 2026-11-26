@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0620/MA-0621 regression: Dracolich legendary rows carried `uses:1` on
 // "Pounce" with no header row — legendaryHeaderAction() swallowed Pounce as
 // the economy header (MA-0567/MA-0510 header-swallow) and the prose spellcast

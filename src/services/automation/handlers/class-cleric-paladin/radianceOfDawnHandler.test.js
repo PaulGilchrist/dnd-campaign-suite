@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract suite for radianceOfDawnHandler: Channel Divinity charge
 // gate, modal payload shape, save/damage resolution, player save prompts, logging,
 // and popup HTML. Dice, damage application, and network are mocked; the only real

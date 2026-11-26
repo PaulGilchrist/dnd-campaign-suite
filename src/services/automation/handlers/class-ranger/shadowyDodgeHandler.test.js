@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Shadowy Dodge handler unit tests. Fully deterministic: every external
 // dependency (damageRollback, logService, runtime store, combat context,
 // rangeCheck, diceRoller) is mocked at module level, so every outcome (second

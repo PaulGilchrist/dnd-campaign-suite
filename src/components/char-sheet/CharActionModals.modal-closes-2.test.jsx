@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Tests for modal close handlers in CharActionModals.jsx:
 // - shieldBashModal / quiveringPalmModal close (setModalState null + dispatch refresh events)
 // - CelestialResilienceModal onSkip wiring

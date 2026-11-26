@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1859: Behemoth "Earthshaker (Recharge 5-6)" — "(Recharge 5-6)" was NAME-TEXT
 // ONLY: no `recharge` field authored, so the recharge gate resolved null → the DC 25
 // Strength save chip re-opened a full save prompt on every same-turn press with zero

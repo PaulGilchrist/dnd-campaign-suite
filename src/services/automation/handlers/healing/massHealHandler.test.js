@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Sole lane for massHealHandler.js (Mass Heal, level-9 hit-point pool distribution):
 // handle() opener routing (ally-list fallback, max-targets config, total-pool resolution)
 // and confirmMassHeal() application lane (per-target clamp to missing HP, runtime hitPoints

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx:410-428).
  * handleReset touches ONLY component-local useState (EncounterBuilder.jsx:161-209; sort
  * state at :214-215 is deliberately NOT wiped) —

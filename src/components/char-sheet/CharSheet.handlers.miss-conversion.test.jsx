@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Regression ledger for the Boon-of-Combat-Prowess hit-flag split
 // (bug-boon-combat-prowess-hit-flag-not-persisted): a miss converted to a hit
 // deals damage AS A HIT (Done dispatches dice-roll-done {hit:true}), so the

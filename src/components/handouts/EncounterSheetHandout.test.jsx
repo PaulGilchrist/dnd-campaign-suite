@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 encounter sheet handout contract: the SAVED pool row (name,
 // selectedMonsters refs, description, effectiveXP) renders a full roster
 // table whose CR/XP columns are derived from the bestiary rows the host

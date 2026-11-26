@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns the applyRelease() release-flow cleanup contract: the filter predicate
 // and `|| []` guard inside cleanupQuiveringPalmEffect. Popup happy path is
 // pinned in quiveringPalmHandler.test.js; the L285 addEntry log-catch is

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — click → roll context matrix (owner lane).
  * Owns the clicked-cell roll contract: which bonus reaches each roll fn and

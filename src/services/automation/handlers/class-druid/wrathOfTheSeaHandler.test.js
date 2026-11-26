@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Deterministic unit tests for the Wrath of the Sea automation handler: pure control
 // flow over fully-mocked runtime/log/combat/dice boundaries (rangeToFeet is REAL —
 // the 5-ft Emanation / 15-ft push defaults resolve through it). Pins the exact

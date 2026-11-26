@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // Carrying-capacity law lane for the fixed rules.js:394-399 facade + rules-core.js:23
 // bundle wiring (#1251). Pre-fix the facade delegated to abilityCalc.getHitPoints on
 // BOTH ternary branches, so every persisted character carried carryingCapacity === HP

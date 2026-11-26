@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // encountersService lane: owns the transport bytes of the encounter-CRUD client —
 // exact GET/POST/PUT/DELETE tuples against /api/campaigns/:campaign/encounters[/...],
 // campaign AND encounter names encodeURIComponent'd into every URL, exact envelope

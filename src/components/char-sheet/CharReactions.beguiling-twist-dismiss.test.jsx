@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // Save-dismiss leak pin for CharReactions.handleBeguilingTwistConfirm: the raw
 // 'save-result' listener (beguiling-twist producer) registered beside
 // createSaveListener's own listener used to be removed ONLY on a matching

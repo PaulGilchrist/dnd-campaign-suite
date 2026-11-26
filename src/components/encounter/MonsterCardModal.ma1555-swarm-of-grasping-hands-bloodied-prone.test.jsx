@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1555: Swarm of Crawling Claws "Swarm of Grasping Hands" — two inert prose riders
 // fixed on monsters.json actions[0]: (1) Bloodied 11 (2d8 + 2) Necrotic variant rides the
 // live MA-0007 GM-adjudication seam via conditional_damage (buildChargeBonusOffer arms on

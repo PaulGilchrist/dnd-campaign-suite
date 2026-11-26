@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1755 young-blue-dragon Sand Cloud chip — the ONLY young-specific fact at this
 // component seam: young-blue's card renders the [2] row as a clickable chip that opens
 // the zone+save composite picker carrying the distinct lair_sand_cloud te payload

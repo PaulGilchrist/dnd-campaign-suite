@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract suite for the CLA-317 sneak-attack gate in contextBuilder-sync.js
 // (computeSneakAttackDice / hasFlankingAlly). Fully mocked, no timers, stable 2024 rules —
 // no churn expected when the app changes.

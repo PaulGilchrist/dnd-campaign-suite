@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Monster-lane opportunity-attack resolution (bug-monster-oa-resolution-
 // auto-missed-by-melee-range-gate). The card's ONLY pre-fix resolution lane
 // was a generic melee chip gated on the mover's POST-move position — always

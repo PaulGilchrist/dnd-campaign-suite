@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-23
+// @maintained-by-ai 2026-10-14: 2026-10-23
 // MA-0367 inline-save seam (unique lane): fixture converted to helper-built
 // per #505 — context fields derive BY-name from the authored Bearded Devil/
 // Infernal Glaive disk row and the wound arm is BUILT via the PRODUCER

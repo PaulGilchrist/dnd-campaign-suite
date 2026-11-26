@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic error-path contract for applyShockwave(): both addEntry rejection
 // catches ([quiveringPalm] Error: at handler L191/L212 — owned exclusively here)
 // must log without throwing, and the `finalDamage ?? finalDamage` fallback in

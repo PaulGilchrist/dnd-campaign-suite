@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // @improved-by-ai
 // Staged-damage guard seam (hit-popup-backdrop-void-guard, 2026-11-11; the
 // shared-Popup dismissal law of 2026-11-16 routes dismissable={false} exactly

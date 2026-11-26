@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Tavern Brawler PUSH lane (owner of src/services/combat/steps/features/tavernBrawlerPush.js).
  * Contract: condition is a coarse gate (unarmed weaponType + hit !== false +

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // savePrompt.js — dropPendingSavePrompt (backlog 2026-11-03 save-prompt-queue-
 // dismiss-orphan). createSaveListener registers the promptId in the campaign
 // pendingSavePrompts bucket + pendingSaveListenerPrompts list; a DISMISSED

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-20
+// @maintained-by-ai 2026-11-20: 2026-11-20
 /* Lane: no-op re-click guard (improve 2026-11-20 backlog). Clicking the chip
  * of an ALREADY-PLAYING mood used to re-run selectMood wholesale — a second
  * POST /music with identical bytes, a second byte-identical `Set ambience: …`

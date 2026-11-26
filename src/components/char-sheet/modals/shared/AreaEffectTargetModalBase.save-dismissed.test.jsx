@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // AreaEffectTargetModalBase — save-dismissed forwarding (save-dismissed sweep
 // family, 2026-11-05). The base registers its save buses only while
 // `processing`; the new handleSaveDismissedOverride companion must mirror

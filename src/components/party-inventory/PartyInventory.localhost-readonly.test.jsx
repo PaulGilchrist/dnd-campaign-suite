@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // Regression lock for bug-player-clients-can-write-party-inventory — the Party
 // Inventory view must be READ-ONLY on non-localhost (network) clients: no +/-
 // currency chips, no Give, no Add Item, no item-row qty stepper/Edit/Move/Delete

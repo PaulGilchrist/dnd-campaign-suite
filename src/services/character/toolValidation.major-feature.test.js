@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // toolValidation MAJOR-feature lane (#2062): Fighter majors "Tool: " row extraction in
 // applyMajorFeatureGrants — the join where getMajorFeatureProficiencyChoices rows become
 // category limits (via equipment.json tool→category lookup) and flow into validateTools.

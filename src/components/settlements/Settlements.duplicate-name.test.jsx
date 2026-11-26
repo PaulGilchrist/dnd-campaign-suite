@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Lane: duplicate-name guard only (Settlements.jsx hasDuplicateName + inline error).
 // Collisions block save with an inline error and keep the modal open; editing an
 // existing settlement under its own name must never trip the guard; server-side

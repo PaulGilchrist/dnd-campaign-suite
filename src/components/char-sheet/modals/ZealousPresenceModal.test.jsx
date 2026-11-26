@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // ZealousPresenceModal is a thin props adapter over shared/CreatureSelectionModal.jsx with no
 // logic of its own. This file pins ONLY that seam: the exact props forwarded to the shared
 // modal — the hardcoded Zealous Presence copy (title/icon/description/confirm vs source) and

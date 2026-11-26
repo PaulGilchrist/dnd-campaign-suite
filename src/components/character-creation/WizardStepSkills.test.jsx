@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base lane for WizardStepSkills: disk-faithful skill rendering (names/abilities
 // are a verified subset of public/data/ability-scores.json as loadSkills() derives
 // { name, ability }), proficiency checkbox onChange payloads, expertise elevate/

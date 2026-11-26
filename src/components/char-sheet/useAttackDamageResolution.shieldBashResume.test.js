@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Shield Bash RESUME lane at the useAttackDamageResolution seam. Since
 // bug-sheet-attack-shield-bash-rider-drops-weapon-damage the chooser pauses
 // the real pipeline at _pausedStep:'shieldBashRider' AFTER proceedToDamage —

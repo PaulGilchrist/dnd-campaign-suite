@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // SP-094: Protection from Evil and Good charm immunity must be enforced on the

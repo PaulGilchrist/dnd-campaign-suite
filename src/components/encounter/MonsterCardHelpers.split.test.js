@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0399 Black Pudding Split + MA-1249 Ochre Jelly arming/species prose.
 // Row carries automation {type:'reaction', trigger:'bloodied_or_lightning_slashing',
 // effect:'split'}; the gate reads live combatSummary HP (bloodied: ≤ floor(maxHp/2)

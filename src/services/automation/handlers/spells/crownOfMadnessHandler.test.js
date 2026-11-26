@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Crown of Madness cast lane — canonical home for crownOfMadnessHandler.handle.
 // Live path (grep-verified 2026-10-16): spellCastService triggerSpells.js:255 'crown of madness'
 // → crownOfMadnessService.triggerCrownOfMadness → executeHandler → automation/index.js:549

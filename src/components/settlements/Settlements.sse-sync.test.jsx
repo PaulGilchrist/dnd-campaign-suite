@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-10-28: 2026-10-29
 // Live-sync contract for the Settlements manager (improve settlements-
 // sessions-no-list-sse): every settlements-list-<campaign> SSE event (per
 // server/routes/settlements.js broadcastSettlementsList: created/updated/

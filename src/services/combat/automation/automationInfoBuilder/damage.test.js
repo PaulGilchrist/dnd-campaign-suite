@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── Canonical unit home for the damage lane (family split map:
 // automationInfoBuilder.test.js — damage_bonus / damage feat-gate / GWF
 // feat-shape are pinned HERE; automationCollector.coverage.test.js cites

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Options lane for CharCharacterAdvancement (siblings: .rendering.test.jsx owns
 // grouping/filtering, .coverage.test.jsx owns the live sanitizeHtml wiring):
 //   - automation.options rendering (string/object/mixed)

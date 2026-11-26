@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Roadmap Item 10 (sensory cues) — the per-client SFX settings widget on the
 // Music control row. Runs against the REAL audioCues service + the global
 // Audio mock (setup.js): the widget's contract is the localStorage pref bytes

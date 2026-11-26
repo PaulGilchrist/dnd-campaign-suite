@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic handler-contract suite: pins handle()/confirmMistyWanderer() return shapes,
 // the owned _<FeatureName>_freeCastCount runtime pool key (exact-key pins), full-string own
 // popup/log composition, and CLA-229 logging. Only churns if handler behaviour changes on purpose.

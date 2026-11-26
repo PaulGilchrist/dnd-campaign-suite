@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-130 rest-lane lock: 2024 Paladin lv5 Faithful Steed (classes.json
 // free_spell uses:1 recharge:"long_rest") spends `_Faithful_Steed_freeCastCount`
 // to 0 via spellPreparationService.adjustRechargeCounter. The spent 0 must

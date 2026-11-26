@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // FT-103 char-sheet UI lane — delegation pins only for the Reactive Strike row.
 // Row clickability, the generic hasAutomation → executeHandler dispatch lane, and
 // the non-clickable contrast are pinned in CharReactions.edgeCases.test.jsx (FT-103);

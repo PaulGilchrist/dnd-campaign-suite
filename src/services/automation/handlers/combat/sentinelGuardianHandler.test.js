@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Pure handler contract: deterministic output from mocked damageUtils/logService deps.
 // Pins FT-100 Sentinel(Guardian) lane registered in automation/index.js (sentinel_guardian).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

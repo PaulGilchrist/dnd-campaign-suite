@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1847: Apep "Devour the Boat" save-lane no-heal rider — failed DC 26
 // CON save grants the registered 'no_healing' te on the victim sourced from
 // the attacker (MA-0016 byte-shape: duration until_start_of_next_turn) with

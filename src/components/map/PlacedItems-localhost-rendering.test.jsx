@@ -1,4 +1,4 @@
-//@maintained-by-ai
+//@maintained-by-ai 2026-10-19
 // PlacedItems localhost-gating render lane: the isLocalhost true/false pair for
 // NPCs — token bytes survive identically for network clients, while GM-only
 // affordances (transparent grab hit rect, drag highlight) render on localhost

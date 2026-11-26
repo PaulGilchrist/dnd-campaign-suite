@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Consumerless save-prompt resolution (bug-shieldbash-save-resolved-after-reload-is-a-dead-end).
 // A save prompt REPLAYS after a tab reload by design (SSE snapshot law), but the
 // createSaveListener continuation that consumes the modal's local `save-result`

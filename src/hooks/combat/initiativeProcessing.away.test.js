@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // processInitiativeRoll split-party face: an away PC's roll is shown + logged
 // but NEVER stamped onto the tracker, no initiative-rolled seam fires, and
 // the concentration/expiration upkeep is skipped. Base roll tail pinned in

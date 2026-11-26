@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // choiceStorage.js is a thin, stable wrapper: key mangling plus delegation to the
 // in-memory runtime store (fetch is inert in tests via src/test/setup.js).
 // This suite pins that public contract and should need no churn as the app changes.

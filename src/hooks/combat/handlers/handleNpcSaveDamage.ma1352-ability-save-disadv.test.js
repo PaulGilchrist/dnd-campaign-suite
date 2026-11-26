@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1352: NPC-inline save-roll consumer for the ability-scoped
 // ability_save_disadvantage te (Psychic Gray Ooze Pseudopod hit-clause):
 // disadvantage (2d20, min) on saves of the te's ability ONLY, other save

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Peerless Athlete self-buff activation contract: already-active guard, Channel Divinity
 // charge spending (with maxCharges fallback), activeBuffs append, expiration, and logging.
 // Deterministic — all dependencies mocked, no timers, no DOM.

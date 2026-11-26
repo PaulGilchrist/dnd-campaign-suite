@@ -5,7 +5,7 @@
 // Roll-time consumer computeSubtractDiePenalty covered in
 // d20RollComputation.subtract-die.test.js; legendary uses:3 economy in
 // monsterLegendaryUses.test.js.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { describe, it, expect } from 'vitest';
 import { parseSubtractDieClause } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Results lane for AOEConditionModal: (1) activeConditions deduplication on fail-apply,
 // (2) trap blocking exclusion of eligible targets (full source-distinguishing branch
 // matrix of the component-local isTargetExcludedByTraps). Save resolution/prompts/logging

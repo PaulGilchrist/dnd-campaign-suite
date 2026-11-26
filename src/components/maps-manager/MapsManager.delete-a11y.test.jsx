@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Accessibility pin for the Delete-map confirm (backlog 2026-11-01 AY):
 // role="dialog" + aria-modal + labelled-by the "Delete Map" heading, discoverable
 // by standard [role=dialog] probes, with a working focus trap. Mirrors the

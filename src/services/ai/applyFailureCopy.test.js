@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Backlog 2026-11-22 (UI) — the failed-apply copy law: plain-English sentence
 // first, raw transport error only as a BOUNDED tail (a proxy HTML 500 page
 // must never flood the .ai-notice). Deterministic pure-function contract,

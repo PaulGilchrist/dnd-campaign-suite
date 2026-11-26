@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0063: Adult Blue Dragon Sand Cloud lair row — CANONICAL zone+save picker
 // template (CON DC 15, no damage, blinded 1 min) mirroring MA-0042 Insect Cloud.
 // CANONICAL TEMPLATE: young-blue (MonsterCardModal.lair-sand-cloud-young-blue

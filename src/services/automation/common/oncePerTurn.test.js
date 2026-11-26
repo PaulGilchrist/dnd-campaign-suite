@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the once-per-turn latch contract (FT-082:
 // re-arm is round-scoped off the holder's own store, never the stale
 // cs.activeCreatureName mirror). Stable pure behaviour — no app churn needed.

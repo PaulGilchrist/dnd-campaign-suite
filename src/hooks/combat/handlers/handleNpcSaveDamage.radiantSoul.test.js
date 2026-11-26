@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-279: single-target save spells consume the Radiant Soul once-per-turn flag
 // at save-damage application time when the formula carries the execution-owned adder.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

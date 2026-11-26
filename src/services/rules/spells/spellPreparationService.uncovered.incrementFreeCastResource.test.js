@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // uncovered.incrementFreeCastResource.test.js — uses_expression SHARED-BRANCH
 // loop arms, RESTORE (rollback) side only. Routed by the MASTER table (base

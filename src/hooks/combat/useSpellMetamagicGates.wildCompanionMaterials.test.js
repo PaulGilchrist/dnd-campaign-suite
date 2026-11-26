@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // CLA-388 Wild Companion material-waiver seam of gateMetamagic (useSpellMetamagicGates.js
 // hasWildCompanionWaiver / isBlockedByConsumedMaterial / handleNonSorcererCast consumption).
 // 2024 classes.json (Druid lv2): "expend a spell slot or a use of Wild Shape to cast the

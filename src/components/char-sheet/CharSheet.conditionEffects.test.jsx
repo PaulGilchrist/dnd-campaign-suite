@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSheet RENDER prop-flow lane. computeConditionEffects (service) is mocked;
 // computeCharConditionEffects in CharSheet.conditionEffects.js runs for real, so
 // tests here pin how its outputs reach child components plus the sheet-side

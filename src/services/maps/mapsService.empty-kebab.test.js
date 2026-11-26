@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // mapsService.empty-kebab.test.js — regression for bug-map-name-empty-kebab-undeletable-dotfile.
 // A map name whose kebab handle is empty (punctuation-only like '!!!', emoji,
 // non-Latin scripts) collapses the lane URL to `/maps/` — which the runtime-store

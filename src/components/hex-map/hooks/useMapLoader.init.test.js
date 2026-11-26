@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /*
  * useMapLoader — init lane (observable state before any load resolves).
  *

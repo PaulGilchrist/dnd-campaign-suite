@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-10
+// @maintained-by-ai 2026-11-10: 2026-11-10
 // Owner ruling 2026-11-10 (bug-turnlock-spell-denial-pays-slot-and-material):
 // an enforcement turn-lock DENIAL on the sheet spell-cast lane must cost
 // NOTHING — the gateMetamagic entry gate (mirroring the attack lane's

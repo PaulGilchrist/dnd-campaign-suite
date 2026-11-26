@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-182 Improved Brutal Strike lane: the two hook-side seams the selection
 // service suite does NOT cover — (1) a handleAttackClick with lv9+lv13 riders
 // tied on dice count opens the chooser with the IMPROVED rider's payload

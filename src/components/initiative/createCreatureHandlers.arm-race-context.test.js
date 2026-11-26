@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-12
 // Regression (bug-race-arm-patch-beats-swap-clear-post): the scoped arm PATCH is
 // coalesced ~120 ms client-side, so cross-tab it could land AFTER a concurrent
 // control swap's full-board POST (which deletes targetName on the same write, per

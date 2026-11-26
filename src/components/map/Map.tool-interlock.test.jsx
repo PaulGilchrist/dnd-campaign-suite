@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // ─── Lane: Map tool MODE INTERLOCK (ruler ↔ spell ↔ paint/erase/select) ───
 // Pins the bidirectional exclusivity that the ruler-not-interlocked bug broke:
 //   face (a): arming Spell while the ruler was armed left the wand visually

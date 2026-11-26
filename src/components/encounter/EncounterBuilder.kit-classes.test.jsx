@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /* Lane — .ct-* design-kit convergence (QA backlog tranche 1, Encounters view):
  * the EncounterBuilder root carries .ct-container (the App.css kit scope) and
  * its toolbar/action buttons render with the shared kit hierarchy: Save/Load/

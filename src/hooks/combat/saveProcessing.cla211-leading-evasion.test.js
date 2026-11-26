@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-211: the prompt-save lane folds Leading Evasion ONLY on the GM's
 // chooser selection. saveResult.evasionActive (dispatched synchronously with
 // the save-result event) is preferred; the leadingEvasionSelections stamp is

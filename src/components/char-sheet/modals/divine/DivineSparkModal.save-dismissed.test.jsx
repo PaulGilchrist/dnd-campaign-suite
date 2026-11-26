@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // DivineSparkModal — dismiss-softlock regression (bug 2026-11-05). The Harm
 // branch parks the modal on the `save-result` window event; a GM Dismiss on
 // the un-rolled save prompt never dispatches one (dismiss doctrine — a

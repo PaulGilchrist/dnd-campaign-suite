@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /* Lane: starter-checklist "Join <wave>" deep link (backlog 2026-11-11 KW) —
  * a fired encounter-load signal auto-opens the EXISTING Load modal
  * (saved-wave list) without a manual Load click, single-shot: requests made

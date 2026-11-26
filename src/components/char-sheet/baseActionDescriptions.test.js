@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // Contract: every base action listed in public/data/actions.json resolves to a
 // non-empty hover tooltip, and Dodge is ruleset-aware (2024 drops the Dex-save
 // advantage clause — mirrors handleDodgeAction's dexSaveClause branch).

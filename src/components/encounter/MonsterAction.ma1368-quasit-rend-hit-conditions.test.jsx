@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1368: Quasit "Rend" — prose carries "Hit: 5 (1d4 + 3) Slashing damage,
 // and the target has the Poisoned condition until the start of the quasit's
 // next turn" but the row shipped WITHOUT hit_conditions, so the rider was

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-26
+// @maintained-by-ai 2026-10-26: 2026-10-26
 // Lane: read-only description panel in the indoor map editor header
 // (backlog 2026-10-26: descriptions surfaced nowhere read-only). The panel
 // mounts under MapToolbar and self-gates: non-empty description renders

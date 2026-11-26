@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 import { render } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 

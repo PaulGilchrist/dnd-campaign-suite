@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // WizardStepFeats owns: the feat-step wiring over SelectableList (SelectableList.test.jsx
 // owns the shared list/search/toggle internals), the exact onArrayFieldChange payloads
 // through this component's checkbox/Add Another/Remove One controls, the selection-count

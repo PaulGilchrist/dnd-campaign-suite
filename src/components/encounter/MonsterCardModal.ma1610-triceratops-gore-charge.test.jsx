@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1610: Triceratops Gore — one-field DATA fix: conditional_damage
 // {dice:"2d8",damage_type:"Piercing"} (modifier unauthored) on monsters.json
 // Gore row so the HIT popup offers "20+ ft Charge: +2d8 Piercing?" + decline

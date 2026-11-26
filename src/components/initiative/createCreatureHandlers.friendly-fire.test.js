@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Lane: createCreatureHandlers.js friendly-fire confirm (Phase 3.2 betrayal,
 // arena-starter §4; migrated off native window.confirm 2026-11-04 CQ). Arming
 // a target from the attacker's OWN ally list routes the pending pair to the

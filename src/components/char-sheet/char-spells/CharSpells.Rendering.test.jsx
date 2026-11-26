@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharSpells rendering tests: how a spell row READS — effect labels, level,
  * duration/time/notes formatting, the prepared cell's text variants, the

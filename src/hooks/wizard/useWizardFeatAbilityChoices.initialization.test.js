@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: saved-choice DEFAULTS written through the setFormData payload when the
 // mount effect initializes featAbilityChoices (needsInit branch of
 // useWizardFeatAbilityChoices.js) — fixed-group default assignment, choice-group

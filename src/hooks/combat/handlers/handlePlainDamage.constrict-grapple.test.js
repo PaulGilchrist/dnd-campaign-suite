@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1842: Apep Constrict ongoing grapple-damage producer — the hit-clause
 // leg registers the registered constrict_grapple te + ONE rounds:100 backstop
 // clock ONLY while Grappled stands on the victim, and logs every grant and

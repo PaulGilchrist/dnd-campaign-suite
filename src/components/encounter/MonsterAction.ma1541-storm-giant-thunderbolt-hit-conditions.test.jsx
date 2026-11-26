@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — trimmed 6→2 tests: tuple-miss disk
+// @maintained-by-ai 2026-10-18: 2026-10-18 — trimmed 6→2 tests: tuple-miss disk
 // fingerprint BY NAME (folded: key placement, core legs + prose anchor,
 // decoy noise, clause arm, inert siblings) + sole press identity only.
 // MA-1541: Storm Giant "Thunderbolt" — prose carries "Hit: 22 (2d12 + 9)

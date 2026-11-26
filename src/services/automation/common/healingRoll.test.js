@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit coverage for the LIVE exports of healingRoll.js: applyHealingDirectly +
 // logHealingToSSE (heal choke points used by healingHandler, bonusAttacksHandler,
 // initiativeHandler, postCastHealService, CharActionModals).

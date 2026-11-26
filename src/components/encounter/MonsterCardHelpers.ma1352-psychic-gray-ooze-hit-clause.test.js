@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1352: Psychic Gray Ooze Pseudopod — "the target has Disadvantage on
 // Intelligence saving throws until the end of the ooze's next turn" was a
 // prose-only rider (no structured keys, zero te) and stayed inert. The fix is

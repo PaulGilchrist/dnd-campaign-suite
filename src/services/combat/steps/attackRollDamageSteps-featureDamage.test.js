@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: feature-driven damage in the attack pipeline — the two post-damage-calc steps owned by
 // attackRollPostDamage.js. Services (features/*.js, automation handlers) own grant/consume store
 // and per-spell internals (#945-#951); THIS lane pins only the pipeline-step bytes of the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── FRAMEWORK LANE: isInteractiveAutomation generic contract (automationService.js:110) ──
 // Owns the framework semantics ONCE: registered-type lookup, automation-array mirror-scan
 // (.some — any interactive half makes the row clickable), the passive_rule interactive-effect

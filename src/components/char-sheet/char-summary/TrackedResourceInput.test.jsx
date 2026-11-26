@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * TrackedResourceInput is a thin seam: it wires props into useTrackedResource,
  * displays "Label: current/max", and toggles an inline editor via click/Enter.

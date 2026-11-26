@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /**
  * Regression lock for bug-admin-upload-cancel-keeps-file-selection: dismissing
  * the "Upload Campaign" confirmation modal (Cancel or the × close) must reset

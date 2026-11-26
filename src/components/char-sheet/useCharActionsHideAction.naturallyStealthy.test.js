@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-177 lane: branches unique to Naturally Stealthy in handleHideAction —
 // the hasNaturallyStealthy eligibility gate, larger-obscuring-creature resolution
 // (inline combatSummary size vs monsters.json fallback), the 5-ft range seam, and

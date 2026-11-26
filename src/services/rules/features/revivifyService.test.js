@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // BASE lane (21 -> 8 tests). Sibling split (headers verified):

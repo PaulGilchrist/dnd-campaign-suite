@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── reaction.test.js — automationInfoBuilder reaction slice (lane #952 template) ──
 // reactionHandlers builder contract: census guard + exact bare defaults +
 // full-custom passthrough + derived-numeric behavior + name/null-automation

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Barrel lane for expirations.js → turnStartEffects.js: effect handlers NOT
 // pinned elsewhere — ensureArray guard (full-message pin),
 // vitalityOfTheTree_turn_start, aura_of_life_turn_start_heal (log included),

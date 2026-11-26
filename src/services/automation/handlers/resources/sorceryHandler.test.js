@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // sorceryHandler.js — Innate Sorcery lane (2024 Sorcerer resource economy).
 // index.js HANDLER_MAP dispatches `sorcery_aura` and `sorcery_incarnate`
 // here (public/data/2024/classes.json: aura uses=2 long_rest, incarnate

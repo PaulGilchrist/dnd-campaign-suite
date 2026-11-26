@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LootEntry lane: owned contract = the standalone loot log entry's OWN render
 // bytes — header icon/title/fixed-epoch time, exact XP byte incl. \u00a0 separator
 // (#829 exact bytes over regex), exact ordered <li> item census (#781), XP→items

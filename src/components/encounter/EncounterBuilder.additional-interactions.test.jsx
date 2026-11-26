@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // EncounterBuilder lane: interactions NOT owned by sibling files.
 // Owned elsewhere (do NOT duplicate here):
 //   - panel-interactions.test.jsx  — checkbox toggle, qty +/-, remove, clear all,

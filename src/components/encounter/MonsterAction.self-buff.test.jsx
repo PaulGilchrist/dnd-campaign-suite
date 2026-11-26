@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Self-buff CHIP component lane (SelfBuffLink, MonsterAction.jsx:280-293):
 // one press pattern, once. Arms exactly one .mc-dice-link-selfbuff per
 // monster_self_buff row (icon per effect, uses counter or honest At Will

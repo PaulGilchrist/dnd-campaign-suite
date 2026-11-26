@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Terminal chooser handlers (confirm/cancel) of useCharActionsAttackHandlers —
 // the modal-resolved half of the attack lane: buff arming, sticky arm/clear
 // safety (CLA-044), once-per-turn spend, logs, and the terminal roll through

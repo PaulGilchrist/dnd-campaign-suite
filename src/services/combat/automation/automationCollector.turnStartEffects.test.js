@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: collectTurnStartEffects builder-row exhaustiveness + exact envelopes + gates
 // (TURN_START_EFFECT_BUILDERS in ./turnStartEffects.js — both dispatch lanes:
 // passive_rule→effect key and raw type→type key). Pure dispatch function: no mocks,

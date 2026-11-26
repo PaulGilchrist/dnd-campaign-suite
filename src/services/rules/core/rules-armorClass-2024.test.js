@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // 2024-only divergences of rules.getArmorClass (rules-armorClass.js).
 // Shared rows are pinned VERBATIM elsewhere and are NOT repeated here:
 //  - 5e twin core/rules-armorClass.test.js: unarmored baseline 10 + Dex

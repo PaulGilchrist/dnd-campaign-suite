@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Nick off-hand latch + Dual Wielder feat lanes of 2024 getAttacks, real builders
 // end-to-end per the #1235-#1239 canon: the wholesale attackCalc.js builder stubbing
 // and the collectWeaponMastery mock are retired — every expectation below is canonical

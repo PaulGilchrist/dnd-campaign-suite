@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // AreaEffectSaveFlow.utils.rollNpcSave — saveBonus key-contract regression.
 // Confirmed defect (test-maintain-bugs ledger): combatSummary saveBonuses
 // carry lowercase-abbreviation keys (getMonsterSaveBonuses / CLA-303), but

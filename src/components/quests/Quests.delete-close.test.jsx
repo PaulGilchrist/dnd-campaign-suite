@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // Regression test for bug-quest-edit-modal-stays-open-after-delete:
 // an accepted delete that resolves MUST unmount the Edit Quest modal
 // (mirroring NPCs/Notes/Factions/Sessions handleDelete close-on-success).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: handle() in celestialResilienceHandler.js — null-map popup, modal routing (result.allies →
 // creatureTargets payload), popup composition ('No allies in range' suffix and self-only fallback),
 // ability_use logging, and the addEntry rejection catch. Grant-side canonical gates (patron,

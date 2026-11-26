@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1868: Cthulhu "Psychic Shatter" — regular (non-legendary) action row,
 // numeric save_dc → the save chip resolves through the regular save-chip lane
 // (MonsterCardModal handleSaveRoll) and NEVER reaches expendLegendaryUse, so

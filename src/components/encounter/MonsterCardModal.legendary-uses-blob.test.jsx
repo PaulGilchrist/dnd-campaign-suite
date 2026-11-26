@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to blob-distinct lanes: by-name data locks
+// @maintained-by-ai 2026-10-18 — trimmed to blob-distinct lanes: by-name data locks
 // (header uses:3, Decay 4d6 auto-damage, Grasping Glob/Lashing Goo delegates)
 // + one effect-distinct click per lane (auto-damage ctx, delegated save ctx,
 // delegated attack ctx). Generic exhausted/latch/own-turn/cooldown/refusal/

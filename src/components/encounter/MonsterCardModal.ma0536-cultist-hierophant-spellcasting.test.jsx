@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0536 data lock: Cultist Hierophant Spellcasting — near-exact twin of the
 // MA-0532 lane on the MA-0421 markup-gap template (save fields already
 // authored). Pre-fix ONLY tier headers carried <strong>; Mage Armor/

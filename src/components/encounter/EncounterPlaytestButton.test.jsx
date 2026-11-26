@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // EncounterPlaytestButton — EB's Playtest CTA (plan 2026-11-25). Owns ONLY
 // the button/modal wiring: one-test-at-a-time locking while a stamp is
 // active, the confirm-copy name resolution, start wiring (args + onStarted

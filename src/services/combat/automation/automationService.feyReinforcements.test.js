@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── INTERACTIVE LANE: fey_reinforcements row clickability (CLA-138, #961 family) ──
 // Dead-button regression (commit "Fey Reinforcements — Special Actions button not
 // wired up"): 'fey_reinforcements' was missing from INTERACTIVE_HANDLER_TYPES, so

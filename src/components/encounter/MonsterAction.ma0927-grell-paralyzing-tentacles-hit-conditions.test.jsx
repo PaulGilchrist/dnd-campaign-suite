@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0927: Grell "Paralyzing Tentacles" three-field fix — disk prose governs
 // (save_dc:11 = CON save DC; escape_dc:12 = GRAPPLE escape, ticket's "12" is
 // the escape half). save_dc/save_type before save_effect (MA-0860/0918 byte-

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Contract tests for the Font of Inspiration automation handler.
 // Deterministic: handle(action, playerStats, campaignName) is a pure function of
 // (action name, charisma bonus, spell slot maxes, runtime state) → popup payload +

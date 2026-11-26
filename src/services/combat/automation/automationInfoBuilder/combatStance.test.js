@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── combatStance builder unit (automationInfoBuilder family) ────────────────
 // Canonical home for the combat_stance builder ENVELOPE (flat per-type pins
 // were deleted at #2093; the facade automationInfoBuilder.test.js routes this

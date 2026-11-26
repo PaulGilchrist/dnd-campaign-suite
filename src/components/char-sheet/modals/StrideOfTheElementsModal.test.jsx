@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * Ownership: StrideOfTheElementsModal.jsx — the movement-mode chooser UI: instruction
  * copy, exactly four STRIDE_OPTIONS rendered as exclusive radios, pre-confirm inertness,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // GENERIC fallback lane — leaf content for LogGenericEntry.jsx (bug-log-api-ghost-entries).
 // Unregistered entry types (or raw API posts) must render an honest row: type
 // label + readable text excerpt, never a silently invisible ghost. Routing

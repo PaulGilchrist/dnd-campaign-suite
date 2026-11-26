@@ -3,7 +3,7 @@
 // (refusal popup + transposition_refused log when absent) and a confirmed
 // swap must persist a teleport_swap_with_illusion te mirror + ability_use log
 // (CLA-357 telekinetic_movement model).
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmTeleport } from './tempTeleportHandler.js';

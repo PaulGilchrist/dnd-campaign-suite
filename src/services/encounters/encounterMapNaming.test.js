@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Encounter battle-map display-name seam (backlog 2026-10-25 pm): the label
 // built here is what BOTH the Maps list (via the map document's displayName)
 // and the auto_encounter_started audit show — one source of truth so the log

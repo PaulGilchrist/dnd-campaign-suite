@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // dungeonNamegen.wordEcho.test.js — dedupe pass for prefix/suffix word echoes.
 //
 // Premise (QA backlog 2026-11-03 CK): the pools overlap on whole words —

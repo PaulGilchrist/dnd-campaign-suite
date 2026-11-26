@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: grantCelestialResilience in celestialResilienceHandler.js — canonical pins for the
 // patron gate, feature/automation gates, self temp HP guard + setTempHp, ALLY_GRANT_SOURCES
 // source gating, ally range collection (map players → combatSummary fallback), and grant-side

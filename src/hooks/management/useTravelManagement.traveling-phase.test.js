@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Lane: useTravelManagement's L5 §10.1 session-phase producer (bug-travel-phase-
 // traveling-never-set). The phase-OWNERSHIP seam (who may clobber an armed
 // phase) is owned by useTravelManagement.session-phase.test.js; the phase state

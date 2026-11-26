@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1571: Swarm of Wasps Bites — conditional_damage:{dice:"2d4",damage_type:"piercing",
 // condition:"half HP or fewer"} authored on monsters.json swarm-of-wasps actions[0] so the
 // HIT popup offers the "or 5 (2d4) piercing damage if the swarm has half of its hit points or

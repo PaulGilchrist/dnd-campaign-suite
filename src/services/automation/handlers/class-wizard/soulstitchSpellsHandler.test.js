@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the CLA-321 soulstitch spells handler (production-live:
 // registered as soulstitch_spells in services/automation/index.js; applySoulstitchSelection
 // called from SoulstitchSpellsModal.jsx). Fully mocked boundary deps; no timers.

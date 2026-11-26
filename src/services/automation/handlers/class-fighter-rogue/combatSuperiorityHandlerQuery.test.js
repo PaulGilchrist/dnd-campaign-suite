@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // combatSuperiorityHandlerQuery.test.js — Query-lane baseline for the maneuver
 // option builders behind the combatSuperiorityHandler barrel (combatSuperiorityQueries.js
 // + dispatchers.js): early-return gates (no known maneuvers / no superiority dice),

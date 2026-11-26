@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0374 / MA-0383: Beholder Eye Rays service. Failed-save grants are driven
 // from monsters.json ray rows (Beholder d10 table, DC 16; Beholder Zombie d4
 // table, DC 14) — every expectation is derived from disk, never hand-transcribed.

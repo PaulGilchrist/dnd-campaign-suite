@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 import { isWithinRange, isDistanceInRange, isWithinRangeOf } from './rangeCheck.js';
 import * as mapsService from '../../maps/mapsService.js';
 

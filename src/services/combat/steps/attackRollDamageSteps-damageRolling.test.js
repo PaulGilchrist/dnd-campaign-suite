@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // damageRolling lane — the dice-rolling pipeline legs of the attackRollDamageSteps
 // pipeline: buildRollBaseDamageStep / buildBuildContextStep / buildSneakAttackStep
 // (attackRollDamageCalc.js, composed at attackRollDamageSteps.js:14-16). Steps are

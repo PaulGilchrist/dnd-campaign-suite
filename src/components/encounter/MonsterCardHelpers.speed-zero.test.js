@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0146: parseSpeedZeroClause parser contract — source pins /speed is 0\b/i
 // → { effect:'speed_zero' } (MonsterCardHelpers.js:85-88). Adult White Dragon
 // Freezing Burst authored failed-save "the target's Speed is 0" clause arms the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Pure handler contract: deterministic output from mocked damageUtils/logService/runtimeStore deps.
 // Pins FT-101 Sentinel(Halt) lane registered in automation/index.js HANDLER_MAP (sentinel).
 // te write is pinned as setRuntimeValue delegation with the exact speed_zero effect object;

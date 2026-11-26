@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-23
+// @maintained-by-ai 2026-10-15: 2026-10-23
 // MA-0367 (PC-target combo save-result seam): Bearded Devil Infernal Glaive —
 // a failed DC 12 CON save inflicts the wound via infernalWoundService; the
 // dc_success:"full" arm keeps the attack damage FULL on BOTH outcomes (the save

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2071: Ziz "Blinding Ascent" legendary child (legendary_actions, by name)
 // — formerly a prose-only row that spent a legendary use unconditionally and
 // died in the console.error at MonsterCardModal.jsx resolveLegendaryRowMechanic

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // P4-c (§10.3) auto-rewards lane — owns ONLY the Clear-Combat contract:
 // enforcement gate, kills-only refusals, floor(total/party) XP split through
 // the runtime 'xp' lane, exact audit logs. Loot GENERATION is owned by the

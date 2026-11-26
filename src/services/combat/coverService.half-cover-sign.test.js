@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Regression lock — RAW sign of the §8.3 zones half-cover lane (bug-zones-half-cover-ac-sign-inverted).
 // Half cover RAISES the target's AC by +2 (PHB 2024 ch.9; the app's items/walls
 // lanes already model cover as a positive coverAcBonus: +2/+5 folded ADDITIVELY

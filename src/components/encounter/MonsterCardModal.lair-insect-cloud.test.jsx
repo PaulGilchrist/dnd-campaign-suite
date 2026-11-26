@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0042 + MA-1749: black-dragon Insect Cloud lair row — structured zone row
 // with an authored 20-ft zone (adult lair_actions[1]; young lair_actions[2]
 // byte-mirrors it via the MA-1749 data fix, so both dragons ride the same

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1894: Fenrir "Winter's Howl (Costs 2 Actions)" save core adjudicated
 // honestly (DC 24 CON, saveResult machine-stamped) but applied NOTHING on
 // fail — the primary Frightened payload was prose-only in `description`,

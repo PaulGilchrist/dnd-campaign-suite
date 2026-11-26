@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic handler contract: all deps mocked, static inputs,
+// @maintained-by-ai 2026-10-15 — deterministic handler contract: all deps mocked, static inputs,
 // exact payloads pinned. Only rework if the handler's popup/toggle/expiration contract changes.
 import { handle, isPassWithoutTraceActive } from './passWithoutTraceHandler.js'
 import { toggleBuff } from '../../common/buffToggle.js'

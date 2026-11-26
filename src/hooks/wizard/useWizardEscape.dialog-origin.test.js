@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-26
 // Regression lock for bug-wizard-discard-toll-escape-rearm-loop: a trusted
 // Escape with focus inside the dirty-draft Discard toll settles the toll at
 // React's #root delegate, React 19 flushes the unmount synchronously WITHIN

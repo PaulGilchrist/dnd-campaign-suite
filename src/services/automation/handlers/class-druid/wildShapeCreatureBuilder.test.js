@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract pins for the Wild Shape activate/cleanup orchestrator.
 // Every service dependency is mocked; no timers, dice, DOM, or wall-clock logic.
 // Update only when the wildShapeCreatureBuilder.js contract genuinely changes.

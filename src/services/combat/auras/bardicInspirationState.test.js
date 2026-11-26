@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // bardicInspirationState lane — unit home for the granted-inspiration runtime
 // readers (consumers: the popup-inline BI offer/commit lanes — handlePlainDamage.js
 // and useLoggedDiceRollAttack.js gate the offense button through

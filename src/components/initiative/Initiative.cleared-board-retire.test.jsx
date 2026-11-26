@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pin (component face) — bug-admin-clear-leaves-mounted-boards-
 // stale-resurrects-data. Admin clear-change-data publishes
 // change-<c>-combatSummary with a null payload so mounted tabs retire; the

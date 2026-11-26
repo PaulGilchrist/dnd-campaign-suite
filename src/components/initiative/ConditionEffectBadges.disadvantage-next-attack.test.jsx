@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Golden lane for the disadvantage_next_attack badge (CLA-158): the badge face
 // comes from the targetEffectDefinitions registry (golden-bytes-once #820) and
 // the tooltip must cite the effect's source. Owned elsewhere: dedupe collision

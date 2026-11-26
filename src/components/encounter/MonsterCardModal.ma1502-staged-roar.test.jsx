@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1502 regression: Sphinx of Valor Roar launcher click path. The disk row
 // is MA-0268 byte-shape staged (staged_roar:true, numeric uses/maxUses:3,
 // DC 20, 500-foot Emanation) with a ROW-AUTHORED roar_stages[] payload —

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-05
+// @maintained-by-ai 2026-11-05: 2026-11-05
 // Shared "?" placeholder def (mounted in Map.jsx <defs> as #generic-prop) for
 // placed-item rows whose `type` has NO sprite art and NO bespoke symbol —
 // legacy rows and AI-Dress-invented types (bug-unregistered-placeditem-type-

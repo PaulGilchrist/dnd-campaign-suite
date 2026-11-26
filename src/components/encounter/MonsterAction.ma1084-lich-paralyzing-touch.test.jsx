@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1084: Lich "Paralyzing Touch" — prose carries "Hit: ... the target has
 // the Paralyzed condition until the start of the lich's next turn" but the
 // row shipped WITHOUT hit_conditions, so the condition rider was structurally

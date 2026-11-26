@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1223 family base (#976 owner ruling, reaffirmed #1084): owns ALL generic
 // normal-ACTION advisory machinery — detector admission/truthiness, popup/log
 // builder chrome + honest fallback copy, one-press + refire record-only

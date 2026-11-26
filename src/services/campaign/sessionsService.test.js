@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /**
  * sessionsService — client-side fetch contract for the GM sessions family.
  *

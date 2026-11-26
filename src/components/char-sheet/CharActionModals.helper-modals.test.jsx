@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharActionModals host-prop tests for helper modals: what the host passes
 // INTO the shared selection modals (title, description, note, showHp, merged
 // target lists) plus skip lanes not covered by sibling files.

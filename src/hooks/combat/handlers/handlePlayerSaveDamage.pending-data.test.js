@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Owns the pendingSave data-shape contract: the record written into
 // pendingSaves[promptId] (and handed to pendingSaveRegistry) BEFORE the
 // player's save prompt resolves. Sibling lanes: adv/dis resolution →

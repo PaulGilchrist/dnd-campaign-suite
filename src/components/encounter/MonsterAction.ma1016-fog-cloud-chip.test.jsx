@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1016: Ice Mephit "Fog Cloud" — innate utility row (spellcasting_ability
 // Charisma, NO spell_save_dc, 1/Day) formerly rendered ZERO affordance (the
 // MA-1014 predicate required spell_save_dc != null). Fix lane: predicate

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // NARRATIVE lane — LogNarrativeEntry.jsx content census (real DOMPurify/marked
 // like LogSinks.sanitize.test.jsx, so these pins prove the row actually routes
 // through the sanitizer, not a stub). Narrative rows are the GM/AI storytelling

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-064: Countercharm — trigger gate (failed save vs charmed/frightened),
 // uses:1 numeric pool + long_rest re-arm, campaignName on the remove seam,
 // machine-truth roll log rolls:[a,b] mode:"advantage".

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * useTravelManagement — trip-owner stamp release lanes (backlog 2026-10-27).
  *

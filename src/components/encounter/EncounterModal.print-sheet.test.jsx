@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Item 4 — the Load list earns a labeled Print verb per saved row. Pressing
  * it opens the paper preview portal with the sheet derived from THAT SAVED
  * ROW plus the host's live bestiary/party — and it is a pure read: no load,

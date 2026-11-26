@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0049: Adult Blue Dracolich Lightning Breath click-path — dracolich-DISTINCT
 // lane only. Row authors recharge as a structured usage OBJECT
 // {type:"recharge on roll", dice:"1d6", min_value:5}, so the modal must render

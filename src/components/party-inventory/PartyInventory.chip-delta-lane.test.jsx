@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // Regression (bug-inventory-chip-cross-tab-full-doc-clobber): currency-chip writes used
 // to POST the tab's WHOLE inventory snapshot through the 400ms trailing debounce, so two
 // GM windows pressing within the debounce window each carried only their own view and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // hunterPreyHandler — deterministic choice gate (modal vs info popup) over one
 // runtime key. Stable contracts pinned here: exact-key read/write
 // ("_Hunter's_Prey_choice" — shared with colossusSlayer step and

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  spellStats lane — the computeSpellStats PRODUCER face of           */
 /*  execution/index.js:191-222 (+ innate read :692, innate +1 seam     */

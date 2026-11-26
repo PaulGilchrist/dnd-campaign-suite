@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MN-013 lane: _Parry_usedRound reaction round latch (PLAYER_ROUND_LATCH_KEYS family).
 // Owned here — ticket-distinct seams only, mapped from source bytes:
 //   set:   executeActionManeuvers.js:658 stamps gate.currentRound (numeric)

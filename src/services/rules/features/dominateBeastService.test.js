@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../automation/index.js', () => ({

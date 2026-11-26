@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Contract tests for the browser tab title derivation in ./config.js
 // (backlog KKK 2026-11-21): the tab must always answer "which campaign is
 // this?" with a "<campaign> — <view>" pattern while a campaign is mounted,

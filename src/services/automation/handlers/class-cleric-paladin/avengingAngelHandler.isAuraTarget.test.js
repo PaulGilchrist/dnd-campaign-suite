@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Lane: isAuraTarget reader (aura-list membership over avengingAngelAuraTargets, pure).
 // Population via handle()/resolveFrightfulAura lives in avengingAngelHandler.frightfulAura.test.js;
 // isActive and cleanupAuraTargetOnDamage have their own sibling suites.

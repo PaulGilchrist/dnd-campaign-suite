@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: INTERNALS of observers.js (log observers) ONLY — registration census + per-handler
 // payload bytes against the logger boundary. Pipeline assembly and the log-observer
 // registration (createObservers zero-args, handler-fires-with-ctx-identity) are pinned

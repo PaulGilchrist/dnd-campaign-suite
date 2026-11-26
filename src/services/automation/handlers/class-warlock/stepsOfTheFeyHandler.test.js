@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic: handle() is pure over mocked
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic: handle() is pure over mocked
 // getRuntimeValue/evaluateAutoExpression/getCombatContext; every test pins a distinct
 // branch (free-cast-count popup guard at 0 — deliberate asymmetry vs mistyEscapeHandler,
 // which defers exhaustion to the taunt modal showing count 0, while this lane guards

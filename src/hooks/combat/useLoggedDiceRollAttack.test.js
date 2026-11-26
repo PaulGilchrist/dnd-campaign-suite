@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // BASE lane: core attack orchestration through createLogAndShow — roll → hit/miss
 // boundary → target resolution → damage/auto-damage transport → log + popup
 // essentials, plus roll-type tails (initiative/save), Indomitable Might logging,

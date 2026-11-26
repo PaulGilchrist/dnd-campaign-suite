@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0065 regression: Adult Brass Dragon Spellcasting — Scorching Ray is a
 // RANGED SPELL ATTACK (+8 = PB+5 + CHA+3), not a block save and not an
 // advisory-only record. The per-spell chip must resolve through the attack

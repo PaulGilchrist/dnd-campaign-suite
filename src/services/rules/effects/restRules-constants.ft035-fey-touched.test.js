@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG FT-035(b) rest-lane lock: Fey Touched (2024/feats.json 'Fey Magic' row) spends
 // TWO live latches at cast time, keyed by FEATURE name, never by the formData key:
 // the chosen-spell row spends the shared `_Fey_Magic_freeCastCount` (rules.js

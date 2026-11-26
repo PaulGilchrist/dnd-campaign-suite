@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // CLA-389 routeCastModal decision table for THIS lane only: how showCastPopup
 // unwraps a castResult shape and picks a sink. This file owns the top-level
 // unwrap branches (runPostCastTriggers returns modal/popup results at the TOP

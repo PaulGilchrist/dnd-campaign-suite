@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // Close-behavior seam: AttackResultPopup owns WHICH close control the popup shows
 // and WHAT each close path does. The contract is behavioral:

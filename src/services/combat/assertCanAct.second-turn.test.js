@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 /**
  * PAIR CORE — assertCanAct ST-seam read (bug-turnlock-denies-holder-on-own-second-turn,
  * owner ruling 2026-11-09: the `(Second Turn)` twin is the HOLDER's extra turn).

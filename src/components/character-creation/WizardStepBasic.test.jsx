@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * Unit lane for WizardStepBasic (name / level / alignment / portrait).
  *

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: Players — Item 5 token cosmetics on the indoor 2D face ─────────────
 // OWNED here: the render consumption of the canonical character-bucket row
 // (config/tokenCosmetics.js) — personal RING COLOR applied via the palette

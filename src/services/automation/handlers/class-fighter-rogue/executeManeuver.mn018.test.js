@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-018: executeManeuver (the LIVE pending-prompt executor for Sweeping Attack)
 // must open a secondary-target chooser, stash pendingSweepingAttack (RAW combatants),
 // and never claim phantom damage on the second creature.

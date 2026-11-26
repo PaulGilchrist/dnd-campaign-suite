@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: ItemsPanel palette contract. SVG decor leaves are wholesale-stubbed
 // HERE BY DESIGN (#890-#902 cite this file) — their pixels are golden-tested
 // beside each leaf; this file owns the PANEL only.

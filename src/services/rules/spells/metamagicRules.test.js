@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // metamagicRules lane: OPTION CATALOG + COSTS owner (both rulesets share this one
 // catalog; consumers cite, never re-drive): MetamagicPopup.jsx:78-89/148,
 // useSpellMetamagicFlow/useMetamagicHandler.js, empoweredSpellService.js (chaMod

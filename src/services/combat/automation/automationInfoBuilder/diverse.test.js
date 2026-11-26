@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── diverse builder unit (automationInfoBuilder family #2104) ───────────────
 // Canonical home for diverse.js — the grab-bag lane of remaining handler
 // types: divine_intervention · extra_action · font_of_magic ·

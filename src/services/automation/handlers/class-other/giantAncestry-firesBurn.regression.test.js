@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic defect lock; every external
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic defect lock; every external
 // module is mocked and only the pure findLastAttack parser + attackerRollGate
 // run unmocked, so no churn is needed unless the CLA-141 contract itself moves.
 //

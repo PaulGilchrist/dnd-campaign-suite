@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SP-015: summon spells scale the creature's HP via automation.hpPerLevelAbove
 // ("+5 HP per slot level above 2") and carry NO damage/heal ladder. That automation
 // ladder alone must arm the Cast-at-Level selector for summon_spirit spells, and the

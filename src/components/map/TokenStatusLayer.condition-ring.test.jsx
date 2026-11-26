@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: TokenStatusLayer — Item 5 uniform condition ring (indoor 2D) ───────
 // OWNED here: the DASHED condition ring painted by the hoisted token-status
 // layer (the lane that already owns the per-creature live subscription and

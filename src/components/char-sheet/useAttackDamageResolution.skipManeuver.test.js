@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // handleAttackRiderManeuverSkip guard matrix — this file owns ONLY the skip lane's
 // gates: prompt close + exactly when the paused pipeline may resume (step gate,
 // stash-exists gate, and the `stash.ctx.hit !== false` key-absent semantics).

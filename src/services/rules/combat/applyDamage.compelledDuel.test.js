@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: Compelled Duel CONSUMER seam in applyDamageToTarget — damage landing on a
 // duel target ends the duel ONLY when the attacker is neither the caster nor the
 // target. This is the damage-trigger expiry lane; duel APPLICATION and the internal

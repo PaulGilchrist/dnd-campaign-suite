@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ADDITIONAL-resource lane for src/services/rules/trackedResources.js.
 // The registry golden + two-way Venn + core/martial/divine ladders live in
 // trackedResources.test.js (base lane); subclass-keyed seeds (_Star_Map,

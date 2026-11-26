@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: src/services/rules/features/regenerateService.js — SOLE real-body owner of
 // confirmRegenerate. The former second export, triggerRegenerate, was EXCISED by the
 // #1398 dead-export census batch (2026-10-23) after RE-VERIFICATION against fix#211's

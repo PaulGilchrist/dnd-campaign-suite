@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: Phase 5 WEB consumer routing of expireStaleEffects (SP-126) — the
 // dispatch seam from a carrier's turn-start sweep to processWebAreaSave.
 // Web is WIRED here (grease joined the wired family 2026-11-19 with

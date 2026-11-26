@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MN-002: defender-side Bait and Switch AC fold getter — reads the dedicated
 // baitAndSwitchActive/Bonus runtime keys (written by executeBaitAndSwitchChoice /
 // executeActionManeuvers) so useLoggedDiceRollAttack folds the buff into ANY

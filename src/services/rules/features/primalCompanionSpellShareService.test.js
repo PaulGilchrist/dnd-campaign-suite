@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-311 Share Spells SERVICE (base) lane. Owns the trigger GATES of primalCompanionSpellShareService.js:
 // passive-absent / self-target / cantrip / unresolvable-level / AoE-cast / companion-exists / companion-alive
 // refusals, exact action-construction envelopes (disk-fronted fallbacks), executeHandler result pass-through by

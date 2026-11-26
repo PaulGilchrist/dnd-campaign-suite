@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Deterministic contract test for divineSparkHandler: all seams (runtime store,
 // target resolver, log service) are mocked; assertions pin the handler's in/out
 // behaviour (charge validation/deduction, modal payload contract, logging).

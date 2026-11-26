@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1936 lane: King Kong legendary advisory row "Climbing Dash (Costs 2 Actions)"
 // (#1086 real-row disk bytes; #1094 name-lookup). Silent-burn fixed by the flat
 // advisory fields §253 movement-row template (MA-1581/MA-1450 family): advisory is

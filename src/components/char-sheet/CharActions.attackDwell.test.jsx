@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // IJ 2026-11-18 improve: attack-chain dwell affordance. While this sheet's popup
 // host is staged (popupHtml → `.popup-overlay > .popup-modal`) or a merged modal
 // is open (e.g. the `.sp-overlay` rider chooser via attackRiderModal), the overlay

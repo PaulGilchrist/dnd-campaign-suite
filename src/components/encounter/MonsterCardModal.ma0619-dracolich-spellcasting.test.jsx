@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18 (13→6): kept BY-name extraction + exact
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18 (13→6): kept BY-name extraction + exact
 // gate map, row-level save_dc 19/Charisma pair pin, strip-tags markup diff, At Will
 // advisory cast ×2 at row DC 19 (zero-chip inert-row render folded in; counter-render
 // class owned by spellcasting.test.jsx :275, counters asserted inline on the gated

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-239: Necrotic Shroud regression — CHA DC ability + non-CD features skip Channel Divinity gate.
 // Unit-side contract of conditionHandler.handle for the automation shape dispatched by
 // celestialRevelationHandler (its dispatcher-side half lives in celestialRevelationHandler.test.js,

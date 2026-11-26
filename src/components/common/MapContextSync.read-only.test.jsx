@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /**
  * Regression lock for bug-player-clients-clobber-fog-reset (the '__map__'
  * co-writer lane): a read-only (network) client must NEVER POST '__map__' —

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0554 base CANON: Darkmantle Darkness Aura (actions[1], 15-ft self
 // emanation, 1/Day) — self-origin zone rows arm the authored te ON SELF via
 // resolveSelfAuraRow, spend the row's 1/Day through the MA-0020

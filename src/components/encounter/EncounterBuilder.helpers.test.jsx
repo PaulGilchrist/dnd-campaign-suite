@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Helpers lane, salvaged: EncounterBuilder's calc/filter/persistence helpers are
 // module-private, so the previous inline copies tested here could never fail when the
 // REAL source broke — they were pure re-implementations. This file now drives the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1334: Poltergeist "Telekinetic Thrust" (actions[2], DC 12 Strength, 2d6 + 2
 // Force) RAW carries NO half-on-success clause — "Failure: 9 (2d6 + 2) Force
 // damage", a successful save pays ZERO. dc_success was ABSENT → engine half-default

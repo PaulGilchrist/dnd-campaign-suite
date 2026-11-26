@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation): BUFF-derived resistances on the
 // "Resistances:"/"Immunities:" rows (charSummaryCalc.js computeResistances) — one test

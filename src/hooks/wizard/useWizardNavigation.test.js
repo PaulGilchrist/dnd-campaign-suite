@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Contract tests for useWizardNavigation. validateStep is mocked at the module
 // boundary — its own rules are covered in src/config/utils.test.js — and the
 // ruleset walk-skipping (5e skips Background) is covered in WizardStepNumbering.test.jsx.

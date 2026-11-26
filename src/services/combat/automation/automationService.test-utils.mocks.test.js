@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Contract lane for the vi.mock factories in automationService.test-utils.js — the ONLY
 // thing this file owns. Both mocks contain real authored logic (a '+N Name' parser and an
 // ability-canonicalization lookup) that 14 automation consumer lanes execute through.

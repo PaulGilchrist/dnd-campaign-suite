@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet — lane: DEFAULT EFFECT ROUTE CONTENT
 // (handle → DEFAULT_EFFECT_ROUTE → handleBardicRoll → handleAttackRollDebuff /
 // handleDamageDebuff; automation/index.js `reaction_debuff` → handle,

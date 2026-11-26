@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // ── contextBuilder COVER lane: bait-and-switch AC bonus ──────────────
 // Tests the bait-and-switch bump in applyCoverModifiers() of
 // contextBuilder-map.js (buildAttackContext with a mapName): when the

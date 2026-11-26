@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * 5e-racial-bonus lane (family seam map in ./5e-immunities.test.js header;
  * mirrors ./2024-race.test.js — siblings cited, never edited): owns 5e.js:58-74

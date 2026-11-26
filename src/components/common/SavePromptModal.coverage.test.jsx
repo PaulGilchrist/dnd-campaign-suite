@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // SavePromptModal — Leading Evasion chooser row UX & prompt queue advancement.
 //

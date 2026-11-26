@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // savePrompt.js — createSaveListener dismissal detach (divine-spark
 // dismiss-softlock family, 2026-11-05). The un-rolled Dismiss branch of
 // SavePromptModal broadcasts `save-dismissed` carrying the promptId. Doctrine

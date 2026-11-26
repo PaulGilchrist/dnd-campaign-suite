@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /* Lane — .ct-* design-kit convergence (QA backlog tranche 1, Encounters view):
  * the Load/Save/Rename modal shell rides the shared App.css kit tiers —
  * .ct-modal-overlay / .ct-modal / .ct-modal-header / .ct-modal-close /

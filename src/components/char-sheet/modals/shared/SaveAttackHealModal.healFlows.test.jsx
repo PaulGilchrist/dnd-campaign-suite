@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Heal-selection lane for SaveAttackHealModal: phase gating of the heal radios,
 // heal-button enablement, exactly-one-target heal orchestration, and post-resolve
 // Cancel / post-heal Done flows. Real HP math, clamping, and persistence are

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Save-flow lane for AOEConditionModal (NON-overlay path): cast logging +
 // storeSpellLastAttack, NPC auto-save resolution, player save prompts and
 // save-result handling, Careful Spell protection (NPC and player branches),

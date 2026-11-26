@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0610: whirlwindService — SOLE owner of the REAL applyWhirlwindTurnStart
 // body: the Djinni Create Whirlwind turn-START recurring tick. Lane boundary:
 //   - Arming/registration is NOT here: zone dict → te transport bytes live in

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // interceptionHandler companion lane: UPSERT PROTECTION EFFECT (upsertProtectionEffect,
 // interceptionHandler.js L141-159) — the campaign-scoped targetEffects store write bytes.
 //

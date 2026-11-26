@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-308 regression (git 649b48918 "fix(CLA-308): Shadow Arts inert — no castable row"):
 // Shadow Arts (2024 Warrior of Shadow lv3 Monk) free-cast authorization, per-spell
 // once-per-Long-Rest consumption and rollback in spellPreparationService.

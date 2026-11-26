@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // Unit-canonical home for src/services/ui/logService.js — REAL module, never mocked here.
 // Contract (verified against server/routes/log.js): the client is a fetch wrapper over
 // GET/POST /api/campaigns/:campaign/log. It performs NO batching, NO buffering, NO

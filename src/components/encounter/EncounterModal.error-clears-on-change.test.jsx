@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /* Lane — stale-inline-error clearing on the name change lane (2026-11-16 XB
  * QA backlog: after the Enter-key blank backstop printed
  * "Encounter name is required", the red copy STAYED while the user then typed

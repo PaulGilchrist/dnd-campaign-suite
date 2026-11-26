@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * Submission lane for CharacterCreationWizard — isolates the handleSubmit
  * boundary (CharacterCreationWizard.jsx handleSubmit) by mocking every hook,

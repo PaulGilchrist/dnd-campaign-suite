@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: inspiration ally-pick confirms in useCharActionsModalHandlers.
 // Pins gate refusals on isolated legs (modal only in the WRONG store vs falsy target
 // WITH the modal open — never modalState={} vacuity), byte-exact object payloads with

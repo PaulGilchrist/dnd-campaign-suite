@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // blurService lane contract — triggerBlur is an ENVELOPE PRODUCER, not a
 // miss-chance calculator: the disadvantage mechanic is consumed elsewhere
 // (contextBuilder-sync.js:492 te.effect === 'blur lookup, ConditionEffectBadges.jsx

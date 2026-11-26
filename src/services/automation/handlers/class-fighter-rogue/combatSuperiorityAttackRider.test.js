@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // executeAttackRider.js lane — executeAttackRiderManeuver() direct contracts:
 // guard short-circuits (not-found / no-dice), die roll + expend, each save-outcome
 // effect branch (prone / push / goad / frightened / disarm / distracting /

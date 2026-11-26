@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // Label-set regression ledger for the .sp-modal rider-chooser footer family
 // (2026-11-07 QA backlog: one shared footer API, labels byte-pinned).
 // Every chooser face in the family must render its confirm/decline pair

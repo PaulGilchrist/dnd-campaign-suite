@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-31
 // AI Dress overlay preview layer (backlog ai-dress-belongs-in-map-view):
 // proposed ops render as cell-anchored markers ON the map svg before Apply,
 // vanish when the proposal clears, and flag off-grid ops loudly.

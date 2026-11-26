@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1872: Cthulhu Madness Whisper — adjudication contract for the fixed row
 // (monsters.json cthulhu legendary_actions[3]: save_dc 24 Wisdom + 4d6 Psychic
 // + dc_success none + te no_reactions, delegates_to Psychic Shatter removed).

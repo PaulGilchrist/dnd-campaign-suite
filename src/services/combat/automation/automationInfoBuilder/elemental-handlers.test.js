@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── elemental builder unit (automationInfoBuilder family #2105) ─────────────
 // Canonical home for the five 2024 Giant-ancestry aspect handlers, verbatim
 // from public/data/2024/races.json: Fire's Burn · Frost's Chill ·

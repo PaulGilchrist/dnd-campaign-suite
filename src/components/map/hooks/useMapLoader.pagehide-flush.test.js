@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /**
  * Lane: map loader — pagehide keepalive flush (backlog 2026-11-24 QE).
  * Hard reload/tab-close mid-stroke (pointer DOWN, moves already in state) or

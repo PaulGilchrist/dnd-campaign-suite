@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Base lane of 2024 getAttacks: the unique orchestration seams and ability-select
 // byte contracts NOT owned by topic lanes. Real builders end-to-end per the
 // #1235-#1242 canon — the wholesale ./attackCalc.js stub, the classRules2024

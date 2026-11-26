@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1160: Mimic Bite grapple-double conditional damage — additive conditional_damage
 // delta authored on monsters.json actions[0] (MA-0007 seam): base 1d8 + 3 Piercing +
 // clause delta 1d8 = RAW 12 (2d8 + 3) Piercing if Grappled by the mimic, plus the

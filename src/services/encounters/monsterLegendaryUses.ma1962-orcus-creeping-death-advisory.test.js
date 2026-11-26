@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1962 lane: Orcus legendary advisory row "Creeping Death (Costs 2 Actions)"
 // (#829 exact-once anchor; #1094 name-lookup). Silent-burn (MA-0510 fingerprint: gated
 // chip spent 2 while resolveLegendaryRowMechanic fell to the console.error dead-end,

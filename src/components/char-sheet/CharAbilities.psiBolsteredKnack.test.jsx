@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CLA-270: Psi-Bolstered Knack proficiency gate on check contexts.
 // The Knack boost must only be offered for skill/tool checks the
 // character has proficiency with — never raw ability checks, non-

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0033 regression: Adult Black Dragon Spellcasting — Melf's Acid Arrow
 // (level 3 version) is a RANGED SPELL ATTACK (+9), not a save spell. The
 // per-spell chip must resolve through the attack seam (MA-0022 delegated roll

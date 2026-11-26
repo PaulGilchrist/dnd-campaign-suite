@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Rolling lane — directSpellDamageSteps.js steps[2] spellRollDamage (direct-spell path).
 // Contract (source :122-151): dispatch EXACTLY ONE roller on ctx.formula, passed verbatim
 // (#1019): overchannelActive → rollExpressionMaximized even when isCrit is also set

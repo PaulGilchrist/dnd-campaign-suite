@@ -9,7 +9,7 @@
 // This file owns the gate branch only (the armedRound === round === attackerName
 // conjunction). The weapon-name refusal branch (isPolearmWeapon → false) and
 // the attack_roll leg shape belong to the main lane bonusActionAttackHandler.test.js.
-// @maintained-by-ai: 2026-10-15 — deterministic: every dependency (runtime store,
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic: every dependency (runtime store,
 // lastAttack, polearm util, combat context, log) is module-mocked; the gate is a
 // pure round/identity ledger test that needs no churn when the app changes.
 // @schema-version: 1

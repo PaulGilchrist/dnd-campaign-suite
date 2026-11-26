@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1867: Cthulhu "Tentacles" — compound attack+save row shipped attack-only;
 // the DC 26 Strength rider save half (post-hit → pulled 20 ft. + Grappled,
 // escape DC 26) was structurally absent (no save_dc/save_type → ActionSaveRoll

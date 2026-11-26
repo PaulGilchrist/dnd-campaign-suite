@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Lane: focus restoration after a seeded create attempt (backlog SS
 // 2026-11-22). The seeded quick-create modals flip `disabled={seeding}` on
 // BOTH footer buttons, so the clicked Create sheds activeElement to BODY

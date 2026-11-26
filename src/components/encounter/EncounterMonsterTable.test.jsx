@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // EncounterMonsterTable component lane: rendering contracts and per-row callback payloads
 // for the standalone table only. Builder-level state machines live elsewhere and are NOT re-tested here:
 //   - EncounterBuilder.additional-interactions.test.jsx — handleSort state machine via observable row order

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // 2024 class-feature axes of getAttacks: Tavern Brawler, College of Dance,
 // Soulknife Psychic Blade, and Blessed Warrior fallback unarmed strikes.
 // Lane splits (verified 2026-10-20, real builders, no stub echoes):

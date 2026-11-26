@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // contextBuilder-sync advantage/disadvantage PRIORITY lane — the only suite
 // asserting the ordering contract of buildAttackContextSync's forced-mode chain:
 //   conditionAttackMode > stored/buff-scan accumulation > deferred resolvers > dis fold.

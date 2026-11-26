@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0084: Adult Bronze Dragon Thunderclap picker — 20-ft Radius, DC 17
 // CON, 3d6 Thunder, dc_success NONE. Copy never carries the half-damage
 // boilerplate (success = no damage), and the picker stays inert until the

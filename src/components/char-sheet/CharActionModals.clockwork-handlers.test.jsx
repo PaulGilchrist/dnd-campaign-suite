@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Clockwork Cavalcade choice routing (handleClockworkCavalcadeChoice in CharActionModals)
 // and the confirm wiring of its sub-modals to their handler props.
 // Covered elsewhere:

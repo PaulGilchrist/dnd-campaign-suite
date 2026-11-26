@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18 (11→7 tests): kept BY-name extraction
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18 (11→7 tests): kept BY-name extraction
 // + exact gate map, save_dc seam pins, strip-tags markup diff, upcast pins,
 // save_dc seam e2e via Blight save leg, per spellcasting template (#645-#655).
 // Vacuous drops: not.toContain/toBeUndefined subsumed by full toEqual; em-tag

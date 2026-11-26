@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * truePolymorph HEXAD lane #1983 — .apply (FOURTH lane). Subject: truePolymorphService.js.
  * Seam map: truePolymorphHandleModes.test.js header (#1980–#1986); also read

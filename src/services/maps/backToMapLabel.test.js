@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 /**
  * backToMapLabel.test.js — unit pin for the shared dynamic Back-button label
  * source (backlog 2026-11-11 JV). Both board toolbars (indoor MapToolbar.jsx,

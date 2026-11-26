@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Contract for the small-screen breakpoint hook (backlog 2026-11-23
 // collapsible-sidebar). jsdom has no matchMedia, so the hook's documented
 // fallback lane is live in tests: window.innerWidth + the `resize` listener.

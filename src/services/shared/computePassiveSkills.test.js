@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /**
  * LANE: computePassiveSkills.js (src/services/shared) — pure util, DIRECT unit tests.
  * Exporters->callers: race-rules 5e.js:99 getSenses and 2024.js:151 getSenses

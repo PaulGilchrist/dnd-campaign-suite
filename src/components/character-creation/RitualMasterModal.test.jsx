@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // RitualMasterModal BODY lane (fix#362, ledger :622 rec #394): the first and
 // only lane for this host — pins the ritual filter (:18-21, level 1 AND
 // ritual===true only) and the save contract (:30-39, exactly proficiencyBonus,

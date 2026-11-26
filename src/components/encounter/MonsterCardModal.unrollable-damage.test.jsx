@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0014 modal press-refusal lane (owner): a dispatched damage-chip press whose roll
 // resolves null must console.error + emit exactly ONE 'automation blocked' log carrying
 // the authored formula bytes — zero rollDamage, no fabricated total, never silence.

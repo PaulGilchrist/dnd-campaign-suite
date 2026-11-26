@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SHORT-REST BASE LANE (mirror of restRules-longRest.test.js): the generic
 // null-everything batch — every SHORT_REST_RESOURCES key -> null in the ONE atomic
 // setRuntimeBatch, alongside the HP byte and buff/condition clears — is this file's

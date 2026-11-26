@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1877: Demogorgon Tentacle save-chip TRANSPORT lock — the producer half of
 // the save-gated max-HP-reduce fix. NEW transport field:
 // buildAbilitySaveRollContext.saveRiderAttackDamage — the click-time snapshot

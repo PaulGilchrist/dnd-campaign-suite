@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0532 data lock: Cultist Fanatic Spellcasting rode the MA-0421/MA-0500
 // markup-gap template (save fields already authored). Pre-fix ONLY the tier
 // headers carried <strong>; Light/Thaumaturgy/Command/Hold Person were plain

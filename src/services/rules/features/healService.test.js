@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * healService lane — fixed-amount PRODUCER for 'Heal' (lv6), live export.
  *

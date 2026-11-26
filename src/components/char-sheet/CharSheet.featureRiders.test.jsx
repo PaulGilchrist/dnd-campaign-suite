@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSheet sheet-side feature-rider wiring lane: spend flags, resource
 // decrements, log shapes, and tracker updates produced by CharSheet.handlers
 // invocations.

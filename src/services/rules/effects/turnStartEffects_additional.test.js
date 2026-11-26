@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Lane: per-effect turn-start handler faces NOT pinned elsewhere + the
 // FT-082 te option-scoping collateral chain.
 // Owner header (expirations_expireStaleEffects.test.js, verbatim): "the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // bug-visitor-drains-pending-save-listener-bucket — GM-ownership guard on the
 // SSE-adopted drain of the campaign GM-authority `pendingSaveListenerPrompts`
 // bucket. With a GM (localhost) tab and a LAN visitor tab both mounted, the

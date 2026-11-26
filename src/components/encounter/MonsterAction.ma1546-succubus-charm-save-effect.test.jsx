@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1546: Succubus "Charm" (Dominate Person lv8) — the row authored only
 // save_dc/save_type, NO save_effect, so extractConditionsFromSaveEffect
 // returned [] and applyDamagelessSaveConditions early-returned (saveProcessing

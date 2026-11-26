@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 // The condition-lane Results face itself (improve-condition-aoe-results-face,
 // 2026-11-24). The Stinking Cloud sheet-cast chain now terminates on this SAME
 // ResultsSummaryModal the AOEConditionModal selection lane rides (renderPopup

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pin for bug-5e-fighter-extra-attacks-second-wind-zeroed: the
 // Second Wind max resolver (computeSecondWindMax) and its seed site
 // (computeTrackedResources.addMartialResources). The 2024 table carries a

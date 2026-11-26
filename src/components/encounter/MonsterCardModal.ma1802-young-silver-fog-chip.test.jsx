@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1802/MA-1803: Young Silver Dragon lair lane — ADVISORY twins at the modal seam.
 // [0] was a BARE STRING, [1] a nameless dict (both inert static spans, zero
 // affordance — MonsterCardBody.jsx:385 string short-circuit / isLairRowClickable).

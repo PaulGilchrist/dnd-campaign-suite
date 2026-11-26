@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  helpers.js magic-missile chain — module-direct sole-runner lane   */
 /*                                                                    */

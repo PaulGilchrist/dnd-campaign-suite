@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4: the PLAYER quest board earns the same labeled Print verb — the
 // visitor-reachable half of the handout family. Rows arrive field-whitelisted
 // from /quests/board, so paper can never carry notes; the disabled honest

@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for the Mantle of Inspiration lane
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for the Mantle of Inspiration lane
 // (handle() route detection, handleMantleOfInspiration modal + guard, confirmMantleOfInspiration
 // side effects). Fully mocked, no wall-clock or network. Generic-lane copy
 // (`Could not calculate temp HP`, `No temp HP expression defined`) is owned solely by

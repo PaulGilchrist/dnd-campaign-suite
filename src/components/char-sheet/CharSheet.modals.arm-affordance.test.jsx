@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Lane: renderPopup's "Arm a target" deep-link footer (backlog 2026-11-24
  * run BA). The sheet's no-target refusal popup value carries
  * { html, armTargetName } — the host keeps the refusal copy byte-identical

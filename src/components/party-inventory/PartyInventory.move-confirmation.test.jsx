@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-24: 2026-10-24
 // Improve (Item Move legs confirm): both item transfer legs executed silently while the
 // currency Give modal confirmed named sums. The Move-to-Player modal submit now arms the
 // SHARED in-app confirm naming qty + item + destination player ("Move 2 × Hempen Rope to

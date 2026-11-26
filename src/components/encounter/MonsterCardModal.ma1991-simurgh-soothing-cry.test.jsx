@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1991 regression: Simurgh "Soothing Cry (Costs 2 Actions)"
 // (legendary_actions[3]) shipped {name, delegates_to:null, description} only —
 // the MA-1936/MA-1990 twin: the generic MA-0021 Expend chip SPENT TWO

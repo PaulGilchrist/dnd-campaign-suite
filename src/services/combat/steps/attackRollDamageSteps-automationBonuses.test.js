@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // attackRollDamageSteps-automationBonuses lane: CANON fold for attackRollBonuses.js
 // generic guards + the melee/monk/heavy/frenzy/divine-fury branches (no other file in
 // the repo touches melee_weapon_hit, monk_weapon_or_unarmed_hit, melee_heavy_weapon_hit,

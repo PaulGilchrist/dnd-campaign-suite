@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // autoRerollHandler — main lane: handle() router dispatch, Guarded Mind, save-reroll
 // resource-cost decrements (success side), bardic die lane, generic psionic_energy_die
 // lane (incl. zero-pool + _trackedResources-default ordering BEFORE the homing

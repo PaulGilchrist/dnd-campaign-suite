@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0035: Adult Black Dragon Acid Breath (Recharge 5-6) click-path.
 // Fresh click spends the recharge (threshold 5), routes the LINE row through
 // the SAME SaveAttackAoeModal flow as MA-0031 cones with a labelled

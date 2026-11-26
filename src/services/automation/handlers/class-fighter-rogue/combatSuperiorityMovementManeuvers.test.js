@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // executeActionManeuvers.js — executeMovementManeuver lane (the ONLY lane for the
 // movement executor: Bait and Switch modal building on the executeActionManeuvers side,
 // the unknown-movement-effect popup fallback, and the pre-roll dice gates).

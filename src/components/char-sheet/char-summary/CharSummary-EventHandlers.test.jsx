@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // CharSummary window event handlers + XP prop-sync effect.
 //

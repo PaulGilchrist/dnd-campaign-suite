@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to the two MA-0019-distinct attacker-sense legs
+// @maintained-by-ai 2026-10-18 — trimmed to the two MA-0019-distinct attacker-sense legs
 // (Blindsight immunity vs ordinary Disadvantage fold) through the real
 // computeConditionEffects→combineAttackModes seam; 7 bisect-dead service mocks
 // purged (only rollAttack capture + targetEffects feed are load-bearing).

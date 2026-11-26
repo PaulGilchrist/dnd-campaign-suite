@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit contract for useCharacterManagement (file upload/download,
 // active-character selection). Stable leaf hook — see note in useCharacterManagement.js:
 // intentionally NOT refactored onto useEntityManagement, so these tests ride along with

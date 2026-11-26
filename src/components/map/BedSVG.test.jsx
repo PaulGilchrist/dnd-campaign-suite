@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SVG asset lane — static decorative token, zero mocks, golden-once.
 // Old 12 attr-spie tests -> 4: (1) props/ref forwarding contract,
 // (2) element census + inert-click static-art guard, (3) authored path

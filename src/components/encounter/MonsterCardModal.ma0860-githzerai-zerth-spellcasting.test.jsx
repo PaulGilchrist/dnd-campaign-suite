@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0860 data lock: Githzerai Zerth Spellcasting row (actions[2]) carried
 // cosmetic spell_save_dc 14 + spellcasting_ability "Wisdom" and the DC only in
 // prose — buildAbilitySaveRollContext (MonsterCardModal.jsx:1329, saveDc =

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Refreshing Step lane: confirmation copy + Cancel round-trip (chooser restored,
 // inert until confirmed) and the accept dispatch with Math.random pinned — exact
 // setTempHp payload (d10 bounds), exact decrement write with freeCastCountKey

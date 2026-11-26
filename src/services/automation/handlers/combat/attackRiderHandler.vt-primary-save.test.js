@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // VT picker-header honesty threading (bug-vt-picker-header-claims-trip-after-save-success):
 // when a Trip cast with the versatile_trickster passive finds secondary targets,
 // applyRiderOption must stamp versatileTricksterPrimarySave — the resolved primary

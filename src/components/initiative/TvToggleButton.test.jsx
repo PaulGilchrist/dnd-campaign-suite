@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // F7 (visual audit) print-law fix, folded into the Item 4 print pass: the
 // header TV chip is screen chrome — the Exit floater already carries
 // .no-print, the toggle must not out-print it. The companion light-face law

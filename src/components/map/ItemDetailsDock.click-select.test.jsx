@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // ─── Lane: placed-item CLICK-select → visible delete dock ────────────────────
 // OWNED here — the click-to-select affordance lane (backlog 2026-10-25:
 // token delete was contextmenu-only), end to end through the real Map:

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1558: Swarm of Insects "Bites" (single-action swarm, indexed BY name) — inert
 // prose Bloodied variant fixed on monsters.json via conditional_damage riding the live
 // MA-0007 GM-adjudication seam (buildChargeBonusOffer arms on cd?.dice, Helpers:687).

@@ -1,5 +1,5 @@
 // MN-013: Parry reaction economy latch + server-fresh heal read-modify-write
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { executeReactionManeuver } from './executeActionManeuvers.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

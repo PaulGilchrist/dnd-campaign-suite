@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for useWizardAbilities: pure point-buy rules and
 // hook API surface, fully mocked deps, no DOM/network/timing coupling.
 import { renderHook, waitFor } from '@testing-library/react';

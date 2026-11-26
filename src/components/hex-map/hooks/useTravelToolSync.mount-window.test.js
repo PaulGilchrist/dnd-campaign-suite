@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 // Regression lock for bug-hex-mount-window-silent-trip-cancel.md: during the
 // fresh-boot mount/hydration window a client could silently DESTROY a live
 // trip. Branch 3 of useTravelToolSync fell to its legacy `cancel` action when

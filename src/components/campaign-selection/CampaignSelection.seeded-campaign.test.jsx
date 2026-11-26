@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Seeded quick-create lane on campaign selection (arena-starter §2.3/§3.4):
 // localhost-only Arena/Starter buttons next to the renamed standard create, the
 // modal pre-fills the dated default name, and Create routes through the

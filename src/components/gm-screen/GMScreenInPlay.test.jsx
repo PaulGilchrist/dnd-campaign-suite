@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // "In Play" strip contract: conditions and effects surface from the runtime
 // character stores and the campaign targetEffects key; spell-overlay zones
 // surface from the container-passed spellZones prop; the combat block

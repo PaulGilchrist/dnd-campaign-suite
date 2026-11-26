@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation PAIR seam map (this file = core lane; choice-sources = skillValidation-choice-sources.test.js):
 //   • core (HERE): getSkillLimits totals, fromClass/fromRace/fromBackground shapes, null-data
 //     defaults per ruleset, 5e hardcoded background default, getPreSelectedSkills auto-vs-choice

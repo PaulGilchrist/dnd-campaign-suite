@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /* ------------------------------------------------------------------ */
 /*  #1471 + fix#107 TWIN CLOSE-OUT — modalSpells.js handleSilence    */
 /*  (POST-FIX :247-:316; pre-fix :231-:268) SIZE/RANGE PARSING,      */

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-10-24: 2026-11-17
 // Regression (bug-party-inventory-currency-rapid-click-collapse): rapid chip clicks in a
 // single synchronous task each read the SAME stale closure snapshot of `inventory`, so
 // +1×3 collapsed to +1 and +100×2 collapsed to +100 — every click POSTed the same

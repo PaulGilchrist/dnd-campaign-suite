@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // LANE OWNERSHIP — AnimalShapesSelectionModal test trio
 // - AnimalShapesSelectionModal.behavior.test.jsx (behavior lane): interaction lifecycle and
 //   callback contract — loading/error states, Cancel/Close/Escape semantics, overlay click

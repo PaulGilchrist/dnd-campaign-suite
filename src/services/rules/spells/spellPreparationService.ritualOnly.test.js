@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-234 regression — spellPreparationService._ritualOnly CONSUME lane (2024 Barbarian,
 // Path of the Wild Heart: Nature Speaker / Animal Speaker unlimited slotless rituals).
 //

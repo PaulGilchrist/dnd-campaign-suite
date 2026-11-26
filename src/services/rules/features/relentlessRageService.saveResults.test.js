@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 //
 // SAVE-RESULTS lane: pins ONLY the save-result resolution seam of
 // handleSaveResult (relentlessRageService.js:92-196) — the latch WRITER

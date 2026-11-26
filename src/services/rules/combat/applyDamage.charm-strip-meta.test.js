@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // LANE — applyDamage damage-triggered condition strip (removeCombatConditionsOnDamage,
 // applyDamage.js) owns the activeConditionMeta hygiene leg: every stripped condition
 // must purge its matching activeConditionMeta row in the SAME merged write

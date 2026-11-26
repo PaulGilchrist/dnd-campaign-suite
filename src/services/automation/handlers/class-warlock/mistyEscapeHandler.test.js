@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic: handle() is pure over mocked
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic: handle() is pure over mocked
 // findLastAttack/getRuntimeValue/evaluateAutoExpression/getCombatContext/buildSaveDc/
 // addEntry; every test pins a distinct branch (3-clause reaction-damage guard with
 // no-side-effect refusal, full modal payload own-composition, null-context grace,

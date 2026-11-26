@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-16
+// @maintained-by-ai 2026-11-16: 2026-11-16
 // Improve (party-inventory mixed mental models): an unnoticed-open .pi-modal-overlay used
 // to silently swallow every background click while the currency steppers next to it wrote
 // the party pool on their own (debounced). Now (a) the currency card states the two lanes

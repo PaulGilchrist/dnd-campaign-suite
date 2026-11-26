@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Regression (bug-ai-dress-tokens-invisible-write-only-lane): AI-Dress monster
 // tokens now persist as placedItems rows of type 'monster' — the renderer
 // MUST draw them (the legacy items[] lane draw zero was the bug). Monster

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01
+// @maintained-by-ai 2026-11-01: 2026-11-01
 // Naming-surface contract (backlog 2026-11-01 AW): every placed-item marker
 // carries title={placedItemLabel(item)} so two same-type props are
 // distinguishable by a mouseless DOM probe — no hover/click discovery.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // DH crit-ledger-shape lane (2026-11-06 improve) — attackRollDamageCalc.js sheet-lane crit
 // damage rows carry the monster lane's per-dice-group `*2` marker idiom (playbook §4 "Crit
 // damage lane log shape": monster rows log `1d6*2+1 (N)`). Every dice group the base/sneak

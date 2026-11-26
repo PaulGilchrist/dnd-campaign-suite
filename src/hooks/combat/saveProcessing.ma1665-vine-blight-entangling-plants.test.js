@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1665: Vine Blight "Entangling Plants" (actions[1]) — row-local cast-save
 // PROCESSING lane (§MA-1656 family). Save-domain seams:
 //   #847 rollConditionSaveHandler  — save ROLL UI seam (dice input, prompt)

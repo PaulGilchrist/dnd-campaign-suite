@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1718: Wight "Life Drain" (actions[3], DC 13 Constitution, 5 ft) —
 // FAIL(a)/DATA fixed at the data layer: the row authors
 // save_hp_max_reduce:{equal_to:"damage"} so the LIVE MA-1547 save-path drain

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // §9.4 — world keeper console (component lane only): the request carries the
 // referee's kind/focus, the card's exit is chosen by proposal kind, nothing
 // writes until the referee acts, and every failure stays honest.

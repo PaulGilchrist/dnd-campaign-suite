@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Owner lane: the log-writing contract for handlePlayerSaveDamage (per AGENTS.md,
 // every automation must log with event details). Asserts the EXACT log rows this
 // handler emits: the save-prompt row and the two forced-success save-damage rows.

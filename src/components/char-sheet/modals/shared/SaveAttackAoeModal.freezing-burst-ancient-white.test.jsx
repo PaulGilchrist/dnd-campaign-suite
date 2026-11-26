@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0260: Ancient White Dragon Freezing Burst sphere picker — CON DC 20,
 // canonical 4d6 Cold (data drift: save_effect previously said 17/5d6 and
 // omitted the Speed-0 clause). Confirms the authored row: canonical

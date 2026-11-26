@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /* global HTMLCanvasElement */
 // ─── Lane: 3D last-seen ghost tokens (Item 7 parity, owner ruling 2026-11-19) ──
 // The scene-level decision for the visitor "Last Seen" face in 3D: _buildLastKnownTokens

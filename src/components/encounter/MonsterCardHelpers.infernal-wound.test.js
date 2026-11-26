@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0367 helper lane: parseInfernalWoundClause is a STRUCTURED-KEY-ONLY arm
 // (MonsterCardHelpers.js:356-364) — armed solely by hit_target_effect
 // 'infernal_wound' on the BY-name Bearded Devil/Infernal Glaive disk row

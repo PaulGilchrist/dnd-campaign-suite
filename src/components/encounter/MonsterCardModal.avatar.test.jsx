@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // MonsterCardModal header avatar (improvement 2026-11-16): the GM's stat-block
 // modal carries the monster avatar like the character sheet, and clicking it
 // zooms to the shared full-size AvatarModal popup. Owned here:

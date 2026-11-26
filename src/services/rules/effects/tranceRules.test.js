@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 import { describe, it, expect } from 'vitest'
 import races5e from '../../../../public/data/races.json'
 import races2024 from '../../../../public/data/2024/races.json'

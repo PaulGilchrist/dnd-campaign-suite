@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * banishment QUINTET lane #1874 — CANONICAL HOME for isBanishmentBlocked internals
  * (banishmentHandler.js L29-45). Seam map in banishmentHandler.edge-cases.test.js.

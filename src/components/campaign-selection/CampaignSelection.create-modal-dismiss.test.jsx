@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // Lane: quick-create modal dismiss (backlog 2026-11-13 DG). The three
 // Create-family modals (New Campaign / New Arena Battle / New Starter
 // Adventure) used to answer ONLY their Cancel/Create buttons — Escape and a

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation SUBDIR lane (#2059): INTERNAL exports of expertise.js —
 // parseClassExpertiseSkillList colon-pool parsing + the classExpertiseSkillLists
 // restricted-list gate of getExpertiseLimits. Cited homes, never re-pinned here:

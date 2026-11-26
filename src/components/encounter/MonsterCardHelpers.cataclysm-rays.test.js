@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0673 OWNER truth-table: Elemental Cataclysm
+// @maintained-by-ai 2026-10-18 — MA-0673 OWNER truth-table: Elemental Cataclysm
 // "Cataclysmic Event" structured rays[] → eye-rays picker seam (no pooled
 // 13d6 VAR shell). Locks ONLY this lane's MA-0673 branches: buildEyeRayAction's
 // aoe route (MonsterCardHelpers.js:3167), eyeRaySaveSpellInfo's spellInfo gate

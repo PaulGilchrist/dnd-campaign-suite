@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: editor-movement flood/BFS (SOLE OWNER — verified by consumer census).
 // Maps-family cite table:
 //   effectiveWalls.test.js #1169 ..... wall derivation internals — consumed THROUGH

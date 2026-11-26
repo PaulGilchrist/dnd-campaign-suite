@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * Lane: the distinct effect TYPES dispatched by the EXPIRATION_HANDLERS table
  * in clearExpirationEffects.js that no other lane pins. Tested at the unit

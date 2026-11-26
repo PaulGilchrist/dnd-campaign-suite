@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-019/CLA-020 ticket lane: aura-immunity gate on the addCondition GM-add seam
 // (conditionSaveService.js auraSuppressesCondition + optional auraImmunities channel).
 //

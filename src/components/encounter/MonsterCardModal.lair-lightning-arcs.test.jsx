@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0064: Adult Blue Dragon lair_actions[2] "Lightning Arcs" — the ONLY
 // authored lair row whose prose line LEADS WITH ITS WIDTH ("5-foot-wide
 // line … within 120 feet") and the sole max≠first feet-token row in the

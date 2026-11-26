@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: hooks/combat — grant-side notification seam (NOT attack-post-processing consumption;
 // that lives in attackPostProcessing.*.test.js). Module identity: battleMaster.js is the
 // maneuver-SELECTION store reader + version-bump hook consumed by App.jsx (character-list

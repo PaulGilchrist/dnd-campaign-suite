@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // ── Regression pin for bug-hand-of-healing-modal-overstates-restored-hp ──
 // performMonkHeal computes BOTH healAmount (pre-clamp roll sum) and

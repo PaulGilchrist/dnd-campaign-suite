@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // App-level wiring tests for the post-rollback carry-over flow.
 //
 // CampaignAdmin's rollback handler writes a 'postRestoreNotice' to sessionStorage

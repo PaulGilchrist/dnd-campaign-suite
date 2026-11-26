@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * HexMap — extreme-weather audit row + stale-prompt clear (bug 2026-10-27-G).
  *

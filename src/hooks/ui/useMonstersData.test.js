@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Stable contract for the useMonstersData wrapper: { monsters, loading, error }
 // shape, /data/monsters.json fetch path, non-ok error message, and module-level
 // caching. All consumers (EncounterBuilder, HexMap) mock this hook, so this is

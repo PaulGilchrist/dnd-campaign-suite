@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SP-094: monster-attack attacker-type lookup must resolve the real monsterType
 // (EB combatSummary monsters carry type:'npc' with the real D&D type in monsterType).
 // Lane: attack-chip click → real findCreatureByName/getTargetFromAttacker →

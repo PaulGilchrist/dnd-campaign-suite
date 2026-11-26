@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1488 lane: Spectator "Spell Reflection" gated reaction — disk row
 // automation {type:"reaction", effect:"spell_reflection", dcSuccess:"none"}
 // arms the chip; press runs round-latch → two-faced spell identity → uses →

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-10-14: 2026-10-24
 // Generate-settlement behavior only: the generator's output lands in the new-
 // settlement modal as a fully prefilled draft, failures are logged without
 // opening the modal, and a dirty form is protected by a confirm-before-overwrite

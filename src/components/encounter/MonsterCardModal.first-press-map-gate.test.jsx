@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // Lock for the 2026-11-20 CCC backlog improvement "Modal first-press mapData
 // race": MonsterCardModal fetches the active map async on mount and the attack
 // chip's commit path (handleAttack → resolvePressSpatialState →

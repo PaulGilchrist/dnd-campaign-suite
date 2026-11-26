@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0889: advantage-gated secondary rider consumer — Goblin Boss
 // Scimitar/Shortbow "plus 1d4 … if the attack roll had Advantage" and the
 // MA-1444/1445 Scout Captain Shortsword/Longbow "plus 3d6 … with Advantage"

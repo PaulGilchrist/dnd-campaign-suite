@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: EFFECTS-TAB BROWSING — search input mount byte + focus (:181-188), group
 // heading + badge census derived ONCE from registry data (:192-209), the four
 // searchable faces of the filter (label/description/group/effect-key,

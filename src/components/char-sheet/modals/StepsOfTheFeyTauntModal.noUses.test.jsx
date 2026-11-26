@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // NoUses lane: exhausted-uses gating (newCount: 0, unlimited unset) for the
 // normal-mode chooser — the "No uses remaining" copy, four inert step options
 // (clicks never advance, nothing dispatches), and the free-cast Skip that stays

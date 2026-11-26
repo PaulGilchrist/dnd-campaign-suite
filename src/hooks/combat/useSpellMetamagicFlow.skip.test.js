@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-10-15: 2026-11-15
 //
 // SKIP AUTHORITY — metamagic gate lane.
 // Owns the gate → pending → skip contract for the gated spells below (simple-handlers.test.js

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Lane: useTvPresentation VICTORY-BANNER gating (backlog 2026-11-18).
 // Law: trackerHasFoes counts REAL foes only — a bare "+NPC" placeholder row is
 // bookkeeping, never a combatant, so it must not keep the gate truthy and

@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to row-distinct legs: BY-name disk locks (#387),
+// @maintained-by-ai 2026-10-18 — trimmed to row-distinct legs: BY-name disk locks (#387),
 // spell-origin identity table, press e2e + reason-coded refusals. Generic
 // gate/latch/uses/fold/consume legs cite-skip owners (see header cites).
 // MA-1170: Mind Flayer Arcanist Shield — inert prose reaction fixed with the

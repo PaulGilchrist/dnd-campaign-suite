@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 import { render, screen, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';

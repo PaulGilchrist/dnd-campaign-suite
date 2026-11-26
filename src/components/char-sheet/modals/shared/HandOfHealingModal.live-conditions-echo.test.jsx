@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // bug-hoh-physicians-touch-stale-conditions-phantom-row — the Physician's
 // Touch section of the Hand of Healing result stage previously snapshotted

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet — lane: WARDING-FLARE ROUTE te-PRODUCER CONTRACT
 // (CLA-383 regression locks): Warding Flare must write te disadvantage_next_attack
 // (te-producer model, mirrors verified Vicious Mockery/Sap/Tumble) instead of the

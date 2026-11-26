@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Regression pins for bug-sheet-attack-shield-bash-rider-drops-weapon-damage:
 // the Shield Bash rider mounts on the POST-damage seam 'shieldBashRider'
 // (subscribe 'damage:applied', emit 'bash:resolved'), so a staged-HIT `Done`

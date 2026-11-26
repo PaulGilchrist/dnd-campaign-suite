@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // Owns: unit canon for the two pure helpers in buffApplier.js — applyAbilityScoreIncreases
 // (additive featIncrease accumulation, case-insensitive name match, 'any'/unnamed skip) and
 // mergeDeduplicated (case-insensitive dedupe, append-not-replace, create-key-on-missing).

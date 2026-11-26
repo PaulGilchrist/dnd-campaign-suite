@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0020 framework lane (Aboleth "Dominate Mind (2/Day)", #976 exemplar):
 // owns ALL generic ability-save N/Day machinery — the rest of the family
 // cites here and holds only its ticket rows.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // BA-001: Dodge (baseAction) — EB monster attack rolls against a dodging PC
 // must fold the Dodge activeBuff into attack mode as Disadvantage (2d20,
 // mode marker), mirroring the verified PC-side seam countDodgeDisadvantage

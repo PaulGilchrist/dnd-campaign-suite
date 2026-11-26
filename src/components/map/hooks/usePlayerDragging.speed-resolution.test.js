@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Lane: usePlayerDragging — movement-budget SPEED SOURCE
 // (bug-movement-budget-caps-all-movers-at-30).
 //

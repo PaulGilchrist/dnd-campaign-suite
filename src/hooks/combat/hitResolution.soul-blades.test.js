@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-320 hitResolution seam (hitResolution.js runHomingStrikes/attemptHomingStrike):
 // Soulknife lv9 Soul Blades "Homing Strikes" — on a Psychic Blade miss, roll the
 // psionic die and add it; hit vs EFFECTIVE AC spends 1 Psionic Energy; natural 1

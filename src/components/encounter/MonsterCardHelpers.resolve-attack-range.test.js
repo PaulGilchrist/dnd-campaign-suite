@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 // bug-monster-ranged-attack-wrong-range-bands: the monster-card press lane's
 // resolveAttackRange fell back to a hard-coded 30 ft when an action JSON
 // carried no structured `range` field (42 ranged actions, incl. Goblin

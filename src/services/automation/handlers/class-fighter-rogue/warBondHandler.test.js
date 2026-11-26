@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-379: War Bond (Eldritch Knight lv3, 2024).
 // Owns the warBondHandler contract: handle() routing (refusal popup / auto-summon /
 // warBondSummon chooser payload), handleSummon() persist + popup strings, handleBond()

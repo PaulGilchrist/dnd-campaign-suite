@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-11-24: 2026-11-24
 // QA backlog 2026-11-24 (improve party-inventory-qty-silent-normalize): #pi-item-qty
 // silently rewrote invalid input — 0/−3/1.5/blank became 1 at the keystroke AND again
 // before the POST, so the user typed a number and stored a different one with zero

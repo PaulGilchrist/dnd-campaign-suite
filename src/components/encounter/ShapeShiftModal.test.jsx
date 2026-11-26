@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1020: ShapeShiftModal — the Imp Shape-Shift form chooser, reusing the
 // MA-0275 AnimalSpiritVariantModal mc-overlay/sp-modal byte-shape (smallest
 // existing chooser). This file owns the MODAL UI contract only: forms read

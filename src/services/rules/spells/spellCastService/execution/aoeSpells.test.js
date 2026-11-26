@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  HUB AoE-modal routing + generic-heal branch lane (#1464)          */
 /*                                                                    */

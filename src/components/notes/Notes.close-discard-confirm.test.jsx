@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-24
+// @maintained-by-ai 2026-10-28: 2026-11-24
 // Regression lock for improve 2026-10-29-V (ct-lanes-close-x-unguarded): the
 // Notes lane's ×/Cancel close path must NAME the discard through the shared
 // useReloadGuard when the draft is dirty — wizard precedent

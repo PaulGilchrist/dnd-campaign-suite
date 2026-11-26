@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * removeCurseService lane — FORWARDER-CONTRACT ONLY (thin wrapper, 33 lines).
  *

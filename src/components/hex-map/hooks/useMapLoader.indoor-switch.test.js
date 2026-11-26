@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /**
  * Lane: hex map loader — cross-shape save guard on the hex→indoor POI-entry
  * switch (bug 2026-10-30).

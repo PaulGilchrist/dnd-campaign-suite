@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1071: Kuo-toa Whip "Pincer Staff" — household save_dc:0/save_type:""/
 // save_effect:"" empty-noise decoy (MA-1021 census family) previously ADMITTED
 // the ActionSaveRoll save lane (gate tested save_dc == null, 0 ≠ null): every

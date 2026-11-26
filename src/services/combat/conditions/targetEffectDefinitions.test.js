@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Registry canon owner (#820 golden-once): TARGET_EFFECT_DEFINITIONS is imported by the
 // entire conditions family (#995-#1011, all maintained: base #998 dispatch, compute #1000
 // fold bytes, combine #999, internal #1001, tickets, saveService quad, utils #1006,

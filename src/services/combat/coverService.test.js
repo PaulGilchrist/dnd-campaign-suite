@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // L5-003 §8.3 lane — combat/coverService.js: intervening-CREATURE half cover (+2 AC).
 //
 // Contract here (GEOMETRY + CHANNEL, not the items/walls rules-table):

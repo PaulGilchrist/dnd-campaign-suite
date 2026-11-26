@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: cleaveMastery step ASSEMBLED via buildAttackRollDamageSteps() (attackRollDamageSteps.js:29).
 // Cleave Mastery (2024 feat): on a hit you may make ONE extra weapon attack against a
 // SECOND creature — weapon dice only, ability modifier stripped from damage.

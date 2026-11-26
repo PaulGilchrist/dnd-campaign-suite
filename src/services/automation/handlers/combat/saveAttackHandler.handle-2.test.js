@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit contract for handle()'s routing lanes:
+// @maintained-by-ai 2026-10-16 — deterministic unit contract for handle()'s routing lanes:
 // tracked-uses cost (incl. long_rest_or_expend_rage fallback), heal/condition/AoE
 // modal routing, effect-only and condition popups, pushEffect normalization, and
 // buildSaveAttackRollResult payload + notes composition (darkness-dispelled note

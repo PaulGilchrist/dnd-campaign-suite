@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: automationPassives BASE — the generic passive dispatch/collection
 // framework: hasPassiveEffect + delegate census, collectWeaponMastery plumbing
 // (extra/replace/choice/kind aggregation, null shapes), the un-gated legs of

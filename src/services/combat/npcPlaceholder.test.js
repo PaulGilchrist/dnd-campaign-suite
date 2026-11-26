@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Lane: isBareNpcPlaceholder — the bare "+NPC" placeholder classifier
 // (services/combat/npcPlaceholder.js, doctrine twin of creaturePresence.js:
 // component tests factory-mock initiativeService, so the predicate lives on

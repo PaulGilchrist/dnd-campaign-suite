@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 9→4, spellcasting lane only (cataclysm
+// @maintained-by-ai 2026-10-18 — trimmed 9→4, spellcasting lane only (cataclysm
 // legendary/delegate legs owned by MonsterCardModal.legendary-uses-elemental-
 // cataclysm.test.jsx #629; generic uses-counter/refusal/At-Will-recast and
 // formatActionUsage owned by spellcasting.test.jsx :275/:281/:317 and

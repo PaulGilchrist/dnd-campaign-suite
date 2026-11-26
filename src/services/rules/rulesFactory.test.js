@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // rulesFactory BASE lane: dual-ruleset SELECTOR MATRIX owner + full factory export
 // surface drift-pin. rulesFactory = selector ('5e'/'2024' per playerSummary.rules)
 // routing raceRules/classRules + getPlayerStats hub (repo AGENTS.md canon).

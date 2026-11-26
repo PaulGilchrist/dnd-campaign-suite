@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Host-wiring tests for the three inline choice modals that flow through
 // CharActionModals → CharActionModals.SecondaryModals → SecondaryTargetModals →
 // SecondaryTargetModal: Sweeping Attack, Bait and Switch, Commander's Strike.

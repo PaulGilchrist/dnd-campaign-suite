@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1354 regression: Psychic Gray Ooze Mind Corrosion (At Will) gated reaction.
 // Gate: RAW campaign lastAttack with the monster as save-fail target on a
 // spell-origin effect (isSpellOriginLastAttack MA-0013 seam) + identifiable

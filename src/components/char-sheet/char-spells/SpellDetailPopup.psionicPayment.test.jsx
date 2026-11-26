@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // SpellDetailPopup Psionic Sorcery payment checkbox lane (component level).
 // Proves the contract of the "Use Sorcery Points (N SP) instead of spell slot"
 // checkbox:

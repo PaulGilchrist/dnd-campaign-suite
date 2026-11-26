@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Guarded close-side focus landing (GK 2026-11-17): the guarded (staged-HIT)
 // face keeps its zero-pull-on-open law — opening moves NO focus, the chip that
 // held it keeps it — but its CLOSE side no longer strands keyboard users at

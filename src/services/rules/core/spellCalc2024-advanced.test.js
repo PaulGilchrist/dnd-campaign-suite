@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // spellCalc2024 twin lane. Scope: 2024 Path-of-the-Wild-Heart behavior NOT owned by siblings,
 // pinned against disk ground truth (public/data/2024/classes.json Barbarian, read 2026-10-20:
 // class spell_casting_ability is 'Intelligence'; major declares 'Wisdom'; major.spells carry

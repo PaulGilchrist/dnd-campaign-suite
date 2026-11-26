@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1351: Pseudodragon Sting fail-margin bands on the DAMAGE-BEARING save
 // leg — unlike the MA-0639/MA-1000 rider-only composites (save chip pays no
 // damage), Sting's save adjudicates its own 2d4 Poison pool, so the DC chip

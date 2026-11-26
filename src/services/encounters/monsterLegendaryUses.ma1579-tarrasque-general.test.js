@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1579: Tarrasque legendary_actions[0] "General" header authors uses:3
 // (adult-blue-dracolich MA-0050 byte-twin, §MA-1456/§MA-1494 header+counter+
 // spend-gate fingerprint). Pre-fix the row had NO numeric uses →

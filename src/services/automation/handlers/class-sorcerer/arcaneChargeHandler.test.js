@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-010 regression: Arcane Charge is RAW-gated on "When you use Action
 // Surge" — the surge latch (actionSurgeUsedThisRound === current round from
 // a campaignName-threaded fresh combat-summary read, CLA-004 pattern) is the

@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-1639 OWNER lane: vampire "Bite" (actions[2], DC 17 Constitution,
+// @maintained-by-ai 2026-10-18 — MA-1639 OWNER lane: vampire "Bite" (actions[2], DC 17 Constitution,
 // 1d4 + 4 Piercing plus 3d8 Necrotic) save-path ATTACKER-RECOVER rider.
 // Owns the vampire Bite disk fingerprint + parseSaveAttackerRecover structured-key-only
 // parser + block-save context threading for THIS row. Regain is HP recover

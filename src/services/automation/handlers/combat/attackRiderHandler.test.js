@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // attackRiderHandler core lane: handle() routing (choice modal / single-option
 // auto-apply / ready-info / oncePerTurn skip / slashing_damage_hit validation),
 // applyRiderOption single-option contract (optKey stash, pendingRiderChoice

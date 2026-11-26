@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-075: handleMagicMissileConfirm hardcoded isUpcast:false and slotLevel from
 // spell.level, so prepareSpellCast paid the lv1 slot even when the popup carried a
 // Level 2/4 selection on spell.upcastLevel — the lv-N slot was never paid and

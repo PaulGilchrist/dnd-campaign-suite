@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0248: Ancient Silver Dragon Paralyzing Breath (paralyzingBreathService —
 // PRODUCER lane, MA-0068 staged-sleep shape / MA-0102 weakening sibling): the
 // first failed CON save stages Incapacitated + the paralyzing_staged te (NO

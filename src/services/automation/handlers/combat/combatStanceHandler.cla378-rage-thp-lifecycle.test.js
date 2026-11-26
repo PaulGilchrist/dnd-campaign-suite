@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-378: Vitality of the Tree — rage-activation surge ordering + rage-end THP strip.
 // combatStanceHandler sextet lane: owns grant-BEFORE-buff-POST ordering + the single-deferred-POST
 // count, rage anchor stamps, max-surge pick + rage ability_use log composition (full strings), and the

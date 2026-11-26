@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Pass Without Trace badge-face lane (SP-085): golden render of the
 // 'pass_without_trace_bonus' targetEffect — label/icon read from the live
 // registry via getEffectDefinition (never hand-typed), the builder's

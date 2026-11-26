@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-12
+// @maintained-by-ai 2026-11-12: 2026-11-12
 // Regenerate-from-stamped-opts service (VG backlog 2026-11-12): the stamped
 // generationOpts must reach the correct CLIENT generator VERBATIM (Room Adjacent →
 // generateAdjacentDungeon, BSP → generateDungeon, Terrain → generateHexTerrain), the

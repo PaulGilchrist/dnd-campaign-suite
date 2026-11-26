@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CANON selection-priority lane for selectBrutalStrikeRiders (2024 Barbarian
 // Brutal Strike riders): pure filter + sort, zero RNG — fixed candidate arrays
 // in, exact output-name order pinned by hand ONCE per row (never re-run the

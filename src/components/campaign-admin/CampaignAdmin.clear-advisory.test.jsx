@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 /**
  * Clear Change Data stale-sessions advisory (backlog XY 2026-11-23): the
  * success strip must carry an honest per-lane note that only the initiative

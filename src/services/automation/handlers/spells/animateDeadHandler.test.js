@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * animateDead SEXTET lane #1867 — handle() (main).
  * Seam map lives in animateDeadHandler.confirm.details.test.js; all six lanes

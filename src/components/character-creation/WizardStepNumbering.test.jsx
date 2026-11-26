@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * OWNER of the wizard step-numbering contract: one canonical index drives the
  * sidebar indicator, the content headings, and the Next/Back walk order.

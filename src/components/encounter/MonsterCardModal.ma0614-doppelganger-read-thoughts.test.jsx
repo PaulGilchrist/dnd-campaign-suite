@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0614 data lock: Doppelganger "Read Thoughts" — spell_save_dc-only row was
 // inert (generic save shell MonsterAction ActionSaveRoll arms exclusively on a
 // numeric row-level save_dc, MonsterAction.jsx:116; spell_save_dc never reaches

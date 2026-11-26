@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1766: Young Bronze Dragon lair_actions[0] was a BARE STRING (inert
 // static span, zero affordance — MonsterCardBody.jsx:357 first disjunct).
 // DATA fix promotes it to the byte-proven adult-bronze MA-0085 "Fog Cloud"

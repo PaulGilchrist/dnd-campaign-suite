@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Two-stage flow-orchestration seam for useSpellMetamagicFlow.
 // Owns: gateMetamagic → stage-machine entry, select→advance→confirm→clear+log,
 // and skip semantics for the three two-stage handlers (Enhance Ability:

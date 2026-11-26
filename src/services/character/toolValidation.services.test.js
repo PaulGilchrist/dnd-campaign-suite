@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // toolValidation SERVICES lane (#2064, trimmed pass #398+): getToolsByCategory units —
 // the Skilled-usage computation deferred here by the limits opener (#2061).
 // SEAM MAP (siblings cited, never re-pinned here):

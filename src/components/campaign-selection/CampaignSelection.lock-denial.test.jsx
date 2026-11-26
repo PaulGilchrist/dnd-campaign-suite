@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Backlog 2026-11-11 LZ — quick-create lock denial is INLINE, not a full-page
 // dead end. A POST /api/campaigns 403 (CAMPAIGN_LOCK refusing an off-allowlist
 // name) must keep the create modal open, PRESERVE the typed name, and render

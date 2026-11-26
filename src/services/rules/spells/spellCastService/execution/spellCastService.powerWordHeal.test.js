@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  PWH HUB-EDGE LANE (#1481/#1487 family) — executeSpellCast hub    */
 /*  (execution/index.js:669) routed LIVE past :702 into the CLA-392  */

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0146: Adult White Dragon Freezing Burst sphere picker — CON DC 14,
 // 2d6 Cold, 30-ft radius. Owns the two speed_zero gate legs not pinned by
 // the ancient-white data lane (freezing-burst-ancient-white.test.jsx covers

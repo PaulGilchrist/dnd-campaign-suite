@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /* Lane — FULL-STACK delete single-confirmation for defect #410 (fix#410 2026-10-22;
  * confirm tier unified 2026-11-24 QA backlog: the leaf's native window.confirm
  * retired onto the shared in-app DeleteConfirmModal).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership: the `auraComboEffects` prop — the ONLY owner of this prop across the
 // CharSummary-* family (verified by grep over all siblings).

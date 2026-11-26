@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-004: Commanding Presence reaction executor rule deviations — the die was
 // spent twice (once on the check, again here), disadvantage went down a phantom
 // `activeConditions 'disadvantage'` channel no consumer folded into attacks,

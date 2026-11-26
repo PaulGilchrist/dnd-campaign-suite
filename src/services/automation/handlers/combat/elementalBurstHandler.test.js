@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic: handler is a pure FP-gate (stored FP →
+// @maintained-by-ai 2026-10-15 — deterministic: handler is a pure FP-gate (stored FP →
 // _trackedResources → maxFP fallback, < 2 blocks, else deduct 2 + open modal).
 // All deps mocked at module boundary; modal internals owned by ElementalBurstModal.test.jsx.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

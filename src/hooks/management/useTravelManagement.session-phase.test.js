@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-25
 // Lane: useTravelManagement's L5 §10.1 session-phase wrapper — PHASE OWNERSHIP
 // (bug-autoencounter-travel-phase-clobber). The travel-mode state write itself
 // and the travel engine are owned by useTravelManagement.test.js; the phase

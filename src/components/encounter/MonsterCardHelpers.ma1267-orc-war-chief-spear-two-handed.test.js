@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 7→3 tests (#523); rec #523 re-run 2026-10-23: generic
+// @maintained-by-ai 2026-10-18 — trimmed 7→3 tests (#523); rec #523 re-run 2026-10-23: generic
 // offer-shape + two/one select-log fork ritual folded to canon (two-handed.test.js:25-36
 // ,47-61) per fold twin ma1661:42-49; lane keeps BY-name disk lock + distinct plus-rider
 // DEFAULT select-leg (below). disk lock folds key-placement +

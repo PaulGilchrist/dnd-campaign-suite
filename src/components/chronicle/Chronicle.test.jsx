@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Chronicle view faces (backlog Item 2): loading/empty (F14 pattern), the
 // session-grouped forward-ordered story, mechanics-noise exclusion, the shared
 // markdown sink actually routing through DOMPurify (real sanitize.js — attack

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0073: parseSpeedHalfClause parser contract — Adult/Ancient Brass Dragon
 // Scorching Sands authored failed-save "Speed is halved" clause arms the
 // speed_half te producer in saveProcessing (MA-0038 parse shape). This is a

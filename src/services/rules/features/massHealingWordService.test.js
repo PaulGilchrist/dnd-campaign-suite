@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * massHealingWordService lane — AoE PRODUCER (bonus-action, multi-target,
  * per-target d4 dice). Twin of the #1384 massCureWoundsService lane; this

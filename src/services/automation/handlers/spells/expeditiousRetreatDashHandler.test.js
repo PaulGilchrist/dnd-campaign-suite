@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SP-128 lane: Expeditious Retreat Dash handler (bonus-action Dash → speed_boost
 // grant). Owns: cast grant (exact buff/latch/expiration/log bytes), serialization
 // of second same-turn click via a faithful store, round-wrap re-arm, and guard

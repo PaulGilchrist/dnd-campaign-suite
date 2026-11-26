@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Nature's Sanctuary handler unit tests (activation handle, move handleMove,
 // activateNaturesSanctuary, moveNaturesSanctuary). Fully deterministic: every
 // external dependency (runtime store, expiration queue, log, combat context,

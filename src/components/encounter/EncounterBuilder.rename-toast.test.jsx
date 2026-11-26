@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /* Lane — rename-success toast at the builder seam (backlog 2026-10-28-T: EB rename
  * success was the only silent lane — save/update/load/404 all toast).
  * OWNED HERE (toast.test.jsx cannot reach the rename UI: its EncounterModal stub

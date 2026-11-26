@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Pure, deterministic geometry contract for SpellOverlay.js: stable shape
 // defaults and hit-test math. Needs no churn as the app changes; only
 // revisit if the overlay model itself changes shape behaviour.

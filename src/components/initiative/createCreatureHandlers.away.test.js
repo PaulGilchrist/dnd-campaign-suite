@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Split-party handler lane (plan initiative-split-party): handleToggleAway /
 // handlePartyPresenceChange — localhost gate, the single board write, and the
 // per-change party_split / party_rejoined audit rows. Mutation semantics

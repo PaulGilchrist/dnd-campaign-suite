@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // SP-075: gateMagicMissile read only spell.level, so an upcast selection carried on
 // spell.upcastLevel (SpellDetailPopup onCast) still armed a 3-dart Distribute popup
 // while the popup promised a higher-level cast. Pins the effective-level dart total

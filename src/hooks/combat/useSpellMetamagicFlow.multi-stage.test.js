@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — see lane map below
+// @maintained-by-ai 2026-10-15: 2026-10-15 — see lane map below
 // Multi-stage state-machine lane — unique seams only:
 //  * True Polymorph path-storage: path-select persists the chosen path on the open
 //    pending machine (object-path resolution → confirm-payloads / complex-handlers.spells;

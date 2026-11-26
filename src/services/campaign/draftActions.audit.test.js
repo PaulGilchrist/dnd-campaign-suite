@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // Backlog 2026-11-13: approving/rejecting a draft used to ride the plain CRUD
 // save/delete lane with NO campaign-log trace — another GM tab could not see
 // that a live entity came from an approval. approveDraft/rejectDraft now each

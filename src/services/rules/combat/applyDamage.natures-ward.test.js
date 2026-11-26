@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-237 regression at the applyDamage choke point: Nature's Ward (2024
 // Circle of the Land lv10) — when the PC save-damage lane forwards FULL-STAT
 // characters (the modal fix), the CLA-336 land_resistance fold in

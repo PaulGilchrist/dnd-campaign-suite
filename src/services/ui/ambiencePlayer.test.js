@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-25
+// @maintained-by-ai 2026-11-25: 2026-11-25
 /**
  * ambiencePlayer.js — unified ambience engine unit lane
  * (formerly youtubePlayer.test.js; Item 3 offline-ambience migration).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // fix#172 family (census test-maintain-bugs.md:1320): the five same-class
 // monsters.json rows with NO dedicated per-row lane — Kraken "Swallow",
 // Tarrasque "Tail", Pit Fiend "Bite", Dragon Turtle "Tail", Adult Blue

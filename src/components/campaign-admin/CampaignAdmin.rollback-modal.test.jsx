@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 /**
  * Toolbar "Rollback to Snapshot" modal affordance lane (improvement
  * admin-rollback-zero-count-blind-confirm): opening the modal REFRESHES

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-081: Defensive Tactics defect-lock/regression lane for 2024 Ranger (Hunter).
 // Steady-state handle/applyChoice composition is owned by defensiveTacticsHandler.test.js.
 // This lane locks the defect seams the main lane leaves open:

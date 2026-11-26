@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract test for useAppData: mocks the dataLoader boundary and
 // asserts the hook's output shape (initial values, happy path, showButton guard,
 // error path). Stable unless the hook's returned field list changes.

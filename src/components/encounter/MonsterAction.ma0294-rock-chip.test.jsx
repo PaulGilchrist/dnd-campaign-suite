@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0294 (component unit lane): recharge-spent styling on the ATTACK-roll
 // chip. The attack chip was ungated (rechargeOut previously consumed only by
 // ActionSaveRoll/RechargeNote). A spent Rock (Recharge 6) row must style its

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 //
 // SPECIAL PATHS — gate-lane branches with no owner in the sibling lanes.
 // Owns:

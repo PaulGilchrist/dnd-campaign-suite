@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CANON framework base for the monsterLegendaryUses family. Generic behavior
 // lives HERE; per-monster disk-byte tickets own their own lanes.
 //   MA-0021 header/max/remaining + expend gate + turn-latch + spend/refusal

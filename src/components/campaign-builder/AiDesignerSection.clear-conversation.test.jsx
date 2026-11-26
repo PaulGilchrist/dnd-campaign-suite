@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-07
 // Backlog 2026-11-07 DJ: authoring residue (design-notes.json) lives outside
 // the Admin "Clear Change Data" lane, so the designer carries its own reset.
 // The "Clear Designer Conversation" button opens the shared DeleteConfirmModal

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* Lane — disabled-row-actions-while-loading gate in the Load modal
  * (QA 2026-10-24 night backlog: a synthetic pen click landing on a
  * just-reloaded row list could silently close the modal — the click hit a

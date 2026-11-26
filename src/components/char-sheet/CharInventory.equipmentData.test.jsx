@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory equipment-data guards in the popup builder (seam unique to this file):
 //   - desc as a non-array string is dropped by the Array.isArray guard in
 //     buildItemPopupHtml (CharInventory.jsx) — the popup still renders the item

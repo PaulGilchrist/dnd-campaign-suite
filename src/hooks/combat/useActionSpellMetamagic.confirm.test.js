@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Authoritative lane for handleActionMetamagicConfirm: payment (CLA-271 psionic
 // checkbox), metamagic/spell logging, metaCtx flag building, and pending clearing.
 // Click-lane queuing is covered by the castClick/attackClick siblings.

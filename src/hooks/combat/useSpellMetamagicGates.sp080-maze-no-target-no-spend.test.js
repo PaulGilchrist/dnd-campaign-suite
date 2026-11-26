@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-080 no-spend family (§CLA-208 pay-no-effect) gate lane: Maze has no chooser
 // modal, so gateMetamagic resolves the exact same armed initiative target mazeHandler
 // will use (getCombatContext + targetResolver.resolveTarget) and refuses UNPAID in

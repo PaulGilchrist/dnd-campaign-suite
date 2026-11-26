@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Regression ledger — bug-sheet-nick-mastery-hit-drops-damage-stage: the
 // second+ Devious Strikes cycle within one tab load silently dropped the
 // chooser AND the damage stage. Machine cause: the cycle-1 close forwarded

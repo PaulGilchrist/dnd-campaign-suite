@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 //
 // improve heal-modal-live-hp-echo — mounted heal UI adopts target-bucket SSE
 // echoes mid-dwell. Before this lane the header stayed `100 / 143` after an

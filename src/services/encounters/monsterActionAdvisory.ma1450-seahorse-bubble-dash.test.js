@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1450: Seahorse "Bubble Dash" — RAW pure self-movement row formerly
 // carried junk attack_bonus:0 → clickable "+0" chip adjudicating a bogus
 // to-hit vs the armed target (live fingerprint 2026-09-28: roll/attack

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * useLootHandlers — handler-seam contract for the Initiative loot UI.
  *

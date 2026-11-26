@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // combatStanceHandler sextet — lane: INSTINCTIVE POUNCE (regression CLA-201).
 //
 // Owns (per the six-lane seam map in .activation.test.js): the canonical

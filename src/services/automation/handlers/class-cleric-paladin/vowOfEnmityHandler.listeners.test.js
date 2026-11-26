@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic: mocks the runtime-state, combat-context, and log seams at
 // module boundaries; vi.resetModules per test isolates the un-removable
 // window listener that setupVowTransferListener registers. Pins the stable

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // CharActionModals inline-modal wiring tests — behaviors NOT covered elsewhere:
 // - BastionOfLaw confirm → handleApply payload flows into setPopupHtml, then
 //   modal closes. (Arg routing → secondary-targets.test.jsx; close-on-onClose →

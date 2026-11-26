@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Lane: useRailClipped (Item 7, F19) — the horizontal-rail clipped detector
  * behind the Initiative edge-fade cue. jsdom reports zero layout metrics, so
  * the harness pins scrollWidth/clientWidth in a layout effect (layout effects

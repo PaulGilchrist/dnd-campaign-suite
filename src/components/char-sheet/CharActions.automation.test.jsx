@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Consolidated: "calls executeHandler when action has automation" + "does not call executeHandler
 // for plain actions" → 1 click-path test (asserts dispatch args and inert plain row).
 // Removed: "feature detail popup for actions with details but no automation" — duplicated,

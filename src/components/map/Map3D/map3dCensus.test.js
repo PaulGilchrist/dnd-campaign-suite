@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 // Lane: map3dCensus — the pure per-origin census counts + header line behind
 // the 3D scene-header chip (owner ruling 2026-11-20 "count only
 // live-visible"). The counts must be derived from the SAME predicates the

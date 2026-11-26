@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // L5-003 §8.3 (triage #1) — duration-clock producer tests.
 // The clock here is the repo's ROUND counter: entries mature at initiative
 // seams (roundToSet / getCurrentCombatRound), NEVER on wall-clock time

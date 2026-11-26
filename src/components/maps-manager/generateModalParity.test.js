@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Twin-parity pin (UF backlog 2026-11-12): the Dungeon/Terrain generate modals
 // share their child styling through the neutral `gen-modal-*` prefix, defined
 // ONCE in gen-modal-shared.css. jsdom cannot resolve the CSS cascade, so these

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: initiativeService — the RUNTIME +NPC / turn-navigation seam of initiative.
 // Ownership split (do not re-drive here): d20 ROLL math is owned by
 // src/services/dice/diceRoller.test.js; encounter-BUILDER entry assembly and its

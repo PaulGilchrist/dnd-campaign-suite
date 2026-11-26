@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for holyNimbusHandler.handle: toggle on/off runtime
 // writes (exact order), Channel Divinity charge spend and max-charge fallback, buff
 // dedup, popup payload copy, campaign log, and log-failure resilience.

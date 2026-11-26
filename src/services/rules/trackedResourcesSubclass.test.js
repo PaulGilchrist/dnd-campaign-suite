@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // SUBCLASS/ANCESTRY-KEYED seed lane for src/services/rules/trackedResources.js.
 // LIVE ALLOCATION cite #1532, verbatim:
 //   '_Star_Map, _Steps_of_the_Fey, tireless, naturesVeil, stonecunning,

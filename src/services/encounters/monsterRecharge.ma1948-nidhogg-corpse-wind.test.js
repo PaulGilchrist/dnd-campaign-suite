@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1948: Nidhogg "Corpse Wind (Recharge 5-6)" save core live-verified
 // EXACT (DC 24 CON, 12d10 Necrotic, floor-half success face 62→31 via PC
 // prompt) but the recharge gate never armed — name-text "(Recharge 5-6)"

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-06
 // Lane map: host mounting under these merge rules →
 // CharActionModals.sneak-chooser-rearm.test.jsx; precedence for OPEN
 // collisions pinned upstream by CharActionModals.rendering.test.jsx.

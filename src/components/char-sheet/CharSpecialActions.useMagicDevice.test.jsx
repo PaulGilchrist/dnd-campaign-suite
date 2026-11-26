@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-374 regression: the Special Actions "Use Magic Device:" row must be
 // clickable and dispatch through executeHandler to handleUseMagicDevice,
 // surfacing the activation/deactivation clause popup (previously the row was

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Deterministic contract tests for auraOfVitalityHandler: every external
 // boundary (runtime store, dice, healing, expirations, log, combat data,
 // concentration, targetEffects registry) is mocked at module level, so these

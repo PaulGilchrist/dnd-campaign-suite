@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-01 (AZ2 improve: the native window.confirm here
+// @maintained-by-ai 2026-10-14: 2026-11-01 (AZ2 improve: the native window.confirm here
 // became the in-app named modal — the menu now only hands off + closes; the
 // `Remove "<name>" from the map?` dialog is owned by the parent lane, see
 // Map-handlers.test.jsx and DeleteFromMapModal.test.jsx.)

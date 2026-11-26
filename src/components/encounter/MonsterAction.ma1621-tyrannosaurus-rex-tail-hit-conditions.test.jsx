@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1621: Tyrannosaurus Rex "Tail" — prose carries "If the target is a
 // Huge or smaller creature, it has the Prone condition" but the row shipped
 // WITHOUT hit_conditions, so the prone rider was structurally inert

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Folder-confirm-payloads AUTHORITY: every popup-bearing confirm lane of the full
 // useSpellMetamagicFlow hook, exercised end-to-end (gateMetamagic → pending →
 // confirm → setPopupHtml). Levels/ranges are pinned against spells.json (RAW).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Rules lane: exhaustionRules.js — the ONLY owner of exhaustion level math
 // (app-authored DC ladder, death cap, long-rest reduction). Pure module:
 // zero mocks (#952), fixed inputs -> exact outputs hand-derived ONCE from

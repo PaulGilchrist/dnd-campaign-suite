@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (per family delegation): AC buff ATTRIBUTION BADGES —
 // the text, .aura-source marker, and tooltip of each buff-driven indicator in

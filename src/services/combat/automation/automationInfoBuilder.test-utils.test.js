@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── automationInfoBuilder.test-utils.test.js ─────────────────────────
 // Pins the contract of the shared fixtures consumed by ~30 automationInfoBuilder
 // test files (BASE_STATS, makeFeature) plus the mock-expressions factory's

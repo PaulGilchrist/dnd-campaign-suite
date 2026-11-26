@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-208 regression lane: Land's Aid style save+heal area features must restore
 // real HP to EB-joined monsters. Monster HP lives in combatSummary.currentHp
 // (applyDamage NPC branch), NOT in the per-name runtime currentHitPoints —

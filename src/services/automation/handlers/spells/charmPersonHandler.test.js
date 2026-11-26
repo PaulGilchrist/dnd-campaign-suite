@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // # charmPersonHandler — Charm Person (WIS save-or-suck charm, concentration). #1883
 // Production module is a 12-line DELEGATION shell: handle() → handleCharmSpell(action, playerStats,
 // campaignName, config) in charmSpellUtils.js. This lane pins DELEGATION only — the charmPerson

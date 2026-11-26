@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-27
+// @maintained-by-ai 2026-10-27: 2026-10-27
 // Conflict-banner contract for the Factions manager: when the server refuses a
 // save with a 409 concurrent-edit conflict (body { conflict: true } — the
 // service copies it onto the thrown error), the banner keeps its verbatim

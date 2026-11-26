@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-27
+// @maintained-by-ai 2026-10-27: 2026-10-27
 // Regression lock for bug-ct-409-reopen-reseeds-stale-list-recovery-loop:
 // after a concurrent-save 409 the guided recovery ("close, reopen, re-apply")
 // used to dead-end — closing the editor never re-fetched the list (the SSE

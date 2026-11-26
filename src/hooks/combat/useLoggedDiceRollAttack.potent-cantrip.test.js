@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Attack-lane seam (createLogAndShow): Potent Cantrip (2024 classes.json Evoker lv3:
 // "miss with attack roll or target succeeds on saving throw → half the cantrip's damage")
 // and Soulknife lv9 Homing Strikes gate wiring. Owns what reaches logEntry /

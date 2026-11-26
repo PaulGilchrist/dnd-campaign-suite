@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory item lookup — parenthetical extraction before equipment lookup
 // (seam unique to this file per the seam map in CharInventory.edgeCases.test.jsx).
 //

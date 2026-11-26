@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Live-control gate on the LAN visitor's ALREADY-OPEN monster stat block
 // (bug-released-delegation-stale-open-card-keeps-rolling): the avatar-click open
 // gate (CreatureCard CardAvatar ⇒ getCreatureController !== null) is only

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-019: aura-granted condition-immunity channel feeding the condition-apply seams.
 // Per the auras/ folder lane map in auraComboEffects.test.js: membership/range gating
 // (cannot-act, ally-inclusion, isWithinRange, missing aura/name) is canonical THERE —

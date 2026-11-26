@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0031: Cold Breath (Recharge 6) enforcement service — CANON base for the
 // whole recharge family. Gate, fire-spend, refusal vocab (popup + log), and
 // turn-start d6 regain (≥threshold recharges, <threshold stays spent).

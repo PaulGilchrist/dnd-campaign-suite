@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // contextBuilder-sync activeBuffs lane — canonical owner of the buff-scan
 // advantage paths (advantage_attacks_advantage_against / advantage_attacks_and_saves
 // / create_illusion), vow-of-enmity positive, rage stance-damage accumulation,

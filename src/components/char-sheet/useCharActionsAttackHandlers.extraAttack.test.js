@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Regression pins for bug-extra-attack-display-only-never-rolls (press half):
 // every allowed press that reaches the roll step registers the Extra Attack
 // chain EXACTLY once via stageAttackRoll (the seam all five press

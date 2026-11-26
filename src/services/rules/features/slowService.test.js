@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // ── slowService lane map (subject: slowService.js — spellCast producer lane) ──
 // Lane (this): triggerSlow() ONLY — case-insensitive exact-name gate, save-DC
 //   resolution chain, slot-level chain, exact action envelope, delegation to

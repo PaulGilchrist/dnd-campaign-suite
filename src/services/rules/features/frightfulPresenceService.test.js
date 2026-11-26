@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0048/0147/0163 — frightfulPresenceService BODY lane: track arms te +
 // ONE merged 10-round clock, turn-END consumer repeats the save, grant
 // writes the 24h immunity te (14400 = "24 hours" round LABEL, CLA-334 —

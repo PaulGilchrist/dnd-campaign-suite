@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * App-level contract for the `map-activate` SSE event (App.jsx →
  * handleMapActivateEvent):

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Marker lifecycle (create/consume/drop buckets) for the pending opportunity-
 // attack registry (bug-monster-oa-resolution-auto-missed-by-melee-range-gate).
 // Storage doctrine mirrors pendingSavePrompts: campaign-level object keyed by

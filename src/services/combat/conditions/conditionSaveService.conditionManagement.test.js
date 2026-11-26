@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Generic condition-management lane of conditionSaveService (owned here):
 // removeCondition full lane (:101-115, incl. activeConditionMeta strip :109-114) and
 // addCondition auto-immunity gate (:141-150), append/dedup replace-not-stack (:152-154),

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * LANE (family seam map in ./5e-immunities.test.js header, mirrored by
  * ./2024-race.test.js — cited, never edited): getRace only — race lookup +

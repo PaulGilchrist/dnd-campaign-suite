@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Players from './Players.jsx';

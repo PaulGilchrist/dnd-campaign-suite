@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Special-attack lane of 2024 getAttacks (attackCalc2024.js): Swift Quiver
 // (:478-494) and Starry Form (:595-597) rows.
 // Real builders end-to-end per the cla225/edge-cases pattern (#1235/#1236

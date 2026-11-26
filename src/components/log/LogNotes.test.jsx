@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // NOTE lane — canonical home for note content AND the add-note flow (Log.jsx).
 // REC #884: absorbed the NoteEntry content census retained in LogEntryRendering.test.jsx
 // (its #879 custom-values pin migrated here verbatim-in-face — that lane should drop its

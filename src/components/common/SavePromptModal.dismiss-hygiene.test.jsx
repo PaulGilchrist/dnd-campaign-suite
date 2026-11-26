@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // SavePromptModal — dismiss hygiene (backlog 2026-11-03 save-prompt-queue-
 // dismiss-orphan). Locks the drained-queue contract mirroring the
 // concentration/death-save lanes:

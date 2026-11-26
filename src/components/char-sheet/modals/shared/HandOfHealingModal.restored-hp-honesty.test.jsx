@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // Regression pin for bug-hand-of-healing-modal-overstates-restored-hp: the
 // result modal used to render the pre-clamp roll total (payload.healAmount) as
 // "N HP restored" even when its own ability_use audit row said

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0877: Gnoll Fang of Yeenoghu "Bite" — prose carries "the target has
 // the Poisoned condition until the start of the gnoll's next turn" but the
 // row shipped WITHOUT hit_conditions, so the condition rider was

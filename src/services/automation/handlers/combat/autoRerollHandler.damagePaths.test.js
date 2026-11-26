@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // autoRerollHandler — applyMissTurnedHitDamage damage-payload lane (numeric-bonus seam).
 //
 // Seam map for the autoRerollHandler.test.js quint:

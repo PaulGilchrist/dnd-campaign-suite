@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* ------------------------------------------------------------------ */
 /*  DIRECT lane: handleRemoveCurse (triggerSpells.js) popup-payload   */
 /*  propagation, fix#353 (#1466/#1499). The OLD law was the :0-      */

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Small pure wiring module over mocked deps — deterministic branch contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

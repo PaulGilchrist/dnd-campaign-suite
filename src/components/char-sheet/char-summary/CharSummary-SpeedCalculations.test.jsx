@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // CharSummary speed-row calculations — the ONLY owner in the CharSummary family of:
 // exhaustion reduction (applySpeedConditions), condition speed effects

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // improve cure-conditions-echo (backlog 2026-11-14 HZ) — the Cure Conditions
 // sections (both tiers) previously snapshotted the target's activeConditions

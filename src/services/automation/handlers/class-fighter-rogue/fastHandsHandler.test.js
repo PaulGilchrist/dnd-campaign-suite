@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the Fast Hands bonus-action handler:
 // popup/modal shapes, exact '_FastHands_usedRound' latch delegation through
 // the oncePerTurn seam (latch internals are pinned in oncePerTurn.test.js —

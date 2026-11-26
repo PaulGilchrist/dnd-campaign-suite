@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Regression pins for bug-stale-level-down-pool-overshoot: a persisted bucket
 // can outlive a shrink of its level-derived max (DM edits a character's level
 // down, class resync). The stored-bucket read branch must clamp

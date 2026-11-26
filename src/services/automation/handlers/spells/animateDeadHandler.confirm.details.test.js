@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * animateDead SEXTET seam map — all six lanes share animateDeadHandler.js:
  *  - #1863 confirm.initiative — resolveCasterInitiative share/fallback + byInitiativeDesc sort

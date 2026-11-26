@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: EffectAdder MODAL CHROME (canonical owner) — heading exact-byte-once,
 // tab-bar census BY NAME in exact order (#789/#849), tab-switch panel seam
 // (one mount/unmount observation each direction), overlay + modal-content clicks

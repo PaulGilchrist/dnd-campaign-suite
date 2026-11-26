@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * ElementalAttunementModal — NPC SAVE RESOLUTION lane (resolveAllSavesAndDamage NPC branch).
  *

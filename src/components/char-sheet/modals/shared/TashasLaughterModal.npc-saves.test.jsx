@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // TashasLaughterModal NPC save-resolution lane (auto-roll at confirm): full failure
 // effect set, clean success with close, mixed-confirm seam, condition dedup,
 // targetEffects replacement, Heightened Spell disadvantage, and NPC-vs-player routing.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 // ---------------------------------------------------------------------------
 // spellPreparationService.wildCompanion.test.js — CLA-388 lane: the WILD
 // COMPANION paid-grant shared-key auth + consume face of spellPreparationService.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // FT-068 regression: SpellDetailPopup Quick Ritual affordance for Ritual Master
 // feat-granted prepared ritual spells — the checkbox offers a regular-casting-time
 // slot-free cast, is disabled + warned once the once-per-long-rest counter

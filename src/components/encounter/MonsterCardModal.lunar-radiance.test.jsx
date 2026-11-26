@@ -17,7 +17,7 @@
 //    MonsterAttackPopup is a pure passthrough (MonsterCardModal.jsx:2092).
 //  - rollAttack ctx → popupHtml.autoDamage transport lives at
 //    useLoggedDiceRollAttack.js:201 (no owner test found — reported upstream).
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';

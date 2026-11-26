@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // ── sleetStorm QUARTET seam map (shared subject: sleetStormHandler.js) ──
 // lane (this) — .areaSave: processSleetStormAreaSave ONLY — the recurring
 //   per-creature DEX-save lane, fired at the caster-turn initiative seam by

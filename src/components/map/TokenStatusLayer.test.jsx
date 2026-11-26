@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: the hoisted token status chip layer (backlog RG 2026-11-19 occlusion
 // fix). Renders the SAME component trio Map.jsx paints — Players, PlacedItems
 // and TokenStatusLayer as siblings in one <svg> — so the DOM proves the real

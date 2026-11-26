@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit tests for resourceCheck.js — three small pure/logic-light functions over
 // stable contracts (runtime-store key construction, fallback precedence, arithmetic).
 // Deterministic with mocked module boundaries; no churn expected as the app changes.

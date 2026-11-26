@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1890: Fenrir "Devour (Recharge 5-6)" shipped core save/damage exact
 // (DC 26 STR, 6d10+10 Piercing, half on success — live E2E verified) but the
 // prose-only gates were inert: fired 4/4 vs NOT-grappled victims with zero

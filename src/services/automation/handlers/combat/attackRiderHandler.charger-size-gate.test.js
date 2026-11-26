@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // FT-106: applyRiderOption size-gate — Charger Push vs Huge must refuse
 // (logged `<feature>_refused`, latch NOT marked); Small + Damage-Bonus legs
 // preserve the existing accept shape. Handler-lane only: the validator

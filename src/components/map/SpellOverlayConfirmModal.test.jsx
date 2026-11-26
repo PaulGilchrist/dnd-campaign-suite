@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Lane: SpellOverlayConfirmModal — the descriptor→copy seam for the spell
 // overlay destructive lanes (backlog 2026-11-01 BA, replaces the retired
 // native confirms in useSpellOverlay). OWNED here: the verbatim copy both

@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-1407 reflexive antennae owner: trimmed 16→7 tests
+// @maintained-by-ai 2026-10-18 — MA-1407 reflexive antennae owner: trimmed 16→7 tests
 // (disk+registry+spec lock once, gate truth-table once, refusals collapsed,
 // resolve-e2e once per save outcome, honest latch chain incl. round-wrap).
 // MA-1407 regression: Rust Monster Reflexive Antennae (At Will) gated reaction —

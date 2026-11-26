@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: EFFECTS config zone hint (QA 2026-11-19, owner decision: informational hint ONLY).
 // Manual adds of the four cast-armed zone defs (grease/sleet_storm/stinking_cloud/web)
 // are inert markers — the recurring turn-start saves arm only from the cast lane — so the

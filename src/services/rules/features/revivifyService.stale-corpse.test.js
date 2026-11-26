@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-14: 2026-11-15
 // bug-revivify-stale-isdead-negative-heal regression pins. A desynced player
 // bucket (isDead:1 with POSITIVE currentHitPoints — e.g. left by a writer that
 // resurrected without resetting the latch) must never be "revived" DOWNWARD:

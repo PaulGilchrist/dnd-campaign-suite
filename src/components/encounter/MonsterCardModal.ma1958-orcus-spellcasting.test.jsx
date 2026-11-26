@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1958 data lock: Orcus Spellcasting rode the MA-0421/MA-1879 twin
 // markup-gap template. Pre-fix the WHOLE description was plain text —
 // extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses

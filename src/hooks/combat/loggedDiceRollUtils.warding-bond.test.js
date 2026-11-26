@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // SP-125 AC-bonus seam: wardingBondHandler stamps acBonus:1 on the WARDEE's
 // activeBuffs (public/data/spells.json "Warding Bond": +1 AC, +1 saves,
 // resistance to all damage, shared damage). The caster-side bond buff carries

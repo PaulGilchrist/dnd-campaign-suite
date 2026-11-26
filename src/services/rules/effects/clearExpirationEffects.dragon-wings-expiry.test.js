@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-099 lock: the dragon_wings rounds-clock expiry must clear the active
 // flag and log — previously the EXPIRATION_HANDLERS entry was a silent strip
 // with zero runtime producers.

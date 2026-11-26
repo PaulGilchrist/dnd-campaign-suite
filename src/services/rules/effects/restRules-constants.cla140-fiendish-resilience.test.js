@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // BUG CLA-140 rest-lane lock: 2024 (and 5e) classes.json Fiend Patron lv10 Fiendish
 // Resilience re-chooses "when you finish a Short or Long Rest" — the used-latch
 // `_fiendishResilienceUsed` (written true by fiendishResilienceHandler.applyTypeChoice

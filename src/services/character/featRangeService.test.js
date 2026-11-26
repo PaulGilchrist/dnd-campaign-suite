@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { computeFeatRangeEffects, matchesExtraReachCondition, resolveMeleeReachBonus } from './featRangeService.js'

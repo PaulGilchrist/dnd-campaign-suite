@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharSpells interaction tests: the attack-header roll seam (to-hit math with
  * exhaustion, forced-mode pass-through, cannotAct gate) and the Prepared-header

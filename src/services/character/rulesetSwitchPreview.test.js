@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /**
  * Keep/drop classification for the ruleset-switch confirm modal (roadmap
  * Item 2). Pure-service lane: every case feeds target-ruleset data shaped

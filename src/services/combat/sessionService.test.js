@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // sessionService contract owner: session phase state machine over the campaign
 // runtime key `sessionState` (exploration | encounter | travel | roleplay).
 // Phases move ONLY on action — never wall-clock. Consumers (initiative tracker,

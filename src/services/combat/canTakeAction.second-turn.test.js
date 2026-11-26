@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 /**
  * LANE: canTakeAction.js turnLockDenial — CLA-360 (Second Turn) seam
  * (bug-turnlock-denies-holder-on-own-second-turn, owner ruling 2026-11-09:

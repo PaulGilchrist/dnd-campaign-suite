@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * Scope: the CharSpells/SpellTargetPopups boundary for the four popup widgets it
  * renders — MetamagicPopup, MultiTargetPopup, MagicMissileTargetPopup, UpcastPopup.

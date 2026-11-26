@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── initiative_action builder envelope (automationInfoBuilder family) ──────
 // Canonical home for the initiative_action BUILDER envelope. The builder is a
 // fixed 11-key copier: whitelisted auto.* fields ride `||` arms (except

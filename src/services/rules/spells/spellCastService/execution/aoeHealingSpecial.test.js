@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // AoE-heal special lane: hub (execution/index.js) routing of the SPECIAL healing
 // spells through the mass-healing trigger chain at :328-332, adopted per #1459
 // (orphan pins created by the mandated heal-fold; #1462 master keeps the

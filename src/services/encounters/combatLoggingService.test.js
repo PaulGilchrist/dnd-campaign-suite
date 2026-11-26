@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: combatLoggingService.js — service-side log entry PRODUCTION bytes only.
 // UI consumers (initiative handlers, CharConditions, LogEntryRendering #885, LogRoll #887)
 // own call-site args + rendering and mock this service; exact entry bytes live ONLY here.

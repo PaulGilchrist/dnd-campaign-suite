@@ -146,4 +146,4 @@ describe('MA-1641 Vampire Deathless Strike silent-burn fix', () => {
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

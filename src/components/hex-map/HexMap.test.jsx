@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // HexMap container lane — rendering/loading transition, toolbar wiring (back/name/tool-select/
 // viewport/panels), SVG pointer·wheel·context routing, background-click cleanup, exact child
 // prop forwarding, and POI/character drag-and-drop.

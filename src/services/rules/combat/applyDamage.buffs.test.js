@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // LANE — applyDamage buffs CONSUMPTION: the player-only generic activeBuffs
 // resistanceTypes merge (resolveCreatureDefenses :753-757 → addBuffResistances
 // :251-258) and the Arcane Ward self-absorb consumer seam (absorbIntoArcaneWard

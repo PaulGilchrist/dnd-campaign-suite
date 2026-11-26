@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-0019 regression: Aboleth Consume Memories target-eligibility gate.
 // The save row carries target_prerequisite {conditions:["charmed","grappled"],
 // by_attacker:true}. Owned HERE: the disk row BY name (#387) and the modal

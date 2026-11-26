@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-138: confirm ARMS the latch at usesMax (never decrements at arm — arm-0 +
 // cast-auth->0 was a dead free-cast). The spell row consumes the latch and honors
 // the runtime no-Concentration choice stamped here.

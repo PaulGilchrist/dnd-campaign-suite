@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // NpcAvatar leaf lane — props-in/DOM-out render contract of the initiative NPC avatar.
 // Zero module mocks: AvatarImage is pure presentational and its own contract (src
 // resolution incl. campaign prefix, initial fallback, sizing, interactivity) is pinned

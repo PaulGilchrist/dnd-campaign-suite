@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Lane: the autoDamageSecondary* rider on PLAIN damage — the designated owner
 // of the secondary-damage contract (the hitClause lane explicitly deferred all
 // redundant secondary-leg tests here). Guards rollAndApplySecondaryPlainDamage:

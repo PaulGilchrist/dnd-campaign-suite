@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 //
 // ── #1811 monk lane — healingHandler.js self_healing modal basics ────────
 // SUBJECT: handleMonkHealing's isSelf=true shortcut + performMonkHeal modal

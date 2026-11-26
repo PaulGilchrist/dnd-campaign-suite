@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over
+// @maintained-by-ai 2026-10-16: 2026-10-15 — deterministic full-mock lane over
 // reactionSaveHealHandler.handle() (Relentless Rage save-then-heal reaction).
 // LIVE: automation/index.js `reaction_save_heal` → handleReactionSaveHeal;
 // fed by public/data/classes.json + 2024/classes.json; whitelisted in

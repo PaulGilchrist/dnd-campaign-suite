@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionDebuffHandler octet+ — lane: ATTACKS-VS-ALLY GATE (effect
 // 'disadvantage_on_attacks_vs_ally' — the Protection fighting-style Reaction,
 // live from rules-fightingStyles.js 5e + 2024, dispatched via

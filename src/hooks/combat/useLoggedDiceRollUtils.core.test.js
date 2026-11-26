@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Core unit lane for loggedDiceRollUtils.js — the only place these getter
 // implementations run unmocked (every useLoggedDiceRollAttack/Damage wrapper
 // lane mocks this module and tests only its own consumption seam).

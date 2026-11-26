@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-22
 /**
  * Sanitizer lane (SECURITY-CRITICAL — XSS law home for the whole app).
  * Coverage-trim exception does NOT apply here: every attack-vector class must

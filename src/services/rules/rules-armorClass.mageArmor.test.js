@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-074 mage_armor RUNTIME-BUFF AC-MATH OWNER: rules-armorClass.js computeBaseArmorClass
 // buff branch (rules-armorClass.js:60-65) — 13 + Dex UNCAPPED (RAW) + precedence over the
 // base armor/unarmored lanes. This is the AC face every twin header points at:

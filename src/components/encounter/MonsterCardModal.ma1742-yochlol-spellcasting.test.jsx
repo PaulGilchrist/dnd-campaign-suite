@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1742 data lock: Yochlol Spellcasting rode the MA-0421 markup-gap
 // family — plain-text spell names (zero affordances, row inert). DATA-MARKUP
 // fix wraps the four spell names in <em> with <strong> tier headers on the

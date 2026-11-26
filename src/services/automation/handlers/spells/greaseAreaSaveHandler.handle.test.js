@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── PAIR seam map (greaseAreaSaveHandler.js — handle.test.js #1922 + areaSave.test.js #1921) ─

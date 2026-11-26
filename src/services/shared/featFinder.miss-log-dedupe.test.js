@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { findFeat, resetFeatFinderMissLog } from './featFinder.js';
 import feats5e from '../../../public/data/feats.json';

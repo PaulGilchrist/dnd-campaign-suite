@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic state-machine contract tests for useTravelManagement. All services
 // and the runtime store are fully mocked, so this suite stays green across app churn
 // unless the hook's own observable contract changes.

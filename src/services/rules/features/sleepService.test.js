@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-107 Sleep spell face (BASE lane) of the DUAL-FACE sleepService. Per the
 // #1414 split recorded in sleepService.staged-breath.test.js:43-48, THIS lane
 // owns: triggerSleep, isSleepImmune, spell defaults (WIS/concentration, the

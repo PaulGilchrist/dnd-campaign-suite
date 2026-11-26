@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Canon for the shared badge/tone DISPLAY helpers (roadmap Item 6): the
 // label capitalization contract (moved from gm-screen/partyRowData.js), the
 // invisible-as-buff condition tone law, the registry-cls semantic fold

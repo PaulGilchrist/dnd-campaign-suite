@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // #386 audit. Disk-faithful fixtures (#387): the mocked fetch serves
 // public/data/resistances-immunities.json verbatim — the prod list is versioned on disk
 // (13 types), so empty-data states can never render and are not tested. The wizard always

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-048: 2024 races.json Celestial Revelation is recharge:'long_rest' only —
 // a spent `_celestialRevelationUses` counter (0) must SURVIVE a Short Rest
 // (Short Rest re-armed the latch live) and be nulled by the Long Rest atomic

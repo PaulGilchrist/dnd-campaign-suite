@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1978: Scylla "Blood Tide (Recharge 5-6)" save core live-verified
 // EXACT (DC 25 DEX, 10d10 Piercing, half-on-success RAW-correct default —
 // do NOT author dc_success) but the recharge gate never armed — name-text

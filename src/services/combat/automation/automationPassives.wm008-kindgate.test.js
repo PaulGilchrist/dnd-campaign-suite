@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: automationPassives WM-008 — the kind-bucket gate × replaceMastery
 // precedence matrix of collectWeaponMastery. The WM-008 bug: the gate
 // (passives.some type === 'weapon_kind_mastery' && !kindMatch ⇒ baseMastery

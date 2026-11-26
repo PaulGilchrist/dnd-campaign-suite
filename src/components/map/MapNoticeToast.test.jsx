@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // MapNoticeToast presentational pins (backlog map-fresh-fallback-silent): the
 // indoor rejected-load notice renders in the shared .map-toast slot as a
 // polite live region naming the dead map; a null message renders nothing

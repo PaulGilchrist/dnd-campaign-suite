@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // First-session checklist: visibility keyed on the starter seed document,
 // steps name the GENERATED entities and deep-link real views, dismiss and
 // completion write NOTHING (pure onboarding).

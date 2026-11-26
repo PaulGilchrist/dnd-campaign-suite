@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0044 regression: Adult Blue Dracolich Frightful Presence (Multiattack-named
 // mechanic). Frightened application landed with MA-0017 (saveProcessing
 // .applyDamagelessSaveConditions — verified live PC + NPC paths). Residuals

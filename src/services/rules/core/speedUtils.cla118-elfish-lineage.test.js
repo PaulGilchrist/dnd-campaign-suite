@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-118 unit lane for speedUtils.applyElfisLineageSpeed ONLY: the seed
 // arithmetic (base = playerStats.speed ?? race.speed), the zero-bonus
 // passthrough, and the no-base error branch.

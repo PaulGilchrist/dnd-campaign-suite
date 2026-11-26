@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // SP-128 lane: SPELL_RUNTIME_CLEANERS['Expeditious Retreat'] concentration-break
 // purge ONLY (concentrationService.js:166-182). On every break of the ER
 // concentration the Dash grant dies: sheet-row flag, per-turn Dash latch,

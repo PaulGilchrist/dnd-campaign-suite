@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Base Hide lane for handleHideAction (useCharActionsBaseActions): cannotAct gate,
 // already-hidden refusal (case-insensitive), the success/failure channel with
 // byte-exact popup/log canon and Invisible + advantage_on_stealth stamping

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // useCallback stability seam for useSpellCastExecutor: castAction must keep a stable
 // reference while props are unchanged (consumers re-render-loop guard) and must be
 // recreated whenever any runCast/castAction dependency changes.

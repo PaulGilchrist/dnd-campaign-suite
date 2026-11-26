@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /**
  * lastAttack tier law + campaign-key audit sweep
  * (bug-lastattack-not-a-campaign-key-celebrates-clears-silently).

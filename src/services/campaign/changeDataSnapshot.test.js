@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /**
  * Lane: shared in-flight change-data reads — src/services/campaign/
  * changeDataSnapshot.js (backlog 2026-11-22 SV: the mount seam fired four

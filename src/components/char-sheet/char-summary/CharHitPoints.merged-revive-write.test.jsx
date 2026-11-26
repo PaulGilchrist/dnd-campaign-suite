@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Network-shape lock for the merged sheet-revive write (backlog 2026-11-14 MM):
 // a value>0 HP commit used to fire FOUR full-bucket POSTs per action
 // (currentHitPoints, deathSaves, deathFailures, isDead — one SSE echo each).

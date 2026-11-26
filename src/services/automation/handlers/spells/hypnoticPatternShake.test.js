@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * hypnoticPatternShake.test.js — shake-it-free lane (SECOND of the hypnoticPattern PAIR,
  * per the #1925 seam map in hypnoticPatternHandler.test.js).

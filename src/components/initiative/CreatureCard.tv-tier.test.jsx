@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // TV-mode GM card census (ZA 2026-11-23 backlog, owner decision 2026-11-23):
 // a GM tab in TV presentation mode is a table-mounted screen shared with
 // players, so its initiative cards must read EXACTLY like a LAN visitor's.

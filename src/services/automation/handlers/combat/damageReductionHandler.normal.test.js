@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // damageReductionHandler — NORMAL (flat/typed) reduction lane of the damageReduction quint.
 // Lane map (handle() flow in damageReductionHandler.js):
 //   - equipment gates (requiresShield / requiresShieldOrWeapon) -> damageReductionHandler.test.js

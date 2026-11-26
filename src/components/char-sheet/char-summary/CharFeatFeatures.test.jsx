@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharFeatFeatures — visibility of feat-tracked resource rows and their
  * getMax() formulas.

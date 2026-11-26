@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // spellPreparationService.modifications.test.js — the modifiedSpell TRANSFORM face:
 // exactly what prepareSpellCast hands back to callers as "the spell to actually cast".
 // Byte-fidelity lane: every row pins input-bytes -> output-bytes -> disk-authority.

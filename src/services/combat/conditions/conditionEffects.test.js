@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Base-canon lane for the conditionEffects engine (conditionEffects.js).
 // Owned HERE: CONDITIONS_THAT_* data sets, the per-condition handler census
 // (CONDITION_EFFECT_HANDLERS), the EARLY/LATE + generic-channel dispatch of

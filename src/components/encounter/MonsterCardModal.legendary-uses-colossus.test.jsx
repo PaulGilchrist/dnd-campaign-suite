@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed to colossus/death-knight-distinct lanes: by-name
+// @maintained-by-ai 2026-10-18 — trimmed to colossus/death-knight-distinct lanes: by-name
 // data locks (header uses:2 resolves, Smite→Radiant Ray + Stomp→Slam, Dread
 // Authority advisory cast-row, Lunge→Dread Blade w/ secondary bytes) + one
 // effect-distinct click per lane (2 delegated attack ctx with distinct damage

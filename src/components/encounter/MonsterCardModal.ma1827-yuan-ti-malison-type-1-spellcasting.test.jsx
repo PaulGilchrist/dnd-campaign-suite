@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1827 data lock: Yuan-ti Malison (Type 1) Spellcasting rode the MA-0421 /
 // MA-1742 / MA-1814 / MA-1818 markup-gap family — plain-text spell names (zero
 // affordances, row inert) while the save_dc 13 + save_type Wisdom pair sat

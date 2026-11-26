@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — canonical lane for the Inspiring Movement seam of
+// @maintained-by-ai 2026-10-16: 2026-10-15 — canonical lane for the Inspiring Movement seam of
 // reactionBonusHandler.js (handleInspiringMovement / applyInspiringMovement /
 // resolveInspiringMovementUses / appendAgileStrikes). Fully mocked, deterministic, no
 // timers. Bend Fate / applyD20Modifier / AC bonus / Leap Aside / Veer are canonical in

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0857 OWNER: githzerai-psion Psionic Defense At-Will 999 disk lock + spend economy
+// @maintained-by-ai 2026-10-18: 2026-10-18 — MA-0857 OWNER: githzerai-psion Psionic Defense At-Will 999 disk lock + spend economy
 // MA-0857 regression: Githzerai Psion "Psionic Defense" (RAW unlimited) — disk row was
 // prose-only (name/description/spellcasting_ability) = gate-null inert, zero affordance.
 // Fix authors the MA-0006 feather_fall byte-shape onto the existing live seam: automation

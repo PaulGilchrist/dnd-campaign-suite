@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-335 regression: same-hit refire round latch + honest cap text
 // Lane split (family recipe): direct lane owns latch stamp + cap-text
 // composition; dispatch lane keeps ONE round-refusal mirror only. The

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Sole-real-body-owner lane for holyAuraDamageService.js:1-62. Only production
 // consumer is applyDamage.js:819 (handleWardedDamageEvents), which runs this
 // service REAL (no applyDamage* lane mocks it) — so every branch of the real

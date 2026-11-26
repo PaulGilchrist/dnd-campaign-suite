@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // SP-013: Barkskin cast resolved to ZERO effect — handleBarkskinConfirm called
 // applyBarkskinEffect with POSITIONAL args while the function destructures a
 // SINGLE object (targetNames always undefined → early return null). This file is

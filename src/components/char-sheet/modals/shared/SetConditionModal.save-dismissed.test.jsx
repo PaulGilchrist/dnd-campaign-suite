@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // SetConditionModal — handleSaveDismissedOverride seam (save-dismissed sweep
 // family, 2026-11-05). The base lane renders a buttonless "Waiting for save
 // roll..." freeze until every prompt resolves via save-result; the GM's

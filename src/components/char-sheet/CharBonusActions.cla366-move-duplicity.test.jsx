@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-366 regression: the Invoke Duplicity "move the illusion" clause had no
 // producer anywhere. While the create_illusion buff is active, a
 // "Move Invoke Duplicity (Transposition)" bonus action row must render and

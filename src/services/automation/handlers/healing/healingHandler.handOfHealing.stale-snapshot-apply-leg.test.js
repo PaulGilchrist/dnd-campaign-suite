@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // ── MM 2026-11-14 fix (bug-hoh-negative-heal-stale-snapshot-clamp) ──
 // SUBJECT: applyMonkHeal (healingHandler.js, reached through the CLA-163 picker

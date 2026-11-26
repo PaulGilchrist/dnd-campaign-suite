@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for smiteOfProtectionHandler.handle() — all side-effecting
 // dependencies (runtime store, expirations, log service) are mocked, so this suite is
 // stable and needs no churn as the app changes. Expiry-side behaviour is covered by

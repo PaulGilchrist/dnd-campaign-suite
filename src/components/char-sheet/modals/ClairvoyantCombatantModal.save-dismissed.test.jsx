@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // ClairvoyantCombatantModal — dismiss-softlock regression (save-dismissed
 // sweep family, 2026-11-05). handleConfirm parks the modal at
 // step==='result' with result===null (renders NOTHING — the cast silently

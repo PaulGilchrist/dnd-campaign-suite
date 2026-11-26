@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // ---------------------------------------------------------------------------
 // Contract pins for CharSheet.test-utils.jsx fixture factories.
 //

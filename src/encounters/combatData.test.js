@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 /**
  * src/encounters/combatData.js is a shim consumed by src/services/combat/steps/*.js.
  * Full behavioral coverage of every function lives in

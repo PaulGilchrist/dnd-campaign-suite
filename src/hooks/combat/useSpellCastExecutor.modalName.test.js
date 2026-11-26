@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Owns modalName field-derivation semantics only: how a bare (non-automationPopup)
 // modalName result is dispatched, including the unknown-name guard. The full
 // modalName→modal-state key map lives in useSpellCastExecutor.modalRouting.test.js;

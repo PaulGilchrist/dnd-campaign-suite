@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // Regression (bug-player-currency-give-is-one-way-invisible): Give wrote currency into
 // the character file (inventory.currency) and audited the move, but the From Players
 // pane listed backpack items only — coins were write-only with zero read/return UI.

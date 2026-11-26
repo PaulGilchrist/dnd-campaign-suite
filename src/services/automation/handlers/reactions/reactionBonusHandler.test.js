@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // reactionBonusHandler.js MAIN lane — repo-canonical home of applyD20Modifier internals
 // (description building, outcome shifts, campaign log), plus handleBendFate modal,
 // handleAcBonus (Defensive Duelist), handleLeapAside, and handleVeer.

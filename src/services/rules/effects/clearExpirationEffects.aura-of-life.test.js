@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-008: Aura of Life expiry cleanup leg — when the remove_active_buff
 // expiration for 'Aura of Life' fires (rounds:100 clock expiry OR the
 // concentration-break seam running clearPendingExpirations), the buff, the

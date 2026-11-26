@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Blade Ward handler contract: activation/deactivation toggle, bane_penalty
 // targetEffect registration (replace-in-place vs push), expiration, log,
 // popup passthrough, and null/empty guards. Fully mocked and deterministic.

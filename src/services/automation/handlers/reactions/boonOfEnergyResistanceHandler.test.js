@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Unit contract for the Boon of Energy Resistance chooser (registered in
 // automation/index.js as boon_of_energy_resistance). Pins the handle/modal
 // branches, the once-per-rest isChange guard (order-insensitive), valid-type

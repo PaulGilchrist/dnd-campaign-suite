@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0362 regression: Barlgura Spellcasting save-leg — the row was prose-only
 // ("spell save DC 13" with no numeric save_dc/save_type), so Phantasmal Killer
 // prompted "DC Unknown", saveResult null, zero damage, Frightened never landed,

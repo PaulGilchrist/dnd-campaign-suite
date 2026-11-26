@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-10
+// @maintained-by-ai 2026-11-10: 2026-11-10
 // Missing-material cast refusal on the gateMetamagic lane (useSpellMetamagicGates.js):
 // refuse-must-log-and-popup law (2026-11-10 improve). A registry-gated spell whose
 // exact MATERIAL_REGISTRY itemName is NOT in the caster's backpack must (a) popup with

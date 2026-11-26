@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // QUARTET lane (see resistancesValidation.test.js header seam map): race-side resistance extraction
 // (5e + 2024) via getResistanceLimits — the CANONICAL home for race extraction (Info lane cites
 // this file per #2049) — plus the race-switch subrace seam ({ name: '' } must never reach the

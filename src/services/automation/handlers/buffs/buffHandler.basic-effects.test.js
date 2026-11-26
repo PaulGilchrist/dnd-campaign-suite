@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Basic-effect lanes of buffHandler.handle: the bonus_action_dash delegate
 // (Adrenaline Rush uses resolution + temp-HP bonus), effect delegation
 // (teleport / vow_of_enmity), the FT-105 dash_action speed_boost grant,

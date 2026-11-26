@@ -33,7 +33,7 @@ vi.mock('../../../rules/effects/expirationQueue.js', () => ({
 // L5-003 §8.1: token-move seam — default OFF keeps legacy prose byte-identical.
 // Swap-with-illusion (CLA-366) coverage lives in tempTeleportHandler.cla366-transposition.test.js;
 // this file owns the plain/shadow/moonlight main lane, slot economy, and extended-flag contract.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 vi.mock('../../../combat/teleportService.js', () => ({
     applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
 }));

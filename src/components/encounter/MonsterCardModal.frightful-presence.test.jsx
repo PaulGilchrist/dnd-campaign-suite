@@ -118,4 +118,4 @@ describe('MA-0039 Adult Black Dragon Frightful Presence legendary row', () => {
   });
 });
 
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18

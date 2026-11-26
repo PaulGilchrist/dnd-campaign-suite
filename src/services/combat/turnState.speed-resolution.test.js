@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Lane: movement-budget speed resolution (bug-movement-budget-caps-all-movers-at-30).
 //
 // Regression pin: the drag/card budget read the token-only `speedFeet` field

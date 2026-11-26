@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 /**
  * Write-batch pin for the rest/initiative seam (bug-sheet-initiative-seam-
  * resurrects-rider-conditions, MA-0809 / playbook §5 family).

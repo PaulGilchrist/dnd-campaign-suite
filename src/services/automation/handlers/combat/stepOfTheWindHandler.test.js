@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CLA-333 Option A: base Dash is a free Bonus Action, always available. Expending 1
 // Focus Point is the opt-in upgrade to Disengage + Dash + doubled jump. The handler
 // auto-upgrades when FP are available and falls back to the free Dash at FP<cost — it

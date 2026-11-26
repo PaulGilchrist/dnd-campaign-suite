@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // EncounterSelectedMonsters component-contract lane: renders the REAL panel directly
 // (never a replica). Uniquely owns (per lane map): exact per-row callback payloads +
 // call counts (onRemoveMonster index, onViewDetails full selected-entry bytes),

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * LANE: canTakeAction.js — the PURE gate decision table (L5-001, #815 hand-derived).
  * Every bucket × state edge falsifiable in one row (#842), exact verdict bytes

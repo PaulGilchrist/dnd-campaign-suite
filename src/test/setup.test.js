@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 /**
  * Pinning suite for src/test/setup.js — the shared Vitest harness.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1016 modal seam: handleSpellCast forks the innate utility row
 // (Ice Mephit "Fog Cloud", real monsters.json bytes: spellcasting_ability
 // + numeric uses:1/maxUses:1 MA-0633 shape, usage "1/Day" on the FIELD —

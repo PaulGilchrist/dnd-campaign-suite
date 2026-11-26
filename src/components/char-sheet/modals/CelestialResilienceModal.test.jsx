@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CelestialResilienceModal — thin wrapper over shared/CreatureSelectionModal.jsx.
 //
 // Caller seams (deferred, NOT covered here):

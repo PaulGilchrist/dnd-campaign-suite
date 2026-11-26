@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1872: Cthulhu legendary_actions[3] "Madness Whisper (Costs 2 Actions)"
 // shipped `delegates_to:"Psychic Shatter"` — the gated press spent a legendary
 // use then routed into Psychic Shatter's structurally different save pool

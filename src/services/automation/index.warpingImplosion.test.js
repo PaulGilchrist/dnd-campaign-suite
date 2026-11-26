@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-384 dispatch lane: Warping Implosion ships type 'save_attack' in prod
 // data, so the generic save_attack handler always won and the dedicated
 // warping_implosion handler was unreachable — resolveHandler's fingerprint

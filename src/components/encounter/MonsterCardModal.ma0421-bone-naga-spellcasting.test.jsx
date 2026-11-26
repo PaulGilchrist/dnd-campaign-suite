@@ -1,4 +1,4 @@
-// @maintained-by-ai — MA-0421 lane (bone-naga spellcasting bytes + save_dc seam).
+// @maintained-by-ai 2026-10-18 — MA-0421 lane (bone-naga spellcasting bytes + save_dc seam).
 // Trimmed 12→6 tests: generic chip/spend/refuse/advisory/At-Will/formula lanes
 // cited-skipped to owners (MonsterCardModal.spellcasting.test.jsx #588, usage #571,
 // spell-save lane). Kept by-name: bone-naga markup-only diff proof, 1/Day gate

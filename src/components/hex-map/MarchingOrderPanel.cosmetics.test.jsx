@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: MarchingOrderPanel — Item 5 cosmetics on the hex 2D face ───────────
 // OWNED here: the marching-order avatar is a character's TOKEN FACE on the
 // hex surface (the board carries one shared party marker — see the component

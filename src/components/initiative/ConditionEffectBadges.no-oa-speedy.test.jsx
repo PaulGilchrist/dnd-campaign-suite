@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // no-oa / speedy lane for ConditionEffectBadges: exact badge faces (label,
 // semantic class, icon, tooltip) for 'No OA' and 'No OA (Crit)' plus the
 // three prop-driven Speedy badges, and the × click that clears each runtime

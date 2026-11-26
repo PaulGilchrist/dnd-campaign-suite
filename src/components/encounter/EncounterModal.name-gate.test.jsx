@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 /* Lane — name-gate validation family (2026-11-16 QA backlog: NPC/Quest modals
  * DISABLE Save on an empty/whitespace-only name while EncounterModal left it
  * enabled and refused inline after press; converged on the disabled majority:

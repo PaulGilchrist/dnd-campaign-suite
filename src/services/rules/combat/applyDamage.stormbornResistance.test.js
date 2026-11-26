@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-336 lane at the DAMAGE seam: with stale computedStats (runtime toggles never
 // recompute it, applyDamage.js:217-226), the LIVE getDamageResistances gate must
 // inject the Stormborn triple at hit-resolution. Disk bytes: public/data/2024/classes.json

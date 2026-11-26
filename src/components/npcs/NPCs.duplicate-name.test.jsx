@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Duplicate-name contract for the NPCs manager: saving a new NPC (or renaming
 // onto another NPC's name, any case) must show an inline error without
 // persisting, mirroring the server guard in server/routes/npcs.js — which

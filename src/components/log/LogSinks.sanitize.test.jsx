@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // SANITIZE-AT-SINK lane (backlog 2026-10-30-AO log-description-raw-html-sink-audit) —
 // the four log sinks that render entry.description via dangerouslySetInnerHTML
 // (AbilityUseEntry, SpellEntry, SaveResultEntry, SummonsEntry) must route the

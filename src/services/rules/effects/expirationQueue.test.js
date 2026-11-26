@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // Lane: expirationQueue.js processExpirationList corrupt-entry isolation (#1298,
 // owner-blanket-approved ⚠ pair fixed at file):
 //  • :47-era — a null list entry TypeErrors the loop and the caller's outer

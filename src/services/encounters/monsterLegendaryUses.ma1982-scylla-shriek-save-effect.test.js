@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1982: Scylla legendary "Shriek (Costs 2 Actions)" shipped save core
 // live-verified EXACT (DC 23 WIS, 2d10 Thunder, half-on-success default
 // RAW-correct — dc_success stays ABSENT, do NOT author it) but the

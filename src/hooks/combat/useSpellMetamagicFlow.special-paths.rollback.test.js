@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-10-15: 2026-11-15
 //
 // SKIP/DISMISS EDGE PATHS — spell-specific custom lanes NOT in the skip.test.js authority table.
 // Owns the money/log semantics of the two custom confirm lanes that bypass

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-143 READ-side gate lane: the feature-row lane must gate `after_attack_action`
 // rows on `_attackActionTakenRound === getCurrentCombatRound()` — refusal (popup +
 // byte-exact `<feature>_refused` log, §5 convention) with ZERO writes, or proceed

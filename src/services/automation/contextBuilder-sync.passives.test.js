@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic passive-flag contract tests for buildAttackContextSync:
 // hunter lore notice, critical range, glorious defense (retroactive — absent by design),
 // stroke of luck / boon of fate / boon of combat prowess availability, and Graze mastery.

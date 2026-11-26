@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── resource.test.js — automationInfoBuilder resource slice (lane #952 template) ──
 // resourceHandlers builder contract: census guard + exact BARE default envelopes +
 // full-custom passthrough + restore_expression numeric contract + ?? vs ||

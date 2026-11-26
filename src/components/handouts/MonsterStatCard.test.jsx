@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 monster print card contract: the printed face is the monsters.json
 // row verbatim — standard 5e stat-block lines, ability grid, CR/XP, and the
 // traits/actions/reactions/legendary sections — with live-combat overlays

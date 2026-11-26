@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the 2024-wizard background-ability hook:
 // parsing, clamping, localStorage persistence, and validation with dataLoader
 // mocked. No timers, no network, no DOM — stable as the app evolves.

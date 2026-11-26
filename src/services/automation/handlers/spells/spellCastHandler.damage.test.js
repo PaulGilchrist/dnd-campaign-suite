@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // spellCastHandler .damage lane — SEPTET HEAD. Owns the damage-roll content of
 // spellCastHandler.js: buildSpellDamageRoll (L318-352), the damage feed of
 // lookupSpellData (L306-316), and the damage-vs-popup branch at L413-417.

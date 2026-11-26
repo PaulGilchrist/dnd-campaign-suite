@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // MN-015 regression: validateSizeLimit must resolve monster SIZE from
 // monsters.json via getMonsterData (suffix-strip 'Hill Giant 1' -> 'Hill Giant')
 // because EB combatSummary creatures historically carried no size field.

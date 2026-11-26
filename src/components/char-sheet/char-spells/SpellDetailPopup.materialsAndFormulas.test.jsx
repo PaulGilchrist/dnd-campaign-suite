@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * SpellDetailPopup — consumed-material row and MOD resolution in the upcast selector.
  *

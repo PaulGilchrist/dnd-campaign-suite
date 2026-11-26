@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0322: Awakened Shrub / Rake — flat "Hit: 1 Slashing damage." (no
 // damage_dice_primary) must arm autoDamageFormula "1" on the attack chip and
 // resolve dice-less on hit (total 1, empty rolls), never silently zero.

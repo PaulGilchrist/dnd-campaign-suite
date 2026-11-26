@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Zero-creature Initiative mount (bug-zero-creature-initiative-null-name): a freshly
 // quick-created campaign (Arena/Starter — zero characters, no server combatSummary)
 // mounts the Initiative board with an EMPTY roster. The no-server-cs branch used to

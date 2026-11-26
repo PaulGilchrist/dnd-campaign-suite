@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1329: Poisonous Snake "Bite" (attack+save composite) — the row shipped
 // damage_dice_primary "2d4" (the SAVE-leg poison pool) with no authored flat
 // primary, so extractDamageDiceFromDescription short-circuited and the attack

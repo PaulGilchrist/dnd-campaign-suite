@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-08
 // Lane: ClearCombatConfirmModal — the copy/chrome layer for the Initiative
 // "Clear" overlay (backlog 2026-11-08 EK, replaces the retired native
 // window.confirm in createCreatureHandlers.handleClear). OWNED here: the

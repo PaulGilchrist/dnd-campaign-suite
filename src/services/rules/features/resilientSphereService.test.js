@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * resilientSphereService — trigger-service lane for the Resilient Sphere spell.
  *

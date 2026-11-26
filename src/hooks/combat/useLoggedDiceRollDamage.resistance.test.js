@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Resistance consumer fold in the damage wrapper (createLogDamageAndShow →
 // handlePlainDamage.js rollResistanceReduction): te matching (target, chosen
 // damage type, case-insensitive), the 1d4 reduction folded into the total

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0314: Archmage "Protective Magic (3/Day)" reaction was prose-only inert
 // (bare name+description row → getGatedMonsterReaction null → zero affordance).
 // DATA fix mirrors the verified MA-0013 Aberrant Cultist / MA-0300 Arcanaloth

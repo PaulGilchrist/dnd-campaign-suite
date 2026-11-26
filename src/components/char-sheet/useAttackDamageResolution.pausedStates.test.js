@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Canonical pause-state matrix for the resolveAttackDamage seam (applyPauseState):
 // which _modalType pause stashes WHAT — byte-exact stash shapes with key sets
 // pinned (distinguishing key-absent from stashed-undefined). Invariants pinned

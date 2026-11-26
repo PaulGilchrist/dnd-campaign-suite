@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-120 lane — attackRollDamageCalc.js buildRollBaseDamageStep (rollBaseDamage).
 // Rule (5e Evocation 10th level, Empowered Evocation): when you cast an evocation
 // spell that deals damage, you add your Intelligence modifier to that damage roll.

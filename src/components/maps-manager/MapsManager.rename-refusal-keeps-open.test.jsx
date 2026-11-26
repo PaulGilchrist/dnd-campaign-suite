@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-26
 // MapsManager.rename-refusal-keeps-open.test.jsx — backlog 2026-11-26: a
 // duplicate-name or non-kebab rename commit used to CLOSE the inline editor,
 // so the banner ("A map with that name already exists" /

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-322: Spell Breaker — Dispel Magic internals BEHIND the dispatch seam.
 // Boundary (verified): every execution/ consumer lane MOCKS triggerDispelMagic —
 // including execution-post-cast #1477, which owns the index.js:357 dispatch face

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-096: 2024 races.json Draconic Flight is recharge:'long_rest' with a
 // 10-minute buff — buffHandler stamps `draconicFlightUsed = true` on activation
 // and expiry/retract/Incapacitated drop the buff WITHOUT refunding the use

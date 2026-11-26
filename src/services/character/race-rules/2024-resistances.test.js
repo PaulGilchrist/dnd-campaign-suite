@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * Lane: getResistances (2024.js) per FAMILY SEAM MAP in 2024-immunities.test.js —
  * subrace.damage_resistance, Fiendish Legacy map + runtime refinement (CLA-139),

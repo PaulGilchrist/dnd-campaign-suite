@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18
+// @maintained-by-ai 2026-10-18: 2026-10-18
 // MA-1141: Mastiff "Bite" — prose carries "If the target is a Medium or
 // smaller creature, it has the Prone condition" but the row shipped WITHOUT
 // hit_conditions, so the Prone rider was structurally inert

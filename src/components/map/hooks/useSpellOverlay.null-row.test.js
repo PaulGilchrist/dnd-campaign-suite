@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // LANE: useSpellOverlay null-row fail-soft (bug-overlay-viewer-null-row-crashes-map-view).
 // Legacy pre-guard disk docs (public/campaigns/<c>/data/spell-overlays.json) can carry
 // null rows. GET /spell-overlay passes them through unfiltered, and the merge lanes

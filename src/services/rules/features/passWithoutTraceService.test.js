@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Pass Without Trace SERVICE lane (lv2 abjuration group-stealth buff).
 // Producer-vs-forwarder: triggerPassWithoutTraceSpell is a ZERO-PRODUCTION-CALLER
 // forwarder (grep 'triggerPassWithoutTraceSpell' src => only this service's own

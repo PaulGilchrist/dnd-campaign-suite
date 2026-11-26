@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Trim audit (conditions-extraction lane): word-scan is re-echoed ~100x across
 // monsterLairActions.test.js + saveProcessing.*.test.js on REAL save_effect strings.
 // Removed with evidence:

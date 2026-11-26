@@ -17,7 +17,7 @@
 //   attacks and its harm tests start at uses=0, so a stale-threaded-counter
 //   bug would slip past cla144. If cla144 absorbs that seam, delete it here.
 // All module boundaries are mocked; pins are deterministic handler contracts.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────

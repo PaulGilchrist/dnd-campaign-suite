@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0367 sole-real-body owner (turnStartEffects.infernal-wound.test.js:27 pins the
 // dispatch with the service MOCKED; THIS file runs the real body of every export).
 // REAL, unmocked: targetEffectDefinitions — registerTargetEffect merge semantics at

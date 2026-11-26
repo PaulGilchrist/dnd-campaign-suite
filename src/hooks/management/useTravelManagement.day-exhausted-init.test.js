@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 /*
  * useTravelManagement — over-budget MOUNT flag (improve 2026-10-26-E backlog).
  *

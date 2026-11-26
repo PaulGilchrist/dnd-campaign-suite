@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0303/MA-0590: parseBothOutcomesClause helper-lane canon — the tail after
 // the byte-exact "Failure or Success:" marker arms the AoE picker SUCCESS-leg
 // grant (MonsterCardModal.jsx:384 consumer): canonical conditions (MA-0063

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Base lane — classifyBucket generic decision-order rules, authoritative single
  * taxonomy (L5-002 §7.2). Synthetic fixtures only; zero mocks (classifier is

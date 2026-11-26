@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1530: parseSpeedReduceClause parser contract — Steam Mephit Steam Breath
 // authored failed-save "Speed decreases by N feet" clause ("the target's Speed
 // decreases by 10 feet until the end of the mephit's next turn") maps to the

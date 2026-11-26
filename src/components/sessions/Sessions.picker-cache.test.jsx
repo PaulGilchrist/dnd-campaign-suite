@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-10-29: 2026-10-29
 // Picker-list cache contract (improve 2026-10-29-W backlog): the six link-picker
 // lists (maps/encounters/npcs/quests/settlements/notes) used to re-fetch on
 // EVERY planner open. Now the first open per view mount fetches each exactly

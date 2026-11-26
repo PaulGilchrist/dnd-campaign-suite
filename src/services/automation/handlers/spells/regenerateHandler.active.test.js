@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // ── regenerate QUARTET seam map (shared subject: regenerateHandler.js) ──────────
 //   #1946 .active   (this) — 'active'-predicate lane: isRegenerateActive reads.
 //   #1947 .apply    — applyRegenerateEffect healing application (expression

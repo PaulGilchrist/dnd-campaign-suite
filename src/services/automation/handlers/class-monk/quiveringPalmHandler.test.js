@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Main-lane contract for quiveringPalmHandler: handle() happy path (exact popup copy +
 // targetEffects vibration-card write — the card shape pinned nowhere else in the cluster),
 // existingTarget modal path (active target beats current selection), the lastAttack

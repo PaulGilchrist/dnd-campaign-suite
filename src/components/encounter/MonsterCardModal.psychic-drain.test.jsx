@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0023 modal lane: Aboleth Psychic Drain press lifecycle (MA-0018/19/21 fold).
 // Owned HERE: the legendary chip press end-to-end — any-ally prerequisite gate runs
 // BEFORE the spend (unmet presses refuse: popup + psychic_drain_refused log, zero

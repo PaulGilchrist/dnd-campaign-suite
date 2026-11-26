@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // LC 2026-11-14 improve — HoH PICKER-stage combatSummary HP echo. The chooser
 // used to be a mount snapshot: mid-dwell writes to combatSummary.creatures

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // FT-007: Boon of Combat Prowess — once a miss is converted, the popup must
 // flip to a hit state: offer button hides, the conversion row appears, and the
 // Done button renders (computedHit authoritative flip) so auto-damage dispatches.

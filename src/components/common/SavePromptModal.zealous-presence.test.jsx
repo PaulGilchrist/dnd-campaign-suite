@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // CLA-394 modal lane: the Zealous Presence buff (effect advantage_attacks_and_saves
 // read from the target's activeBuffs) must grant BLANKET saving-throw advantage in

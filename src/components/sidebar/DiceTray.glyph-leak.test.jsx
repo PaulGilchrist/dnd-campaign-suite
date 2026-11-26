@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-12
+// @maintained-by-ai 2026-11-12: 2026-11-12
 /* Lane: dice-tray decorative-glyph textContent leak (backlog 2026-11-12 QR).
  * The SVG <text> digit glyphs concatenated into every .dice-btn textContent
  * ("4d4", "8d8", "10d10", "12d12", "%d100"), polluting body-text dumps.

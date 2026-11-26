@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owner of the protection_from_energy automation handler contract: popup payload
 // shapes, activeBuffs/protectionFromEnergyDamageType runtime writes, expiry,
 // concentration registration (SP-093), and logging. Two-stage UI flow gating lives in

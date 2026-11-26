@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Small-screen collapsible-sidebar behavior (backlog 2026-11-23): below the
 // 768px breakpoint the sidebar docks off-canvas behind a keyboard-usable
 // toggle; opening focuses the nav, Escape/backdrop dismiss, and choosing ANY

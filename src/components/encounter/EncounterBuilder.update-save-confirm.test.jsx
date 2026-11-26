@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 /* Lane — update-save named overwrite confirm + toast honesty (bug-eb-update-save-silent-overwrite).
  * The toolbar Save lane with a loaded encounter (currentEncounterName set) must gate its PUT
  * behind a NAMED native confirm — house canon for durable-data mutations (row delete confirms

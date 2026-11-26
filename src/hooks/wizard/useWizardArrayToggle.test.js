@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Contract test for the pure useWizardArrayToggle hook: array add/remove/toggle
 // over the (setFormData, setErrors) setState API, nested dot-path support,
 // pre-selection locks, and per-field error clearing. Deterministic against

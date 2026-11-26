@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Lane: NpcUnarmedConfirmModal — the copy/chrome layer for the campaign-NPC
 // unarmed join-confirm (backlog 2026-11-17 EG, replaces the INVERTED native
 // window.confirm retired from npcCombatService). OWNED here: the honest

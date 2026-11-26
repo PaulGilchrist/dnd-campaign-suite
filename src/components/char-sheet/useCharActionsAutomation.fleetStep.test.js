@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-405 feature-row automation lane: the Fleet Step seam in handleAutomationAction is
 // ONLY lane-unique behavior — (1) a resolved Bonus Action row (casting_time
 // "1 bonus action" OR action:'bonus_action') calls grantFleetStep with byte-exact

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-04
 // Lane: seed-modal a11y tier (backlog 2026-11-04 CP). The Arena/Starter
 // quick-create modals ride the shared .modal-* chrome but used to lack the
 // role="dialog" tier the newer common/DeleteConfirmModal.jsx exposes, so a

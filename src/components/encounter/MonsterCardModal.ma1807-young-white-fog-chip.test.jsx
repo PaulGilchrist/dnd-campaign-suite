@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1807/MA-1808/MA-1809 modal-seam lane: young-white-dragon lair_actions [0]
 // was a BARE STRING and [1]/[2] nameless dicts (inert static spans —
 // MonsterCardBody.jsx MonsterLairAction string/nameless disjuncts, isLairRowClickable

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0102 lane: Adult Gold Dragon Weakening Breath picker — damageless STR DC 21
 // cone. The picker seam owns: weakening-clause copy (never the MA-0090 "null null
 // damage" / half-damage boilerplate), the RAW "isn't currently affected by this

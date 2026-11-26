@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // saveOnlyHandler (dispatched as automation type `save_only` from
 // src/services/automation/index.js — distinct from saveAttackHandler).
 // Deterministic unit contract: popup shape, save-prompt delegation, and the

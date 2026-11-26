@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1224 regression: REACTION-category advisory seam (Nalfeshnee "Pursuit" —
 // RAW move-end-triggered teleport reaction, prose-only, zero affordance, double
 // inert: no automation.effect → GatedMonsterReaction null AND no move-end

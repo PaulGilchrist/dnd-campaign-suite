@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract pin for restoreBalanceHandler (CLA-295).
+// @maintained-by-ai 2026-10-15 — deterministic contract pin for restoreBalanceHandler (CLA-295).
 // Owns the handler lane only: uses accounting (exact runtime keys), refusal guards,
 // popup/log full-string composition. Armed-state internals (armRestoreBalance /
 // isRestoreBalanceArmed / consumeArmedRestoreBalance) are owned by

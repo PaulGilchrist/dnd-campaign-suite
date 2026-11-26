@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 /**
  * sleepShakeHandler.confirm.test.js — #1957 (family quad #1957–#1959, seam map in sleepHandler.test.js header)
  *

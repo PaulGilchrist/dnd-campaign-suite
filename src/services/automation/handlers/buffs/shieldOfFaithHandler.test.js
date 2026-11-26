@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Shield of Faith handler contract: target-selection popup shape, +2 AC buff
 // registration into activeBuffs, per-target expiration + log, and the pure
 // activeBuffs predicates (isShieldOfFaithActive / getShieldOfFaithBonus,

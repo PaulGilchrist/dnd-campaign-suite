@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 //
 // ERRORS lane: pins ONLY the failure faces of checkRelentlessRage's four
 // addEntry call sites — :90 trigger, :126 success, :141 failure, :187

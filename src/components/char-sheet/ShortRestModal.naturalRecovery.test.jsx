@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Natural Recovery lane: Druid/Ranger 2024 hit-dice-per-short-rest slot recovery UI
 // wiring — gating flags, budget/disable states, CLA-232 merged-batch apply, once-per-
 // long-rest consumption, stale-apply refusal, and consumed/re-armed display.

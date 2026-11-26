@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // mapsService.test.js — owner lane: maps CRUD transport (exact-fetch canon #1010).
 // Every fetch pinned to method + URL + options/body BYTES (no objectContaining);
 // responses consumed as the real server envelopes from server/routes/maps.js BY NAME

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the manually-triggered undying sentinel handler
 // (heal a willing target at 0 HP). Fully mocked; the separate applyDamage.js
 // auto-trigger path is covered by applyDamage.undyingSentinel.test.js.

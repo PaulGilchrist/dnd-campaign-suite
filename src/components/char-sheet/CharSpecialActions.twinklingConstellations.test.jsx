@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-368 regression: the Special Actions "Twinkling Constellations:" row must
 // be clickable, dispatch through executeHandler, open the constellation chooser
 // modal, apply the chosen constellation via the TWINKLING applier (never the

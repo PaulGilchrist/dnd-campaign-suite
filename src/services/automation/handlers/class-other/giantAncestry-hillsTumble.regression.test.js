@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic defect lock; runtime/log/
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic defect lock; runtime/log/
 // expirations/damageUtils are mocked and only the pure findLastAttack parser +
 // attackerRollGate + registerTargetEffect run unmocked, so no churn is needed
 // unless the CLA-169/CLA-141 contracts themselves move.

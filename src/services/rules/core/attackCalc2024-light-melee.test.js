@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Light-melee seam lane of 2024 getAttacks: row placement by the Light property
 // (non-Light → Action; <2 Light → all Action; ≥2 Light → highest-dice (tie →
 // first) is Action, the rest Bonus Action) plus two_weapon_fighting ability-in-

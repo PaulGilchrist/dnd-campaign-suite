@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-10
 /* global HTMLCanvasElement */
 // Lane: the dev-only hex census (Hex3DScene.getCensus) — twin of
 // ./map3dScene.census.test.js for the outdoor diorama (backlog 2026-11-10 HD).

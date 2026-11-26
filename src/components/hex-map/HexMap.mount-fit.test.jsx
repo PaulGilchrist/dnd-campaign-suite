@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // ─── Lane: board mount auto-fit decision (fitVersion law, YG backlog 2026-11-16) ─
 // The full-mount seam for the ONE canonical branch: consumeMountFit fits ONLY
 // when the loader-held fitVersion differs from HEX_FIT_VERSION. A stamped doc

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-143: the Attack-action row lane arms the round-keyed latch
 // `_attackActionTakenRound` (holder + round) that gateTriggerRequirement
 // (useCharActionsAutomation.js), the grappler step, and bonusActionAttackHandler

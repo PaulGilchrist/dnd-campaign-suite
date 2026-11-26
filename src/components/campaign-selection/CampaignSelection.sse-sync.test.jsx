@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-02
+// @maintained-by-ai 2026-11-02: 2026-11-02
 // Live-refresh contract for the campaign-selection screen (2026-11-02 BE
 // backlog): the server publishes app-level `campaigns-list` events on
 // campaign create/rename/delete and meta writes

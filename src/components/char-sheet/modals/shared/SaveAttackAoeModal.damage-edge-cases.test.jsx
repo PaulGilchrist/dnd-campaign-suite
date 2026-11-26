@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // Damage-resolution edge cases on the SaveAttackAoeModal picker lane.
 // Family role: Careful Spell damage-zeroing on both resolve branches —
 // the NPC auto-roll lane (save still fails, damage folds to zero, no apply,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-308 regression: Shadow Arts (2024 Warrior of Shadow Monk) — sheet grants/stamps
 // lane (cited by automationShadowArts.route.test.js as the grants-stamp owner).
 // The Monk disk ladder gates every spellcasting row behind required_major

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // FT-002 regression lane: skill-proficiency cap enforcement in
 // WizardStepSkills — over-cap selections must be refused at the checkbox
 // (previously the counter showed "3 of 2 allowed" and the over-cap

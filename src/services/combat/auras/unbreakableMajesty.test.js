@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Unbreakable Majesty (2024 Paladin) — module internals.
 // Consumers (hitResolution attack-side, navigationHandlers round-wrap,
 // CharSummary/CreatureCard badges) mock this module wholesale in their own

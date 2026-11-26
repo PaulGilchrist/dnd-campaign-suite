@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // CLA-019: Aura of Courage — saveProcessing failed-save leg suppresses aura-covered
 // conditions (suppression logged); control targets and uncovered conditions still land.
 // Seam-only: the aura membership/range channel itself is verified in

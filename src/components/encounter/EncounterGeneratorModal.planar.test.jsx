@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-28
 // Regression: the generator's environment selection must cover ALL 12
 // environments the bestiary models (public/data/monsters.json), including
 // 'planar' — previously the group chips and the All preset listed only 11,

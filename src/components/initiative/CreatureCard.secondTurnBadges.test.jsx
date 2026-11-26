@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // CLA-360 ST-row display parity (FU 2026-11-09): a structural second-turn row
 // DISPLAYS the holder's targetEffects and concentration (the Add modal remaps
 // writes to the holder — c5883e4a4 — so the old self-name filter left the row

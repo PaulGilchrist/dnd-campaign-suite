@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane #1056 — sacredWeapon (attack-step): while an active Sacred Weapon buff exists, a
 // melee/unarmed attack's damage-type byte is converted to the channeller's damageTypeChoice.
 // Sacred-weapon family map:

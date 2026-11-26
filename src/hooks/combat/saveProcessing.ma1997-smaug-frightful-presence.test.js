@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-1997: Smaug the Golden "Frightful Presence" — FP save row authored ONLY
 // conditions:["frightened"] + save_dc/save_type: the DC 22 Wisdom save adjudicated
 // honestly on the live EB-NPC inline lane (chip armed, victim rolled, failure

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Nick mastery lane (weaponMasteryHandler.applyNickMastery): once-per-turn latch
 // written to the player's '_Nick_UsedRound' runtime key as a PLAIN round number
 // (consumers attackCalc2024 / CharBonusActions compare it against

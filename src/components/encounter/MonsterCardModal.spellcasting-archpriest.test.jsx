@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0318 regression lane — Archpriest Spellcasting save-leg DC 17.
 // Pre-fix the row authored only prose ("spell save DC 17") with no numeric
 // save_dc/save_type, so the Flame Strike save-leg died at "DC Unknown — no

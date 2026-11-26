@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // toolValidation PARSING lane (#2063): pure-string regex parsing of parseToolChoiceString
 // ('Choose N ...' extraction + category-name normalization) and parseFeatToolProficiency
 // (2024 feat benefit descriptions). ZERO mocks: neither export ever fetches — the module's

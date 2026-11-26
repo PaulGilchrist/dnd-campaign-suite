@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Backlog 2026-11-01 — referee actor select "no actor" option: the combobox
 // carries an explicit blank-first option, selecting it omits the actorStats
 // key from the ask POST body entirely (the stats-less control lane moves from

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Form-change behavior while editing an existing settlement: typing into fields
 // updates the draft, and the conditional threat field tracks its value.
 // Intentionally NOT duplicated here (covered in sibling files):

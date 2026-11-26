@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // savePromptService lane: this file owns the transport bytes produced by the
 // service itself — exact POST/DELETE URLs (campaign encodeURIComponent'd,
 // '<family>-<targetName>' keys), exact { value } JSON envelopes, DELETEs with

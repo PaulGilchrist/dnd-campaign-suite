@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0544 regression: Cyclops Oracle Portent — d20-replacement pool reaction
 // (advisory-pool floor, CLA-325). GM-click arms the pool roll: resolver rolls
 // 1d20, stores the value on the monster's `portentRolls` runtime pool, logs

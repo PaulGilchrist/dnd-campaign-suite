@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Bridge lane (#976 adjudication): owns ONLY the combatSummary → generateLootSuggestions
 // seam — null-roster guard, the campaign 'targetEffects' summon filter (party-source
 // exclude, GM / unknown-source / non-npc / no-index keeps), roster→{index,qty}

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // PrayerOfHealing latch lane (SP-091). The generic massHealUtils.createMassHealHandler
 // behaviour (casting-mod/expression resolution, modal-vs-popup dispatch, maxTargets
 // slicing, clamp/apply, hp_change logging, heal_multi payload shape, maximization rolls,

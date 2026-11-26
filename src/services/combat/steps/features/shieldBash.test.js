@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // shieldBash step lane map (owner cites):
 //  - THIS file owns src/services/combat/steps/features/shieldBash.js:
 //    condition gate (FT-103), handler gate table, save-DC resolution

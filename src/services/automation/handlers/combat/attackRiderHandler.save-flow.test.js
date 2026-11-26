@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // attackRiderHandler.handleShieldBash save-flow lane: save-prompt shape, DC resolution,
 // FT-082 _shieldBashBaseAttack stash, save-damage outcome logging, oncePerTurn skip
 // passthrough. Prerequisite refusals (shield / lastAttack) are owned by

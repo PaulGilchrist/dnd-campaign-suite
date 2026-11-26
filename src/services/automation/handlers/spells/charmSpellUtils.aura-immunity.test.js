@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // #1884 charmSpellUtils.aura-immunity — canonical home (pair #1884/#1885) for the
 // handleCharmSpell aura-immunity suppression leg + legacy-charmed-write control.
 // CLA-020: Aura of Devotion — the Charm Person/Monster failed-save leg is gated by the

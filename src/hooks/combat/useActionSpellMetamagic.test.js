@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // Base lane: hook mount/state basics and the isBonusSorcerer metamagic gate only.
 // Behaviour lanes own the paths: castClick, attackClick, aoeClick, confirm, skip, modalRouting.
 import { describe, it, expect, vi } from 'vitest';

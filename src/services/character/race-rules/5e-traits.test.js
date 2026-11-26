@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * LANE (family seam map in 2024-immunities.test.js header; 5e half opens in
  * ./5e-immunities.test.js, both cited never edited): addTraits/getTraits only —

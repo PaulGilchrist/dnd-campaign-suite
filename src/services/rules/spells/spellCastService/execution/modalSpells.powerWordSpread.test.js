@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  CLA-392 SPREAD-GATE LANE (#1481) — modalSpells.js:9-:39 REAL     */
 /*                                                                     */

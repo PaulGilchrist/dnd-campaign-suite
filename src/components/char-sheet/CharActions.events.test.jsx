@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Pins CharActions' window event-bus contract (via useCharActionsEventListeners +
 // inline CLA-230 listener): popup HTML formatting, modal-state passthrough,
 // damage-type choice/skip flow, and listener teardown on unmount.

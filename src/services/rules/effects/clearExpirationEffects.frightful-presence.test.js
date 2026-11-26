@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * MA-0048 lane: frightful_presence_immunity_grant expiration type ONLY —
  * the 1-minute FP clock's grant leg. On expiry the handler registers the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // SavePromptModal — Holy Aura save advantage (SP-067)
 // Cast holy_aura targetEffects must grant advantage (two d20, keep highest) on all saves.

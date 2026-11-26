@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Destructive Stride — skipTargetChoice lane (last of quad; siblings cover
 // handle / applyDamageTypeChoice / applyTargetChoice in their own files).
 // Production-live: the Skip flow in DestructiveStrideModal.jsx (line 29) and

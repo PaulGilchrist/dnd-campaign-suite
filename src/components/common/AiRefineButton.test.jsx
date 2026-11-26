@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Campaign-authoring Phase 6 — the AI button on an object: instruction →
 // replacement lands in the CALLER's form state (never saved here), errors
 // surface inline, and a closed prompt clears state.

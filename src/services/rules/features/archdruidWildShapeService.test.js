@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-013 input-truth lane for hasUnlimitedWildShape (cited by
 // buffHandler.wild-shape.test.js as the canonical pin for this predicate's
 // inputs; consumer wiring lives there, max-uses 2/Infinity in

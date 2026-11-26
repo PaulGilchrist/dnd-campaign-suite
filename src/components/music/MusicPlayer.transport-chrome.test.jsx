@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-12
+// @maintained-by-ai 2026-11-12: 2026-11-12
 /* Lane: stop-retires-chrome law (backlog 2026-11-12 NN). With no mood armed
  * the sidebar transport must render NO Play/Pause or Stop button in
  * .music-controls — the sidebar face of TvMusicTransport's conditional

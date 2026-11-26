@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * banishment QUINTET lane #1872 — handle() core loop (banishmentHandler.js L229-319):
  *  - no-creatures popup short-circuit L234-243 (null and empty-creatures combat contexts);

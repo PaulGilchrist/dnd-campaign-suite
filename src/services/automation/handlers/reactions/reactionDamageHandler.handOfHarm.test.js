@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over the stable
+// @maintained-by-ai 2026-10-16: 2026-10-15 — deterministic full-mock lane over the stable
 // CLA-158 gate/economy/scaling contracts; no churn expected as the app moves.
 // CLA-158: Hand of Harm standalone reaction lane.
 // Holder-targeted trigger creature_within_5ft_hits_on_attack_roll (registered

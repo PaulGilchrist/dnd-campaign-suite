@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-050 regression: Circle of the Land spells (2024 Druid, passive).
 // After each Long Rest the druid chooses one land type; the chosen land's
 // spells are always-prepared AT THEIR FIXED classes.json LEVELS (arid:

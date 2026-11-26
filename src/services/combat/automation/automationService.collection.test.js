@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CITATION-OWNER (#957/#960): automationService.collection.test.js owns service-level catalog
 // categorization — which features the facade collects, what filters them out, and which bucket
 // each survivor lands in. Row-bytes belong to the builder lanes; exhaustive type→bucket dispatch

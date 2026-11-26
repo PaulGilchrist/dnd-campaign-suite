@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1932: King Kong "Thunder Roar (Recharge 5-6)" save core live-verified
 // EXACT (DC 23 Wisdom, Frightened-until-end-of-next-turn on fail, nothing on
 // success, no damage dice) but the recharge gate never armed — name-text

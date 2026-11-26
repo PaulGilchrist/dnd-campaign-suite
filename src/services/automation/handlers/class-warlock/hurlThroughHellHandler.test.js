@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic handler-contract suite: everything is mocked at module seams, no timers,
 // no DOM. CANONICAL HOME of the pact-slot matrix (findPactSlotLevel / hasPactSlotAvailable
 // consumption — pactMagicUtils has no dedicated suite; clairvoyantCombatant and contactPatron

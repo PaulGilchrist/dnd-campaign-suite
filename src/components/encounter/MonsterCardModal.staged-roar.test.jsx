@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0268 regression: Androsphinx Roar INLINE click lane in MonsterCardModal.
 // The disk row (live bytes via roarRow()) is staged_roar:true, maxUses:3,
 // WIS DC 18, shapeless (no area field) — click N arms ONLY stage N's canonical

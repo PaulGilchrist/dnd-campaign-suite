@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Backlog improve `at-will-reaction-chip-999`: an At Will reaction authored with
 // the uses/maxUses:999 sentinel (Goblin Boss "Redirect Attack" — live repro of the
 // chip that printed "(999 left)") renders its gated-reaction chip WITHOUT any

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // spellCastHandler .wildCompanion lane — #1972, LAST of the spellCast septet.
 // Owns per SEPTET SEAM MAP (spellCastHandler.damage.test.js header, the law):
 // the CLA-388 branch (handle L387-389) + handleWildCompanion +

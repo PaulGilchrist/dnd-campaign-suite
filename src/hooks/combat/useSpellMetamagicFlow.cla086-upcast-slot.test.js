@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // CLA-086: the gated confirm lane pays the upcast slot but the heal seams (runCureWounds /
 // runHealingWord) historically resolved at the base makePending spellLevel. This file pins
 // ONLY the upcast seam: the canonical stampPaidSlotLevel backfill (and its cantrip / base /

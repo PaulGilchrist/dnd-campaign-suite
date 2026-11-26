@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-396 regression (rules-root lane): playerStats.saveProficiencies MUST be
 // written unconditionally at rules.js:518 from allFeatures. Pre-fix (commit
 // a045ae523^), the writer sat inside the `if (featFeatures.length > 0)` block,

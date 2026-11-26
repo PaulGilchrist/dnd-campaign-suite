@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Owns: rollbackFeatIncreases semantics of useWizardFeatAbilityChoices.js — both
 // paths that roll back feat-derived ability increases (feats emptied, and feats
 // non-empty but no choice-type increases left), the residue guard (rollback writes

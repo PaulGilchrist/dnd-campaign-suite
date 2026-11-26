@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 //
 // .ct-* design-kit convergence (tranche 2): the character-sheet view rides the
 // shared App.css kit. OWNED HERE (unique): the class-contract layer —

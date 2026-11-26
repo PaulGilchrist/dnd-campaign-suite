@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-219 + producer lane (Charm-Person twin of charmMonsterService.test.js #1343): this is the
 // ONLY lane exercising the REAL charmPersonService — every hook consumer
 // (useSpellMetamagicFlow.* — 13 lanes, all verified vi.mock'ing the service) and the downstream

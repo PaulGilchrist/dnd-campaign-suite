@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 

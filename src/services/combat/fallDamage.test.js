@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // CLA-315 fall-damage producer lane: fallDamage.js is the app's only producer of
 // trigger:'falling' events. Authored rule: 2d10 bludgeoning per 10 feet fallen,
 // min 2d10, cap 20d10 (cap clamps at 110ft+ raw 22d10 → 20d10).

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0348 regression lane — Bandit Deceiver Spellcasting, damageless-save lift.
 // Pre-fix Hold Person was damageless, so handleSpellCast routed it advisory:
 // use spent, no save prompt, Paralyzed never landed. Fix = DATA save_dc 14 +

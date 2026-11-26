@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-19
+// @maintained-by-ai 2026-10-19: 2026-10-19
 // CLA-230 lane (consumeOneShotAdvantage, attackPostProcessing.js:280-291): a
 // one-shot next_attack_advantage te (Moonlight Step / Shadow Step / Steady Aim /
 // Blink) is consumed by the ONE attack roll it benefits — hit OR miss both

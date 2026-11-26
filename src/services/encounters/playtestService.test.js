@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Playtest orchestration contract (plan 2026-11-25): snapshot FIRST (nothing
 // writes before the restore point exists), awaited stamp BEFORE any lane that
 // could roll back (in-flight stamp vs rollback race), staging → join order,

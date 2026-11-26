@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-2063: Ymir "Frost Geyser (Costs 2 Actions)" picker-lane consumer unit — the
 // full-struct fix (save_dc/save_type/damage dice+type/range/save_effect + the honest
 // appended "Success: half damage." clause) on the LIVE Radius picker seam.

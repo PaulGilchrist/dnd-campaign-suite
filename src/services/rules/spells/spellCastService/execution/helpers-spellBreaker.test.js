@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  CLA-322 Spell Breaker — module-direct face of exported            */
 /*  refundSpellBreakerSlot (helpers.js:102-107).                     */

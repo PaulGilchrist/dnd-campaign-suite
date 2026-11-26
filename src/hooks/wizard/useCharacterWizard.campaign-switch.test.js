@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 /**
  * Campaign-switch seam contract for useCharacterWizard (2026-11-20 reattach bug):
  * the wizard open-flags live on the never-unmounted App, so leaving and

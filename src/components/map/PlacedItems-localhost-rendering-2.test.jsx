@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Remote clients must never receive localhost-only map elements (hit areas,
 // drag highlights) or the secret-door icon. Each item renderer in PlacedItems.jsx
 // carries its own `isLocalhost` guard, so every type is exercised here.

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Use Magic Device (CLA-374, Rogue Thief 2024): passive toggle handler — owns
 // activation/deactivation of the 'use_magic_device' buff on activeBuffs, the
 // popup + campaign-log composition (full-string pins below are canonical for

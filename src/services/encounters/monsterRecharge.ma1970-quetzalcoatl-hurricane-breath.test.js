@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1970: Quetzalcoatl "Hurricane Breath (Recharge 5-6)" save core live-verified
 // EXACT (DC 25 DEX, 20d6 Thunder, half-on-success default RAW-correct; "90-foot
 // Cone" parses to SaveAttackAoeModal picker) but two DATA fields missing: NO

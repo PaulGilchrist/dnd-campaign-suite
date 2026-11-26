@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-15
+// @maintained-by-ai 2026-11-15: 2026-11-15
 // Stone Skin confirm payment seam (slot-owe fix, bug-enhance-ability-stone-skin-
 // confirms-never-pay, owner ruling 2026-11-15: pay BOTH lanes through the canonical
 // seam — RAW is slot AND diamond dust). Same template as

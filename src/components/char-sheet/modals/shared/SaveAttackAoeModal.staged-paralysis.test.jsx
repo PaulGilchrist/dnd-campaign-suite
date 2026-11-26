@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0248: Ancient Silver Dragon Paralyzing Breath picker lane — stagedParalysis
 // arms the multi-stage ladder seam: picker copy states the two-stage ladder
 // (never half-damage / null-damage / flat "Incapacitated, Paralyzed" grant

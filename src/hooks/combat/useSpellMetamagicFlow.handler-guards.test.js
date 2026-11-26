@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Guard ownership for the useSpellMetamagicFlow exposed surface: every
 // confirm/skip/two-stage handler must be a side-effect-free no-op when
 // invoked WITHOUT pending state (misfire protection). A misfired confirm

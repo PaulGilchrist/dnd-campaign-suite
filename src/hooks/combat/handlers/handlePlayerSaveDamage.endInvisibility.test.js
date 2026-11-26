@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Owner file for the forced-success-save invisibility seam in handlePlayerSaveDamage:
 // the careful-spell and contact-patron routes both converge on applyForcedSuccessSave,
 // where endInvisibilityOnHostileAction fires iff applyDamageToTarget reports

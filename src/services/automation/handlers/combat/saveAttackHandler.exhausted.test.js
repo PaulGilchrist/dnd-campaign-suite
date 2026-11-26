@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit contract for the exported isExhausted()
+// @maintained-by-ai 2026-10-16 — deterministic unit contract for the exported isExhausted()
 // predicate (channel divinity / wild shape / tracked-uses refusal gating).
 // Pure logic over action.automation + playerStats with module-boundary mocks;
 // stable unless the predicate's signature or runtime keys change.

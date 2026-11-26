@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: npcCombatService.addNPCToInitiative — sole owner of NPC-initiative assembly
 // (source read in full: hard gate → dup check → unarmed refusal (needs-weapon,
 // zero-write — the host arms NpcUnarmedConfirmModal, backlog 2026-11-17 EG) →

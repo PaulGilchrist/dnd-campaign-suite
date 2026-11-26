@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1089 frightening-gaze-specific seam ONLY: the Lich "Frightening Gaze"
 // disk row (monsters.json, DC 20 WIS, dc_success none, fear dc_success "none")
 // byte-builds the save context through extractConditionsFromSaveEffect +

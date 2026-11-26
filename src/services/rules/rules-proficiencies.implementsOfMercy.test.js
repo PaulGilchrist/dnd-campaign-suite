@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-181 — Implements of Mercy (2024 Warrior of Mercy monk major, classes.json lv3):
 // "Gain proficiency in Insight and Medicine skills and Herbalism Kit."
 // Rules-root lane: pins getProficiencies (rules-proficiencies.js 2024 path wiring

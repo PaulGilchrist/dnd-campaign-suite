@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-13
 // Backlog 2026-11-13 XA: every form control inside the PlanEditor
 // (.ai-designer-plan) must carry an explicit, unique, non-empty aria-label that
 // mirrors its visible label text, so automation can resolve controls by

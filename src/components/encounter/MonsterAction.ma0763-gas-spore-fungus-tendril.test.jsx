@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0763: Gas Spore Fungus "Tendril" — prose carries "Hit: ... the target has
 // the Poisoned condition" but the row shipped WITHOUT hit_conditions, so the
 // condition rider was structurally inert (buildHitConditionClause reads

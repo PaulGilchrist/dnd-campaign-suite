@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * greaterRestorationService lane — CONFIRM PASS-THROUGH ONLY (thin wrapper).
  *

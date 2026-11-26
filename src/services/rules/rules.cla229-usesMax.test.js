@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-229 (fix d4d6b8cfe) orchestrator lane: rules.getPlayerStats collects
 // automation (collectAutomationFromFeatures / buildAttackInfo) BEFORE
 // rules.getAbilities assigns ability `.bonus` (rules.js:549), so

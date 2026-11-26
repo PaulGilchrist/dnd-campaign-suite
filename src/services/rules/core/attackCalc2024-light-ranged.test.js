@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // 2024 light-ranged seam lane of getAttacks (attackCalc2024.js buildRangedAttacks):
 // row placement by the Light property on Ranged weapons (non-Light → Action;
 // <2 Light → all Action; ≥2 Light → highest average damage, tie → first, takes

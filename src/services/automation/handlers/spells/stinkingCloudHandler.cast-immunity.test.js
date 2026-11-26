@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── CAST-TIME immunity gate (bug-stinking-cloud-cast-applies-poison-to-immune-creature) ─

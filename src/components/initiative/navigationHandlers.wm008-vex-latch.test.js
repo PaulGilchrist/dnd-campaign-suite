@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // WM-008 lane: campaign-scope '_Vex_appliedTarget' auto-apply latch at the ROUND-WRAP seam
 // of navigationHandlers. #867 header: "wm008 owns _Vex_appliedTarget" — this file is the
 // owner. Never mock the latch logic; only its collaborators (#791).

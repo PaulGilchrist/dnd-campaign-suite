@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane: SetConditionModal base render / selection / confirm — header & instruction text,
 // target rows & counter, NPC auto-roll vs player-prompt result rows, and save-result
 // resolution. Side effects (immunity denial, Channel Divinity spend, roll/condition/expiry

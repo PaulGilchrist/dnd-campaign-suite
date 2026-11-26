@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Lane: map loader — owns (campaign, map) → fetch exact-once (#786 transport bytes),
  * loaded-state adoption, save-post payload exactness, 1s autosave debounce flush

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // Active-map single source of truth (backlog 2026-11-11 split-brain improve):
 // the staging lane must END on the `/activate` lane — the same client path
 // the Maps-manager Activate button rides — so the server-owned `activeMaps`

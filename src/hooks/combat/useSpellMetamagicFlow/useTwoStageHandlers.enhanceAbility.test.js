@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Enhance Ability handler internals for useTwoStageHandlers (per-handler owner —
 // flow orchestration / stage-machine seam lives in ../useSpellMetamagicFlow.gate-two-stage.test.js).
 // Pins the SP-039/CLA-113 call shape: handleEnhanceAbilityConfirm passes a SINGLE object

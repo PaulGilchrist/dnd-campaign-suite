@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic contract tests for the multiTargetAlly (Inspiring Leader)
+// @maintained-by-ai 2026-10-15 — deterministic contract tests for the multiTargetAlly (Inspiring Leader)
 // lane of tempHpBuffHandler: handle() modal payload, FT-046 featName→ASI resolution and
 // once-per-rest latch, confirmBolsteringPerformance apply/clamp/log. Fully mocked, no timers,
 // no DOM — stable unless the handler's contract changes.

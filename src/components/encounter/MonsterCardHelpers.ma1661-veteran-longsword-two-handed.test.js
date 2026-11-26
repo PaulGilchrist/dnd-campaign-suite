@@ -14,7 +14,7 @@
 // MonsterCardModal.two-handed.test.jsx:213-223; null-triple transport for
 // secondary-less rows in MonsterCardModal.cultist-flat-secondary.test.js:38.
 // Key-order pins dropped as non-behavioral (#555).
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
 import { buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 //
 // Unit tests for the Haste automation handler (./hasteHandler.js).
 // Fully deterministic: every external dependency (runtime store, combat

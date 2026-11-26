@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: CANON owner of IRV (immunities/resistances/vulnerabilities/condition
 // immunities) resolution. Single-schema since the no-legacy sweep
 // (2026-11-16): every monsters.json row carries the canonical split keys

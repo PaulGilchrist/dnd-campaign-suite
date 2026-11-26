@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // MA-0138: Adult Silver Dragon Cold Gale legendary line picker — DEX DC 19,
 // 4d6 Cold half-on-success, push-only fail clause ("pushed up to 30 feet
 // straight away"). saveConditions is EMPTY (push is not a canonical

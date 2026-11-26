@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 // ── diceRoller DEV forced-d20 seam lane ──────────────────────────────
 // Owns the harness seam added by backlog 2026-11-20 BBB: globalThis.__forceNextD20
 // (one-shot arm → consume → auto-disarm) plus the `?testRoll=<n>` URL-param

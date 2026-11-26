@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Lane: standard New Campaign modal dialog a11y tier (backlog 2026-11-22 SV).
 // The inline quick-create modal rode the shared .modal-* chrome but used to
 // lack the role="dialog" tier its seeded siblings gained in

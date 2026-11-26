@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1477: Solar "Slaying Bow" (monsters.json solar|actions[2], DC 21
 // Dexterity, range "600 feet") — three-field (+dc_success) DATA fix. Before
 // the fix the row carried ONLY prose numerics: parseHpThresholdKillClause

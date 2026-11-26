@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // §9.3 — confirmed director-intent apply: target stamp via existing lane,
 // move advisory only, logs, refusals. Pure dispatcher with an injected stamp
 // lane and mocked log service — deterministic contract, no app churn expected.

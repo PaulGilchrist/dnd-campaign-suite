@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: applyDamage attacker-condition riders — effects keyed off the ATTACKER,
 // dispatched only inside handleWardedDamageEvents when damage actually lands.
 //

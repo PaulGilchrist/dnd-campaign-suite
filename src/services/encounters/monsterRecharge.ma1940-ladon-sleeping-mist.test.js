@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1940: Ladon "Sleeping Mist (Recharge 5-6)" save core live-verified
 // EXACT (DC 23 Constitution, Unconscious on fail, damageless 60-foot Cone
 // picker, multi-target selectable) but the recharge gate never armed —

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 // Backlog 2026-11-22 UI23 follow-up: refused-edit preservation. The freshness
 // 409 honestly refuses a stale save, but the lane's founding doctrine is
 // "navigating away never discards them" — so the refused bytes are parked in

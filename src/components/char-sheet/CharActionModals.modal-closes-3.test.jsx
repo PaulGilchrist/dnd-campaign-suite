@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Close-handler coverage for CharActionModals.jsx modal keys NOT covered by
 // modal-closes.test.jsx or modal-closes-2.test.jsx:
 // healingPoolModal, saveAttackHealModal, elementalAffinityModal,

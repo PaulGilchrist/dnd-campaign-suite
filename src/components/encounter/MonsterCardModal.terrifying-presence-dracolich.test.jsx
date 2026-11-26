@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0622: Dracolich "Terrifying Presence" (legendary, DC 19 WIS, 2d10
 // Psychic, range "30-foot Emanation") listed damage under FAILURE ONLY —
 // RAW carries no "Success: half damage" clause, so a successful save must pay

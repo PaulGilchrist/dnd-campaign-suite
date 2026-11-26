@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharConditions — CAMPAIGN LOG payloads (every automation must log).
  *

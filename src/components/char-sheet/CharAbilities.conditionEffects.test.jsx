@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharAbilities — conditionEffects DISPLAY lane (isolated modifier paths).
  * Verifies how auto-fail saves, save advantage suffixes, exhaustion, pass without

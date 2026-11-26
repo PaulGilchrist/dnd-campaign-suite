@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: healing/distribution modal confirms in useCharActionsModalHandlers.
 // Pins gate refusals on isolated legs (falsy arg WITH the modal open vs modal present
 // only in the WRONG store — never modalState={} vacuity), byte-exact dispatch payloads

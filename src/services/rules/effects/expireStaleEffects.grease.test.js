@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // Lane: Phase 6 GREASE consumer routing of expireStaleEffects — the
 // dispatch seam from a carrier's turn-start sweep to processGreaseAreaSave
 // (owner decision 2026-11-19 "WIRE IT": the SP-056 recurring lane was

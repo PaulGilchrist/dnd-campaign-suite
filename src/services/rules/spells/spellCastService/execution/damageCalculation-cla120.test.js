@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-120 lane — damageCalculation.js:45 computeEmpoweredEvocation is the SINGLE OWNER
 // of the cast-resolution INT fold (git 9f4a06ba6: "INT modifier added TWICE per damage
 // roll"). Cannot-regress (#1443 kill-matrix discipline): fresh formulas bake exactly one

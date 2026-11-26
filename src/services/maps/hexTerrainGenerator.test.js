@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: procedural overland map generation (terrain grid + rivers) for fixed seeds.
 // Flagship shape: byte-exact full-map pins for fixed seeds — terrain grids as row
 // strings (legend below, consumed row-major), exact terrain census counts per type,

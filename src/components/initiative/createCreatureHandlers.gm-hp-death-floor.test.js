@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression lane for bug-gm-hp-input-negative-player-hp: the GM HP input on a PLAYER
 // card used to (a) persist negative commits straight into the canonical runtime key
 // currentHitPoints (e.g. −50), (b) log a self-contradicting hp_change row — threshold

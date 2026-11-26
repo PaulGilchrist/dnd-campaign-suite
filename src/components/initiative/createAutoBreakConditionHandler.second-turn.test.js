@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // LANE: createAutoBreakConditionHandler.second-turn — locks the phantom-bucket
 // removal fix (bug-secondturn-badge-removal-synthetic-name). The (Second Turn)
 // row card DISPLAYS the holder's conditions (CLA-360 buildDisplayCreature

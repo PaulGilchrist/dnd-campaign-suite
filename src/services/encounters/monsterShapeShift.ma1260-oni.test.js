@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1260: Oni "Shape-Shift" — formerly a junk attack_bonus:0 row rendering
 // a lone clickable "+0" chip that rolled a bogus to-hit (live audit: press →
 // roll/attack name:'Shape-Shift', lastAttack ABSENT). Fix = DATA-only:

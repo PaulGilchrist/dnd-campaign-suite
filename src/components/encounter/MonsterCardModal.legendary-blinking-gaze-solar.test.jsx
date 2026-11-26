@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1479 regression: Solar legendary_actions[0] was the Blinking Gaze CHILD
 // with uses:1 — legendaryHeaderAction() (monsterLegendaryUses.js:153, rows[0].uses
 // != null) swallowed it as the economy header, and MonsterCardBody.jsx slice(1)

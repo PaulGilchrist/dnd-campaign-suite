@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // Backlog 2026-11-16 WK: Activate/Deactivate was feedback-silent — the only
 // confirmation was the row button flipping label. The toggle now rides the
 // shared ephemeral-toast lane (useEphemeralToast + a null-when-idle

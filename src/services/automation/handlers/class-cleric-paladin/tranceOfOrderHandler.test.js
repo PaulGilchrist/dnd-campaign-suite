@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit tests for the Trance of Order handler (CLA-364): a stable
 // state machine over the runtime store (free use → 0, 5 SP restore, refusals
 // with zero spend) plus isActive/deactivate contracts. All dependencies mocked;

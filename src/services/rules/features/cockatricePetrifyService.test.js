@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // MA-0501: Cockatrice Petrifying Bite staging (cockatricePetrifyService,
 // MA-0248 paralyzingBreathService ladder shape): the 1d4+1 Piercing damage
 // rides the ATTACK HIT (dc_success:"full"); the CON save (DC 11, disk canon

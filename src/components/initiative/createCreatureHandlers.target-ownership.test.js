@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-23
 // Lane: createCreatureHandlers.js PC-row target ownership gate + arming audit
 // (bug-visitor-arms-any-pc-target-cross-player-write). A LAN (non-localhost)
 // tab may arm a target ONLY on the row its device plays — the sidebar

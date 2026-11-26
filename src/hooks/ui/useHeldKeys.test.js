@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // useHeldKeys — the shared held-key camera pump (owner 2026-11-25, trackpad
 // game-day lane). This file owns the hook's CONTRACT: press-and-hold pumps one
 // onFrame per rAF tick with summed axes + dt, release stops the pump, the

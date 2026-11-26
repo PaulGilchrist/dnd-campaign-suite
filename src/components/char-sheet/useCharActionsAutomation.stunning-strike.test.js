@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-342 Stunning Strike row-gate lane (gateStunningStrike / markStunningStrikeUsed):
 // a save_only 'Stunning Strike' row (trigger monk_weapon_or_unarmed_hit) arms ONLY on your
 // own melee HIT (not auto-miss), once per turn, with a legal OTHER-creature target CURRENTLY

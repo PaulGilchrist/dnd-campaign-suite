@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // invisibilityService lane contract — OWNER of the REMOVE side of the
 // invisibility-adjacent family. blurService.test.js #1341 header cites verbatim:
 // "invisibilityService.test.js owns the REMOVE side of the invisibility-adjacent

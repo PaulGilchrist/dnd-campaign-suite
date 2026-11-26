@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-145: Font of Inspiration SHORT-rest re-arm lane (restRules-shortRest.js).
 // Mechanism: disk canon (2024 classes.json Bard lv5) says "regain all expended
 // uses ... when you finish a Short or Long Rest". 'bardicInspirationUses' is NOT

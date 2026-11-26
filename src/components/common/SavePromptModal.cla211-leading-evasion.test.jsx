@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // @improved-by-ai
 // CLA-211 — Leading Evasion chooser, MODAL side of the contract:
 //   1. Confirming a chooser session stamps ONLY the ticked prompt/target

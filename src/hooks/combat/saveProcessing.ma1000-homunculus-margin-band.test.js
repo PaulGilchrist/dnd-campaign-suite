@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1000: Homunculus Bite fail-margin bands — the rider-only composite save
 // chip (MA-0560 fork, MA-1000 guard fix) rides applyDamagelessSaveConditions
 // with saveConditions ['poisoned'] (shallow-band-only save_effect, MA-0639

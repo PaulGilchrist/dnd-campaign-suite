@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // LANE: initiative.conditions-live-sync — regression for the cross-tab condition-badge staleness
 // (bug-initiative-condition-badges-stale-cross-tab). The displayCreatures memo merges
 // activeConditions/activeConditionMeta via the imperative getRuntimeValue; a passive tab's

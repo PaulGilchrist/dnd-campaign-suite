@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Census lock (backlog 2026-11-17 sp-overlay entrance-focus adoption): every
 // component file whose ROOT renders the .sp-overlay chrome must adopt the
 // shared entrance-focus tier (src/hooks/ui/useOverlayEntranceFocus.js — pull

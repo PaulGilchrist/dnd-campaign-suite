@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 /**
  * CharConditions — condition save MECHANICS: which effects grant advantage,
  * how dice + bonuses combine, and how the result popup reports the outcome.

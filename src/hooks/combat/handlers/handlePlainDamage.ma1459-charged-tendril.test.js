@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1459: Shambling Mound "Charged Tendril" size-conditional pull rider —
 // the fix that made the promised transport clause LAND (§944: pull clauses
 // grep-zero-inert on attack rows). Locks: (1) the data↔parser seam —

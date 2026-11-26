@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2059: Ymir "Glacier Wave (Recharge 5-6)" — fingerprint #12 recharge
 // name-text trap (MA-0663/1916/1924/1948/1987/1996/2017/2041/2051 family):
 // row authored with recharge ONLY in the name, no flat recharge field →

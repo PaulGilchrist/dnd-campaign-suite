@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // DeathSaveEntry lane: owned contract = death_save entry RENDER bytes only —
 // enum-cover presentation map (#877): title/class/die-string per producer
 // `result` value (absent|'stable'|'dead'|'removed') + neutral UNKNOWN arm,

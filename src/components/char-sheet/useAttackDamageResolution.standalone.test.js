@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane: the STANDALONE (no-hook) path of useAttackDamageResolution.js — the only
 // exported entry point here is resolveAttackDamageStandalone; every assertion is a
 // pure function call through the pipeline seam, no React render.

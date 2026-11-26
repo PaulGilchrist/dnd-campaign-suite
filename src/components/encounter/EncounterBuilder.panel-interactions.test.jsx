@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // EncounterBuilder lane: table-row / selected-panel interactions + monster card modal.
 // This lane uniquely owns (per lane map): checkbox toggle incl. decrement-to-zero,
 // row qty controls visibility, row + selected-panel remove buttons, Clear All,

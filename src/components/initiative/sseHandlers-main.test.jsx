@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // LANE: sseHandlers-main — dispatch table behind the app's ONE shared SSE connection (#app mandate:
 // Initiative.jsx registers a single <Subscriber>; this module owns only event→dataKey routing + the
 // SSE-mirrored turn seam). Other owners: subscriber registration + combat-summary-updated adoption

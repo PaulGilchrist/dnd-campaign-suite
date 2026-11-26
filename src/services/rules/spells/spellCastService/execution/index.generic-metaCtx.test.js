@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /* ------------------------------------------------------------------ */
 /*  OWNER (sole lane): what index.js :710 FORWARDS to handleGeneric-  */
 /*  Automation — the mock-boundary arg pin (earlyReturns-generic:10    */

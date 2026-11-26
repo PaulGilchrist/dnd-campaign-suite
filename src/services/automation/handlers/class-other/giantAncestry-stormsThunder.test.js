@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15 — deterministic mocked-seam lane; runtime store, dice,
+// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic mocked-seam lane; runtime store, dice,
 // log, damage and findLastAttack are mocked, so only the Storm's Thunder handler
 // composition runs under test. No churn needed unless the handler contract moves.
 //

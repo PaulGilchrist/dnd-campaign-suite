@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Canonical primary suite for conditionHandler.handle (set_condition / channel_divinity seam).
 // Fully mocked and deterministic: buildSaveDc defaulting (CLA-238 CHA vs WIS), Channel Divinity
 // charge gate (CLA-303), maxTargets cap, duration parsing, map/attacker position, payload shape,

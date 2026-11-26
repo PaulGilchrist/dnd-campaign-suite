@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Invisibility handler: thin adapter over invisibilityShared.js.
 // This suite pins the regular-Invisibility contract (popup type, buff name
 // 'Invisibility', 'Concentration, up to 1 hour' default, the

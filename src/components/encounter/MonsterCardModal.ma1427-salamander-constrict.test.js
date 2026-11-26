@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1427: Salamander Constrict (monsters.json actions[2]) — the attack_bonus:0
 // decoy satisfied isCompositeAttackSaveRow → saveLegCarriesSecondaryDamage matched
 // the "2d6" byte inside save_effect → resolveSaveLegDamageFields REPLACED the save

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Silence guard lane: applySilenceThunderImmunity (applyDamage.js:291-303),
 // logSilenceImmunity (:332-340) and its log gate (:795-797). Generic immunity
 // arithmetic is owned by applyDamage.helpers.test.js:53-86 — full-damage values

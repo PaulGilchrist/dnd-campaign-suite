@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Taunting Step confirm lane only (handleTauntConfirm) — the one lane no sibling
 // covers: save dispatch via createSaveListener, taunting_step targetEffects upsert
 // (in-place replace, other effects preserved), addExpiration payload, exact

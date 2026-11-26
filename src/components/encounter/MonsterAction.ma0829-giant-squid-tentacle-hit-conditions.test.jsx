@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0829: Giant Squid "Tentacle" — prose carries "If the target is a Huge
 // or smaller creature, it has the Grappled condition (escape DC 16) from one
 // of two tentacles" but the row shipped WITHOUT hit_conditions/escape_dc, so

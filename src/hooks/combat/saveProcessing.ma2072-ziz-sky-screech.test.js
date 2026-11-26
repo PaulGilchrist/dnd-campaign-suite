@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-15: 2026-10-14
 // MA-2072: Ziz "Sky Screech (Costs 2 Actions)" legendary save child — formerly
 // a prose-only row (name + delegates_to:null + description only) that spent 2
 // legendary uses via the MA-1883 costs-2 NAME-parse and dead-ended at the

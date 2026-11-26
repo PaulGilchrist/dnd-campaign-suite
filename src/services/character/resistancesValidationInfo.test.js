@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // QUARTET lane (see resistancesValidation.test.js header seam map): getResistanceInfo granted/source API —
 // who-granted attribution (Race | Class | "Race, Class" join | Unknown) and the exact { isGranted, source,
 // isPreSelected } contract. Canonical extraction home is NOT here: race-side lives in

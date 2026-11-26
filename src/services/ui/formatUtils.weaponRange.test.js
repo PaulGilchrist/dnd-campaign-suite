@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-03
 // formatWeaponRange — melee-vs-ranged Range-cell label branch for the sheet
 // Actions tab (2026-11-03 backlog: bare "5 ft." read as a firing range).
 // Pins: melee-lane rows get the explicit "Reach " label, ranged bands and

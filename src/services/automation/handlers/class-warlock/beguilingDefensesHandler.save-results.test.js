@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Save-result sub-lane of the beguilingDefenses pair: covers the save-result
 // listener registered by handle() — promptId guard, lastAttack stamping, the
 // psychic retaliation contract, log composition, and listener teardown.

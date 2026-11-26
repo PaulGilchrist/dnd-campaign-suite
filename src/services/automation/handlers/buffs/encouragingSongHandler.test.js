@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic contract tests for the Encouraging Song buff handler: pure async
 // logic with all side-effecting dependencies (runtime store, log, combat context)
 // mocked. Stable behaviour — no churn expected as the app evolves.

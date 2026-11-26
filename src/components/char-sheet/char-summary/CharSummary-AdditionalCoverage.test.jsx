@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Lane: speed overrides derived from activeBuffs/playerStats priority chains
 // (deriveAspectSpeeds + aquatic_adaptation) and Stormborn resistances gated on

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 // Confirm wiring for the mass-healing modals rendered through CharActionModals:
 // clicking a modal's confirm button invokes its handler prop with the modal's
 // selected targets (payload flows modalState → modal → handler prop).

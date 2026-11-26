@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: services/combat/creatureTypeResolver.js — resolveCreatureType(creature) (CLA-173/SP-094)
 // Contract (pure resolver → zero mocks, #952): no creature → undefined; else creature.monsterType || creature.type.
 //   • Precedence (#967): runtime monsterType beats CONTRADICTING declared type — EB-joined monsters carry

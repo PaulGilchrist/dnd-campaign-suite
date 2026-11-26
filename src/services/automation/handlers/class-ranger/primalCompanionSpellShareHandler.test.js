@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic: runtime store, logService, rangeCheck all mocked at module;
+// @maintained-by-ai 2026-10-15 — deterministic: runtime store, logService, rangeCheck all mocked at module;
 // pins handler branch behaviour (guards, range gate, dedupe, share mirroring) and own-composition strings.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applySpellShare } from './primalCompanionSpellShareHandler.js';

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * rules-hunterPrey.js PRODUCER lane — owns the Horde Breaker marker (family
  * canon: superiorHuntersPrey.integration.test.js:19 cites THIS file as the

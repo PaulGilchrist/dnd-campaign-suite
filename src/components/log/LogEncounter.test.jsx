@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // EncounterEntry lane: owned contract = encounter log-entry RENDER bytes only —
 // leg polarity (container class, icon, title) for every producer-emitted action,
 // exact ordered roster bytes (roster census #781) on the start leg, exact

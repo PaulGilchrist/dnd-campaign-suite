@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // spellCastHandler .popup lane (#1969) — owns the single-spell free-cast popup
 // composition of spellCastHandler.js: grantFreeCastPopup (L354-368) + castLabels
 // (L11-15), reached at L417. SEPTET SEAM MAP lives in spellCastHandler.damage

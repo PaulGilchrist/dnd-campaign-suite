@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // prayerOfHealingService BASE lane (2024 fixture; direct-service trigger).
 // Lane split (per prayerOfHealingService.results.test.js header + sp091 #1311):
 //   - THIS lane owns: name gate, pre-combat guards (ladder-null, combat-context

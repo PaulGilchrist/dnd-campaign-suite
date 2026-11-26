@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-372 lane — SOLE OWNER of the uncannyMetabolismUsed latch rest-boundary
 // contract (verified: no sibling test in this folder names the key, and it is
 // NOT registered in LONG_REST_RESOURCES/SHORT_REST_RESOURCES, so the base lane's

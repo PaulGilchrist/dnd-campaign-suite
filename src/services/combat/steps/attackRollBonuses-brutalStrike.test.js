@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // steps/ lane: owns attackRollBonuses.js `applyBrutalStrikeBonuses` — the APPLICATION
 // face of the REAL selector: the chosen rider's dice are rolled and appended to the
 // attack-roll acc, chosen options are granted to campaign targetEffects, logged, and

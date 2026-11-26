@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Registry-fallback lane for ConditionEffectBadges: every stored targetEffect
 // whose key has NO dedicated BADGE_SPECS entry must still render exactly one
 // generic badge built from getEffectDefinition (label/icon/cls/description)

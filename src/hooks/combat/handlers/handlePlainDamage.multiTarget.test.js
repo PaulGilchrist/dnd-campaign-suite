@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: handlePlainDamage — MULTI-TARGET ITERATION owner (#789 exact-order precedent).
 // Module under test: src/hooks/combat/handlers/handlePlainDamage.js (reached via
 // createLogDamageAndShow, src/hooks/combat/useLoggedDiceRollDamage.js). NOT

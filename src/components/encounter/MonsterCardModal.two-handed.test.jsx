@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0325: Azer Warhammer advertised two-handed 1d10+3 variant (monsters.json
 // damage_dice_two_handed) — GM-adjudicated choice on the monster attack HIT
 // popup (MA-0007 offer-on-result shape, ALTERNATIVE primary dice). This lane

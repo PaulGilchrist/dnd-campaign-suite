@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /* Lane — .ct-* design-kit convergence (QA backlog tranche 1, Initiative view):
  * the Initiative root carries .ct-container so the App.css kit (every rule
  * .ct-container-scoped) styles the GM control row and the loot panel. Pins the

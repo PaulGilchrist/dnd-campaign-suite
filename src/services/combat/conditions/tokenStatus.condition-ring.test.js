@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // ─── Lane: tokenStatus.hasTokenStatusIndicators (Item 5 condition-ring law) ───
 // The uniform "wears a condition ring" predicate must answer from the ONE
 // registry derivation the chips use — never a second read of the raw

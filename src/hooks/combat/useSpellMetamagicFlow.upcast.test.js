@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Generic upcast maxTargets threading through the gate lane: extractMaxTargets
 // (spellGateHelpers.js) parsing the "N targets" string from upcast_at_slot_level
 // into pending.maxTargets for Charm Monster and Banishment — the two gates no

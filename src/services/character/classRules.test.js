@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 import { describe, it, expect } from 'vitest';
 import classRules from './classRules.js';
 import classes5e from '../../../public/data/classes.json';

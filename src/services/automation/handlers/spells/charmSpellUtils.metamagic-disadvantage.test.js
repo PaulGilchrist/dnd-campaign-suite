@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-219 / #1885: charm NPC inline adjudication honours the Heightened Spell /
 // Magical Ambush disadvantage transport — 2d20 keep-low, applied once.
 //

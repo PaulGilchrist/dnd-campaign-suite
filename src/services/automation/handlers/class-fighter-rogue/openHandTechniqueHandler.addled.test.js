@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Open Hand Technique — addled lane only.
 // Owns: instant addled option (no save listener, popup copy, store write, log roll)
 // and the noOpportunityAttacks → Addled condition producer contract.

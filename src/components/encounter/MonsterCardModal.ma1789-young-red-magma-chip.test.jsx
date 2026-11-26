@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1789/1790/1791 modal-seam lane: young-red-dragon lair_actions [0] was a
 // BARE STRING and [1]/[2] nameless dicts (all inert static spans —
 // MonsterCardBody.jsx MonsterLairAction string/nameless disjuncts). DATA fixes

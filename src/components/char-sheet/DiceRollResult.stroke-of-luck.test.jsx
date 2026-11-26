@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-339: Stroke of Luck (Rogue lv20) — offer must be gated to FAILED d20 tests only.
 //
 // Seam ownership map:

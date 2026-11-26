@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-29
 // Regression: bug-eb-join-empty-combatsummary-silent-fail — handleJoinEncounter
 // pre-wrote the `encounter/joined` campaign-log row BEFORE awaiting
 // addMonstersToInitiative and had no try/catch, so a rejected join died as an

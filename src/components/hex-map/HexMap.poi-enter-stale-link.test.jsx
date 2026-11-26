@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-30
 // Regression lock for bug-hex-poi-enter-deleted-map-phantom-resurrect: the golden
 // Enter chip rendered next to a POI whose linked indoor map was deleted under the
 // mounted editor stayed live (validLinkedMaps is a mount-time probe snapshot and

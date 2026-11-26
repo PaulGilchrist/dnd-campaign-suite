@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Barrel-import lane: imports addExpiration via ./expirations.js (the public
 // re-export consumers use), unlike addExpiration.ba001-single-write.test.js
 // which imports ./expirationQueue.js directly. That direct module owns the

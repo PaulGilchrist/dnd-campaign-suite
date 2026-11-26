@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // SavePromptModal — producer abandonment notice (divine-spark dismiss-softlock,
 // 2026-11-05). Dismissing an UN-ROLLED prompt never dispatched any outcome, so
 // producers parked on a raw `save-result` window listener stranded their modals

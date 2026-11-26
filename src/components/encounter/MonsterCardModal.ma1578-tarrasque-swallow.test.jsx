@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1578: Tarrasque "Swallow" (save, DC 20 Constitution) — pre-fix the fail face paid
 // NOTHING: dice lived only in save_effect prose, every structured key was absent, so
 // saveChipPlan.formula was null → raw d20 popup ("DC Unknown"), applySaveDamage's damage

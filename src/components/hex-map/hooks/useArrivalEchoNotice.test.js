@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-11
 // One-shot trigger logic for the shared-adoption arrival notice (backlog
 // JT 2026-11-11): the hook reads the ECHO lane only (synced travel-mode +
 // travel-lastMessage values) and fires the caller's display callback exactly

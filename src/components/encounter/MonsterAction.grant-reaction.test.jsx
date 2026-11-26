@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0882 component lane: GrantReactionLink chip in MonsterAction.jsx — automation
 // {type:"monster_grant_reaction", effect:"incite_rampage", range_ft:60} (Gnoll Pack
 // Lord "Incite Rampage") arms a clickable .mc-dice-link-grantreaction role=button

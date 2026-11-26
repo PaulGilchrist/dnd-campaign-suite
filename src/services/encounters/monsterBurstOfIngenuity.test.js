@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1510: Sphinx of Wonder "Burst of Ingenuity" (reactions[0]) — formerly a
 // zero-affordance plain-text row: no automation (§60 gated lane unarmed),
 // uses:"2/Day" STRING unparseable by every usage parser (MA-1502 NaN gate →

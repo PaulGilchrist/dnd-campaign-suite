@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Celestial Resilience lane of ShortRestModal: when applyShortRest resolves with a
 // celestialResilienceAllies grant (shape { creatureTargets, allyTempHp, selfTempHp,
 // maxTargets } or null — restRules-shortRest.js:501), the modal opens an ally picker;

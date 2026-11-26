@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0042: area picker persisting-zone arm seam — with a zoneTe payload
 // (byte-inert when null) the confirm writes a zone te per covered creature
 // (`lair_insect_cloud`, source=caster, repeatTurnEnd) + caster tracking

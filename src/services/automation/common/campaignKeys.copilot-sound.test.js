@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-22
 /**
  * Copilot + Sound-owner tier law (learnability plan Phases 1/5).
  *

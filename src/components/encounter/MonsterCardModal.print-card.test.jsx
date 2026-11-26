@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 /* Item 4 — the stat-block modal header earns a labeled Print Card verb that
  * opens the shared paper preview with the SAME monsters.json row the
  * interactive card runs. Boundary mocks identical to MonsterCardModal.test.jsx

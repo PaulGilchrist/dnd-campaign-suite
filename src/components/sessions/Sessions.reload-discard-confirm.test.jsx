@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-10-28: 2026-10-29
 // Regression lock for improve 2026-10-29-V (Sessions dirty-Reload silently
 // discards the open draft): the 409 banner's one-click "Reload list" must
 // NAME the discard via the shared useReloadGuard like the five .ct-* sibling

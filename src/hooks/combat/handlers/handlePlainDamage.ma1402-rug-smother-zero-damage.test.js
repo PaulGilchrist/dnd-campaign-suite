@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1402: Rug of Smothering "Smother" damageless hit-clause consumer proof —
 // the ONE rug-specific contract: handlePlainDamage (via createLogDamageAndShow)
 // consumes the REAL rug disk row end-to-end — buildHitConditionClause(SMOTHER)

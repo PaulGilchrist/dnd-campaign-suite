@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: npcGenerator.js — pure random custom-NPC factory. Sole export: generateNPC(existingNPCs).
 // Split (owner): npcsService.test.js owns campaign-CRUD transport (/api/.../npcs);
 // npcFormUtils.test.js owns form defaults (#1179); npcCombatService.test.js owns initiative (#1178);

@@ -1,4 +1,4 @@
-// @maintained-by-ai — deterministic unit tests for savePrompt.js's own contract
+// @maintained-by-ai 2026-10-15 — deterministic unit tests for savePrompt.js's own contract
 // (buildSaveDc arithmetic, createSaveListener payload shape, promptId matching).
 // Pure behaviour behind mock boundaries; no timers, no network (setup.js fetch is inert).
 // If buildPromptPayload gains a field, extend the exact-payload assertions in one place.

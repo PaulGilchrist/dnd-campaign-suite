@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-034 Beguiling Twist (ranger reaction, routed via automation/index.js `reaction_save`).
 // Deterministic seam pins: getCombatContext / getRuntimeValue('campaign','lastAttack') /
 // isWithinRange are mocked; buildSaveDc + rangeToFeet run REAL (wiring only — internals

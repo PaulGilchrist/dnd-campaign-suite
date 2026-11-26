@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-23
 // #1241-family silent-zero sweep (fix#241 census): the six flagged rider branches of
 // attackRollBonuses.js now decline UNRECOGNIZED shapes LOUD with zero contribution
 // instead of vanishing at rollExpression-null. Mirrors the fix#241 frenzy lane shape

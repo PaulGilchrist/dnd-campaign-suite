@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * useTravelManagement — cleared-key null echoes must never blank the SPA
  * (bug-hex-arrival-null-echo-blank-screen, 2026-10-27 run L).

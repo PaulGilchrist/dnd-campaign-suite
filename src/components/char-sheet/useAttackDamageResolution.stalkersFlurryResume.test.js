@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-326 Stalker's Flurry AFFIRMATIVE-RESUME lane at the useAttackDamageResolution
 // seam: the choice modal pauses the real pipeline at _pausedStep:'featureRiders'
 // BEFORE proceedToDamage, stranding the triggering hit's damage. This lane owns the

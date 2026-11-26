@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CharSpecialActions autoDamageRoll seam map (family opener):
 // - THIS FILE pins ONLY the component seam in CharSpecialActions.jsx (~L719-733):
 //   the autoDamageRoll callback handed to useLoggedDiceRoll — its wiring/delegation

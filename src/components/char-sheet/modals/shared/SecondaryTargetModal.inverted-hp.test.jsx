@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 //
 // Never-render-current>max honesty guard (backlog 2026-11-14 MM HoH
 // mount-snapshot improve). The chooser's row resolves `N` bucket-first

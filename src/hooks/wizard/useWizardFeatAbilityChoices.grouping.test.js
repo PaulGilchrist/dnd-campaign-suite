@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Sole owner of grouped-choice structure coverage for useWizardFeatAbilityChoices.js:
 // buildGroupedChoices (fixed / choice 1-2 / multi-amount-fallback branches) and the
 // normalizeAbilityNames parsing branches ("Increase your X score", "Choose ... from:",

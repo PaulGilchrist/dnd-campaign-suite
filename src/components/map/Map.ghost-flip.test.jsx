@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: the viewMode-flip seam of last-known-position memory (SK 2026-11-19
 // improve). useLastKnownPositions is HOISTED into Map.jsx above the 2D/3D
 // conditional so the per-client ghost cache survives a 2D→3D→2D round-trip —

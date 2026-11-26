@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Source contract for strideOfTheElementsHandler (CLA-400): passive chooser gated on
 // elementalAttunementActive — verbatim refusal popup when inactive, strideOfTheElements
 // modal with pass-through payload when active, zero runtime writes either way.

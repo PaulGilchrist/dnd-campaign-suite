@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // Corona of Light (sunlight_aura) picker-route pins — bug-corona-aura-inert-in-
 // aoe-picker-route: the SaveAttackAoeModal adjudication seams (computeNpcSave +
 // resolvePcTarget prompt builder) resolved saves WITHOUT ever consulting the

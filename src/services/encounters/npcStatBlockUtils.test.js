@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: custom-NPC combat-readiness guards + NPC→monster stat-block byte contract.
 //
 // OWNED HERE (other lanes cite, do not re-drive):

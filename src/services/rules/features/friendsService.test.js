@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * friendsService lane — the PRE-CAST GATE + TRIGGER-STAMP OWNER (friendsService.js)
  * and the early-end READER of the Friends latch (endFriendsOnHostileAction L199-221).

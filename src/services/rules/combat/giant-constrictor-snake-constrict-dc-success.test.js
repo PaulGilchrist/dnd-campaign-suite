@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0798: Giant Constrictor Snake "Constrict" (actions[2], DC 14 Strength,
 // shapeless "10 feet" → inline auto-save, 2d8 + 4 Bludgeoning) RAW authors NO
 // success clause — Failure pays damage+Grappled, Success pays ZERO. dc_success

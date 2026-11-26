@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1212/1217/1220: zoneOnly picker CONFIRM through the rapport_spores lane.
 // Rapport-specific semantics pinned here (zone fundamentals live in lair-zone
 // #217, save-less zero-roll guard in lair-darkness #215): the ONLY engine

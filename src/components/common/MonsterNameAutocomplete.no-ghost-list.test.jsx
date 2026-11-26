@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 // Regression lock for bug-eb-autocomplete-ghost-blocks-initiative-clicks:
 // the dropdown used to auto-open from mount-time query seeds (Initiative cards
 // autofocus their rename field with the creature's name; Join Encounter

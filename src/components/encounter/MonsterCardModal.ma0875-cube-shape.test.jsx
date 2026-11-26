@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" — 30-foot Cube of Darkness at a
 // point within 60 feet. The Cube token was unparsed (picker-inert, chip degraded
 // to the inline single-target block save), so cubeCoverageFeet/radiusAoeFallback's

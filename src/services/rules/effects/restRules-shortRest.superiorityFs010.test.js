@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // FS-010: Superiority Dice SHORT-rest restore lane (restRules-shortRest.js
 // addFighterResourceUpdates). Mechanism: 'superiorityDice' is in
 // SHORT_REST_RESOURCES (generic null re-arm) and addFighterResourceUpdates

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Regression (improve-run 2026-11-19, same family as the resolved
 // bug-clear-latch-eviction-resurrects-stamps): handleRemoveDead used to fire
 // THREE sequential setRuntimeValue calls (isDead/deathSaves/deathFailures),

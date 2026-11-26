@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharInventory edge cases — SEAM MAP for the CharInventory test family:
 //   edgeCases (THIS FILE): falsy-vs-truthy `cost` line in the popup; empty/null
 //     array ELEMENTS in equipped (itemNameOf typeof guard) — rendered then clicked.

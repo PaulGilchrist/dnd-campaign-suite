@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Lane: useLastKnownPositions = the per-client position-memory oracle behind
 // last-known-position mode (roadmap Item 7). It decides WHO ghosts: recording
 // happens only while a creature token is unfogged on this client, ghosts are

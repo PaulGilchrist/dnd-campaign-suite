@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Seam map for CharCharacterAdvancement (three-file split — keep lanes disjoint):
 //   .rendering.test.jsx — section header, name/description display, grouping and
 //       "* N" count suffix, featuresToIgnore filtering (5e, 2024, rules default),

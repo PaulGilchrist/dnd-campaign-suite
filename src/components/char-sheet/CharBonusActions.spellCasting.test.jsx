@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // CharBonusActions host: pending-popup DISPLAY contract.
 // When useSpellMetamagicFlow arms a pending state, this host must surface the
 // right popup/modal with the right display data (spell identity, sorcery

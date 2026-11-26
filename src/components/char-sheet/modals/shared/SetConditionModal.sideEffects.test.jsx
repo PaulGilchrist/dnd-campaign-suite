@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Lane: SetConditionModal side effects only — immunity denial, Channel Divinity
 // charge spend, and the roll/condition/expiration log seams. Render, target
 // filtering, and Turn Undead behavior live in the sibling test files.

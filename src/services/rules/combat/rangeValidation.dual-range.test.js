@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-20
 // bug-monster-ranged-attack-wrong-range-bands: dual-notation ranges ("80/320 ft.",
 // 79 authored bestiary fields) used to fail rangeToFeet's anchored single regex
 // → null → computeRangeEffect NEVER applied the bands, and the monster-card press

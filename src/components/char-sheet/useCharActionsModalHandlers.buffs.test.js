@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Routing-seam lane: buff-choice modal confirms in useCharActionsModalHandlers.
 // Pins gate refusals (isolated falsy legs per #339), exact buff-service call
 // payloads (arity + byte), setPopupHtml on result.payload only, runtime-store

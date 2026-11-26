@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1150 regression: Merfolk Wavebender Spellcasting.
 // Defect 1 — the advisory cast log stamped the spell-side 5e dc_type ("DEX")
 // over the row's authored save_type ("Wisdom"). Root cause was spurious DATA:

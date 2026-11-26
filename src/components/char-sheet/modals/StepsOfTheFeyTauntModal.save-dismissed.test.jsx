@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-05
 // StepsOfTheFeyTauntModal — dismiss-softlock regression (save-dismissed sweep
 // family, 2026-11-05). Both save lanes (Taunting + Dreadful) park the modal on
 // Promise.all(waitForSaveResult); the GM's un-rolled Dismiss on a queued

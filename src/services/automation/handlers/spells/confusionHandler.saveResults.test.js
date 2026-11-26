@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * confusion TRIO seam map — two modules, three lanes:
  *  - THIS LANE (#1889, saveResults) — confusionHandler.js save-result outcome side:

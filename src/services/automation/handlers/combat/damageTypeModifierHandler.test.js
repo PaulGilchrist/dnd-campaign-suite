@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // damageTypeModifierHandler — deterministic contract pins for the
 // damage_type_modifier (Empowered Strikes, 2024) automation lane.
 //

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // ── psionic.test.js — automationInfoBuilder psionic slice (lane #952 template) ──
 // Unit home for the EXACT emitted info bytes of psionicHandlers (psionic.js):
 // psi/telekinetic feature automation rows → handler-input envelopes.

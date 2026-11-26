@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 /**
  * quickBuildService — Quick Build draft legality against the REAL rules data.
  *

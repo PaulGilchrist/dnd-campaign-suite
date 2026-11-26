@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 /**
  * Lane: MAIN per-type clear dispatch, pinned through the PUBLIC wrapper
  * clearAllExpirationEffects (rest/initiative seam): queue read → dispatch-all

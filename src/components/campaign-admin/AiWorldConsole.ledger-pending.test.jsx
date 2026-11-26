@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-21
 // MMM 2026-11-21 — quest_draft ledger-check PENDING face: while the ledger
 // fetch is in flight (ledgerNames === null) the card says "Checking ledger
 // names…" instead of posing as scrutiny-clean; the affordance is quest-card-

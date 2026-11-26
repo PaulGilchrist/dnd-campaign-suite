@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 
 // MA-0639: Drow Hand Crossbow fail-margin rider — parseSaveMarginClause unit
 // contract (source: MonsterCardHelpers.js). STRUCTURED-KEY-ONLY arm

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // TRAVEL ENTRY content lane — owns the rendered bytes of TravelEntry (LogTravelEntry.jsx).
 // Render-vs-service split (cite-owner convention):
 //   routing travel→TravelEntry .log-travel .... owned by #879 container dispatch (LogEntryRendering.test.jsx) — cut here

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // truePolymorph HEXAD lane #1981 — handler main handle(): GATES + SAVE FLOW.
 // Owns (truePolymorphHandler.js):
 //   • combat-context gate (:225-235) and target gates (:239-248, :260-267)

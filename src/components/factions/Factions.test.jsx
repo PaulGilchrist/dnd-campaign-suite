@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Base CRUD / modal / search lane for Factions: header + mount-load, loading
 // and empty states, modal open/close lifecycle, save-disabled-by-name guard
 // (the disabled byte IS the guard — clicking a disabled button is a no-op,

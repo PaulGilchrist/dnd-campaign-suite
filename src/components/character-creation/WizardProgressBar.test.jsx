@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import WizardProgressBar from './WizardProgressBar.jsx';

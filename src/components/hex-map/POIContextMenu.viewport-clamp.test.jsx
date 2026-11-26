@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // ─── Lane: POIContextMenu — viewport clamp law ───────────────────────────────
 // Backlog 2026-11-17 (indoor ItemContextMenu viewport-clamp improve): the
 // shared law — a context menu anchored on a token/POI low on the board must

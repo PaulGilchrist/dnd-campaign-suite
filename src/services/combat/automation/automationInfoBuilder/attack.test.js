@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Unit lane (canonical home) for attackHandlers in ./attack.js — exact envelopes,
 // defaults, and calcs, invoked DIRECTLY (facade dispatch is pinned by the flat
 // automationInfoBuilder.test.js delegation table — not re-pinned here).

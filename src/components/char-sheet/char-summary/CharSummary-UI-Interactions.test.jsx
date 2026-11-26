@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-14
 //
 // Coverage ownership (CharSummary family delegation): popup CLICK wiring —
 // user clicks in the summary that open detail popups. OWNED HERE (unique):

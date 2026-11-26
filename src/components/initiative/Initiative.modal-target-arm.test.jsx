@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-16
 // XD-1116 improvement (2026-11-16): the .mc-overlay stat modal mirrors the card's
 // target-arm select into its header so the full GM attack flow completes inside
 // the modal. Host wiring pin: Initiative hands GmStatBlockModal (and through it

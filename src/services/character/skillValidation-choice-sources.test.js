@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // skillValidation PAIR seam map (this file = choice-sources lane; core = skillValidation-core.test.js):
 //   • choice-sources (HERE): WHERE skill choices come from — getSkillLimits' skillChoiceSources
 //     attribution (source/count/pool per class/race/background/feat/race_feat lane), 5e guard.

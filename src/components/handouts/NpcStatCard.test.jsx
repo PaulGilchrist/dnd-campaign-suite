@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Item 4 NPC handout card contract: a combat-ready NPC prints the full stat
 // block (AC/HP+HD/speed/initiative, abilities+mods, saves/skills/defenses,
 // actions/traits/reactions) PLUS the roleplay essentials; a lore-only NPC

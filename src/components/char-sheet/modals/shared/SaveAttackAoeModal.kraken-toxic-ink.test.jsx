@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1058: Kraken Toxic Ink emanation picker (CON DC 23, 15-ft Emanation,
 // DAMAGELESS). Pre-fix the row had NO numeric save_dc and NO range → the save
 // chip never armed and the gated "Expend Legendary" chip spent the use then hit

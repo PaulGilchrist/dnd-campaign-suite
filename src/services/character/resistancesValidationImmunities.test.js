@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // QUARTET lane (see resistancesValidation.test.js header seam map): class-side immunity
 // extraction + level gates — extractClassImmunities via getResistanceLimits.
 // Disk anchors, verified against public/data/classes.json + public/data/2024/classes.json:

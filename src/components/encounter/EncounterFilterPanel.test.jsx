@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Component-unit lane for EncounterFilterPanel: the panel's own render surface and
 // callback payloads. Filter STATE / filterMonsters lives in EncounterBuilder.helpers
 // (#401); builder-level filter-change dispatch wiring lives in builder lanes

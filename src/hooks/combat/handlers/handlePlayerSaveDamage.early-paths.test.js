@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Guard/early-return coverage for handlePlayerSaveDamage at the DIRECT handler
 // seam: target resolution, non-player target, and the careful-spell not-in-ally-list
 // bail-out (the seam where the handler must touch nothing — via the

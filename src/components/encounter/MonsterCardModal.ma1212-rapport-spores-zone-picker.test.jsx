@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1212/1217/1220: Myconid Adult/Sovereign/Sprout "Rapport Spores" ACTION-row →
 // the untouched MA-0043 zoneOnly area picker. The modal's own seam: chip click routes
 // handleZonePickerRow → handleLairZone({...action, save_dc:null}) — picker opens with

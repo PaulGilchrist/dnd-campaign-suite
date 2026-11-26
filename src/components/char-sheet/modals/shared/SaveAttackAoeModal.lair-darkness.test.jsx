@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0043 zoneOnly picker seam — Shroud of Darkness (canonical darkness lair
 // action, NO save). Render is inert: save-less copy (15-foot darkness, no DC
 // wording, GM-enforced dispel clause), caster excluded, ZERO writes. Confirm

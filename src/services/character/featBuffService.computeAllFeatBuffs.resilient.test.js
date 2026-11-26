@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // featBuffService.computeAllFeatBuffs.resilient.test.js — LANE #2021/9 of the featBuffService
 // nine-lane cluster (map in featBuffService.applyFeatBuffsToFormData.test.js header, #2016 law).
 // Subject seam: computeAllFeatBuffs (featBuffService.js:583-633) saveType resolution for the

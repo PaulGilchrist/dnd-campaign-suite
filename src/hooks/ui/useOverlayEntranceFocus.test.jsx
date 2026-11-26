@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Unit tier for useOverlayEntranceFocus (backlog 2026-11-17: sp-overlay choosers
 // left document.activeElement on BODY while open). Locks the composed house
 // idioms: DeleteConfirmModal first-focusable entrance pull (disabled skipped,

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1987: Simurgh "Purifying Blaze (Recharge 5-6)" save core live-verified
 // EXACT (DC 24 DEX, 12d10 Radiant, half-on-success RAW-correct default —
 // do NOT author dc_success) incl. live multi-target picker (60-foot Cone parses

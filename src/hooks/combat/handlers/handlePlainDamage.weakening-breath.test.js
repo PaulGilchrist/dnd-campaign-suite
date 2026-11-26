@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-0102: Weakening Breath damage-subtract consumer (handlePlainDamage lane).
 // While the afflicted attacker carries the weakening_breath te, each plain
 // damage roll rolls the te's damageSubtractDie once (monsters.json Adult Gold

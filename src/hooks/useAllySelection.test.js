@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // Behavior contract tests for the ally-selection helpers (useAllySelection.js),
 // exercised against the REAL runtime store (server-first pattern) with only the
 // network boundary (fetch) stubbed: get/set round trips through the

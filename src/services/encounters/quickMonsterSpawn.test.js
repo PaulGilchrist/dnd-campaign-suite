@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-19
 // Quick mob spawn service (roadmap Item 4). The heart of the acceptance is
 // REUSE: quickSpawnMonster runs the REAL encounterToInitiative join lane
 // (only its network/dice/log boundaries are mocked — same harness shape as

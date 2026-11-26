@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-02
 // Lane: CreatureCard control-delegation presentation (Phase 2).
 // Owned here: the GM-only control picker (NPC rows only, player options, dispatch
 // of assign/release), the auto-note for derived summon control, the LAN card-opening

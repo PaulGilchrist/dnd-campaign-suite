@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-17
+// @maintained-by-ai 2026-11-17: 2026-11-17
 // Shared purse rule (improve sheet-purse-read-face): extracted verbatim from
 // PartyInventory.jsx so the From Players pane and the sheet's read-only Purse row
 // share ONE implementation mirroring the server's characterCurrency() rule

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-17
 // Regression lock for bug-avatar-zoom-close-focus-stolen-by-card-autocomplete:
 // Initiative cards are keyed `${name}-${runtimeStateTick}`, so every tick
 // re-key, SSE echo, or overlay riding over the board REMOUNTS the GM rename

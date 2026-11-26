@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // seeInvisibilityService lane contract — triggerSeeInvisibility is the ONLY export
 // and the SOLE production producer of the 'see_invisibility' temp_buff action row
 // (grep "effect: 'see_invisibility'" non-test src => this file only; thirdEyeHandler.js

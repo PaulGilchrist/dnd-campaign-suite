@@ -6,7 +6,7 @@
 // Trigger identity, round latch, spend arithmetic and refusal logging live in
 // MonsterCardHelpers.gated-reaction.test.js — never restated here. Consumed→closed
 // is prop-derived at campaign seams; no wall-clock anywhere (strictly turn-based).
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';

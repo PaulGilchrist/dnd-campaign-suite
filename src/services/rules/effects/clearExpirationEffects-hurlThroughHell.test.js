@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // Regression tests for CLA-175: Hurl Through Hell incapacitated duration and
 // return-to-space resolution via the expiration queue.
 // Owner of the hurl_through_hell_return clear lane: condition + targetEffect

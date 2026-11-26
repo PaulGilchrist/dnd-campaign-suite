@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1739: Yeti "Chilling Gaze" (actions[3], DC 13 Constitution, 30 feet,
 // 5 (2d4) Cold + Paralyzed on fail) RAW pays NOTHING on success — "Success:
 // The target is immune to the Chilling Gaze of all yetis (but not abominable

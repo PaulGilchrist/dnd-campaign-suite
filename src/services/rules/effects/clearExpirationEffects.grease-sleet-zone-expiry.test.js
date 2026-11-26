@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // SP-056 WIRE IT lock (owner decision 2026-11-19): the grease/sleet zone
 // clocks (greaseAreaSaveHandler.handle.js:76 / sleetStormHandler.handle
 // .js:74 producers) must reach a real EXPIRATION_HANDLERS consumer — both

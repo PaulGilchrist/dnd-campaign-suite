@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // Backlog 2026-11-03 (CK): the map-row type badge used to be nested inside
 // .maps-manager-item-name with no whitespace, so screen readers and innerText
 // scans saw "The Colosseum PitIndoor". These tests pin the fix behaviourally:

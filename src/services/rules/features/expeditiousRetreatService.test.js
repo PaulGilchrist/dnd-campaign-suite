@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // SP-128 cast lane: expeditiousRetreatService.triggerExpeditiousRetreat body.
 // Owns "cast stamp + grant flag" (delegated VERBATIM by dashHandler.test.js:5-6
 // "cast stamp + grant flag → rules/features/expeditiousRetreatService.test.js"

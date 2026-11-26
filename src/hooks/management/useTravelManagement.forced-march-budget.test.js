@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-26
 // Regression: the exhaustion speed penalty must land on the day it is earned.
 // forcedMarch()/forceCamp()/changePace() write travel-forcedMarchHours in the
 // SAME tick they write travel-dailyBudget — when the budget rode the memoized

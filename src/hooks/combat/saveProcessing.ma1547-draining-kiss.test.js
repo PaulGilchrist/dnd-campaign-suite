@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1547: Succubus "Draining Kiss" SAVE-SEAM consumer — the §1096 save-path
 // twin of MA-1489's attack-lane hp_max_reduce seam; the authoritative save-path
 // HP-max-drain service integration (service-internals unit rides along here

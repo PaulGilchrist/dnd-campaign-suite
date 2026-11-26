@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0819: Giant Scorpion "Claw" — prose carries "If the target is a Large or
 // smaller creature, it has the Grappled condition (escape DC 13) from one of
 // two claws" but the row shipped WITHOUT hit_conditions/escape_dc, so the

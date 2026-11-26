@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-2054: Yamata no Orochi "Head's Vigil" (legendary_actions[2]) DATA fingerprint.
 // The MA-1974/MA-2002 ACTIVE-TRAP family: prose-only row starved of the MA-0051
 // ability_check key — the generic Expend chip spent a legendary use, hit the

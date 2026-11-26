@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-14
 // modalMap routing for the HoUoM in-sheet corpse chooser (backlog 2026-11-14
 // NP improve): executeHandler's {type:'modal', modalName:'handOfUltimateMercy'}
 // result must open handOfUltimateMercyModal with the producer payload passed

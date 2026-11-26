@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /* QA backlog 2026-11-24 (session-terminating log rows): the server stamps every
  * campaign log row from its LIVE sessionState at write time
  * (server/routes/log.js addEntry — pinned there by server/routes/log.test.js),

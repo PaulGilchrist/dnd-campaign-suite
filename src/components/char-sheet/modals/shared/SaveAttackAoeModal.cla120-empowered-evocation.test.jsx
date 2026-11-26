@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // CLA-120: Empowered Evocation save-AoE one-roll model — the picker rolls INT
 // onto the FIRST selected target's damage roll exactly once per cast (RAW: one
 // damage roll per spell); every other target rolls dice-only (CLA-279 shape).

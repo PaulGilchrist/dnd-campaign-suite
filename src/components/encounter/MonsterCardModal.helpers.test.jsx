@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // Behavioral tests for the condition-effect badge row in the monster card modal.
 //
 // Ownership audit (lane #573-#606 catch-all, re-verified Oct 2026):

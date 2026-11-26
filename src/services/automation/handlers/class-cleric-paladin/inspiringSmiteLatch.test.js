@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-200 regression — once-per-Divine-Smite latch (token lane only).
 // A single Divine Smite cast arms ONE 2d8+level Channel Divinity THP pool.
 // After the distributor is CONFIRMED (inspiringSmiteUsedToken stamped == the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 /**
  * SilenceModal — execution owner for the Silence spell popup.
  * Lane map (verified 2026-10-17):

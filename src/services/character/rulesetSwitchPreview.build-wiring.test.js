@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /**
  * Wiring lock for the over-cap ledger fix
  * (bug-ruleset-switch-ledger-persists-overcap-feats-skills):

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Home of the automationRouter type→bucket breadth matrix — per the family map in
 // automationCollector.coverage.test.js ("router bucket tables → automationCollector.types.test.js").
 // Fixtures are synthetic shapes pinning dispatch machinery, not disk content from public/data.

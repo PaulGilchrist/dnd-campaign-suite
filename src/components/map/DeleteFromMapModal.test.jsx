@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-01
 // Lane: DeleteFromMapModal — the descriptor→copy seam for the indoor map
 // editor's named confirm (backlog 2026-11-01 AZ2). OWNED here: the verbatim
 // copy both removal lanes show (`Delete "<label>" from the map?` for placed

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-27
 /*
  * TravelPanel — extreme-weather camp affordance (bug 2026-10-27-G).
  *

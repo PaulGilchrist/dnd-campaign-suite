@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // CLA-023 Avatar of Battle — disk-row-to-halving application lane.
 // Ticket contract: the 'Avatar of Battle' feature's verbatim automation envelope
 // (damageTypes B/P/S) halves matching damage at the compute seam.

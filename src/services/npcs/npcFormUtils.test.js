@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: custom-NPC form utilities — authoring defaults, save-time AC/HP
 // coercion, and attitude style lookup.
 // @app invariant: npcs.json is custom-NPC-only; these form defaults belong to

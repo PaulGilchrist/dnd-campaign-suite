@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MAINTENANCE PASS 2026-10-18: 6→3 tests. Data describe collapsed 3→1 BY-name
 // disk lock (fields + derivation + spells.json both paths in one pass). Modal
 // chip-detect folded into the gated-click test (args identity = the fix);

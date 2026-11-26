@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-1939: Ladon Constrict — live-verified FAIL(b)/DATA, two-field core fix.
 // Disk actions[2] carried attack_bonus 15 / 4d8 + 8 Bludgeoning / hit_conditions
 // ["grappled"] but NO escape_dc (grant reason rendered "Constrict (escape DC —)",

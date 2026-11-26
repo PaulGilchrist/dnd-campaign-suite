@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-22
+// @maintained-by-ai 2026-11-22: 2026-11-22
 /**
  * Deferred plan B — AiReadinessPanel: the click-only contract (mount fires
  * ZERO requests), chip derivation per check outcome, the honest listed/not-

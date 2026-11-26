@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-037: Bewitching Magic rides the StepsOfTheFeyTauntModal in its own mode —
 // unlimited free Misty Step confirm, never the 4-option chooser, never the
 // Steps_of_the_Fey free-cast counter, and every resolution logs.

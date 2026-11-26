@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-18
 // MA 2026-11-18 backlog (owner decision: auto-retire the damage-result popup at
 // rider-chain mount). The committed-damage face (popupHtml.damageApplied — the
 // hp_change row has ALREADY landed; the face is purely cosmetic) must never

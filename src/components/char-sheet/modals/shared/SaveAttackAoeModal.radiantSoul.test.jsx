@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // CLA-279: Radiant Soul save-AoE one-target model — +CHA folds onto the FIRST eligible
 // selected target's damage roll exactly once per cast, and the once-per-turn stamp plus
 // pending-target pointer are consumed at application (cla120 Empowered Evocation shape).

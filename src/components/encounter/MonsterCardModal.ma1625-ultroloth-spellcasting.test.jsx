@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-1625 data lock: Ultroloth Spellcasting (actions[3]) rode the
 // MA-0421/MA-1230/MA-1478/MA-1543/MA-1591 markup-gap family — the WHOLE
 // description was plain text on a SINGLE line with "; " tier separators:

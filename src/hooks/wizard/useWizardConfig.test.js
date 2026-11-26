@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // useWizardConfig is a stable, generic engine hook: config-driven slot fetching,
 // validation, and pre-select auto-merge. Every test here uses pure mocks and is
 // deterministic and order-independent (fresh mocks per test, unique preSelect stateKeys

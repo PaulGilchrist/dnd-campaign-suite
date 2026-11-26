@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * prismaticSpray SEXTET lane #1941 — canonical home for the internals of the
  * ONLY exported helper of prismaticSprayHandler.js: isPrismaticSprayBlocked

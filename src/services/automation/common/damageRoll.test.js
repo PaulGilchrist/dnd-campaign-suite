@@ -1,7 +1,7 @@
 // Scoped to rollDamageForAction (pure: diceRoller is the only collaborator).
 // buildAttackContextForDamage lanes live in buildAttackContext-map.test.js
 // and buildAttackContext-noMap.test.js — keep new tests out of this file.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Lane: description composition — own-contract of buildMasteryDescription (pure fn).
 // Sibling lanes own the handler paths that consume it (push/nick/postDamage/main).
 // Redundant, brittle, and low-value tests removed:

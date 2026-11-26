@@ -1,4 +1,4 @@
-// @maintained-by-ai — trimmed 2026-10-18: removed 16 duplicate legs per super-owner lane
+// @maintained-by-ai 2026-10-18 — trimmed 2026-10-18: removed 16 duplicate legs per super-owner lane
 // (9 exhausted dups :297/:405/:530/:707/:718/:840/:1035/:1091/:1545 → canonical :190,
 // 3 latch dups :418/:543/:731 → canonical :310, 4 cooldown dups :552/:740/:1047/:1173 →
 // canonical :427 incl. merged popup-wording). Distinct bytes absorbed into the canonical

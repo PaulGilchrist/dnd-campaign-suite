@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // CLA-357 regression: chooser modal + isWithinRange gate + te + refusal log +
 // raw `30_ft` token never leaks into popup/log prose.
 // Both exports are LIVE API surface: handle() is the automation/index.js registry

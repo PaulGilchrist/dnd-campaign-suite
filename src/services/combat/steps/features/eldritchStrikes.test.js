@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 /**
  * Feature-decision lane: steps/features/eldritchStrikes.js (CLA-109 fix).
  * Owns the weapon_attack_hit attack-rider decision bytes: the rider filter

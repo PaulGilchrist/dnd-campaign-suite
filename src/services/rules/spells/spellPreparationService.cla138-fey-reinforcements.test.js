@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // CLA-138 Fey Reinforcements (2024 Ranger/Fey Wanderer lv11) — CAST-time lane in
 // spellPreparationService: free-cast latch auth/consume + the no-Concentration quirk.
 // Provenance (disk, read via readFileSync below with drift-throw):

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // MA-0655/0658 self-buff BASE seam canon — Duergar "Enlarge" + "Invisibility".
 // One chip click: already-active latch → MA-0020 uses gate → spend FIRST
 // (double-spend guard) → register te ON SELF → ONE merged addExpiration

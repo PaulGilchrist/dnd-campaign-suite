@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 // rules.js FACADE-GLUE lane — owns ONLY the glue that lives inside rules.js and
 // that the real-graph lanes cannot see: module-selection dispatch (#1256 collapsed the
 // no-op ternaries), wrapper arity,

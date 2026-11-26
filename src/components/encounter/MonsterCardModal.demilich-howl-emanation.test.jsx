@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 // MA-0590 / MA-0603: authored "N-foot Emanation" RANGE rows (Demilich "Howl"
 // DC 19 CON 20d6 Psychic; Dire Worg "Dreadful Howl" DC 16 WIS 8d8 Psychic —
 // both Recharge 5-6) route the click through the same SaveAttackAoeModal area

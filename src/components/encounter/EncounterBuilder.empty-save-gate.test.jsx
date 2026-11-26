@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-24
 /* Lane: empty-draft save gate (backlog 2026-10-24 — EB saved zero-monster
  * encounters with effectiveXP 0 and toast-confirmed them). Clicking
  * "Save encounter" (and the "Update encounter" leg) with zero drafted monsters

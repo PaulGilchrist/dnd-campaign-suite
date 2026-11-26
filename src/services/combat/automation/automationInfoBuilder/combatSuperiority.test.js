@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // combatSuperiority.js builder-envelope unit lane (#2099) — this file owns the
 // per-maneuver ENVELOPE VALUES this module emits. Sibling lanes (cite, don't re-pin):
 // • routing breadth: automationCollector.types.test.js

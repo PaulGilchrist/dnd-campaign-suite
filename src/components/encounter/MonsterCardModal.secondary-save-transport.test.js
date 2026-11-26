@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-0427: the block-save transport must carry authored secondary damage
 // (monsters.json brazen-gorgon actions[2] damage_dice_secondary "3d8" Fire)
 // from the save chip through buildSaveOptions + buildAbilitySaveRollContext

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-24
 /* Lane — pool-row DELETE on the shared DeleteConfirmModal a11y tier (QA backlog
  * 2026-11-24: the Load-picker row trash retired its native window.confirm, which
  * blocked the whole automation lane until handled and gave the destructive action

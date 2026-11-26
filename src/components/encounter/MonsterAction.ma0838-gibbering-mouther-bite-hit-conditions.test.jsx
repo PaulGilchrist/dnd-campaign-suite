@@ -17,7 +17,7 @@
 // (attackRowMissingToHit), and clause class of this exact row are owned
 // generically by the mega lane (handlePlainDamage.hitClause.test.js:183-334)
 // and the ma0286 truth table — not re-derived here.
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-18
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';

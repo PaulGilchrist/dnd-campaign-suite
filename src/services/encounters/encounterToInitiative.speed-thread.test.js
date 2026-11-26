@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-09
 // Lane: EB join → combatSummary `speed` threading
 // (bug-movement-budget-caps-all-movers-at-30, monster face).
 //

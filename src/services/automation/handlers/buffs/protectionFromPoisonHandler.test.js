@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Unit tests for protectionFromPoisonHandler.js — deterministic pure-behaviour contract:
 // handle() popup payloads, applyProtectionFromPoison() runtime-store writes (exact payloads),
 // expiration registration, campaign log, and isProtectionFromPoisonActive() lookup.

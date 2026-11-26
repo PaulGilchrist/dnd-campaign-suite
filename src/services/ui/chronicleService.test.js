@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-25
 // Chronicle compose model (backlog Item 2): the deliberate include/exclude
 // entry-type set, session grouping, forward-time ordering, the unsessioned
 // bucket, session section dating, and the Markdown export built from the SAME

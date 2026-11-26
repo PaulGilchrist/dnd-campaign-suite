@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // Modal action mechanics only: loading/empty states, modal open/close,
 // delete-button visibility, and generate button state. Intentionally NOT
 // duplicated here (covered in sibling files):

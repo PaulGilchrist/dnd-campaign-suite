@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai 2026-10-15: 2026-10-15
 // MN-014: Precision Attack (trigger attack_roll_miss) was offered on HITS
 // because the hit-branch query only gated weapon/melee TYPE, never hit/miss.
 // These pins lock the two halves of the fix on the LIVE consumer lanes

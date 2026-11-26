@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 /**
  * banishment QUINTET seam map — five lanes share banishmentHandler.js:
  *  - #1872 banishmentHandler.handle.test.js — handle() core (L229-319): no-target popup,

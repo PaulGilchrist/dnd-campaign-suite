@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // L5-005 §9.2 — confirmed-ruling apply tests: gated lanes, refusals, audit.
 // Every mutating boundary (runtime store, log, dice, effect registry) is
 // mocked; the oracle lane stubs fetch to pin the server-roll URL contract.

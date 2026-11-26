@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-15
 // Deterministic unit contract for the Third Eye automation handler (2024 wizard feature):
 // already-active popup/refusal-log branches, option-selection modal payload, strict
 // buff-table writes to the runtime store, and unknown-option rejection. Both exports

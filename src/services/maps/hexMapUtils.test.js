@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-20
 // Lane: pure hex math/layout for pointy-top axial grids (SOLE OWNER — verified by consumer census).
 // Production consumers cite here for hex arithmetic and keep their own integration bytes:
 //   hexTerrainGenerator.js ................. getAllHexes/hexKey/hexNeighbors consumption

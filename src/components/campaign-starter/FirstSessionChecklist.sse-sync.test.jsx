@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-20
+// @maintained-by-ai 2026-11-02: 2026-11-20
 // Live-sync contract for the first-session checklist (improve starter-seed-
 // no-list-sse): every successful PUT /starter-seed (Regenerate in ANY tab,
 // create-time seed write) publishes `starter-seed-<campaign>` carrying the

@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // MA-1850 data lock: Archlich Spellcasting rode the MA-0421/MA-0611/MA-0619
 // twin markup-gap template. Pre-fix the WHOLE description was plain text —
 // extractors returned []/{} → SpellCastLinks null → ZERO .mc-dice-link-spell

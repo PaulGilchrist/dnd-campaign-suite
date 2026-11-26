@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-17
 // ---------------------------------------------------------------------------
 // CharSheet modal CANCEL/SKIP lane (render + close-without-dispatch).
 // Each shape-change / Shield of Faith popup must render its modal with the

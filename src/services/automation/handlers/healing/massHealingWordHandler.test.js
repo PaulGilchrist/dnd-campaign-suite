@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-16
 // Opener lane of the massHealingWord trio (#1822; siblings: confirm #1820 maintained, #1821 deleted
 // as factory dupes). massHealingWordHandler.js is a 12-line config wrapper around
 // massHealUtils.createMassHealHandler. The shared opener contract inside the factory

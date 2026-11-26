@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-21
 //
 // DEATH-SAVES lane (#1399: "deathSaves owns the downstream slot machine").
 // Pins ONLY handleDeathSaveResult (relentlessRageService.js:151-188), the

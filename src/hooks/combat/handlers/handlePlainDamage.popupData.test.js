@@ -1,4 +1,4 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-10-19
 // Lane: handlePlainDamage — popup PAYLOAD BYTES owner (#744 write count, #789/#825 byte-exact census).
 // Module under test: src/hooks/combat/handlers/handlePlainDamage.js (reached via createLogDamageAndShow,
 // src/hooks/combat/useLoggedDiceRollDamage.js). NOT services/automation/handlers/combat/multiTargetHandler.js

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai 2026-10-14: 2026-10-14
 // MA-1656: Vampire Umbral Lord "Hunger of Hadar" SAVE-seam consumer lock.
 // Row data (monsters.json actions[3]): DEX save DC 18, dc_success:"none",
 // damage_dice_primary 4d6 Acid, save_effect Blinded (GM-enforced while inside
