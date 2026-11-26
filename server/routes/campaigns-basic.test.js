@@ -180,6 +180,13 @@ describe('campaignsBasic - GET /api/campaigns', () => {
 
 // ─── /api/campaigns/:campaign ──────────────────────────────────────────────────
 
+// Root `.json` files are only listed when they parse as character documents
+// (non-empty `name` — see isCharacterDocument); tests exercising the listing
+// must seed their contents via MOCK_FILES.
+function setupCharacter(fileName, name) {
+    MOCK_FILES.set(`/mock/campaigns/root/test-campaign/${fileName}`, JSON.stringify({ name }));
+}
+
 describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
     afterEach(clearMockFs);
 
@@ -188,6 +195,8 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
             dirEntry('character1.json', false),
             dirEntry('character2.json', false),
         ]);
+        setupCharacter('character1.json', 'Character One');
+        setupCharacter('character2.json', 'Character Two');
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -205,6 +214,9 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
             dirEntry('alpha.json', false),
             dirEntry('middle.json', false),
         ]);
+        setupCharacter('zebra.json', 'Zebra');
+        setupCharacter('alpha.json', 'Alpha');
+        setupCharacter('middle.json', 'Middle');
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -221,6 +233,7 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
             dirEntry('character.txt', false),
             dirEntry('data.csv', false),
         ]);
+        setupCharacter('character.json', 'Character');
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -266,6 +279,7 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
         setupReaddir('/mock/campaigns/root/my-special-campaign', [
             dirEntry('character.json', false),
         ]);
+        MOCK_FILES.set('/mock/campaigns/root/my-special-campaign/character.json', JSON.stringify({ name: 'Character' }));
 
         const app = createTestApp();
         await request(app).get('/api/campaigns/my-special-campaign');
