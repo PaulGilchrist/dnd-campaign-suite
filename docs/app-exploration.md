@@ -51,7 +51,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-26 (hex WSAD hint vs clamp reality):** the `.hex-map-keyboard-hint` chip ("WASD/arrows to pan · +/- to zoom · Shift 2× · R to reset view") stays fully lit at FIT zoom on small boards where `clampHexPan` pins pan — a first-time key press honestly moves nothing with zero feedback. Consider dimming/hiding the pan clause (or the chip) while the view is clamp-pinned, mirroring how affordances elsewhere signal unavailability. Paths: `src/components/hex-map/HexMap.jsx:769`, `services/maps/hexViewMath.js`.
 - **2026-11-26 (R law is surface-dependent):** indoor 2D R restores the STORED viewBox, hex 2D R jumps to `VIEW_RESET_ZOOM` centered (losing the saved view and — via autosave — persisting that loss into the map doc). Same keystroke, two opposite contracts on adjacent boards; if the hex behavior stays, the hint should say "R to re-center". Not filed as a bug — plausible design split, needs owner intent before it becomes one.
 - **2026-11-26 (wizard toll focus law):** after the re-arm bug is fixed, consider moving initial focus into `DiscardDraftDialog`… already on Cancel — fine; the ACTUAL friction: the toll's Cancel/`Yes, Discard` buttons are unstyled generic `<button>`s on the `modal-shell` tier while every other confirm in the app family renders `.ct-btn`/`.delete-confirm-btn` — visually quiet for a destructive answer. Cosmetic only. Paths: `src/components/common/DeleteConfirmModal.jsx:143-148`.
 

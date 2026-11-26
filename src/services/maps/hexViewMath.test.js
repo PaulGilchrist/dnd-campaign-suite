@@ -9,7 +9,7 @@ import {
 } from '../../config/outdoorConfig.js';
 import {
     hexGridPixelBounds, clampHexPan, centerHexView, fitHexView,
-    HEX_FIT_INSET_PX, HEX_FIT_VERSION, VIEW_RESET_ZOOM,
+    HEX_FIT_INSET_PX, HEX_FIT_VERSION, VIEW_RESET_ZOOM, isHexPanClampPinned,
 } from './hexViewMath.js';
 
 // Owner fixture shape: poi-showcase (gridSize 8 → 16 cols × 8 rows).
@@ -134,5 +134,36 @@ describe('clampHexPan inverted bracket (whole span fits the viewport)', () => {
         const maxPanY = b.offsetY + b.height - (GRID_SIZE / 4 - 1 || 0.5) * 1.5 * HEX_SIZE - viewH;
         expect(clamped.x).toBe(maxPanX < minPanX ? b.centerX - viewW / 2 : Math.min(maxPanX, Math.max(minPanX, px)));
         expect(clamped.y).toBe(maxPanY < minPanY ? b.centerY - viewH / 2 : Math.min(maxPanY, Math.max(minPanY, py)));
+    });
+});
+
+// Hex WSAD hint backlog 2026-11-26: the chip dims its pan clause while the
+// clamp pins pan. The predicate must agree with the handler's own clamp math:
+// pinned ⟺ every pan delta answers with the same centered value.
+describe('isHexPanClampPinned', () => {
+    const b = hexGridPixelBounds(HEX_COLS, GRID_SIZE);
+
+    it('pinned at fit-regime zoom (whole board fits the viewport)', () => {
+        const fit = fitHexView(HEX_COLS, GRID_SIZE, 1548, 895);
+        expect(isHexPanClampPinned(b, GRID_SIZE, fit.zoom)).toBe(true);
+    });
+
+    it('mobile after zooming in past the fit regime (VIEW_RESET_ZOOM)', () => {
+        expect(isHexPanClampPinned(b, GRID_SIZE, VIEW_RESET_ZOOM)).toBe(false);
+    });
+
+    it('pinned ⟺ clampHexPan answers extreme pan deltas identically', () => {
+        // Two regimes, two grid sizes: whenever the predicate says pinned,
+        // opposite huge deltas clamp to byte-identical values (zero feedback
+        // for the key press); whenever it says mobile, some axis moves.
+        for (const [cols, rows] of [[HEX_COLS, GRID_SIZE], [24, 12]]) {
+            const bounds = hexGridPixelBounds(cols, rows);
+            for (const zoom of [0.95, 1, 1.2, 1.6, 2, 4]) {
+                const pinned = isHexPanClampPinned(bounds, rows, zoom);
+                const a = clampHexPan(bounds, rows, zoom, -1e6, -1e6);
+                const c = clampHexPan(bounds, rows, zoom, 1e6, 1e6);
+                expect(pinned).toBe(a.x === c.x && a.y === c.y);
+            }
+        }
     });
 });

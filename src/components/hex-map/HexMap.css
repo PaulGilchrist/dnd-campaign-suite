@@ -1447,3 +1447,15 @@
 [data-theme="light"] .hex-map .hex-map-keyboard-hint {
     color: #667;
 }
+
+/* Pan clause while clampHexPan pins pan (fit-regime zoom on small boards):
+   WASD/arrows honestly move nothing, so the clause dims to the same
+   unavailable-affordance opacity as the hex CSS disabled buttons
+   (.travel-btn-advance:disabled). Un-dims live once zoom frees the brackets. */
+.hex-map .hex-map-keyboard-hint .hex-map-hint-pan {
+    transition: opacity 0.15s;
+}
+
+.hex-map .hex-map-keyboard-hint .hex-map-hint-pan-pinned {
+    opacity: 0.4;
+}

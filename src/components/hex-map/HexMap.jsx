@@ -8,7 +8,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
-import { VIEW_RESET_ZOOM, HEX_FIT_INSET_PX, HEX_FIT_VERSION, fitHexView } from '../../services/maps/hexViewMath.js';
+import { VIEW_RESET_ZOOM, HEX_FIT_INSET_PX, HEX_FIT_VERSION, fitHexView, hexGridPixelBounds, isHexPanClampPinned } from '../../services/maps/hexViewMath.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -177,6 +177,19 @@ function consumeMountFit({
     setPanX(fit.panX);
     setPanY(fit.panY);
     return true;
+}
+
+// Class for the keyboard-hint chip's pan clause (hex WSAD hint backlog
+// 2026-11-26): at fit-regime zoom BOTH clampHexPan brackets are inverted, so
+// WASD/arrows honestly move nothing — the clause dims to signal that. The
+// predicate reads the SAME pure clamp math as the pan handler (via
+// hexViewMath), derives from live zoom, and un-dims the moment zooming in
+// frees an axis. Hoisted out of HexMap's body per the consumeMountFit
+// max-statements precedent.
+function hintPanClauseClass(hexCols, hexRows, zoom) {
+    return isHexPanClampPinned(hexGridPixelBounds(hexCols, hexRows), hexRows, zoom)
+        ? 'hex-map-hint-pan hex-map-hint-pan-pinned'
+        : 'hex-map-hint-pan';
 }
 
 // The one view-normalize layout pass (was inline in HexMap's body; hoisted per
@@ -765,10 +778,14 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
                 call site adds zero branches. */}
             <MapDescriptionPanel mapData={mapLoader.mapData} />
             {/* Keyboard camera hint (owner 2026-11-25) — same chip as the
-                indoor 2D/3D lanes; keys work with no pointer focus. */}
+                indoor 2D/3D lanes; keys work with no pointer focus. The pan
+                clause carries a semantic modifier while clampHexPan pins pan
+                (fit-regime zoom on small boards) so the chip never advertises
+                a keystroke that moves nothing. */}
             <div className="hex-map-keyboard-hint no-print">
                 <i className="fa-solid fa-circle-info"></i>
-                <span>WASD/arrows to pan · +/- to zoom · Shift 2× · R to reset view</span>
+                <span className={hintPanClauseClass(hexCols, hexRows, zoom)}>WASD/arrows to pan</span>
+                <span>· +/- to zoom · Shift 2× · R to reset view</span>
             </div>
 
             {loading ? (
