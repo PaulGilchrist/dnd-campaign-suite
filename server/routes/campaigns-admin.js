@@ -456,9 +456,33 @@ function selectRollbackSnapshot(campaign, snapshots, requested) {
     return { filename: requested };
 }
 
+// A persisted '__map__' slug is only promotable back into activeMaps when it
+// names a plain map file (no path segments — mirrors isSafeSnapshotName's
+// separator discipline). Uploads and hand-edited snapshots can carry anything.
+function isPlausibleMapSlug(slug) {
+    return typeof slug === 'string' && slug !== ''
+        && !slug.includes('/') && !slug.includes('\\') && !slug.includes('..');
+}
+
 function reloadCampaign(campaign) {
     readFile();
     logCache.delete(campaign);
+    // The in-memory active-map pointer must roll back with the disk too
+    // (playtest-snapshot gap, 2026-11-25): rollback/upload replace the maps
+    // folder — the staged `travel-encounter-stage` doc is deleted with it —
+    // but activeMaps survived, so GET /active-map kept naming a ghost file
+    // and the GM's honest Deactivate of the restored active map 409'd.
+    // Reconcile from the freshly reloaded '__map__' change-data value (the
+    // same dual-source truth the maps delete/rename lanes reconcile) and keep
+    // that slug ONLY if the restored folder actually holds the file;
+    // otherwise null the pointer, like the admin clear lanes.
+    const restored = characterChangeData.get(campaign)?.__map__?.activeMapName;
+    if (isPlausibleMapSlug(restored)
+        && fs.existsSync(path.join(campaignMapsDir(campaign), `${restored}.json`))) {
+        activeMaps.set(campaign, restored);
+    } else {
+        activeMaps.delete(campaign);
+    }
     publish(`reload-${campaign}`, null, campaign);
 }
 
