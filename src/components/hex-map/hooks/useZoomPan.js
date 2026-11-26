@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
 import useHeldKeys from '../../../hooks/ui/useHeldKeys.js';
 import {
-    hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM,
+    hexGridPixelBounds, clampHexPan, centerHexView, resolveHexResetView,
 } from '../../../services/maps/hexViewMath.js';
 
 // Keyboard camera speeds — shared contract with the indoor lane
@@ -11,7 +11,7 @@ import {
 const KEY_PAN_PX_PER_SEC = 900;
 const KEY_ZOOM_RATE = 0.9;
 
-function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled = false }) {
+function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled = false, storedViewRef = null }) {
     const [panning, setPanning] = useState(null);
 
     const zoomValueRef = useRef(MIN_ZOOM);
@@ -59,12 +59,18 @@ function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, pa
         });
     }, [centerView, setZoom, setPanX, setPanY]);
 
+    // Reset law (owner 2026-11-26, unified with the indoor contract): R and the
+    // toolbar button restore the doc's stored/mount-adopted view bytes — the
+    // loader's storedViewRef (restated by the mount auto-fit) — NOT a
+    // VIEW_RESET_ZOOM re-center, which used to discard the saved view and
+    // persist that loss through the autosave. No adopted view yet (fresh doc)
+    // → the pure seam answers with the legacy centered reset geometry.
     const resetView = useCallback(() => {
-        const clamped = centerView(VIEW_RESET_ZOOM);
-        setZoom(VIEW_RESET_ZOOM);
-        setPanX(clamped.x);
-        setPanY(clamped.y);
-    }, [centerView, setZoom, setPanX, setPanY]);
+        const target = resolveHexResetView(storedViewRef && storedViewRef.current, hexCols, hexRows);
+        setZoom(target.zoom);
+        setPanX(target.panX);
+        setPanY(target.panY);
+    }, [storedViewRef, hexCols, hexRows, setZoom, setPanX, setPanY]);
 
     // ── Keyboard camera lane (trackpad game-day, owner 2026-11-25) ──
     // Same contract as the indoor lane: held keys move at a constant SCREEN

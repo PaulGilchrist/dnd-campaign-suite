@@ -8,7 +8,7 @@ import {
     HEX_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, MAX_ZOOM,
 } from '../../config/outdoorConfig.js';
 import {
-    hexGridPixelBounds, clampHexPan, centerHexView, fitHexView,
+    hexGridPixelBounds, clampHexPan, centerHexView, fitHexView, resolveHexResetView,
     HEX_FIT_INSET_PX, HEX_FIT_VERSION, VIEW_RESET_ZOOM, isHexPanClampPinned,
 } from './hexViewMath.js';
 
@@ -164,6 +164,37 @@ describe('isHexPanClampPinned', () => {
                 const c = clampHexPan(bounds, rows, zoom, 1e6, 1e6);
                 expect(pinned).toBe(a.x === c.x && a.y === c.y);
             }
+        }
+    });
+});
+
+// Unified hex R law (owner decision 2026-11-26, mirrors the indoor contract):
+// R / toolbar Reset restores the map doc's stored (mount-adopted) view bytes,
+// NOT the VIEW_RESET_ZOOM center. The legacy reset geometry survives ONLY as
+// the no-stored-view fallback (fresh create / rejected render, before the
+// needsResetViewRef settle claims any view).
+describe('resolveHexResetView (R = restore the stored view)', () => {
+    it('stored view present → those exact bytes win, verbatim', () => {
+        // poi-showcase's real stored (mount-fit adopted) bytes.
+        const stored = { zoom: 0.9483204134366925, panX: -53.589746375870845, panY: -40.21798365122615 };
+        expect(resolveHexResetView(stored, HEX_COLS, GRID_SIZE)).toEqual(stored);
+    });
+
+    it('stored view present → never the VIEW_RESET_ZOOM-centered geometry', () => {
+        const legacy = { zoom: VIEW_RESET_ZOOM, ...centerHexView(HEX_COLS, GRID_SIZE, VIEW_RESET_ZOOM) };
+        const stored = { zoom: 3.5, panX: 210.25, panY: 44.125 };
+        const target = resolveHexResetView(stored, HEX_COLS, GRID_SIZE);
+        expect(target).toEqual(stored);
+        expect(target).not.toEqual(legacy);
+        expect(target.zoom).not.toBe(VIEW_RESET_ZOOM);
+    });
+
+    it('no stored view (fresh doc) → the legacy centered VIEW_RESET_ZOOM fallback', () => {
+        const centered = centerHexView(HEX_COLS, GRID_SIZE, VIEW_RESET_ZOOM);
+        for (const none of [null, undefined]) {
+            expect(resolveHexResetView(none, HEX_COLS, GRID_SIZE)).toEqual({
+                zoom: VIEW_RESET_ZOOM, panX: centered.x, panY: centered.y,
+            });
         }
     });
 });

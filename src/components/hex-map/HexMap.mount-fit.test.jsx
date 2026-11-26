@@ -104,6 +104,7 @@ function makeMapLoader(overrides = {}) {
         setZoom: vi.fn(), setPanX: vi.fn(), setPanY: vi.fn(),
         heldFitVersion: null, claimMountFitStamp: vi.fn(),
         needsResetViewRef: { current: false },
+        storedViewRef: { current: null },
         hexMapNameRef: { current: 'mount-fit-map' },
         hexMapDisplayNameRef: { current: 'Mount Fit Map' },
         ...overrides,
@@ -187,6 +188,11 @@ describe('HexMap mount auto-fit decision (fitVersion law)', () => {
         expect(loader.setZoom).toHaveBeenCalledWith(fit.zoom);
         expect(loader.setPanX).toHaveBeenCalledWith(fit.panX);
         expect(loader.setPanY).toHaveBeenCalledWith(fit.panY);
+        // Unified hex R law (owner 2026-11-26): the fitted bytes ARE the doc's
+        // mount-adopted view — the fit restates the R/reset target ref in the
+        // same commit as the stamp claim, so R restores these, not a
+        // VIEW_RESET_ZOOM re-center.
+        expect(loader.storedViewRef.current).toEqual(fit);
     });
 
     it('stale-stamped doc (older fitVersion): refits and restamps via the same single claim', () => {
@@ -196,6 +202,7 @@ describe('HexMap mount auto-fit decision (fitVersion law)', () => {
         const fit = fitHexView(HEX_COLS, GRID_SIZE, RECT.width, RECT.height);
         expect(loader.claimMountFitStamp).toHaveBeenCalledTimes(1);
         expect(loader.setZoom).toHaveBeenCalledWith(fit.zoom);
+        expect(loader.storedViewRef.current).toEqual(fit);
     });
 
     it('the fit is one-shot per board-open: a later pass (interaction re-render) never re-fits', () => {

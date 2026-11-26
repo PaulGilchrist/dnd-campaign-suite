@@ -50,7 +50,7 @@ const setup = (overrides = {}) => {
         hostRef.zoom = zoom;
         hostRef.panX = panX;
         hostRef.panY = panY;
-        return useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY });
+        return useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, storedViewRef: overrides.storedViewRef });
     });
 
     return { ...utils, svgRef, hostRef };
@@ -165,7 +165,8 @@ describe('useZoomPan', () => {
         act(() => { for (let i = 0; i < 25; i++) result.current.zoomOut(); });
         expect(hostRef.zoom).toBe(MIN_ZOOM);
 
-        // resetView returns to the default zoom, grid centered.
+        // No stored view (fresh-doc lane): resetView answers the legacy
+        // default zoom, grid centered.
         // Golden: clamped centered pan for a 10x10 grid at VIEW_RESET_ZOOM —
         // the horizontal bracket is INVERTED there (the whole grid span fits
         // the view), so the board centers; the old min-of-max saturated at the
@@ -175,6 +176,28 @@ describe('useZoomPan', () => {
         expect(hostRef.zoom).toBe(VIEW_RESET_ZOOM);
         expect(hostRef.panX).toBeCloseTo(162.3798, 3);
         expect(hostRef.panY).toBeCloseTo(86.25, 3);
+    });
+
+    // Unified hex R law (owner 2026-11-26): a loaded doc's stored/mount-adopted
+    // view (the loader's storedViewRef) is the reset target — byte-verbatim, so
+    // R round-trips the autosave envelope back to the doc's own stored truth.
+    // The stored-bytes-win / fallback derivation itself is pinned purely in
+    // services/maps/hexViewMath.test.js; this tier pins the WIRING.
+    it('resetView restores the stored/mount-adopted view bytes verbatim', () => {
+        const stored = { zoom: 0.9483204134366925, panX: -53.589746375870845, panY: -40.21798365122615 };
+        const { result, hostRef } = setup({
+            initialZoom: 4, initialPanX: 300, initialPanY: 150,
+            storedViewRef: { current: stored },
+        });
+        act(() => { result.current.resetView(); });
+        expect(hostRef.zoom).toBe(stored.zoom);
+        expect(hostRef.panX).toBe(stored.panX);
+        expect(hostRef.panY).toBe(stored.panY);
+        // NOT the retired law's VIEW_RESET_ZOOM-centered geometry.
+        expect(hostRef.zoom).not.toBe(VIEW_RESET_ZOOM);
+        const legacyCenter = result.current.centerView(VIEW_RESET_ZOOM);
+        expect(hostRef.panX).not.toBe(legacyCenter.x);
+        expect(hostRef.panY).not.toBe(legacyCenter.y);
     });
 
     it('pans on left-drag with viewBox-scaled deltas, clamps, ends, and detaches safely', () => {
@@ -302,7 +325,7 @@ vi.mock('../../../hooks/ui/useHeldKeys.js', () => ({
     default: (opts) => { keyLane.opts = opts; },
 }));
 
-const armedSetup = () => {
+const armedSetup = (overrides = {}) => {
     const svgRef = createSvgRef();
     const hostRef = { zoom: 2, panX: 0, panY: 0 };
     const utils = renderHook(() => {
@@ -312,7 +335,7 @@ const armedSetup = () => {
         hostRef.zoom = zoom;
         hostRef.panX = panX;
         hostRef.panY = panY;
-        return useZoomPan({ svgRef, hexCols: 10, hexRows: 10, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: true });
+        return useZoomPan({ svgRef, hexCols: 10, hexRows: 10, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: true, storedViewRef: overrides.storedViewRef });
     });
     return { ...utils, svgRef, hostRef };
 };
@@ -365,7 +388,7 @@ describe('useZoomPan keyboard lane (hex)', () => {
         expect(hostRef.zoom).toBe(MIN_ZOOM);
     });
 
-    it('R commits the toolbar reset view', () => {
+    it('R commits the toolbar reset view (no stored view → legacy reset geometry)', () => {
         const { result, hostRef } = armedSetup();
         keyFrame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
         act(() => { keyLane.opts.onAction('reset'); });
@@ -373,5 +396,19 @@ describe('useZoomPan keyboard lane (hex)', () => {
         expect(hostRef.zoom).toBe(VIEW_RESET_ZOOM);
         expect(hostRef.panX).toBe(centered.x);
         expect(hostRef.panY).toBe(centered.y);
+    });
+
+    it('R restores the stored/mount-adopted view when one exists (unified law)', () => {
+        const stored = { zoom: 1.37, panX: 250.5, panY: 77.25 };
+        const { result, hostRef } = armedSetup({ storedViewRef: { current: stored } });
+        keyFrame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
+        act(() => { keyLane.opts.onAction('reset'); });
+        expect(hostRef.zoom).toBe(stored.zoom);
+        expect(hostRef.panX).toBe(stored.panX);
+        expect(hostRef.panY).toBe(stored.panY);
+        // The retired VIEW_RESET_ZOOM-center law must NOT answer when a
+        // stored view exists.
+        expect(hostRef.zoom).not.toBe(VIEW_RESET_ZOOM);
+        expect(hostRef.panX).not.toBe(result.current.centerView(VIEW_RESET_ZOOM).x);
     });
 });

@@ -122,6 +122,23 @@ export function centerHexView(hexCols, hexRows, targetZoom) {
     return clampHexPan(bounds, hexRows, targetZoom, cx, cy);
 }
 
+// The R / toolbar-reset target (owner decision 2026-11-26: the hex law UNIFIES
+// with the indoor contract — R restores the map doc's STORED view, retiring the
+// old jump-to-VIEW_RESET_ZOOM-center split). `storedView` is the view bytes the
+// loader ADOPTED at mount for this document: the stored zoom/panX/panY verbatim
+// for a stamped doc, and the one-shot mount auto-fit's bytes once a stale doc's
+// fit has landed (consumeMountFit restates this ref in the same commit as the
+// stamp claim). Those bytes are already clamped/settled, so the reset rewrites
+// exactly what the doc persists — pressing R round-trips the envelope to its
+// own stored truth (zero drift through the autosave). Only with NO adopted view
+// yet (fresh create/rejected render, before the needsResetViewRef settle) does
+// the legacy reset geometry answer: zoom VIEW_RESET_ZOOM, board centered.
+export function resolveHexResetView(storedView, hexCols, hexRows) {
+    if (storedView) return { zoom: storedView.zoom, panX: storedView.panX, panY: storedView.panY };
+    const centered = centerHexView(hexCols, hexRows, VIEW_RESET_ZOOM);
+    return { zoom: VIEW_RESET_ZOOM, panX: centered.x, panY: centered.y };
+}
+
 // Whole-board auto-fit for a viewport of `viewportWidth × viewportHeight` CSS
 // px (the mounted <svg>'s bounding rect), keeping `insetPx` free on every edge
 // so no POI hit-rect is ever parked at the viewport/toolbar boundary.

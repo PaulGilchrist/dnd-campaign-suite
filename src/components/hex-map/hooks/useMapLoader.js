@@ -261,6 +261,9 @@ function applyExistingMap(existing, mapName, characters, ctx) {
     ctx.setZoom(settledView.zoom);
     ctx.setPanX(settledView.panX);
     ctx.setPanY(settledView.panY);
+    // The R/reset target for this session: the bytes the board mounted on
+    // (stored view clamped — a byte-identity for a settled document).
+    ctx.storedViewRef.current = settledView;
     ctx.hexMapDisplayNameRef.current = existing.displayName || mapName;
     if (existing.weather) ctx.setWeather(existing.weather);
 
@@ -342,6 +345,9 @@ function renderFreshMap(mapName, characters, ctx) {
     ctx.setPanX(0);
     ctx.setPanY(0);
     ctx.needsResetViewRef.current = true;
+    // No stored view for a fresh document — R falls back to the legacy
+    // centered VIEW_RESET_ZOOM geometry the needsResetViewRef pass settles to.
+    ctx.storedViewRef.current = null;
     // A fresh map's display name is its own mapName — reclaim it so an
     // in-place switch cannot carry the previous map's displayName into the
     // new map's save envelope (#801).
@@ -478,6 +484,16 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
 
     const isInitialized = useRef(false);
     const needsResetViewRef = useRef(false);
+    // The view bytes this session ADOPTED at mount for the held document
+    // (unified hex R law, owner 2026-11-26): settleLoadedView's output in
+    // applyExistingMap, restated by HexMap's consumeMountFit the instant a
+    // stale doc's one-shot mount auto-fit lands, and null on the fresh/
+    // rejected render (no stored view yet — resolveHexResetView answers with
+    // the legacy centered VIEW_RESET_ZOOM geometry the needsResetViewRef pass
+    // settles to anyway). useZoomPan's resetView reads ONLY this ref, so R
+    // restores the doc's own stored truth instead of re-centering it away —
+    // the indoor R contract, mirrored.
+    const storedViewRef = useRef(null);
     // Name of the map whose BYTES this instance currently holds in state —
     // null until a load resolves, re-claimed on every load of a NEW name
     // (#801: it used to be seeded from the mount prop and never written
@@ -590,7 +606,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
             heldMapTypeRef,
             travelStateRef, lastSavedRef, resumedTripRef,
-            awaitingFirstEditRef, carriedStampRef,
+            awaitingFirstEditRef, carriedStampRef, storedViewRef,
         };
 
         const loadMap = async () => {
@@ -743,7 +759,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
         panX, setPanX,
         panY, setPanY,
         heldFitVersion, claimMountFitStamp,
-        needsResetViewRef,
+        needsResetViewRef, storedViewRef,
         hexMapNameRef,
         hexMapDisplayNameRef,
     };

@@ -162,7 +162,7 @@ const travelAwaitingDestination = (panelOpen, travelMode, destination) =>
 // max-statements precedent.
 function consumeMountFit({
     loading, svgRef, hexCols, hexRows, heldFitVersion, claimMountFitStamp,
-    autoFitArmedRef, needsResetViewRef, setZoom, setPanX, setPanY,
+    autoFitArmedRef, needsResetViewRef, storedViewRef, setZoom, setPanX, setPanY,
 }) {
     if (loading) { autoFitArmedRef.current = true; return false; }
     if (!autoFitArmedRef.current || !svgRef.current) return false;
@@ -173,6 +173,10 @@ function consumeMountFit({
     needsResetViewRef.current = false;
     const fit = fitHexView(hexCols, hexRows, rect.width, rect.height);
     claimMountFitStamp();
+    // The fitted bytes ARE this doc's mount-adopted view from here on (they
+    // persist with the stamp): restate the R/reset target in the same commit
+    // (unified hex R law, owner 2026-11-26).
+    storedViewRef.current = fit;
     setZoom(fit.zoom);
     setPanX(fit.panX);
     setPanY(fit.panY);
@@ -197,11 +201,11 @@ function hintPanClauseClass(hexCols, hexRows, zoom) {
 // the legacy one-shot centering reset, then the per-commit pan clamp.
 function applyHexViewPass({
     loading, svgRef, hexCols, hexRows, zoom, panX, panY, heldFitVersion, claimMountFitStamp,
-    autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
+    autoFitArmedRef, needsResetViewRef, storedViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
 }) {
     if (consumeMountFit({
         loading, svgRef, hexCols, hexRows, heldFitVersion, claimMountFitStamp,
-        autoFitArmedRef, needsResetViewRef, setZoom, setPanX, setPanY,
+        autoFitArmedRef, needsResetViewRef, storedViewRef, setZoom, setPanX, setPanY,
     })) return;
     if (needsResetViewRef.current) {
         needsResetViewRef.current = false;
@@ -269,7 +273,7 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
         panX, setPanX,
         panY, setPanY,
         heldFitVersion, claimMountFitStamp,
-        needsResetViewRef,
+        needsResetViewRef, storedViewRef,
     } = mapLoader;
 
     const hexCols = gridSize * GRID_COLS_MULTIPLIER;
@@ -281,7 +285,7 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     // Declared ABOVE the zoom lane so the keyboard camera keys arm ONLY in
     // 2D mode (the 3D diorama runs its own key lane).
     const [viewMode, setViewMode] = useState('2d');
-    const zoomPan = useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: viewMode === '2d' });
+    const zoomPan = useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY, keyboardEnabled: viewMode === '2d', storedViewRef });
     const { svgWidth, svgHeight, zoomIn, zoomOut, resetView, clampPan, centerView,
         panning, handlePanStart, handlePanMove, handlePanEnd, handleWheel } = zoomPan;
 
@@ -552,9 +556,9 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
         applyHexViewPass({
             loading, svgRef, hexCols, hexRows, zoom, panX, panY,
             heldFitVersion, claimMountFitStamp,
-            autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
+            autoFitArmedRef, needsResetViewRef, storedViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
         });
-    }, [loading, zoom, panX, panY, gridSize, hexCols, hexRows, heldFitVersion, claimMountFitStamp, clampPan, centerView, setZoom, setPanX, setPanY, needsResetViewRef]);
+    }, [loading, zoom, panX, panY, gridSize, hexCols, hexRows, heldFitVersion, claimMountFitStamp, clampPan, centerView, setZoom, setPanX, setPanY, needsResetViewRef, storedViewRef]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX, top: panY,
