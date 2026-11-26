@@ -16,6 +16,17 @@ export default function useWizardEscape(onRequestClose) {
     useEffect(() => {
         const onKey = (e) => {
             if (e.key !== 'Escape') return;
+            // Event-based suppression (bug-wizard-discard-toll-escape-rearm-loop):
+            // a keydown that ORIGINATED inside a role="dialog" belongs to that
+            // dialog's own Escape lane (DeleteConfirmModal answers KEEP at the
+            // #root React delegate). React 19 flushes that discrete-event update
+            // synchronously WITHIN the root handler, so by the time this same
+            // keydown bubbles to window the toll may already be UNMOUNTED — the
+            // DOM census below then false-sees "no dialog" and re-arms a
+            // byte-identical toll forever. closest() walks the detached
+            // subtree's parent chain (attributes survive the unmount), so the
+            // origin test still holds after the flush.
+            if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;
             if (document.querySelector('[role="dialog"]')) return;
             onRequestClose();
         };

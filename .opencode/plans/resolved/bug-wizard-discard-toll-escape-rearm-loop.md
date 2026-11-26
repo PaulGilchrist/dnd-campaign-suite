@@ -37,3 +37,18 @@ Make the suppression guard event-based, not DOM-timing-based: in `useWizardEscap
 
 ## Severity
 Minor UX issue (keyboard-trap on a shipped modal family + a false documented law); no data-integrity risk because every re-arm settles KEEP and zero writes occur.
+
+## Resolution
+FIXED 2026-11-26 (fix run). The diagnosis in "Likely location"/"Suggested fix" was confirmed verbatim against the code and re-witnessed live before any change: a trusted Escape with focus on the toll's Cancel produced MutationObserver witness `REM 88167.6` → `ADD 88168.9` (React 19 flushes the toll's unmount at the #root delegate BEFORE the same keydown reaches the window listener; the DOM census then false-reads "no dialog" and `confirmDiscardDraft()` re-arms an identical toll while the draft stays dirty).
+
+**Change (client-side only, no server/ruleset twin — `useWizardEscape` is ruleset-agnostic and the six .ct-* lanes have no window re-ask lane):**
+- `src/hooks/wizard/useWizardEscape.js` — added the event-based suppression guard suggested in the bug file, BEFORE the DOM census: `if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return;`. A keydown that ORIGINATED inside a dialog belongs to that dialog's own Escape lane (DeleteConfirmModal answers KEEP); `closest()` walks the detached subtree's parent chain (the `role` attribute survives React's unmount), so the origin test holds even after the sync flush. The mounted-dialog census stays as the second lock for stranded-focus targets outside any dialog. Docstring comment records the race.
+- `src/hooks/wizard/useWizardEscape.dialog-origin.test.js` (NEW) — 6 tests pinning the lane. The flush race is SIMULATED (jsdom cannot produce it natively): a listener on the toll overlay detaches the dialog subtree mid-dispatch, standing in for the #root handler's sync unmount, before the event reaches the window listener. Verified RED without the guard (the race test fails, 5 others pass) and GREEN with it.
+
+**Verification:**
+- New test: `npx vitest run src/hooks/wizard/useWizardEscape.dialog-origin.test.js` → 6/6 pass; revert-probe confirms the race test fails on the old code.
+- Touched folders: `npx vitest run src/hooks/wizard src/hooks/management` → 52 files / 484 tests pass. `npm run lint` → clean (zero warnings).
+- Live re-verification on :5173 in a fresh `qa-starter` (created, exercised, deleted via API; ghost 404; zero character files written):
+  - Dirty draft → header × → toll `Discard changes to "FixVerifyChar"?` (focus Cancel) → **trusted Escape → witness ONE `REM` and NO re-`ADD`; `[role=dialog]` census 0; wizard stays; name held** — the documented KEEP-on-Escape law now holds.
+  - Adjacent faces re-lived: Escape with NO toll open (dirty draft) still arms the toll (wizard close lane intact); Cancel click → KEEP; pure backdrop click → KEEP; `Yes, Discard` → wizard closes; clean-draft Escape → silent close (no toll).
+- Cleanup: qa-starter deleted (`DELETE /api/campaigns/qa-starter` → folder gone, 404); test-campaign change-data + log cleared via admin endpoints.
