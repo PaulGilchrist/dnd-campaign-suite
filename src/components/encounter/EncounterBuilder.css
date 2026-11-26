@@ -801,3 +801,12 @@
   border-color: var(--color-error-border);
   color: var(--color-error-light);
 }
+
+/* Connected-tabs heads-up inside the Playtest confirm (shared modal renders
+   children inside a <p>, so the notice is a block-level span; the warning
+   colour rides the global .warning token from index.css). */
+.encounter-playtest-notice {
+  display: block;
+  margin-top: 10px;
+  font-weight: 600;
+}

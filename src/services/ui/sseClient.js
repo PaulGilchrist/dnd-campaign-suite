@@ -47,10 +47,23 @@ export const subscribeToSSE = (campaignName, handler) => {
         }
         const url = `http://${window.location.hostname}/subscribe?${urlParams.toString()}`;
         const eventSource = new EventSource(url);
-        entry = { eventSource, handlers: new Set(), consecutiveErrors: 0 };
+        entry = { eventSource, handlers: new Set(), consecutiveErrors: 0, clientId: null };
         entry.eventSource.onopen = () => {
             entry.consecutiveErrors = 0;
         };
+        // Named 'client-id' event (server/routes/sse.js): the hub stamps each
+        // connection with its own id on connect (and again after a native
+        // reconnect, which re-registers under a fresh id). GM-side "who else
+        // is connected" lanes pass this as `exclude` so a tab never counts
+        // itself. addEventListener (not onmessage): named events never reach
+        // the default onmessage slot, so existing fan-out is untouched.
+        entry.eventSource.addEventListener('client-id', (e) => {
+            try {
+                entry.clientId = JSON.parse(e.data).clientId || null;
+            } catch (_parseErr) {
+                console.debug('[SSE] malformed client-id event', e.data);
+            }
+        });
         entry.eventSource.onmessage = (e) => {
             let event;
             try {
@@ -95,6 +108,11 @@ export const subscribeToSSE = (campaignName, handler) => {
         }
     };
 };
+
+// Hub-issued client id of THIS tab's shared connection to a campaign, or
+// null while no connection is open / the stamp has not arrived yet.
+export const getOwnSseClientId = (campaignName) =>
+    sources.get(campaignName || '')?.clientId || null;
 
 // Test helper — closes and forgets all shared connections.
 export const resetSSEClient = () => {

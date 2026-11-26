@@ -46,8 +46,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-25 explore: the Playtest confirm copy ends "This is a GM-solo test: no player tabs should be connected." but nothing gates or warns when tabs ARE connected (a visitor tab mid-test would watch a staged board then get rolled back under it). Consider an "other tabs connected" heads-up (the app already counts/observes SSE clients server-side) or documenting the actual mid-test visitor behavior.
-
 ## Blocked / not verified (replaced each run)
 
 - Audible ambience legs (local upload actually emitting sound): MCP browser lacks `--autoplay-policy=no-user-gesture-required`; armed-state + log row + store rows proved, sound not.

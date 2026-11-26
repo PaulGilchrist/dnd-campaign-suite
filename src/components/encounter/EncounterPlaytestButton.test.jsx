@@ -13,6 +13,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 vi.mock('../../services/encounters/playtestService.js', () => ({
     startEncounterPlaytest: vi.fn(),
+    fetchOtherConnectedClients: vi.fn(async () => 0),
 }));
 
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';

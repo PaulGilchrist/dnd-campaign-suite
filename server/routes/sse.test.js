@@ -125,6 +125,22 @@ describe('sse - GET /subscribe', () => {
             expect(subscribers).toHaveLength(1);
             expect(subscribers[0].campaignName).toBe('');
         });
+
+        it('stamps the connection with its hub id via a named client-id event (first write)', () => {
+            const mockReq = createMockReq({ campaign: 'test-campaign' });
+            const mockRes = createMockRes();
+
+            subscribeHandler(mockReq, mockRes);
+
+            const clientIdWrites = mockRes._writes.filter(w =>
+                typeof w === 'string' && w.includes('event: client-id')
+            );
+            expect(clientIdWrites).toHaveLength(1);
+            // NAMED event lane: never reaches legacy onmessage consumers.
+            expect(mockRes._writes[0]).toBe(clientIdWrites[0]);
+            const payload = JSON.parse(clientIdWrites[0].split('data: ')[1]);
+            expect(payload.clientId).toBe(subscribers[0].id);
+        });
     });
 
     describe('character change data snapshot', () => {
@@ -467,6 +483,82 @@ describe('sse - GET /subscribe', () => {
                 expect(lastChangeIndex).toBeLessThan(firstOverlayIndex);
             }
         });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/sse-clients - GM-only connected-clients heads-up lane
+// (playtest confirm, 2026-11-25)
+// ---------------------------------------------------------------------------
+describe('sse - GET /api/sse-clients', () => {
+    const fakeClient = (id, campaignName) => ({ id, campaignName, res: createMockRes() });
+
+    const FOREIGN_HOST = '100.92.171.80';
+
+    beforeEach(clearSubscribers);
+    afterEach(clearSubscribers);
+
+    it('counts live subscribers for the named campaign only', async () => {
+        subscribers.push(
+            fakeClient('a', 'test-campaign'),
+            fakeClient('b', 'test-campaign'),
+            fakeClient('c', 'other-campaign'),
+            fakeClient('d', '') // app-level channel (no campaign) — never counted
+        );
+
+        const res = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ count: 2 });
+    });
+
+    it('excludes the requesting tab\'s own hub id — the solo-GM no-false-positive leg', async () => {
+        subscribers.push(fakeClient('gm-tab-id', 'test-campaign'));
+
+        const solo = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign&exclude=gm-tab-id');
+        expect(solo.body).toEqual({ count: 0 });
+
+        const withoutExclude = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign');
+        expect(withoutExclude.body).toEqual({ count: 1 });
+    });
+
+    it('an exclude id that is no longer on the hub changes nothing (reconnect honesty)', async () => {
+        subscribers.push(fakeClient('fresh-id', 'test-campaign'));
+
+        const res = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign&exclude=stale-id');
+        expect(res.body).toEqual({ count: 1 });
+    });
+
+    it('answers 0 for an unknown campaign and a missing query', async () => {
+        subscribers.push(fakeClient('a', 'test-campaign'));
+
+        const unknown = await request(createTestApp())
+            .get('/api/sse-clients?campaign=nope');
+        expect(unknown.body).toEqual({ count: 0 });
+
+        const bare = await request(createTestApp()).get('/api/sse-clients');
+        expect(bare.body).toEqual({ count: 0 });
+    });
+
+    it('is GM-only: a network-origin Host 403s with the shared denial copy', async () => {
+        subscribers.push(fakeClient('a', 'test-campaign'));
+
+        const res = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign')
+            .set('Host', FOREIGN_HOST);
+
+        expect(res.status).toBe(403);
+        expect(res.body.error).toBe('Access denied: GM-only feature');
+    });
+
+    it('serves no-store so the count is never a heuristic cache phantom', async () => {
+        const res = await request(createTestApp())
+            .get('/api/sse-clients?campaign=test-campaign');
+        expect(res.headers['cache-control']).toBe('no-store');
     });
 });
 

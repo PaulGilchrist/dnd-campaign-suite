@@ -33,6 +33,7 @@
 import utils from '../ui/utils.js';
 import { PLAYTEST_KEY } from '../automation/common/campaignKeys.js';
 import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../hooks/runtime/useRuntimeState.js';
+import { getOwnSseClientId } from '../ui/sseClient.js';
 import { addEntry } from '../ui/logService.js';
 import { addMonstersToInitiative } from './encounterToInitiative.js';
 import { stageEventEncounterMap } from './encounterStagingService.js';
@@ -46,6 +47,30 @@ const STAGE_HEX = { q: 0, r: 0 };
 /** True while a playtest session is stamped on the campaign. */
 export function isPlaytestActive(campaignName) {
     return getRuntimeValue('campaign', PLAYTEST_KEY, campaignName)?.active === true;
+}
+
+/**
+ * Connected-clients heads-up lane (playtest confirm): how many SSE clients
+ * OTHER than this tab are connected to the campaign, answered by the GM-only
+ * /api/sse-clients route from the /subscribe hub's own subscriber list. The
+ * requesting tab names its hub-issued client id (captured from the
+ * connection's 'client-id' event) as `exclude`, so a solo GM never counts
+ * their own connection — no false-positive heads-up. Throws on a failed read;
+ * the confirm step treats a failed read as "heads-up absent" (the count is
+ * informational only — it gates nothing).
+ */
+export async function fetchOtherConnectedClients(campaignName) {
+    const params = new URLSearchParams({ campaign: campaignName });
+    const ownClientId = getOwnSseClientId(campaignName);
+    if (ownClientId) {
+        params.set('exclude', ownClientId);
+    }
+    const res = await fetch(`/api/sse-clients?${params.toString()}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw new Error(data.error || 'Failed to read connected clients');
+    }
+    return typeof data.count === 'number' ? data.count : 0;
 }
 
 export async function startEncounterPlaytest({

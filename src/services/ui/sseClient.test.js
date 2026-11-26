@@ -29,6 +29,7 @@ class MockEventSource {
     constructor(url) {
         this.url = url;
         this.readyState = MockEventSource.CONNECTING;
+        this.namedListeners = {};
         MockEventSource.instances.push(this);
     }
 
@@ -36,8 +37,14 @@ class MockEventSource {
         this.readyState = MockEventSource.CLOSED;
     }
 
-    addEventListener() {}
+    addEventListener(type, fn) {
+        this.namedListeners[type] = (this.namedListeners[type] || []).concat(fn);
+    }
     removeEventListener() {}
+
+    fireNamed(type, data) {
+        (this.namedListeners[type] || []).forEach(fn => fn({ data }));
+    }
 
     fireOpen() {
         if (this.onopen) this.onopen();
@@ -130,6 +137,42 @@ describe('sseClient', () => {
             MockEventSource.instances[0].fireMessage(JSON.stringify({ key: 'k' }));
             expect(good).toHaveBeenCalled();
             expect(errorSpy).toHaveBeenCalledWith('[SSE] handler error:', expect.any(Error));
+        });
+    });
+
+    describe('client-id capture (GM heads-up lane)', () => {
+        it('answers null until the named client-id event lands, then names this tab\'s hub id', async () => {
+            const { subscribeToSSE, getOwnSseClientId } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            expect(getOwnSseClientId('test-campaign')).toBeNull();
+            MockEventSource.instances[0].fireNamed('client-id', JSON.stringify({ clientId: 'abc-1' }));
+            expect(getOwnSseClientId('test-campaign')).toBe('abc-1');
+        });
+
+        it('a malformed payload keeps the null face (lane degrades to the raw total, never throws)', async () => {
+            const { subscribeToSSE, getOwnSseClientId } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            MockEventSource.instances[0].fireNamed('client-id', 'not-json');
+            expect(getOwnSseClientId('test-campaign')).toBeNull();
+            expect(debugSpy).toHaveBeenCalled();
+            expect(errorSpy).not.toHaveBeenCalled();
+        });
+
+        it('a reconnect stamp REPLACES the id (each hub registration is its own identity)', async () => {
+            const { subscribeToSSE, getOwnSseClientId } = await freshImport();
+            subscribeToSSE('test-campaign', vi.fn());
+            MockEventSource.instances[0].fireNamed('client-id', JSON.stringify({ clientId: 'first' }));
+            MockEventSource.instances[0].fireNamed('client-id', JSON.stringify({ clientId: 'second' }));
+            expect(getOwnSseClientId('test-campaign')).toBe('second');
+        });
+
+        it('last unsubscribe forgets the id; unknown campaigns answer null', async () => {
+            const { subscribeToSSE, getOwnSseClientId } = await freshImport();
+            const unsub = subscribeToSSE('test-campaign', vi.fn());
+            MockEventSource.instances[0].fireNamed('client-id', JSON.stringify({ clientId: 'abc-1' }));
+            expect(getOwnSseClientId('other-campaign')).toBeNull();
+            unsub();
+            expect(getOwnSseClientId('test-campaign')).toBeNull();
         });
     });
 

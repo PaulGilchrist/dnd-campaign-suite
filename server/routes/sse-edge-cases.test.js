@@ -505,7 +505,10 @@ describe('sse - GET /subscribe - combined snapshots', () => {
 
         expect(changeWrites).toHaveLength(2);
         expect(overlayWrites).toHaveLength(1);
-        expect(mockRes._writes).toHaveLength(3);
+        // +1: the named client-id stamp is the hub's first write per connection
+        // (playtest-confirm heads-up lane, 2026-11-25).
+        expect(mockRes._writes).toHaveLength(4);
+        expect(mockRes._writes[0]).toContain('event: client-id');
     });
 
     it('should send change data keys in iteration order', () => {

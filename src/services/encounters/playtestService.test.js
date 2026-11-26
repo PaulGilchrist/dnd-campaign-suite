@@ -9,6 +9,7 @@ import {
     startEncounterPlaytest,
     endEncounterPlaytest,
     isPlaytestActive,
+    fetchOtherConnectedClients,
 } from './playtestService.js';
 import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../ui/logService.js';
@@ -37,6 +38,11 @@ vi.mock('./outdoorEncounterGenerator.js', () => ({
 vi.mock('./monsterTokenPlacement.js', () => ({
     generateMonsterPlacements: vi.fn(() => []),
 }));
+vi.mock('../ui/sseClient.js', () => ({
+    getOwnSseClientId: vi.fn(() => null),
+}));
+
+import { getOwnSseClientId } from '../ui/sseClient.js';
 
 const CN = 'test-campaign';
 const SNAP = `${CN}-2026-11-25T10-00-00-000.zip`;
@@ -186,5 +192,38 @@ describe('isPlaytestActive', () => {
         expect(isPlaytestActive(CN)).toBe(true);
         vi.mocked(getRuntimeValue).mockReturnValue(null);
         expect(isPlaytestActive(CN)).toBe(false);
+    });
+});
+
+describe('fetchOtherConnectedClients — confirm heads-up lane', () => {
+    afterEach(() => {
+        vi.mocked(getOwnSseClientId).mockReturnValue(null);
+    });
+
+    it('names this tab\'s hub-issued client id as exclude so a solo GM never counts themselves', async () => {
+        vi.mocked(getOwnSseClientId).mockReturnValue('client-77');
+        mockFetch(() => jsonResponse(200, { count: 2 }));
+        await expect(fetchOtherConnectedClients(CN)).resolves.toBe(2);
+        expect(fetchCalls[0].url)
+            .toBe(`/api/sse-clients?campaign=${CN}&exclude=client-77`);
+        expect(getOwnSseClientId).toHaveBeenCalledWith(CN);
+    });
+
+    it('omits exclude while no connection stamp exists (server then answers the raw total)', async () => {
+        vi.mocked(getOwnSseClientId).mockReturnValue(null);
+        mockFetch(() => jsonResponse(200, { count: 0 }));
+        await expect(fetchOtherConnectedClients(CN)).resolves.toBe(0);
+        expect(fetchCalls[0].url).toBe(`/api/sse-clients?campaign=${CN}`);
+    });
+
+    it('throws with the server refusal message (confirm hides the notice on a failed read)', async () => {
+        mockFetch(() => jsonResponse(403, { error: 'Access denied: GM-only feature' }));
+        await expect(fetchOtherConnectedClients(CN))
+            .rejects.toThrow('Access denied: GM-only feature');
+    });
+
+    it('answers 0 for a malformed success payload instead of inventing a count', async () => {
+        mockFetch(() => jsonResponse(200, {}));
+        await expect(fetchOtherConnectedClients(CN)).resolves.toBe(0);
     });
 });
