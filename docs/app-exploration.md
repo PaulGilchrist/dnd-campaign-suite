@@ -46,7 +46,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-25 explore: `server/routes/campaigns-meta.js` `normalizeToolbelt` dedupes and type-checks `hiddenViews` but accepts UNKNOWN view names verbatim (live: PUT `["bogusView","mapsManager"]` stored + served; clients filter via `normalizeHiddenViews` so it's inert on screen). One server-side filter against `TOOLBELT_VIEWS` (or an honest 400) would keep the lane canonical. Likely one-line change in `normalizeToolbelt`.
 - 2026-11-25 explore: opening an indoor board on a LEGACY map doc writes a one-time normalization PUT (battle-arena gained `lighting: true`, md5 94fcd0bf→9ee473e2) — the hex lane already solved this class with `buildStoredEnvelope` raw-bytes dirty-baseline (playbook); the indoor `useMapLoader`/torchlight default stamp could ride the same law, or harness baselines must expect the stamp on first open after any new doc-field ships.
 - 2026-11-25 explore: the Playtest confirm copy ends "This is a GM-solo test: no player tabs should be connected." but nothing gates or warns when tabs ARE connected (a visitor tab mid-test would watch a staged board then get rolled back under it). Consider an "other tabs connected" heads-up (the app already counts/observes SSE clients server-side) or documenting the actual mid-test visitor behavior.
 

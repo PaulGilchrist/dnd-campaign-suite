@@ -3,6 +3,7 @@ import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { isLocalHost } from '../utils/jsonEntityCrud.js';
 import { publish } from '../utils/changeData.js';
+import { TOOLBELT_VIEWS } from '../../src/services/ui/sidebarNav.js';
 import { Router } from 'express';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,12 @@ const META_FILE = 'campaign-meta.json';
 
 export const CAMPAIGN_TYPES = ['standard', 'arena', 'starter'];
 
+// The view names the toolbelt may hide — the ONE canonical list the sidebar
+// dialog renders (the server reads src directly, campaigns-changedata's
+// MOODS twin doctrine). An unknown name 400s on PUT and degrades on read,
+// exactly like an off-enum `type`.
+export const TOOLBELT_VIEW_NAMES = TOOLBELT_VIEWS.map(({ view }) => view);
+
 const metaPath = (campaign) => campaignDataFile(campaign, META_FILE);
 
 /** Parse the meta document, `{}` for a missing/corrupt file. Never throws. */
@@ -54,14 +61,19 @@ function readCampaignMeta(campaign) {
 
 /**
  * Normalize a stored/sent toolbelt to the canonical shape
- * `{ hiddenViews: string[] }` (deduped). Anything absent or malformed
- * (hand-edited disk file) resolves to the all-visible default — mirrors the
- * resolveCampaignType degrade-don't-500 law.
+ * `{ hiddenViews: string[] }` (deduped, known views only). Anything absent
+ * or malformed (hand-edited disk file) resolves to the all-visible default —
+ * mirrors the resolveCampaignType degrade-don't-500 law: an unknown stored
+ * view name is ignored the same way an unknown stored type resolves to
+ * 'standard'.
  */
 function normalizeToolbelt(toolbelt) {
     const views = toolbelt?.hiddenViews;
     if (!Array.isArray(views)) return { hiddenViews: [] };
-    const strings = views.filter((v) => typeof v === 'string' && v.trim() !== '');
+    const strings = views
+        .filter((v) => typeof v === 'string')
+        .map((v) => v.trim())
+        .filter((v) => TOOLBELT_VIEW_NAMES.includes(v));
     return { hiddenViews: [...new Set(strings)] };
 }
 
@@ -120,6 +132,9 @@ router.put('/api/campaigns/:campaign/meta', asyncHandler((req, res) => {
         const views = toolbelt?.hiddenViews;
         if (!Array.isArray(views) || views.some((v) => typeof v !== 'string' || v.trim() === '')) {
             return res.status(400).json({ error: 'campaign meta toolbelt payload must be { toolbelt: { hiddenViews: [ ...view names... ] } }' });
+        }
+        if (views.some((v) => !TOOLBELT_VIEW_NAMES.includes(v.trim()))) {
+            return res.status(400).json({ error: `campaign meta toolbelt hiddenViews must be one of ${TOOLBELT_VIEW_NAMES.join(', ')}` });
         }
     }
 

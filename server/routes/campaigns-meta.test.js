@@ -6,7 +6,8 @@
 // folder) plus the sidebar toolbelt (an absent/malformed stored field answers
 // the canonical all-visible { hiddenViews: [] }); PUT is GM-only (localhost),
 // a PARTIAL upsert of { type } and/or { toolbelt } with an enum guard on type
-// and a shape guard on toolbelt, so neither write can clobber the other field.
+// and a shape + view-name guard on toolbelt, so neither write can clobber the
+// other field. An unknown view name 400s on write and degrades on read.
 // A corrupt meta file must degrade to the standard default, never 500.
 import express from 'express';
 import fs from 'fs';
@@ -193,6 +194,45 @@ describe('campaign meta toolbelt lane', () => {
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/hiddenViews/);
         expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    // Unknown view names ride the SAME discipline as an off-enum `type`:
+    // the PUT 400s naming the valid set, and a hand-edited disk name
+    // degrades on read (resolveCampaignType twin), so bogusView can never
+    // be stored or served from the API lane.
+    it.each([
+        ['unknown-only', ['bogusView']],
+        ['mixed known + unknown', ['bogusView', 'mapsManager']],
+    ])('refuses a %s hiddenViews payload with 400 and leaves disk untouched', async (_label, hiddenViews) => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ type: 'standard', toolbelt: { hiddenViews: ['music'] } }));
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ toolbelt: { hiddenViews } });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/hiddenViews must be one of/);
+        expect(res.body.error).toContain('mapsManager');
+        expect(JSON.parse(mockFsState.files.get(META_FILE))).toEqual({
+            type: 'standard',
+            toolbelt: { hiddenViews: ['music'] },
+        });
+        expect(publishSpy).not.toHaveBeenCalled();
+    });
+
+    it('GET drops an unknown stored view name (hand-edited disk degrades, known views pass)', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({
+            type: 'standard',
+            toolbelt: { hiddenViews: ['bogusView', 'mapsManager'] },
+        }));
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
+        expect(res.status).toBe(200);
+        expect(res.body.toolbelt).toEqual({ hiddenViews: ['mapsManager'] });
+    });
+
+    it('GET serves only known view names when the stored set is entirely unknown', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ toolbelt: { hiddenViews: ['bogusView'] } }));
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
+        expect(res.status).toBe(200);
+        expect(res.body.toolbelt).toEqual({ hiddenViews: [] });
     });
 
     it('403s a network client writing the toolbelt and leaves disk untouched', async () => {
