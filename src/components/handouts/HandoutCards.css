@@ -1,0 +1,216 @@
+/* ============ Handout card layouts (print & handouts backlog Item 4) ============
+   Classes here live ON the paper sheet (.handout-page owns the light tokens
+   and the print isolation lane in HandoutPreview.css). Everything below is
+   theme-independent ink-on-paper styling: white surface, black rules, the
+   app green reserved for section headings only (still legible in
+   grayscale). No !important anywhere. */
+
+.handout-name {
+    margin: 0;
+    font-size: 1.6em;
+    color: #111;
+    border-bottom: 2px solid #111;
+    padding-bottom: 4px;
+}
+
+.handout-meta {
+    margin: 4px 0 0;
+    color: #555;
+    font-style: italic;
+}
+
+.handout-rulebreak {
+    border: none;
+    border-top: 1px solid #111;
+    margin: 8px 0;
+}
+
+/* 5e stat-block rule lines: bold ink lead-in, plain value. */
+.handout-rule {
+    margin: 3px 0;
+}
+
+.handout-rule-lead {
+    font-weight: 700;
+}
+
+.handout-abilities {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin: 10px 0;
+    text-align: center;
+    border: 1px solid #767676;
+    padding: 6px 4px;
+}
+
+.handout-ability-label {
+    font-weight: 700;
+    font-size: 0.85em;
+}
+
+.handout-ability-score {
+    font-size: 1.05em;
+}
+
+.handout-ability-mod {
+    color: #333;
+}
+
+.handout-section {
+    margin-top: 10px;
+}
+
+.handout-section-title {
+    margin: 8px 0 3px;
+    font-size: 1.1em;
+    color: #14532d;
+    border-bottom: 1px solid #999;
+    padding-bottom: 2px;
+}
+
+.handout-action {
+    margin: 5px 0;
+}
+
+.handout-action .markdown-preview,
+.handout-rp-text .markdown-preview,
+.handout-md {
+    margin: 2px 0;
+}
+
+.handout-md p {
+    margin: 3px 0;
+}
+
+/* Linked notes/recap markdown must not bring the author's h1 onto the GM's
+   one-pager at full page width — paper scales headings down, one family. */
+.handout-md h1 {
+    font-size: 1.2em;
+    margin: 4px 0;
+}
+
+.handout-md h2 {
+    font-size: 1.1em;
+    margin: 4px 0;
+}
+
+.handout-md h3 {
+    font-size: 1em;
+    margin: 4px 0;
+}
+
+.handout-md ul {
+    margin: 4px 0 4px 18px;
+    padding: 0;
+}
+
+/* NPC roleplay fields — the DM-screen half of the card. */
+.handout-rp-field {
+    margin-top: 6px;
+}
+
+/* Tables (encounter roster, session XP guide). */
+.handout-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 4px 0;
+}
+
+.handout-table th,
+.handout-table td {
+    border: 1px solid #767676;
+    padding: 3px 8px;
+    text-align: left;
+}
+
+.handout-table th {
+    background-color: #efefef;
+    font-weight: 700;
+}
+
+.handout-thresholds th,
+.handout-thresholds td {
+    text-align: right;
+}
+
+.handout-table tfoot td {
+    font-weight: 700;
+}
+
+/* Quest board one-pager. */
+.handout-quest {
+    border: 1px solid #999;
+    padding: 8px 10px;
+    margin: 8px 0;
+    background-color: #fff;
+}
+
+.handout-quest-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.handout-quest-name {
+    margin: 0;
+    font-size: 1.05em;
+}
+
+.handout-quest-count {
+    color: #555;
+    font-weight: 400;
+    font-size: 0.85em;
+}
+
+.handout-quest-rewards {
+    margin-top: 6px;
+}
+
+.handout-quest-rewards-title {
+    margin: 0;
+    font-size: 0.95em;
+    color: #14532d;
+}
+
+/* Session one-pager. */
+.handout-contingency-branch {
+    color: #555;
+    font-style: italic;
+}
+
+.handout-checklist-item {
+    margin: 3px 0;
+}
+
+.handout-checklist-done {
+    color: #14532d;
+}
+
+.handout-checklist-box {
+    display: inline-block;
+    width: 1.2em;
+}
+
+.handout-checklist-progress {
+    color: #555;
+    font-weight: 400;
+    font-size: 0.85em;
+}
+
+.handout-linked-note {
+    border-left: 3px solid #999;
+    padding-left: 10px;
+    margin: 8px 0;
+}
+
+.handout-linked-note-title {
+    margin: 0 0 2px;
+    font-size: 0.95em;
+    color: #14532d;
+}
+
+.handout-empty {
+    color: #555;
+    font-style: italic;
+}

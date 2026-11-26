@@ -21,6 +21,7 @@ export const VIEW_HELP = {
   settlements: 'Towns, cities, and villages — hand-built or generated with services, named folk, rumours, government, and threats. Your game-day “who runs the shop?” reference.',
   campaignBuilder: 'The AI Campaign Designer (local model, localhost only): chat a brief, edit the build plan, and generate a whole interlinked adventure as drafts you approve one at a time. Players cannot see drafts until you approve them.',
   campaignLog: 'The campaign’s shared memory: every roll, hit, save, spell, rest, travel event, and audit entry, timestamped and filterable. If someone asks “what number came up?” — it’s in here.',
+  chronicle: 'Your campaign’s story, retold. The Chronicle reads the log and lays the story out forward in time — narrative prose, session recaps, encounters, loot, and rests — grouped by session, with one-click Markdown export and a print-ready face.',
   gmScreen: 'The GM presentation screen for the table-facing view of the campaign.',
   music: 'Table ambience: five moods with auto-play, transport controls, and custom categories. The DJ role is delegable to a player, and every change syncs to all screens.',
   campaignRepair: 'Campaign admin: rename, snapshots and rollback, scoped clears, typed delete — plus the optional Enforcement & Referee console and the local AI settings. Everything here is confirmed and logged.',

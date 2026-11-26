@@ -453,7 +453,19 @@ function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effective
         <div>
             <b>Proficiency: </b>+{playerStats.proficiency}<br />
             <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={handleInitiative}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
-            <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
+            {/* F20 (visual audit 2026-11-25, Item 7): the bare checkbox square
+                read as an unlabeled value slot. Same toggle semantics
+                (role=checkbox, one click ⇒ one toggled update), now a styled
+                token chip with a star glyph + state word. */}
+            <span
+                className={'inspiration-token clickable no-print' + (hasInspiration ? ' inspiration-held' : '')}
+                role="checkbox"
+                aria-checked={hasInspiration}
+                tabIndex={0}
+                onClick={handleToggleInspiration}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleInspiration(); } }}
+                title="Inspiration — click to mark it spent or granted"
+            ><b>Inspiration: </b><i className="fa-solid fa-star" aria-hidden="true"></i> {hasInspiration ? 'Ready' : 'Spent'}</span><br />
             {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
             <CharFeats playerStats={playerStats} showPopup={(feat) => showFeatDetailPopup(feat, setPopupHtml)} />
             {/* CI 2026-11-03 a11y: real <button> (was a bare clickable span) so the

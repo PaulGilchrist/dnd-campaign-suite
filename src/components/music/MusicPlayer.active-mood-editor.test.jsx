@@ -13,9 +13,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -97,7 +97,7 @@ describe('MusicPlayer editor opens on the active mood', () => {
 
   it('active Tavern: an existing Tavern override seeds instead of the starter list', () => {
     stubMusicServer();
-    setActiveMood('tavern', { tavern: [{ videoId: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] });
+    setActiveMood('tavern', { tavern: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] });
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
 
@@ -116,13 +116,19 @@ describe('MusicPlayer editor opens on the active mood', () => {
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(toastNode()).toHaveTextContent('Tavern tracks saved'));
-    expect(stub.server().overrides.tavern.map(t => t.videoId)).toEqual(['dQw4w9WgXcQ']);
+    // Item 3b: the Save lands the whole draft — the textarea row plus the
+    // seeded bundled bed for Tavern.
+    expect(stub.server().overrides.tavern.map(t => t.src)).toEqual(['dQw4w9WgXcQ', '/audio/old-tower-inn.mp3']);
     expect(stub.server().overrides.town).toBeUndefined();
     // The misfiled bucket from the old defect stays empty on disk.
     expect(stub.posts.at(-1).overrides.town).toBeUndefined();
     // Saved into the mood IN PLAY, so the fresh track takes over immediately
     // (saveTracks' saved.mood === editMood && playing lane).
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['dQw4w9WgXcQ']);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(
+      [{ kind: 'youtube', src: 'dQw4w9WgXcQ', title: 'dQw4w9WgXcQ' },
+        { kind: 'local', src: '/audio/old-tower-inn.mp3', title: 'The Old Tower Inn | Medieval Tavern (Randommind, CC0)' }],
+      'test-campaign'
+    );
   });
 
   it('active Tavern: dirty Cancel names Tavern in the discard modal (role=dialog, no native confirm)', () => {
@@ -160,7 +166,7 @@ describe('MusicPlayer editor opens on the active mood', () => {
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
-    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['dQw4w9WgXcQ']);
+    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['dQw4w9WgXcQ', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
     expect(stub.server().overrides.tavern).toBeUndefined();
   });
 

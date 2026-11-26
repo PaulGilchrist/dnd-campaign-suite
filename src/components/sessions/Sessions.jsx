@@ -25,6 +25,8 @@ import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
 import SessionPlayedModal from './SessionPlayedModal.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import SessionOnePager from '../handouts/SessionOnePager.jsx';
 import NpcUnarmedConfirmModal from '../npcs/NpcUnarmedConfirmModal.jsx';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import useDeleteRequest from '../common/useDeleteRequest.js';
@@ -165,6 +167,9 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
   // of the retired inverted native confirm; ephemeral UI pair, never the
   // runtime store (FriendlyFireConfirmModal idiom).
   const [pendingUnarmedNpc, setPendingUnarmedNpc] = useState(null);
+  // Item 4 handout: saved session row whose printed one-pager is open
+  // (display-only). The planner's own surfaces stay the authoring lane.
+  const [printSession, setPrintSession] = useState(null);
 
   // Single choke points for the banner: every message carries its kind (and
   // whether it was a conflict), so the "Reload list" action can never outlive
@@ -685,6 +690,7 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
               session={session}
               isActive={activeSession != null && session.name === activeSession}
               onEdit={handleEditSession}
+              onPrint={setPrintSession}
             />
           ))}
         </ul>
@@ -752,6 +758,16 @@ function Sessions({ campaignName, characters = [], isLocalhost, onViewInitiative
       {/* Dirty-draft toll (QA backlog 2026-11-24): SIBLING mount above the
           planner — its backdrop/Escape answer only the toll. */}
       {discardDialog}
+
+      {printSession && (
+        <HandoutPreview
+          label={`Session One-Pager — ${printSession.name}`}
+          campaignName={campaignName}
+          onClose={() => setPrintSession(null)}
+        >
+          <SessionOnePager session={printSession} characters={characters} campaignName={campaignName} />
+        </HandoutPreview>
+      )}
     </div>
   );
 }

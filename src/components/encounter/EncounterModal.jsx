@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { formatEncounterName } from '../../services/encounters/encountersService.js';
+import { formatEncounterName, loadEncounter } from '../../services/encounters/encountersService.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import EncounterSheetHandout from '../handouts/EncounterSheetHandout.jsx';
 import './EncounterBuilder.css';
 
 // Named-delete copy wrapper over the shared DeleteConfirmModal a11y tier
@@ -27,13 +29,75 @@ function DeleteEncounterModal({ encounterName, onCancel, onConfirm }) {
   );
 }
 
-function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRename, encounters, loading, renameTarget: renameTargetProp }) {
+// Item 4 handout lane: the printed sheet is pure presentation over the SAVED
+// row — no load, no PUT, no XP recompute (the builder's load seam stays the
+// only lane that recomputes). The list lane serves summary rows, so the full
+// roster is fetched by GET only when the row lacks it; CR/XP columns and the
+// difficulty verdict are derived at print time from the host's live bestiary
+// + party.
+function EncounterPrintPreview({ campaignName, encounter, monsters, playerLevels, onClose }) {
+  const [fullRow, setFullRow] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    if (!encounter) {
+      setFullRow(null);
+      setLoadError(null);
+      return undefined;
+    }
+    if (Array.isArray(encounter.selectedMonsters)) {
+      setFullRow(encounter);
+      setLoadError(null);
+      return undefined;
+    }
+    let alive = true;
+    setFullRow(null);
+    setLoadError(null);
+    loadEncounter(campaignName, encounter.name)
+      .then((row) => { if (alive) setFullRow(row); })
+      .catch((err) => {
+        console.error('Failed to fetch the saved encounter for the printed sheet:', err);
+        if (alive) setLoadError(err.message || 'Failed to load the saved roster');
+      });
+    return () => { alive = false; };
+  }, [campaignName, encounter]);
+
+  if (!encounter) return null;
+  return (
+    <HandoutPreview
+      label={`Encounter Sheet — ${formatEncounterName(encounter.name)}`}
+      campaignName={campaignName}
+      onClose={onClose}
+    >
+      {loadError ? (
+        <p className="handout-empty">{loadError} — reopen the sheet to retry.</p>
+      ) : !fullRow ? (
+        <p className="handout-empty">
+          <i className="fa-solid fa-spinner fa-spin" /> Loading the saved roster…
+        </p>
+      ) : (
+        <EncounterSheetHandout
+          encounter={fullRow}
+          monsters={monsters || []}
+          partyLevels={playerLevels || []}
+        />
+      )}
+    </HandoutPreview>
+  );
+}
+
+function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRename, encounters, loading, renameTarget: renameTargetProp, monsters, playerLevels, campaignName }) {
   const [name, setName] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState('');
   const [renameTarget, setRenameTarget] = useState(null);
   // Raw name of the row whose DeleteConfirmModal is open (null = closed).
   const [deleteTarget, setDeleteTarget] = useState(null);
+  // Saved row whose printed sheet preview is open (null = closed). The list
+  // stays the sheet's data source; monsters/playerLevels feed the derived
+  // columns. Display-only — closing the Load modal resets it like the
+  // transient rename state.
+  const [printTarget, setPrintTarget] = useState(null);
 
   useEffect(() => {
     if (mode === 'save') {
@@ -85,6 +149,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
       setNewName('');
       setError('');
       setDeleteTarget(null);
+      setPrintTarget(null);
       return undefined;
     }
     if (deleteTarget) {
@@ -98,6 +163,9 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
       document.addEventListener('keydown', guardEscape, true);
       return () => document.removeEventListener('keydown', guardEscape, true);
     }
+    // Item 4: while a handout preview is open over this list, Escape answers
+    // ONLY the preview — HandoutPreview's own document-CAPTURE listener
+    // consumes the keystroke before the bubbling handler below can run.
     const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
     };
@@ -322,6 +390,17 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                         >
                           <i className="fa-solid fa-pen" />
                         </button>
+                        {/* Item 4 handout: labeled verb on the row it prints
+                            (F12 law); opens the paper preview, writes nothing. */}
+                        <button
+                          className="ct-btn ct-btn-sm"
+                          onClick={() => setPrintTarget(enc)}
+                          aria-label={`Print sheet for "${enc.name}"`}
+                          title={`Print sheet for "${enc.name}"`}
+                          disabled={loading}
+                        >
+                          <i className="fa-solid fa-print" /> Print
+                        </button>
                         <button
                           className="ct-btn ct-btn-sm ct-btn-danger"
                           onClick={() => setDeleteTarget(enc.name)}
@@ -345,6 +424,14 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
         encounterName={deleteTarget}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
+      />
+
+      <EncounterPrintPreview
+        encounter={printTarget}
+        campaignName={campaignName}
+        monsters={monsters}
+        playerLevels={playerLevels}
+        onClose={() => setPrintTarget(null)}
       />
     </>
   );

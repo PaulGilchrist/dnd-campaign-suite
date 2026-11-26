@@ -242,7 +242,8 @@ function CampaignBuilder({ campaignName }) {
       {subscriber}
       <AiDesignerSection campaignName={campaignName} onGenerated={reload} />
       <div className="campaign-builder-header">
-        <h2><i className="fa-solid fa-wand-magic-sparkles" /> Campaign Builder</h2>
+        {/* F13 (Item 7): the header names the view the sidebar names it. */}
+        <h2><i className="fa-solid fa-wand-magic-sparkles" /> Drafts</h2>
         <p className="campaign-builder-subtitle">
           AI-drafted content — invisible to players until you approve it.
         </p>
@@ -266,10 +267,12 @@ function CampaignBuilder({ campaignName }) {
       {error && <div className="campaign-builder-error" role="alert">{error}</div>}
 
       {total === 0 ? (
-        <p className="campaign-builder-empty">
-          Nothing is drafted right now — generate content with the AI designer and it will
-          land here for review before any player can see it.
-        </p>
+        // F14 (Item 7): icon+guidance standard (the .ct-empty-state tier).
+        <div className="campaign-builder-empty ct-empty-state">
+          <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+          Nothing is drafted right now — generate content with the AI designer
+          and it will land here for review before any player can see it.
+        </div>
       ) : (
         DRAFT_KINDS.filter(({ kind }) => groups[kind]?.length).map(({ kind, label, icon }) => (
           <section key={kind} className="campaign-builder-section">

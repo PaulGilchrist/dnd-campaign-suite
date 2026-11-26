@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -38,6 +38,16 @@ function hintText(container) {
   return el ? el.textContent : null;
 }
 
+// Item 3b: every starter mood now HEADS with bundled /audio/ beds — scenarios
+// that exercise the zero-valid lanes must first remove the seeded local rows
+// (the mixed queue law: local rows alone keep a draft saveable).
+function clearLocalRows(container) {
+  let btn;
+  while ((btn = container.querySelector('.music-editor-local-tracks button'))) {
+    fireEvent.click(btn);
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getStore('campaign').delete('music');
@@ -47,15 +57,16 @@ describe('MusicPlayer live track-count validation', () => {
   it('counts the seeded starter tracks live when the editor opens', () => {
     const { container } = renderPlayer();
     openEditor(container);
-    // Town starter catalogue has 2 tracks — the hint reflects the seeded
-    // textarea without any Save.
-    expect(hintText(container)).toContain('2 valid tracks');
+    // Town starter catalogue is 2 bundled beds + 2 YouTube tracks (Item 3b) —
+    // the hint reflects the seeded draft without any Save.
+    expect(hintText(container)).toContain('4 valid tracks');
     expect(container.querySelector('.music-editor-hint-warn')).toBeNull();
   });
 
   it('updates the count as valid ids are typed, without pressing Save', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     fireEvent.change(textarea, {
       target: { value: 'https://youtu.be/aaaaaaaaaaa\nbbbbbbbbbbb' }
@@ -74,6 +85,7 @@ describe('MusicPlayer live track-count validation', () => {
   it('shows a warning hint (not just 0) for fully garbled input', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     fireEvent.change(textarea, { target: { value: 'asdf qwer' } });
     const warn = container.querySelector('.music-editor-hint-warn');
@@ -86,6 +98,7 @@ describe('MusicPlayer live track-count validation', () => {
   it('shows the warning hint when the draft is wiped empty', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     fireEvent.change(textarea, { target: { value: '' } });
     expect(container.querySelector('.music-editor-hint-warn')).not.toBeNull();
@@ -95,6 +108,7 @@ describe('MusicPlayer live track-count validation', () => {
   it('valid input clears the warning and restores the count line', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     fireEvent.change(textarea, { target: { value: 'total junk' } });
     expect(container.querySelector('.music-editor-hint-warn')).not.toBeNull();
@@ -116,6 +130,7 @@ describe('MusicPlayer live track-count validation', () => {
   it('save-time leaf-inline error lane still fires alongside the hint', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     // The rejection drops at console.debug (backlog 2026-11-08 EK): pin that
     // the whole invalid-save attempt stays out of console.error.

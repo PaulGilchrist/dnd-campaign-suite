@@ -32,9 +32,11 @@
     background: #555;
 }
 
+/* F17/F8 family (Item 7): outdoor twin — armed tool green, not buff-blue. */
 .hex-map-toolbar button.active {
-    background: #4a90d9;
-    border-color: #357abd;
+    background: var(--color-primary);
+    border-color: var(--color-primary-dark);
+    color: var(--color-text-inverse);
 }
 
 .hex-map-toolbar .hex-map-poi-indicator {

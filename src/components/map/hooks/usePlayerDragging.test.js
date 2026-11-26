@@ -315,6 +315,9 @@ describe('usePlayerDragging', () => {
         mapData: mapAtUp,
         setPopupHtml: advisorySink,
       });
+      // Item 6 #1: a free-cell drop stays SILENT — the toast lane is for
+      // redirected/refused drops only, never for honest landings.
+      expect(helpers.result.current.snapToast).toBeNull();
     });
 
     it('does not shove a token off its own cell or fire commits when dropped in place', () => {
@@ -335,6 +338,7 @@ describe('usePlayerDragging', () => {
       expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 5, gridY: 5 }); // self excluded from occupancy
       expect(setRuntimeValueSpy).not.toHaveBeenCalled(); // same cell ⇒ no stamp
       expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
+      expect(helpers.result.current.snapToast).toBeNull(); // own cell is never "occupied"
       expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
       expect(helpers.result.current.dragging).toBeNull();
     });
@@ -356,6 +360,45 @@ describe('usePlayerDragging', () => {
       expect(mocks.onTokenMoveLanded).toHaveBeenCalledWith(
         expect.objectContaining({ toCell: { gridX: 6, gridY: 5 } })
       );
+      // Item 6 #1 (feedback honesty): the redirect must NAME the landing
+      // cell — the silent snap read as a swallowed drag (the budget-clamp
+      // branch has toasted forever; the occupied branch never did).
+      expect(helpers.result.current.snapToast).toMatchObject({
+        message: 'Cell occupied — Player1 moved to (6,5).',
+      });
+    });
+
+    it('toast-pins the GM Shift unconstrained occupied-drop redirect with the landing cell', () => {
+      const helpers = press('p1', { hook: { isLocalhost: true }, event: { shiftKey: true } });
+      expect(helpers.result.current.dragging.unconstrained).toBe(true);
+      dropAt(helpers, 220, 200); // (5,5) is p2's cell — findFreeSquare redirects it
+
+      // Drop math unchanged: BFS nearest free cell from the drop point.
+      expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 6, gridY: 5 });
+      expect(helpers.result.current.snapToast).toMatchObject({
+        message: 'Cell occupied — Player1 moved to (6,5).',
+      });
+    });
+
+    // Item 6 #1: the no-free-cell leg (findNearestValid finds nothing ⇒ fall
+    // back to the turn-start cell) gets the honest "stayed at" wording — the
+    // drag was fully refused, the token never moved.
+    it('names the origin cell with stayed-at wording when every neighbor is occupied', () => {
+      mapDataHolder.current = {
+        players: [
+          playerBytes('p1', 'Player1', 0, 0),
+          playerBytes('p2', 'Player2', 1, 0),
+          playerBytes('p3', 'Player3', 0, 1),
+          playerBytes('p4', 'Player4', 1, 1),
+        ],
+      };
+      const helpers = press('p1', { hook: { gridSize: 2 } });
+      dropAt(helpers, 500, 500); // clamps to (1,1) — occupied; only free cell is p1's own (0,0)
+
+      expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 0, gridY: 0 });
+      expect(helpers.result.current.snapToast).toMatchObject({
+        message: 'Cell occupied — Player1 stayed at (0,0).',
+      });
     });
 
     it('falls back to player.id for both the steadyAim key and the trigger payload when name is missing', () => {

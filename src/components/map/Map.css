@@ -9,15 +9,39 @@
     flex-direction: column;
 }
 
-/* Toolbar row */
+/* Toolbar row — F2 (visual audit 2026-11-25, Item 7): the indoor toolbar is
+   long (Paint…Torchlight + zoom/reset). The row now WRAPS instead of pushing
+   the document past the viewport: the header (back/title/Grid Size) keeps
+   one line, and the button group drops below it full-width, wrapping itself
+   again at narrow widths. */
 .map .toolbar-row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    row-gap: 8px;
     margin-bottom: 8px;
     position: sticky;
     top: 0;
     z-index: 10;
+}
+
+/* F6: the title owns a single line (ellipsis) instead of wrapping into the
+   Grid Size input's slot. */
+.map .toolbar-row h4 {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 8px 0 0;
+}
+
+.map .toolbar-row .grid-size-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
 }
 
 .map .toolbar-back-btn {
@@ -41,11 +65,16 @@
     font-weight: 600;
 }
 
-/* Toolbar */
+/* Toolbar — wraps with the F2 law above: full-width second line when the
+   header row can't keep it inline, multi-line at narrow widths. */
 .map .toolbar {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
+    row-gap: 6px;
+    max-width: 100%;
     margin-bottom: 12px;
 }
 
@@ -70,9 +99,11 @@
 }
 
 .map .toolbar button.active {
-    background: #4a90d9;
-    border-color: #2c5f8a;
-    color: #fff;
+    /* F17/F8 family (Item 7): armed-tool state rides the green-primary
+       selection language (blue is the buff color app-wide). */
+    background: var(--color-primary);
+    border-color: var(--color-primary-dark);
+    color: var(--color-text-inverse);
 }
 
 .map .toolbar button i {
@@ -215,13 +246,30 @@
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
-/* Light theme (explicit toggle) */
+/* Light theme (explicit toggle) — ITEM 7 F4 MAP-SURFACE LAW: under light
+   chrome, map boards wear the paper face. The outdoor hex board is always
+   parchment (#F0E8D8, HexMap.css); the indoor board now switches to the SAME
+   parchment in the light theme (dark board in the dark theme — each surface
+   is deliberate in both). Authored bgFill stays map content and wins over
+   this face (GridAndWalls only inlines a fill when the document carries
+   one). Menu plates/toolbars keep the always-dark skin in BOTH themes.
+   Tokens and labels flip to ink so everything stays legible on paper. */
 [data-theme="light"] .map .grid-bg {
-    fill: #f5f5f5;
+    fill: #F0E8D8;
 }
 
 [data-theme="light"] .map .grid-line {
-    stroke: #d0d0d0;
+    stroke: #c9bda2;
+}
+
+[data-theme="light"] .map .creature-name,
+[data-theme="light"] .map .npc-name,
+[data-theme="light"] .map .poi-label {
+    /* Ink on paper, with the same triple-halo idiom inverted — keeps the
+       label readable even when it overlaps an authored dark bgFill or a
+       token disc. */
+    fill: #2b2318;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
 }
 
 [data-theme="light"] .map .creature-circle {
@@ -246,11 +294,6 @@
     stroke-width: 3;
 }
 
-[data-theme="light"] .map .creature-name {
-    fill: #fff;
-    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
-}
-
 [data-theme="light"] .map .toolbar button {
     background: #e8e8e8;
     border-color: #ccc;
@@ -263,23 +306,31 @@
 }
 
 [data-theme="light"] .map .toolbar button.active {
-    background: #4a90d9;
-    border-color: #2c5f8a;
-    color: #fff;
+    background: var(--color-primary);
+    border-color: var(--color-primary-dark);
+    color: var(--color-text-inverse);
 }
 
 [data-theme="light"] .map .wall-cell {
     fill: #8a8a8a;
 }
 
-/* Fallback: system light mode only until an explicit theme is chosen */
+/* Fallback: system light mode only until an explicit theme is chosen —
+   same paper-face law as [data-theme="light"] above (Item 7 F4). */
 @media (prefers-color-scheme: light) {
     body:not([data-theme="dark"]) .map .grid-bg {
-        fill: #f5f5f5;
+        fill: #F0E8D8;
     }
 
     body:not([data-theme="dark"]) .map .grid-line {
-        stroke: #d0d0d0;
+        stroke: #c9bda2;
+    }
+
+    body:not([data-theme="dark"]) .map .creature-name,
+    body:not([data-theme="dark"]) .map .npc-name,
+    body:not([data-theme="dark"]) .map .poi-label {
+        fill: #2b2318;
+        text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
     }
 
     body:not([data-theme="dark"]) .map .creature-circle {
@@ -304,11 +355,6 @@
         stroke-width: 3;
     }
 
-    body:not([data-theme="dark"]) .map .creature-name {
-        fill: #fff;
-        text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
-    }
-
     body:not([data-theme="dark"]) .map .toolbar button {
         background: #e8e8e8;
         border-color: #ccc;
@@ -321,9 +367,9 @@
     }
 
     body:not([data-theme="dark"]) .map .toolbar button.active {
-        background: #4a90d9;
-        border-color: #2c5f8a;
-        color: #fff;
+        background: var(--color-primary);
+        border-color: var(--color-primary-dark);
+        color: var(--color-text-inverse);
     }
 
     body:not([data-theme="dark"]) .map .wall-cell {
@@ -1132,7 +1178,12 @@
 }
 
 [data-theme="light"] .map .map-toast {
-    background: rgba(255, 152, 0, 0.12);
+    /* Solid parchment chip, not a translucent tint (Item 6 #1 live pass
+       2026-11-25): an opaque light chip reads ≥6:1 over any backdrop — the
+       dark board and (since Item 7's F4 paper-face law) the parchment board
+       alike. The old rgba(255,152,0,0.12) tint composited onto near-black
+       and left the dark ink at ~2.7:1 — unreadable where the drop happened. */
+    background: #fff8e1;
     border-color: #cc8800;
     color: #7a5200;
 }

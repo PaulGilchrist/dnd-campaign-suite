@@ -1220,6 +1220,12 @@
     font-size: 0.9em;
 }
 
+/* §7 carry-over (Item 7): the band stays dark in the light theme — its text
+   rides the band-ink token there (dark face unchanged). */
+[data-theme="light"] .character-creation-wizard .rule-info {
+    color: var(--color-band-heading);
+}
+
 .character-creation-wizard .rule-info p {
     margin: 0.25rem 0;
 }

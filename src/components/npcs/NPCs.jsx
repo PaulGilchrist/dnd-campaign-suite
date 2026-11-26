@@ -8,6 +8,8 @@ import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcs
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
 import NpcUnarmedConfirmModal from './NpcUnarmedConfirmModal.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import NpcStatCard from '../handouts/NpcStatCard.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
@@ -48,6 +50,10 @@ function NPCs({ campaignName, onViewInitiative }) {
   } = useCrudList(npcs, ['name', 'race', 'classRole', 'tags']);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  // Handout preview target (Item 4): the row whose Print Card button was last
+  // pressed. Pure display state for the print-only portal — no store write,
+  // no persistence (per-client ephemeral UI, like showModal flags).
+  const [printNPC, setPrintNPC] = useState(null);
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
   const [errorIsConflict, setErrorIsConflict] = useState(false);
@@ -428,6 +434,7 @@ function NPCs({ campaignName, onViewInitiative }) {
               campaignName={campaignName}
               onEdit={handleEditNPC}
               onAddToInitiative={handleAddToInitiative}
+              onPrintNPC={setPrintNPC}
             />
           ))}
         </ul>
@@ -468,6 +475,16 @@ function NPCs({ campaignName, onViewInitiative }) {
       {discardDialog}
 
       <DeleteNpcModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+      {printNPC && (
+        <HandoutPreview
+          label={`NPC Card — ${printNPC.name}`}
+          campaignName={campaignName}
+          onClose={() => setPrintNPC(null)}
+        >
+          <NpcStatCard npc={printNPC} />
+        </HandoutPreview>
+      )}
     </div>
   );
 }

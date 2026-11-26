@@ -29,6 +29,12 @@ export function campaignImagesDir(campaign) {
   return path.join(campaignDir(campaign), 'images');
 }
 
+// Locally-hosted ambience uploads (offline-ambience backlog Item 3):
+// served statically at /campaigns/<campaign>/audio/<file> via the public/ lane.
+export function campaignAudioDir(campaign) {
+  return path.join(campaignDir(campaign), 'audio');
+}
+
 export function ensureDataDir(campaign) {
   const dir = campaignDataDir(campaign);
   if (!fs.existsSync(dir)) {

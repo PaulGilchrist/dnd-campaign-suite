@@ -5,12 +5,13 @@ import useLog from '../../hooks/runtime/useLog.js';
 import { MOODS, DEFAULT_VOLUME, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from '../../services/ui/musicConfig.js';
 import { DEFAULT_MUSIC, normalizeMusic, pauseCommit, pauseLogEntry, stopCommit, stopLogEntry } from '../../services/ui/musicTransport.js';
 import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
+import { useMusicUploads } from '../../hooks/ui/useMusicUploads.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { useTvSoundPresence } from '../../hooks/ui/useTvSoundPresence.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import MusicSfxControls from './MusicSfxControls.jsx';
 import SoundOwnerControl from './SoundOwnerControl.jsx';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 import './MusicPlayer.css';
 
 const YT_FRAME_ID = 'yt-music-frame';
@@ -20,12 +21,14 @@ const YT_FRAME_ID = 'yt-music-frame';
 // both slice on this one separator — no second parser (improve 2026-11-13 DG).
 const TRACK_SEPARATORS = /[\n,]+/;
 
+// YouTube lines parse to canonical rows (musicConfig.js track-row shape);
+// locally-hosted rows arrive only through the upload lane below.
 function parseTrackList(text) {
   return text
     .split(TRACK_SEPARATORS)
     .map(line => extractVideoId(line))
     .filter(Boolean)
-    .map(videoId => ({ videoId, title: videoId }));
+    .map(videoId => ({ kind: 'youtube', src: videoId, title: videoId }));
 }
 
 // Mixed-save warning copy (improve 2026-11-13 DG backlog): the zero-valid
@@ -67,6 +70,21 @@ function MusicMoodChip({ mood, active, trackCount, onSelect, onDelete }) {
         </button>
       )}
     </span>
+  );
+}
+
+// F14 (Item 7, audit): the stopped Music view was a dead canvas — no hint
+// that the ＋/pencil lanes build tracks. This resting face shows while the
+// transport chrome is retired (NN law) and no author surface is open.
+// Pure props, hoisted for the complexity budget (MusicMoodChip idiom).
+function MusicStopFace({ mood, editing, addingCategory }) {
+  if (mood || editing || addingCategory) return null;
+  return (
+    <div className="music-empty ct-empty-state">
+      <i className="fa-solid fa-music" aria-hidden="true"></i>
+      <span>No ambience playing — pick a mood above to start. The ＋ button adds a
+      category; the pencil fills a mood with tracks.</span>
+    </div>
   );
 }
 
@@ -248,6 +266,25 @@ function MusicPlayer({ campaignName, visible = true }) {
   const [editMood, setEditMood] = useState(MOODS[0].key);
   const [trackText, setTrackText] = useState('');
   const [editorError, setEditorError] = useState(null);
+  // Display-only save/reset confirmation toast (mirrors .sessions-toast /
+  // .encounter-toast): names the mood so the confirmation lands even while the
+  // stay-open editor keeps focus (and after Reset's re-seed).
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((message, isError = false) => {
+    setToast({ message, isError });
+    setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
+  }, []);
+  // Local-audio draft lane (offline-ambience Item 3): canonical
+  // { kind:'local' } rows uploaded beside the YouTube textarea, with the
+  // abandoned-upload sweep owned by the hook (useMusicUploads.js).
+  const {
+    localTracks, setLocalTracks, uploading, uploadInputRef, draftUploadsRef,
+    handleAudioUpload, removeLocalTrack, pruneAbandonedUploads,
+  } = useMusicUploads(
+    campaignName,
+    (row) => { setEditorError(null); showToast(`Uploaded ${row.title} — press Save to add it`); },
+    (error) => setEditorError(error),
+  );
   // Dirty-draft guard for the inline editor (improve 2026-10-29-AE backlog,
   // parity with the six .ct-* lanes' ×/Cancel NAMED discard, 4d4b1e69a, and
   // the wizard, 4569f2d67): Cancel or a mood-select switch silently discarded
@@ -259,7 +296,7 @@ function MusicPlayer({ campaignName, visible = true }) {
   // DeleteConfirmModal role="dialog" tier (backlog 2026-11-08 EK, friendly-
   // fire precedent): the guard supplies the dirty verdict (isDraftDirty),
   // the pending action waits in UI-local state until an explicit button.
-  const editorDraft = useMemo(() => ({ trackText }), [trackText]);
+  const editorDraft = useMemo(() => ({ trackText, localTracks }), [trackText, localTracks]);
   const { seedDraft, clearDraft, isDraftDirty } = useReloadGuard({
     modalOpen: editing,
     formData: editorDraft,
@@ -281,10 +318,6 @@ function MusicPlayer({ campaignName, visible = true }) {
     () => trackText.split(TRACK_SEPARATORS).filter(line => line.trim()).length,
     [trackText]
   );
-  // Display-only save/reset confirmation toast (mirrors .sessions-toast /
-  // .encounter-toast): names the mood so the confirmation lands even while the
-  // stay-open editor keeps focus (and after Reset's re-seed).
-  const [toast, setToast] = useState(null);
   const { addEntry } = useLog(campaignName);
 
   // Remote-adoption guard (bug-music-player-no-remote-state-adoption): the
@@ -330,13 +363,13 @@ function MusicPlayer({ campaignName, visible = true }) {
     if (seen.mood === last.mood && seen.playing === last.playing) return; // own echo / no transport change
     if (!playerMounted) return; // no local player to command
     if (seen.playing || !seen.mood) {
-      youtubePlayer.stop();
+      ambiencePlayer.stop();
       setPlayerMounted(false);
       console.info(seen.playing
         ? "[MusicPlayer] Ambience started in another tab — releasing this tab's player (no double playback)"
         : "[MusicPlayer] Ambience stopped in another tab — releasing this tab's player");
     } else {
-      youtubePlayer.pause();
+      ambiencePlayer.pause();
       console.info("[MusicPlayer] Ambience paused in another tab — pausing this tab's player");
     }
   }, [music.mood, music.playing, playerMounted]);
@@ -346,7 +379,7 @@ function MusicPlayer({ campaignName, visible = true }) {
   // volume is folded in whenever the hydrated/echoed value first changes
   // after mount — a remote tab's slider move (or the hydration landing)
   // re-seeds this tab's slider, and the useEffect([volume]) →
-  // youtubePlayer.setVolume below then drives the owner's iframe without a
+  // ambiencePlayer.setVolume below then drives the owner's player without a
   // remount. Echo-safe like the transport guard: a value equal to the last
   // observation, or to what THIS tab just committed via the slider, is never
   // re-applied (the SSE echo of a local drag cannot clobber in-flight state).
@@ -359,15 +392,10 @@ function MusicPlayer({ campaignName, visible = true }) {
     setVolume(seen);
   }, [music.volume]);
 
-  const showToast = useCallback((message, isError = false) => {
-    setToast({ message, isError });
-    setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
-  }, []);
-
   useEffect(() => {
     if (!playerMounted) return;
-    youtubePlayer.ensurePlayer(YT_FRAME_ID);
-    return () => youtubePlayer.dispose();
+    ambiencePlayer.ensurePlayer(YT_FRAME_ID);
+    return () => ambiencePlayer.dispose();
   }, [playerMounted]);
 
   // The panel is now persistent-mounted (App renders it outside the view
@@ -380,7 +408,7 @@ function MusicPlayer({ campaignName, visible = true }) {
   useEffect(() => () => {
     const state = leaveViewRef.current;
     if (!state || !state.playerMounted || !state.music.playing) return;
-    youtubePlayer.stop();
+    ambiencePlayer.stop();
     commitMusic(stopCommit(state.music));
     addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left campaign)' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,19 +425,26 @@ function MusicPlayer({ campaignName, visible = true }) {
   }, [campaignName]);
 
   useEffect(() => {
-    youtubePlayer.setVolume(volume);
+    ambiencePlayer.setVolume(volume);
   }, [volume]);
 
   // Shared editor seeding lane (openEditor, mood-select switch, and the
-  // click-an-empty-custom-category shortcut all funnel through here).
+  // click-an-empty-custom-category shortcut all funnel through here). The
+  // mood's canonical rows split by kind: YouTube `src`s are re-rendered as
+  // textarea lines, locally-hosted uploads become draft rows in their own
+  // list (the textarea parses YouTube URLs only — a local src can never be
+  // forged into it, the server validates the upload shape anyway).
   const seedEditor = useCallback((moodKey) => {
     setEditMood(moodKey);
     const tracks = getTracksForMood(moodKey, music.overrides);
-    const text = tracks.map(t => t.videoId).join('\n');
+    const text = tracks.filter(t => t.kind === 'youtube').map(t => t.src).join('\n');
+    const seededLocal = tracks.filter(t => t.kind === 'local').map(t => ({ ...t }));
     setTrackText(text);
-    seedDraft({ trackText: text });
+    setLocalTracks(seededLocal);
+    draftUploadsRef.current = [];
+    seedDraft({ trackText: text, localTracks: seededLocal });
     setEditorError(null);
-  }, [music.overrides, seedDraft]);
+  }, [music.overrides, seedDraft, setLocalTracks, draftUploadsRef]);
 
   const selectMood = useCallback((moodKey) => {
     // improve 2026-11-20 backlog: re-clicking the chip of an ALREADY-PLAYING
@@ -442,7 +477,7 @@ function MusicPlayer({ campaignName, visible = true }) {
       return;
     }
     setPlayerMounted(true);
-    youtubePlayer.playTracks(tracks.map(t => t.videoId));
+    ambiencePlayer.playTracks(tracks, campaignName);
     commitMusic({ ...music, mood: moodKey, playing: true });
     addEntry({
       type: 'music',
@@ -450,12 +485,12 @@ function MusicPlayer({ campaignName, visible = true }) {
       mood: moodKey,
       message: `Set ambience: ${moodLabel(moodKey)} — ${tracks[0].title}`
     });
-  }, [music, commitMusic, addEntry, isCustomMood, seedEditor, moodLabel]);
+  }, [music, commitMusic, addEntry, isCustomMood, seedEditor, moodLabel, campaignName]);
 
   const togglePlay = useCallback(() => {
     if (!music.mood) return;
     if (music.playing) {
-      youtubePlayer.pause();
+      ambiencePlayer.pause();
       commitMusic(pauseCommit(music));
       addEntry(pauseLogEntry(music.mood, moodLabel(music.mood)));
     } else {
@@ -466,9 +501,9 @@ function MusicPlayer({ campaignName, visible = true }) {
           console.error(`No tracks configured for mood "${music.mood}"`);
           return;
         }
-        youtubePlayer.playTracks(tracks.map(t => t.videoId));
+        ambiencePlayer.playTracks(tracks, campaignName);
       } else {
-        youtubePlayer.resume();
+        ambiencePlayer.resume();
       }
       commitMusic({ ...music, playing: true });
       addEntry({
@@ -478,7 +513,7 @@ function MusicPlayer({ campaignName, visible = true }) {
         message: `Resumed ${moodLabel(music.mood)} ambience`
       });
     }
-  }, [music, commitMusic, playerMounted, addEntry, moodLabel]);
+  }, [music, commitMusic, playerMounted, addEntry, moodLabel, campaignName]);
 
   // Local Stop mirrors the remote-release bytes (improve 2026-11-20 backlog):
   // the adoption lane tears the frame down (stop + setPlayerMounted(false) →
@@ -489,13 +524,13 @@ function MusicPlayer({ campaignName, visible = true }) {
   // Bytes and log row are untouched; the pagehide guard (playerMounted &&
   // playing) simply sees an already-released tab and writes nothing on reload.
   const stopMusic = useCallback(() => {
-    youtubePlayer.stop();
+    ambiencePlayer.stop();
     setPlayerMounted(false);
     commitMusic(stopCommit(music));
     addEntry(stopLogEntry());
   }, [music, commitMusic, addEntry]);
 
-  // Queue exhaustion (youtubePlayer.js handleError): every track failed
+  // Queue exhaustion (ambiencePlayer.js reportFailure): every track failed
   // back-to-back — un-arm the mood and tell the listener honestly instead of the
   // transport claiming it is playing dead videos. Toast lane mirrors the
   // editor-save errors; the log row follows the set_ambience/stop pattern.
@@ -509,7 +544,7 @@ function MusicPlayer({ campaignName, visible = true }) {
   useEffect(() => {
     const handleQueueExhausted = (event) => {
       const label = music.mood ? moodLabel(music.mood) : 'this mood';
-      const failedIds = (event.detail || {}).videoIds || [];
+      const failedSrcs = (event.detail || {}).srcs || [];
       setPlayerMounted(false);
       commitMusic(stopCommit(music));
       showToast(`No playable tracks for ${label} ambience`, true);
@@ -517,7 +552,7 @@ function MusicPlayer({ campaignName, visible = true }) {
         type: 'music',
         action: 'no_playable_tracks',
         mood: music.mood,
-        message: `Ambience stopped — no playable tracks for ${label}${failedIds.length > 0 ? ` (${failedIds.join(', ')})` : ''}`
+        message: `Ambience stopped — no playable tracks for ${label}${failedSrcs.length > 0 ? ` (${failedSrcs.join(', ')})` : ''}`
       });
     };
     window.addEventListener('music-queue-exhausted', handleQueueExhausted);
@@ -569,30 +604,36 @@ function MusicPlayer({ campaignName, visible = true }) {
 
   // Cancel close path (parity with the .ct-* handleRequestClose doctrine): a
   // dirty draft opens the discard modal first; a clean draft closes silently
-  // as before.
+  // as before. A clean close can hold no abandoned uploads (an upload dirties
+  // the draft), so the sweep there is a no-op; the discard lane below does
+  // the real pruning.
   const cancelEdit = useCallback(() => {
     if (isDraftDirty()) {
       setPendingDiscard({ nextMood: null });
       return;
     }
+    pruneAbandonedUploads();
     clearDraft();
     setEditing(false);
-  }, [isDraftDirty, clearDraft]);
+  }, [isDraftDirty, clearDraft, pruneAbandonedUploads]);
 
   // Discard-modal confirm: executes what the retired native-confirm lane ran
   // inline — switch re-seeds the target mood, close discards + unmounts the
   // editor. Cancel just clears the pending prompt (everything stays inert).
+  // Discarding the draft abandons its unsaved uploads: sweep them BEFORE the
+  // re-seed clears the ledger (no orphan files).
   const confirmPendingDiscard = useCallback(() => {
     const pending = pendingDiscard;
     setPendingDiscard(null);
     if (!pending) return;
+    pruneAbandonedUploads();
     if (pending.nextMood) {
       seedEditor(pending.nextMood);
     } else {
       clearDraft();
       setEditing(false);
     }
-  }, [pendingDiscard, seedEditor, clearDraft]);
+  }, [pendingDiscard, seedEditor, clearDraft, pruneAbandonedUploads]);
 
   // Defense-in-depth for the orphan-write class (bug-music-deleted-category-
   // orphan-overrides): never persist overrides under a key the sidebar
@@ -609,8 +650,11 @@ function MusicPlayer({ campaignName, visible = true }) {
 
   const saveTracks = useCallback(async () => {
     if (!refuseMissingMood('track save')) return;
-    // Same memo the live hint reads — save and hint can never disagree.
-    const tracks = parsedTracks;
+    // Same memo the live hint reads — save and hint can never disagree. The
+    // mood's final list is the parsed YouTube rows PLUS the draft's locally-
+    // hosted uploads (offline-ambience Item 3): two input lanes, one canonical
+    // override array.
+    const tracks = [...parsedTracks, ...localTracks];
     if (tracks.length === 0) {
       // Invalid user input, not an app fault: the inline .music-editor-error
       // below (plus the live zero-count hint) is the user-facing feedback, so
@@ -630,17 +674,22 @@ function MusicPlayer({ campaignName, visible = true }) {
       showToast(`Failed to save ${moodLabel(editMood)} tracks`, true);
       return;
     }
+    // The draft's uploads are now referenced by stored data — the server's
+    // supersede prune owns their lifetime from here, not the discard sweep.
+    draftUploadsRef.current = [];
     // Pin the local store to server truth, skipSync: the server already holds it.
     setRuntimeObject('campaign', { music: saved }, campaignName, true);
     if (saved.mood === editMood && saved.playing) {
       setPlayerMounted(true);
-      youtubePlayer.playTracks(tracks.map(t => t.videoId));
+      ambiencePlayer.playTracks(tracks, campaignName);
     }
     // Mixed-list honesty (improve 2026-11-13 DG): the valid rows saved and the
     // toast fires, but unparseable non-empty lines evaporated — say so on the
     // same .music-editor-error seam the zero-valid refusal uses. Fully-valid
-    // saves keep the old clean slate (delta 0 → null).
-    const droppedCount = enteredLineCount - tracks.length;
+    // saves keep the old clean slate (delta 0 → null). The delta counts
+    // TEXTAREA lines against the parsed YouTube rows only — local uploads are
+    // a separate lane and never ride the line-split law.
+    const droppedCount = enteredLineCount - parsedTracks.length;
     if (droppedCount > 0) {
       console.debug(`[MusicPlayer] ${droppedCount} unparseable track line(s) dropped on save`);
     }
@@ -648,13 +697,13 @@ function MusicPlayer({ campaignName, visible = true }) {
     // Stay-open save (backlog 2026-11-08 EM): multi-session track curation
     // made the old close-on-save an open→type→save churn loop. The editor
     // stays mounted with the textarea content intact, and the dirty guard
-    // re-baselines on the SAVED text (useReloadGuard doctrine — same lane
+    // re-baselines on the SAVED draft (useReloadGuard doctrine — same lane
     // resetMood uses — so a Cancel right after Save is a clean, silent close
     // while further edits still pay the discard prompt). Exiting remains
     // Cancel's job; Save never discards.
-    seedDraft({ trackText });
+    seedDraft({ trackText, localTracks });
     showToast(`${moodLabel(editMood)} tracks saved — keep editing`);
-  }, [trackText, parsedTracks, enteredLineCount, editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
+  }, [trackText, localTracks, parsedTracks, enteredLineCount, editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood, draftUploadsRef]);
 
   const resetMood = useCallback(async () => {
     if (!refuseMissingMood('override reset')) return;
@@ -666,16 +715,24 @@ function MusicPlayer({ campaignName, visible = true }) {
       return;
     }
     setRuntimeObject('campaign', { music: saved }, campaignName, true);
+    // The deleted override rows may have referenced local uploads — the
+    // server's supersede prune unlinks them; the discard sweep lets go of
+    // its claim on every file the (now stored) defaults reference.
+    draftUploadsRef.current = [];
     const tracks = getTracksForMood(editMood, saved.overrides);
-    const text = tracks.map(t => t.videoId).join('\n');
+    const text = tracks.filter(t => t.kind === 'youtube').map(t => t.src).join('\n');
+    const seededLocal = tracks.filter(t => t.kind === 'local').map(t => ({ ...t }));
     setTrackText(text);
+    setLocalTracks(seededLocal);
     // Reset lands the editor on the defaults with the modal still open —
     // re-baseline the guard so the fresh seed doesn't look like an unsaved
     // edit (useReloadGuard doctrine: re-seed wherever a save stays open).
-    seedDraft({ trackText: text });
+    seedDraft({ trackText: text, localTracks: seededLocal });
     setEditorError(null);
     showToast(`${moodLabel(editMood)} overrides reset to defaults`);
-  }, [editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
+  }, [editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood, setLocalTracks, draftUploadsRef]);
+
+  // --- Campaign-specific categories (improve 2026-11-07) -------------------
 
   // --- Campaign-specific categories (improve 2026-11-07) -------------------
   // Same permission model as track editing (user decision: ambience duty is
@@ -769,7 +826,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     // 6/6 replay of the two byte-identical bodies). Awaiting keeps the chain the
     // documented order (stopCommit THEN single evict PATCH) deterministically.
     if (music.mood === moodKey) {
-      youtubePlayer.stop();
+      ambiencePlayer.stop();
       setPlayerMounted(false);
       await commitMusic(stopCommit(music));
     }
@@ -859,6 +916,13 @@ function MusicPlayer({ campaignName, visible = true }) {
             onCancel={cancelNewCategory}
           />
         )}
+      {/* F14 (Item 7): the stop face used to be a dead canvas — the mood chip
+          row and nothing else. This is the resting "now playing" zone that
+          names the affordances (pick a mood; the ＋/pencil lanes build its
+          tracks). Transport chrome stays retired-on-stop (NN law); this face
+          shows exactly while that chrome is gone. Hoisted (MusicMoodChip
+          precedent) to keep MusicPlayer inside its complexity cap. */}
+      <MusicStopFace mood={music.mood} editing={editing} addingCategory={addingCategory} />
       <div className="music-controls">
         {/* Stop-retires-chrome law lives in MusicTransportControls (guard
             clause mirroring TvMusicTransport's zero-chrome stop face). The
@@ -930,18 +994,63 @@ function MusicPlayer({ campaignName, visible = true }) {
             placeholder="One YouTube URL or video ID per line"
           />
           {/* Live feedback while typing (see parsedTracks note above): a
-              valid count line, or a warning-style hint when nothing parses.
-              The Save-time .music-editor-error lane below stays unchanged. */}
-          {parsedTracks.length > 0 ? (
+              valid count line (YouTube rows + local uploads), or a
+              warning-style hint when nothing is queued at all. The Save-time
+              .music-editor-error lane below stays unchanged. */}
+          {parsedTracks.length + localTracks.length > 0 ? (
             <div className="music-editor-hint" role="status">
               <i className="fa-solid fa-circle-check"></i>
-              <span>{parsedTracks.length} valid track{parsedTracks.length === 1 ? '' : 's'}</span>
+              <span>{parsedTracks.length + localTracks.length} valid track{parsedTracks.length + localTracks.length === 1 ? '' : 's'}</span>
             </div>
           ) : (
             <div className="music-editor-hint music-editor-hint-warn" role="status">
               <i className="fa-solid fa-triangle-exclamation"></i>
-              <span>No valid tracks yet — paste YouTube URLs or video ids</span>
+              <span>No valid tracks yet — paste YouTube URLs or video ids, or upload a local audio file</span>
             </div>
+          )}
+          {/* Locally-hosted ambience (offline-ambience Item 3): files upload
+              into the campaign's own audio/ folder and play with no internet
+              — the YouTube textarea above stays the paste lane for videos. */}
+          <div className="music-editor-upload">
+            <button
+              type="button"
+              className="ct-btn ct-btn-primary ct-btn-sm"
+              onClick={() => uploadInputRef.current && uploadInputRef.current.click()}
+              disabled={uploading}
+              title="Upload a locally-hosted audio file (offline ambience)"
+            >
+              <i className="fa-solid fa-upload"></i> {uploading ? 'Uploading…' : 'Upload audio'}
+            </button>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              className="music-upload-input"
+              accept=".mp3,.ogg,.oga,.m4a,.wav,audio/*"
+              onChange={handleAudioUpload}
+              aria-label="Upload local audio file"
+            />
+            <span className="music-editor-upload-note">
+              mp3 / ogg / m4a / wav — plays from this server, no internet needed
+            </span>
+          </div>
+          {localTracks.length > 0 && (
+            <ul className="music-editor-local-tracks">
+              {localTracks.map((track) => (
+                <li key={track.src}>
+                  <i className="fa-solid fa-file-audio"></i>
+                  <span className="music-editor-local-title">{track.title}</span>
+                  <button
+                    type="button"
+                    className="ct-btn ct-btn-danger ct-btn-sm"
+                    onClick={() => removeLocalTrack(track.src)}
+                    title={`Remove ${track.title}`}
+                    aria-label={`Remove ${track.title}`}
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
           {editorError && <div className="music-editor-error">{editorError}</div>}
           <div className="music-editor-actions">

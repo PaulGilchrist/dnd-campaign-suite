@@ -146,13 +146,17 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('closing', () => {
-    it('closes via Cancel but not via overlay click', () => {
+    // F11 family law (Item 7 2026-11-25): the bespoke no-Escape/no-backdrop
+    // semantics were retired — close answers Cancel, Escape, and a PURE
+    // backdrop click like every other overlay (useModalDismiss).
+    it('closes via Cancel and via a pure backdrop click', () => {
       render(<GenerateDungeonModal {...props} />);
       const overlay = screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal-overlay');
+      fireEvent.mouseDown(overlay);
       fireEvent.click(overlay);
-      expect(props.onClose).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(props.onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(props.onClose).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -522,6 +526,50 @@ describe('GenerateDungeonModal', () => {
       clickGenerate();
 
       expect(await screen.findByText('Failed to generate dungeon')).toBeInTheDocument();
+    });
+  });
+
+  // F11 family law (Item 7 re-sweep 2026-11-25): the bespoke maps-manager
+  // overlay was the one modal that trapped Escape — it now rides the shared
+  // useModalDismiss lane (Escape + pure-backdrop close, inert mid-generate).
+  describe('Escape/backdrop dismissal (useModalDismiss lane)', () => {
+    const renderOpen = (onClose = vi.fn()) => {
+      render(<GenerateDungeonModal campaignName="test-campaign" onClose={onClose} onMapCreated={vi.fn()} />);
+      return onClose;
+    };
+
+    it('Escape on the overlay closes', () => {
+      const onClose = renderOpen();
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a body-targeted Escape still closes (window rescue lane)', () => {
+      const onClose = renderOpen();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('backdrop click closes; a click inside the panel does not', () => {
+      const onClose = renderOpen();
+      fireEvent.click(document.querySelector('.maps-manager-modal'));
+      expect(onClose).not.toHaveBeenCalled();
+      const overlay = document.querySelector('.maps-manager-modal-overlay');
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('Escape is inert while a generation is in flight', async () => {
+      let release;
+      mapsServiceMocks.createMap.mockImplementationOnce(() => new Promise((res) => { release = res; }));
+      const onClose = renderOpen();
+      fillMapName('Dungeon');
+      clickGenerate();
+      await waitFor(() => expect(dungeonMocks.generateDungeon).toHaveBeenCalled());
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+      release({});
     });
   });
 });

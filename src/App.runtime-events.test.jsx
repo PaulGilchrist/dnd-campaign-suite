@@ -415,7 +415,7 @@ describe('App - Runtime Events & State Management', () => {
       expect(window.alert).not.toHaveBeenCalled();
     });
 
-    it('keeps the wizard open and alerts when character creation fails', async () => {
+    it('keeps the wizard open and raises the in-app Save Failed dialog when creation fails', async () => {
       campaignService.createCharacter.mockRejectedValueOnce(new Error('server offline'));
       await renderInCampaign();
 
@@ -428,7 +428,11 @@ describe('App - Runtime Events & State Management', () => {
         fireEvent.click(screen.getByTestId('wizard-complete-btn'));
       });
 
-      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('server offline'));
+      // Item 7 native-dialog retirement: the failure rides App's wizardDialog
+      // (DeleteConfirmModal 'Save Failed' face), never a native window.alert.
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Save Failed');
+      expect(dialog).toHaveTextContent('server offline');
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       expect(screen.queryByTestId('char-btn-New Character')).not.toBeInTheDocument();
     });

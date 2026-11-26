@@ -99,3 +99,11 @@
   font-size: 0.95rem;
   color: var(--color-text);
 }
+
+/* §7 carry-over (Item 7, same defect family as the cured F1): the deep-green
+   band (--background-color-header) stays a DARK surface in the light theme,
+   so this heading rides Item 6's band-ink token there. Dark face unchanged
+   (the base var(--color-text) rule above is untouched). */
+[data-theme="light"] .wizard-step-background .detail-card-header h3 {
+  color: var(--color-band-heading);
+}

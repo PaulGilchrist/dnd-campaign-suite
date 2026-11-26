@@ -3,7 +3,8 @@
 // Property/convention checks (not hard-coded lists), so adding or removing
 // views that follow the conventions requires no churn here.
 import { describe, it, expect } from 'vitest';
-import { VIEWS, SIDEBAR_BUTTONS, SIDEBAR_VIEWS } from './config.js';
+import { VIEWS, SIDEBAR_VIEWS } from './config.js';
+import { VIEW_LABELS, NAV_ITEMS } from '../services/ui/sidebarNav.js';
 
 describe('routes config', () => {
   describe('VIEWS', () => {
@@ -73,31 +74,35 @@ describe('routes config', () => {
     });
   });
 
-  describe('SIDEBAR_BUTTONS', () => {
-    it('should export an array with required non-empty fields and fa-* icons', () => {
-      expect(Array.isArray(SIDEBAR_BUTTONS)).toBe(true);
-      expect(SIDEBAR_BUTTONS.length).toBeGreaterThan(0);
-
-      SIDEBAR_BUTTONS.forEach(button => {
-        expect(button).toMatchObject({
-          label: expect.any(String),
-          icon: expect.any(String),
-          view: expect.any(String),
-        });
-        expect(button.label).not.toBe('');
-        expect(button.icon).not.toBe('');
-        expect(button.view).not.toBe('');
-        expect(button.icon).toMatch(/^fa-/);
+  describe('sidebar label law (F13, Item 7)', () => {
+    // The old SIDEBAR_BUTTONS list in config.js was a DUPLICATE of the live
+    // nav and drifted ("Encounter" vs the sidebar's "Encounters"). It was
+    // deleted; VIEW_LABELS/NAV_ITEMS in services/ui/sidebarNav.js are the
+    // single source of truth the sidebar renders AND the tab title derives.
+    it('VIEW_LABELS carry a unique non-empty label and fa-* icon per view', () => {
+      const entries = Object.entries(VIEW_LABELS);
+      expect(entries.length).toBeGreaterThan(0);
+      const labels = entries.map(([, { label }]) => label);
+      const icons = entries.map(([, { icon }]) => icon);
+      labels.forEach(label => {
+        expect(label).not.toBe('');
       });
-    });
-
-    it('should have unique view references, labels, and icons', () => {
-      const views = SIDEBAR_BUTTONS.map(b => b.view);
-      const labels = SIDEBAR_BUTTONS.map(b => b.label);
-      const icons = SIDEBAR_BUTTONS.map(b => b.icon);
-      expect(new Set(views).size).toBe(views.length);
+      icons.forEach(icon => {
+        expect(icon).toMatch(/^fa-/);
+      });
       expect(new Set(labels).size).toBe(labels.length);
       expect(new Set(icons).size).toBe(icons.length);
+    });
+
+    it('every NAV_ITEMS destination references a labeled view; openers carry their own icon+label', () => {
+      NAV_ITEMS.forEach(item => {
+        if (item.view) {
+          expect(VIEW_LABELS[item.view], `nav view ${item.view} must have a label`).toBeTruthy();
+        } else {
+          expect(item.icon).toMatch(/^fa-/);
+          expect(item.label).not.toBe('');
+        }
+      });
     });
   });
 
@@ -116,12 +121,13 @@ describe('routes config', () => {
       });
     });
 
-    it('should exactly match the views covered by sidebar buttons (set equality)', () => {
+    it('should exactly match the labeled sidebar views (set equality)', () => {
       // Uniqueness of both sides is asserted above, so sorted-array
-      // equality here is a true set comparison. This also implies every
-      // button view references a valid VIEWS entry.
+      // equality here is a true set comparison. The label source is now
+      // sidebarNav.js VIEW_LABELS (F13) — every SIDEBAR_VIEWS entry must
+      // be labeled there and vice versa.
       expect([...SIDEBAR_VIEWS].sort()).toEqual(
-        SIDEBAR_BUTTONS.map(b => b.view).sort()
+        Object.keys(VIEW_LABELS).sort()
       );
     });
   });

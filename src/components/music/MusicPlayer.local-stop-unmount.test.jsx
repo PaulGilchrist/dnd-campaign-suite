@@ -1,7 +1,7 @@
 // @maintained-by-ai: 2026-11-20
 /* Lane: local-stop frame unmount (improve 2026-11-20 backlog).
  * The remote-adoption lane has always torn the frame down on a FOREIGN stop
- * (youtubePlayer.stop + setPlayerMounted(false) → mount-effect cleanup
+ * (ambiencePlayer.stop + setPlayerMounted(false) → mount-effect cleanup
  * disposes), but this tab's OWN Stop click and delete-active-category lane
  * committed the same bytes while leaving the silent .yt-music-frame mounted —
  * frame-count lied about ownership on the last actor tab and a dead embed
@@ -18,9 +18,9 @@ import { render, screen, fireEvent, act, waitFor, within } from '@testing-librar
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -97,9 +97,9 @@ describe('MusicPlayer local Stop unmounts the frame', () => {
 
     // unmount mirrors the remote-release bytes: stop + setPlayerMounted(false)
     // → mount-effect cleanup disposes the embed
-    expect(youtubePlayer.stop).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).toHaveBeenCalledTimes(1);
     expect(frameCount(container)).toBe(0);
-    expect(youtubePlayer.dispose).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.dispose).toHaveBeenCalledTimes(1);
 
     // shared bytes land exactly as before: arm POST then the stopCommit POST
     expect(posts).toHaveLength(2);
@@ -122,8 +122,8 @@ describe('MusicPlayer local Stop unmounts the frame', () => {
     fireEvent.click(townButton()); // lazy-mount path works after unmount
 
     expect(frameCount(container)).toBe(1); // no stale second frame
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(2); // fresh embed
-    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(expect.any(Array));
+    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledTimes(2); // fresh embed
+    expect(ambiencePlayer.playTracks).toHaveBeenLastCalledWith(expect.any(Array), 'test-campaign');
     expect(server()).toMatchObject({ mood: 'town', playing: true });
     expect(loggedActions()).toEqual(['set_ambience', 'stop', 'set_ambience']);
   });
@@ -147,7 +147,7 @@ describe('MusicPlayer local Stop unmounts the frame', () => {
 
 describe('MusicPlayer delete-active-category unmounts the frame', () => {
   const CRYPT = {
-    overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ videoId: 'b', title: 'b' }] },
+    overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ kind: 'youtube', src: 'b', title: 'b' }] },
     customCategories: { 'custom-crypt': { label: 'Crypt' } },
   };
 
@@ -168,7 +168,7 @@ describe('MusicPlayer delete-active-category unmounts the frame', () => {
     expect(posts[1]).toMatchObject({ mood: null, playing: false });
     const patch = posts[2];
     expect(patch.customCategories).toEqual({});
-    expect(patch.overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
+    expect(patch.overrides).toEqual({ tavern: [{ kind: 'youtube', src: 'b', title: 'b' }] });
     expect(server()).toMatchObject({ mood: null, playing: false });
     expect(server().customCategories).toEqual({});
     expect(loggedActions()).toEqual(['set_ambience', 'delete_category']);
@@ -179,9 +179,9 @@ describe('MusicPlayer delete-active-category unmounts the frame', () => {
     await waitFor(() => expect(document.querySelector('.music-toast')).toHaveTextContent('Category Crypt deleted'));
 
     // NEW: the acting tab releases its frame exactly like the remote lane
-    expect(youtubePlayer.stop).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).toHaveBeenCalledTimes(1);
     expect(frameCount(container)).toBe(0);
-    expect(youtubePlayer.dispose).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('serializes the evict: the stop POST resolves BEFORE the PATCH dispatches (no overwrite race)', async () => {
@@ -235,6 +235,6 @@ describe('MusicPlayer delete-active-category unmounts the frame', () => {
 
     // Town keeps playing — the unmount belongs to the ACTIVE-mood arm only
     expect(frameCount(container)).toBe(1);
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
   });
 });

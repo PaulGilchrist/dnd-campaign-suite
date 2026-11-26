@@ -75,6 +75,10 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 
 vi.mock('../../services/encounters/encountersService.js', () => ({
   formatEncounterName: vi.fn((name) => `Encounter: ${name}`),
+  // Item 4 print lane imports loadEncounter (GET-only roster fetch); these
+  // files never open the sheet, so a resolved-empty stub only satisfies
+  // the module's import binding.
+  loadEncounter: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock('../../services/encounters/encounterToInitiative.js', () => ({

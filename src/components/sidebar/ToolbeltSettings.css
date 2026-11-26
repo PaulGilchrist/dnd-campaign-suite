@@ -1,0 +1,73 @@
+/* Personalized toolbelt dialog (Item 1). The dialog chrome itself is the
+   shared ct-modal kit (App.css) — only the dialog's OWN layout lives here,
+   scoped to the component. The starting-point pills reuse the shared admin
+   pill kit (session-phase-pill in SessionSection.css — the toolbelt-section
+   was added to its selector list there, same cross-section reuse pattern
+   EnforcementSection established). Checkbox rows reuse .enforcement-toggle. */
+
+/* Kit host. Rendered via createPortal into <body> (the dialog must escape
+   the sidebar's z-100 stacking context to sit at the same z-1000 confirm
+   tier as every other ct-modal). The ct-modal kit styles are scoped under
+   `.ct-container`, so this wrapper supplies that ancestor; it is zero-sized
+   (the overlay is position:fixed) so it contributes no layout of its own. */
+.ct-container.toolbelt-modal-host {
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    padding: 0;
+}
+
+.toolbelt-section .toolbelt-intro {
+    margin: 0;
+    font-size: 0.9em;
+}
+
+.toolbelt-section .toolbelt-presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.toolbelt-section .toolbelt-presets .session-phase-pill {
+    cursor: pointer;
+}
+
+/* Custom is a derived status chip, not a button — no affordance it lacks
+   (mirrors the enforcement preset row law). */
+.toolbelt-section .toolbelt-presets span.session-phase-pill {
+    cursor: default;
+}
+
+.toolbelt-section .toolbelt-views {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: none;
+    padding: 0;
+    margin: 4px 0;
+}
+
+.toolbelt-section .toolbelt-note {
+    opacity: 0.75;
+    font-size: 0.85em;
+    margin: 0;
+}
+
+/* Feedback strip — same token language as the Admin status lanes
+   (#1a472a/#90ee90 success, #7c2d12/#fecaca error — readable on both
+   themes, the campaign-admin status colors carry no light twin). */
+.toolbelt-section .toolbelt-status {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.85em;
+}
+
+.toolbelt-section .toolbelt-status--success {
+    background: #1a472a;
+    color: #90ee90;
+}
+
+.toolbelt-section .toolbelt-status--error {
+    background: #7c2d12;
+    color: #fecaca;
+}

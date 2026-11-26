@@ -69,6 +69,38 @@
     scroll-behavior: smooth;
 }
 
+/* F19 (visual audit 2026-11-25, Item 7): the rail's last card used to be
+   chopped mid-name with zero cue that the rail scrolls (macOS hides overlay
+   scrollbars). Cue = the sticky edge-fade twin below, revealed only while
+   the container carries .carousel-rail-clipped (JS measurement lane —
+   useRailClipped), so a fully-visible rail shows no cue. */
+
+/* Sticky edge-fade (see Initiative.jsx): rendered as the last flex child,
+   it pins itself to the right viewport edge of the scrolling rail and
+   paints a soft wash over the chopped card (zero-basis + negative margins
+   keep it from shifting card layout). Hidden by default. */
+.initiative .carousel-rail-fade {
+    display: none;
+    position: sticky;
+    right: 0;
+    flex: 0 0 0;
+    width: 0;
+    align-self: stretch;
+    pointer-events: none;
+    margin-left: -36px;
+    margin-right: -36px;
+    padding-right: 36px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.5));
+}
+
+.initiative .carousel-rail-clipped .carousel-rail-fade {
+    display: block;
+}
+
+[data-theme="light"] .initiative .carousel-rail-fade {
+    background: linear-gradient(to right, transparent, rgba(240, 235, 225, 0.85));
+}
+
 /* NPC remove button */
 .initiative .npc-remove-btn {
     position: absolute;
@@ -1729,4 +1761,87 @@
 
 @media (prefers-reduced-motion: reduce) {
     .initiative .your-turn-cue { animation: none; }
+}
+
+/* ---- TV board on paper (visual audit F7, print-law pass of backlog Item 4) ----
+   The TV face is screen theatre: dark surface, glow pulses, 1.5× zoom. On paper
+   that turned the name text dark-on-dark and burned ink (audit F7). Print media
+   gets its own light face — Chronicle's `body:has(...)` light-canvas idiom,
+   scoped so no other view is touched. The chip that invites this print run
+   (`button.tv-toggle-button`) carries .no-print itself. */
+@media print {
+    body:has(.initiative--tv) {
+        background-color: #fff;
+    }
+
+    .initiative.initiative--tv {
+        --background-color: #fff;
+        --color-text: #111;
+        --color-text-secondary: #555;
+        --color-header: #14532d;
+        --border-color: #999;
+        background-color: #fff;
+    }
+
+    .initiative--tv .creature-card,
+    .initiative--tv .creature-card:hover {
+        background-color: #fff;
+        color: #111;
+        opacity: 1;
+        zoom: 1;
+        box-shadow: none;
+        break-inside: avoid;
+    }
+
+    .initiative--tv .creature-card.active {
+        animation: none;
+        background-color: #fff;
+        box-shadow: none;
+        margin: 8px 12px;
+        zoom: 1.1;
+    }
+
+    .initiative--tv .creature-name,
+    .initiative--tv .combat-header h4,
+    .initiative--tv .tv-next-up {
+        color: #111;
+    }
+
+    .initiative--tv .hp-bar-container {
+        background-color: #ddd;
+    }
+}
+
+/* ===== Light-theme card controls (Item 7, audit F9) =====
+   The Init inputs, target selects and dashed ghost add/edit triggers were
+   skinned for the dark card only: white-translucent borders + opacity ghosts
+   vanished on the light card. The light faces take real ink + borders from
+   the disabled-token pair (index.css), and the dashed ghosts keep their hue
+   at readable strength instead of 50% opacity. */
+[data-theme="light"] .initiative .creature-initiative input[type="number"],
+[data-theme="light"] .initiative .creature-target select {
+    border: 1px solid var(--color-disabled-border);
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+}
+
+[data-theme="light"] .initiative .creature-target select:disabled,
+[data-theme="light"] .initiative .creature-initiative input[type="number"]:disabled {
+    opacity: 1;
+    background-color: var(--background-color-disabled);
+    border-color: var(--color-disabled-border);
+    color: var(--color-disabled-text);
+}
+
+[data-theme="light"] .initiative .effect-add-btn,
+[data-theme="light"] .initiative .concentration-add-btn {
+    opacity: 1;
+    border-color: rgba(126, 34, 206, 0.7);
+    color: #6d28d9;
+}
+
+[data-theme="light"] .initiative .allies-edit-btn {
+    opacity: 1;
+    border-color: rgba(29, 78, 216, 0.7);
+    color: #1d4ed8;
 }

@@ -39,7 +39,7 @@ import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 // FAILED stamp self-heals by clearing the cache so the next transition retries.
 let lastCampaignStamp = null;
 
-/** Test seam (youtubePlayer.js `_resetForTests` precedent): forget the
+/** Test seam (ambiencePlayer.js `_resetForTests` precedent): forget the
  *  last-stamped campaign so the next mount re-stamps, simulating a fresh
  *  module load. */
 // eslint-disable-next-line react-refresh/only-export-components

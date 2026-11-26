@@ -3,8 +3,9 @@
 // live runtime store via read-only useRuntimeValue subscriptions. Zero local
 // game state: the row component subscribes to its own character's HP /
 // condition keys (hooks must live per-row, so each row is its own component).
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import useRailClipped from '../../hooks/ui/useRailClipped.js';
 import { normalizeConditionKeys } from '../../services/combat/conditions/conditionDisplay.js';
 import StatusBadges from './StatusBadges.jsx';
 import { getBaseSpeed } from '../char-sheet/char-summary/charSummaryCalc.js';
@@ -27,7 +28,12 @@ function SkillsCell({ skills }) {
                     className={`gm-skill${skill.expert ? ' gm-skill-expert' : ''}`}
                     title={skill.expert ? `${skill.name} (expertise)` : skill.name}
                 >
-                    {skill.name} {formatBonus(skill.bonus)}
+                    {/* Item 7 F16: expertise rides the app's attention-amber
+                        star (same gold as the ruler/hint language), NOT the
+                        blue that the buff-effect badges own — before this, a
+                        plain blue number silently read as "buffed". */}
+                    {skill.expert && <i className="fa-solid fa-star fa-xs gm-skill-star" aria-hidden="true"></i>}
+                    {' '}{skill.name} {formatBonus(skill.bonus)}
                 </span>
             ))}
         </td>
@@ -128,6 +134,12 @@ function PartyRow({ character, campaignName, campaignEffects }) {
 }
 
 export default function GMScreenPartyTable({ party, campaignName, campaignEffects }) {
+    // F3 (Item 7): the wide party table scrolls horizontally (.ct-scroll-x),
+    // but a tall container parks its (overlay-hidden on macOS) scrollbar far
+    // below the fold — when clipped, name the affordance at the TOP of the
+    // table so cut columns never read as lost data.
+    const scrollRef = useRef(null)
+    const clipped = useRailClipped(scrollRef, party.length)
     return (
         <section className="gm-section" aria-label="Party overview">
             <h3 className="gm-section-title">
@@ -136,7 +148,14 @@ export default function GMScreenPartyTable({ party, campaignName, campaignEffect
             {party.length === 0 ? (
                 <p className="gm-empty text-muted">No party members loaded yet.</p>
             ) : (
-                <div className="gm-table-scroll">
+                <>
+                    {clipped && (
+                        <p className="gm-table-scroll-hint">
+                            <i className="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            {' '}Scroll sideways for the remaining columns.
+                        </p>
+                    )}
+                    <div className="gm-table-scroll ct-scroll-x" ref={scrollRef}>
                     <table className="table-striped gm-party-table">
                         <thead>
                             <tr>
@@ -162,7 +181,8 @@ export default function GMScreenPartyTable({ party, campaignName, campaignEffect
                             ))}
                         </tbody>
                     </table>
-                </div>
+                    </div>
+                </>
             )}
         </section>
     );

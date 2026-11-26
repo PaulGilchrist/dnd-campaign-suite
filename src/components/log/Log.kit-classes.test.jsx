@@ -46,6 +46,10 @@ describe('Log .ct-* kit classes (tranche 2 convergence)', () => {
     // Pinned byte-copy law: composer face unchanged by the convergence.
     expect(post).toHaveAttribute('title', 'Post note');
     expect(post).toHaveAttribute('aria-label', 'Post note');
+    // F12 (Item 7): the unlabeled `+` became a labeled primary — the visible
+    // verb text carries the pinned copy too (icon stays decorative).
+    expect(post.textContent).toContain('Post');
+    expect(post.querySelector('i[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('loading and empty faces ride ct-empty-state alongside the pinned tokens', () => {

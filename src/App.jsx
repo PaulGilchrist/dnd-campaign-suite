@@ -20,7 +20,7 @@ import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import { characterFileName } from './services/campaign/characterFileName.js';
-import useCampaignType from './hooks/management/useCampaignType.js';
+import useCampaignMeta from './hooks/management/useCampaignMeta.js';
 import useAppData from './hooks/runtime/useAppData.js';
 import useCharacterManagement from './hooks/management/useCharacterManagement.js';
 import useCampaignManagement from './hooks/management/useCampaignManagement.js';
@@ -45,6 +45,7 @@ import Sessions from './components/sessions/Sessions.jsx';
 import Factions from './components/factions/Factions.jsx';
 import PartyInventory from './components/party-inventory/PartyInventory.jsx';
 import Log from './components/log/Log.jsx';
+import Chronicle from './components/chronicle/Chronicle.jsx';
 import GMScreen from './components/gm-screen/GMScreen.jsx';
 import MusicPlayer from './components/music/MusicPlayer.jsx';
 import CampaignAdmin from './components/campaign-admin/CampaignAdmin.jsx';
@@ -532,6 +533,7 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
     return (
       <MapsManager
         campaignName={campaignName}
+        isLocalhost={isLocalhost}
         onOpenMap={(mapName, mapDisplayName) => { setMapsView({ type: 'map', mapName, mapDisplayName }); setActiveMapName(mapName); }}
         // Deleting the active map clears the server key (stampActiveMapContext
         // null) — mirror that into this tab's roller-lane context so the stale
@@ -624,7 +626,7 @@ function handleChecklistNavigate(view, intent, setActiveView) {
   setActiveView(view);
 }
 
-function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView, restoredSnapshot }) {
+function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView, restoredSnapshot, hiddenViews }) {
   const views = {
     encounter: <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />,
     notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
@@ -639,6 +641,8 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
+    // Chronicle (backlog Item 2): pure-read story page over the same log lane.
+    chronicle: <Chronicle campaignName={campaignName} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}
@@ -649,6 +653,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
         onDeleteCampaign={onDeleteCampaign}
         restoredSnapshot={restoredSnapshot}
         isLocalhost={isLocalhost}
+        hiddenViews={hiddenViews}
         onNavigate={(view) => setActiveView(view)}
       />
     ),
@@ -699,7 +704,7 @@ function App() {
 
   const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw } = campaignMgmt;
   const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, deleteErrorName, dismissDeleteError, inputRef } = charMgmt;
-  const { showCharacterWizard, showEditCharacterWizard, editingCharacter, closeWizards, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
+  const { showCharacterWizard, showEditCharacterWizard, editingCharacter, closeWizards, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel, wizardDialog } = wizard;
 
    // Compute full stats for all characters through the rules engine
     const [computedCharacters, setComputedCharacters] = useState([]);
@@ -867,16 +872,20 @@ function App() {
       showCampaignSelection,
       activeView,
       characterName: activeCharacter?.name,
+      isLocalhost,
     });
-  }, [campaignName, showCampaignSelection, activeView, activeCharacter]);
+  }, [campaignName, showCampaignSelection, activeView, activeCharacter, isLocalhost]);
 
   useEffect(() => {
     setMapsView({ type: 'none' });
   }, [campaignName]);
 
-  // Campaign type (standard | arena | starter) drives the sidebar chip and
-  // arena nav gating (see useCampaignType).
-  const campaignType = useCampaignType(campaignName);
+  // Campaign meta (type + sidebar toolbelt): the type drives the sidebar
+  // chip and arena nav gating; hiddenViews hides GM-chosen views for every
+  // device in this campaign (learnability backlog Item 1). The activeView
+  // guard argument folds the hidden-view route fallback into the SAME call
+  // (App is at its max-statements ceiling).
+  const { campaignType, hiddenViews, saveHiddenViews } = useCampaignMeta(campaignName, { activeView, setActiveView });
 
   // Starter-checklist remount epoch (backlog UM 2026-11-20): the empty-state
   // card's "Open the starter checklist" affordance bumps this to re-mount
@@ -1142,9 +1151,12 @@ function App() {
             onFactionsClick={handleFactionsClick}
            onGMScreenClick={() => setActiveView('gmScreen')}
            onLogClick={handleLogClick}
+           onChronicleClick={() => setActiveView('chronicle')}
           onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
           campaignType={campaignType}
+          hiddenViews={hiddenViews}
+          onSaveHiddenViews={saveHiddenViews}
           onHelpClick={() => setHelpOpen(true)}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
@@ -1246,6 +1258,7 @@ function App() {
           onDeleteCampaign={handleDeleteCampaign}
           setActiveView={setActiveView}
           restoredSnapshot={restoredSnapshot}
+          hiddenViews={hiddenViews}
         />
         </ErrorBoundary>
         {/* Persistent music player: mounted once per campaign and kept alive
@@ -1269,6 +1282,10 @@ function App() {
             reattach bug); keying by name makes a re-edit of a different character a
             clean remount (fresh seed) rather than a mixed draft. */}
         {showEditCharacterWizard && <CharacterCreationWizard key={editingCharacter?.name} onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={editingCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}
+        {/* Item 7 (native-dialog retirement): the wizard save lane's level
+            confirm / save-failure dialogs (null when idle) — host-mounted
+            sibling so the wizard overlay stays untouched underneath. */}
+        {wizardDialog}
         <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />

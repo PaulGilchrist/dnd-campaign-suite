@@ -25,6 +25,11 @@ import { isLocalEndpoint, PROVIDERS } from '../services/ai/providers/localProvid
 // that renders somewhere is a doc the server admits everywhere.
 import { isValidOverlay } from '../../src/models/SpellOverlay.js';
 
+// Token cosmetics palette (learnability Item 5) — the server polices stored
+// rows against the CLIENT's one palette list (same server-imports-src-config
+// precedent as maps.js reading outdoorConfig.js): one vocabulary, no drift.
+import { TOKEN_PALETTE, isTokenRingId } from '../../src/config/tokenCosmetics.js';
+
 // Mirrors client ENFORCEMENT_DEFAULTS (src/services/combat/canTakeAction.js).
 // Keeping the list explicit here is the point: the server defines the contract.
 const ENFORCEMENT_FLAGS = new Set([
@@ -361,6 +366,52 @@ function validateActiveConditionsArray(value, label) {
 }
 
 /**
+ * Token cosmetics row (learnability backlog Item 5) — scanned when present on
+ * a creature-store bucket write (the character runtime bucket is where the
+ * row canonically lives; see src/config/tokenCosmetics.js for the lane trace).
+ * Shape validity only, never authority: honest players ride this lane from
+ * ANY origin by design (players write their own character keys), so the
+ * refusal copy names the offending value, mirroring the activeConditions and
+ * music-row idiom. Absent/null is the honest unset (the canonical default
+ * look); a present row must be a plain object carrying only the known
+ * fields: ringColor null or a palette id, hideLabel null or boolean.
+ */
+const TOKEN_COSMETICS_KEYS = new Set(['ringColor', 'hideLabel']);
+
+function validateTokenCosmeticsProp(cosmetics) {
+    if (cosmetics === undefined || cosmetics === null) return { ok: true };
+    if (!isPlainObject(cosmetics)) {
+        return {
+            ok: false,
+            reason: 'tokenCosmetics must be an object like { ringColor: "ember", hideLabel: true } '
+                + `(or null to clear) — got ${describeJsonValue(cosmetics)}.`,
+        };
+    }
+    const unknown = Object.keys(cosmetics).filter(key => !TOKEN_COSMETICS_KEYS.has(key));
+    if (unknown.length) {
+        return {
+            ok: false,
+            reason: `tokenCosmetics has unknown key(s): ${unknown.join(', ')} — known keys are: ${[...TOKEN_COSMETICS_KEYS].join(', ')}`,
+        };
+    }
+    const { ringColor, hideLabel } = cosmetics;
+    if (ringColor !== undefined && ringColor !== null && !isTokenRingId(ringColor)) {
+        return {
+            ok: false,
+            reason: `tokenCosmetics.ringColor must be null or one of the palette colours: `
+                + `${TOKEN_PALETTE.map(p => p.id).join(', ')} — got ${describeJsonValue(ringColor)}.`,
+        };
+    }
+    if (hideLabel !== undefined && hideLabel !== null && typeof hideLabel !== 'boolean') {
+        return {
+            ok: false,
+            reason: `tokenCosmetics.hideLabel must be a boolean or null — got ${describeJsonValue(hideLabel)}.`,
+        };
+    }
+    return { ok: true };
+}
+
+/**
  * H1 hardening (§17): monster-side economy shape validation inside creature
  * store writes (POST /:campaign/:storeName posts the full store). The MA
  * engines (monsterLegendaryUses/monsterRecharge) enforce the rules client-side
@@ -377,6 +428,10 @@ function validateMonsterEconomyProps(value) {
         [validateLegendaryLatchProp, value._legendaryUses_usedRound],
         [validateLegendaryCooldownsProp, value.monsterLegendaryActionCooldowns],
         [validateRechargeMapProp, value.monsterRecharge],
+        // Token cosmetics (Item 5): same optional-property doctrine — only
+        // scanned when present, so buckets without the key round-trip
+        // byte-identically.
+        [validateTokenCosmeticsProp, value.tokenCosmetics],
     ]) {
         const result = check[0](check[1]);
         if (!result.ok) return result;

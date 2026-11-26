@@ -46,10 +46,16 @@
 
 .settlements-list-tags {
   font-size: 0.78rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* F5 (Item 7): tag pill treatment (tag tokens, pill radius) so the tag
+     list reads as a set, not a run-on sentence. */
+  background: var(--background-color-tag);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 1px 10px;
 }
 
 .settlements-list-services {

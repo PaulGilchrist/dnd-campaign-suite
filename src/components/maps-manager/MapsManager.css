@@ -520,14 +520,6 @@
   opacity: 0.9;
 }
 
-[data-theme="light"] .maps-manager .generate-dungeon-btn {
-  background: #4a7db5 !important;
-  color: #fff !important;
-}
-
-@media (prefers-color-scheme: light) {
-  body:not([data-theme="dark"]) .maps-manager .generate-dungeon-btn {
-    background: #4a7db5 !important;
-    color: #fff !important;
-  }
-}
+/* F8 (Item 7): the light BLUE override (#4a7db5) is gone — the button is the
+   kit's green-primary verb in BOTH themes, exactly like Create Map and the
+   campaign-selection create row. */

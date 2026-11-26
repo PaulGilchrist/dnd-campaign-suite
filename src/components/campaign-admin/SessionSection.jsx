@@ -48,7 +48,7 @@ function entryMatchesAudit(e) {
     return AUDIT_TYPES.includes(type) || automationType.startsWith('ai_') || automationType === 'manual_takeover'
 }
 
-export default function SessionSection({ campaignName, characters = [], onNavigate }) {
+export default function SessionSection({ campaignName, characters = [], onNavigate, hiddenViews = [] }) {
     // sessionState rides the synced store so SSE moves the pills in every view.
     const [sessionState] = useSyncedState('campaign', 'sessionState', null, campaignName)
     const phase = sessionState?.phase || readSessionPhase(campaignName)
@@ -112,7 +112,7 @@ export default function SessionSection({ campaignName, characters = [], onNaviga
             )}
 
             {/* "Try next" invitations (Phase 2): additive only — see TryNextSection. */}
-            <TryNextSection campaignName={campaignName} characters={characters} onNavigate={onNavigate} />
+            <TryNextSection campaignName={campaignName} characters={characters} onNavigate={onNavigate} hiddenViews={hiddenViews} />
 
             <div className="session-audit">
                 <div className="session-audit-head">

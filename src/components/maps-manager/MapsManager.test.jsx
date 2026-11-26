@@ -117,6 +117,13 @@ describe('MapsManager', () => {
             expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
         });
 
+        // F13 (Item 7): the header names the view the visitor's nav names it —
+        // "Map" on network origins (NAV_ITEMS playerLabel), not "Maps".
+        it('renders the visitor "Map" heading on a non-localhost origin', () => {
+            render(<MapsManager {...props} isLocalhost={false} />);
+            expect(screen.getByRole('heading', { name: 'Map' })).toBeInTheDocument();
+        });
+
         it('shows a loading indicator while maps are being fetched', () => {
             mapsService.loadMaps.mockImplementation(() => new Promise(() => {}));
             render(<MapsManager {...props} />);

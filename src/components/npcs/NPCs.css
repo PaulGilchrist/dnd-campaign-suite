@@ -42,10 +42,15 @@
 /* Tags with icon */
 .npcs-list-tags {
   font-size: 0.78rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* F5 (Item 7): tag pill treatment, twin of .settlements-list-tags. */
+  background: var(--background-color-tag);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 1px 10px;
 }
 
 /* List item header with avatar */
@@ -81,6 +86,10 @@
   align-items: center;
   gap: 8px;
   margin-top: 2px;
+  /* Shared kit narrow law (App.css .ct-header precedent): rows wrap rather
+     than push the Print Card verb off-card on phone-class viewports
+     (Item 4 live proof at 420px). */
+  flex-wrap: wrap;
 }
 
 /* Add to Initiative chip in list — .ct-* kit convergence (tranche 3): the
@@ -398,4 +407,26 @@
   .npcs-stats-tab {
     page-break-before: always;
   }
+}
+
+/* F21 (Item 7): cause text for the disabled Add-to-Initiative — rides the
+   app's parchment advisory chip vocabulary (map-toast / no-attack badge
+   family): amber-on-amber dark, opaque parchment light. */
+.npcs-init-cause {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--background-color-warning);
+  border: 1px solid var(--border-color-warning);
+  color: var(--color-warning);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .npcs-init-cause {
+  background: #fff8e1;
+  border-color: #cc8800;
+  color: #7a5200;
 }

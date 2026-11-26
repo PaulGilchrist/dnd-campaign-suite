@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -65,8 +65,21 @@ function openEditor() {
   return document.querySelector('#music-editor-urls');
 }
 
+// Item 3b: starter moods seed bundled /audio/ beds; the zero-valid refusal
+// lane needs the draft truly empty, so clear the seeded rows first.
+function clearSeededRows() {
+  let btn;
+  while ((btn = document.querySelector('.music-editor-local-tracks button'))) {
+    fireEvent.click(btn);
+  }
+}
+
+// Item 3b: the starter moods head with bundled /audio/ beds, and a Save
+// persists the WHOLE draft — those repo-owned rows ride along with whatever
+// YouTube lines the textarea holds. This helper narrows to the textarea's
+// YouTube survivors, which is what the drop-count scenarios pin.
 const savedIds = (mood = 'town') =>
-  (musicState()?.overrides?.[mood] || []).map(t => t.videoId);
+  (musicState()?.overrides?.[mood] || []).filter(t => t.kind === 'youtube').map(t => t.src);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -89,9 +102,10 @@ describe('MusicPlayer mixed-save drop warning', () => {
       .toHaveTextContent('Town tracks saved — keep editing'));
     expect(document.querySelector('.music-editor-error'))
       .toHaveTextContent(warning(1));
-    // Only the parseable line reached the server (PATCH body and store both).
+    // Only the parseable line reached the server (PATCH body and store both);
+    // the two seeded bundled beds ride along — a Save lands the WHOLE draft.
     expect(stub.posts).toHaveLength(1);
-    expect(stub.posts[0].overrides.town.map(t => t.videoId)).toEqual(['dQw4w9WgXcQ']);
+    expect(stub.posts[0].overrides.town.map(t => t.src)).toEqual(['dQw4w9WgXcQ', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
     expect(savedIds()).toEqual(['dQw4w9WgXcQ']);
     // Editor stays open with the draft intact (stay-open save law).
     expect(document.querySelector('.music-editor')).not.toBeNull();
@@ -157,6 +171,7 @@ describe('MusicPlayer mixed-save drop warning', () => {
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     renderPlayer();
     openEditor();
+    clearSeededRows(); // Item 3b: zero-valid refusal needs NOTHING queued
     fireEvent.change(document.querySelector('#music-editor-urls'), {
       target: { value: 'not a youtube thing\ngarbage' }
     });

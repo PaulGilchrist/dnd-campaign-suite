@@ -3,6 +3,7 @@ import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import {
   buildTokenStatusIndicators,
   TOKEN_STATUS_VISIBLE_LIMIT,
+  TOKEN_CONDITION_RING_RADIUS,
 } from '../../services/combat/conditions/tokenStatus.js';
 import { CELL_SIZE } from '../../config/mapConfig';
 import './TokenStatusIndicators.css';
@@ -54,6 +55,23 @@ function TokenStatusIndicators({ campaignName, creatureName, cx, cy, stack }) {
 
     return (
         <g className="token-status-indicators" data-testid="token-status-indicators" data-creature={creatureName} transform={stack}>
+            {/* Uniform condition treatment (Item 5): a dashed red ring around
+                the token disc whenever the indicator set is non-empty — ONE
+                style on every surface (hex avatars share the class language,
+                see config/tokenCosmetics.css), driven by this SAME registry
+                derivation, never a per-condition glyph (the chips below stay
+                the detail layer). Painted here because this layer already
+                owns the live per-creature subscription, the fog/ghost/hidden
+                cull laws and the buried-stack transform; drawing LAST is the
+                layer's own occlusion fix, so the ring can never be buried. */}
+            <circle
+                className="token-condition-ring"
+                data-testid="token-condition-ring"
+                cx={cx}
+                cy={cy}
+                r={TOKEN_CONDITION_RING_RADIUS}
+                pointerEvents="none"
+            />
             {chips.map((chip, i) => (
                 <g
                     key={chip.id}

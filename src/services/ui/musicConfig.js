@@ -1,6 +1,21 @@
 /**
  * Shared background music — mood catalogue (ambience duty is delegable to players).
  *
+ * Canonical track row (offline-ambience backlog Item 3 + Item 3b, 2026-11-25):
+ * every mood track — starter catalogue or campaign override — is exactly
+ *   { kind: 'youtube', src: <11-char video id>, title }
+ * or
+ * { kind: 'local',   src, title }
+ * where a local `src` is one of two honest paths: a campaign-RELATIVE upload
+ * ('audio/<upload name>', served from public/campaigns/<campaign>/audio/) or
+ * a root-ABSOLUTE bundled bed ('/audio/<name>.mp3', the repo-owned CC0
+ * starter pack under public/audio/ — served straight off the app origin, so
+ * an offline table has sound on first boot with zero uploads). One kind
+ * discriminator, two well-formed src homes; the server validates both
+ * (server/utils/campaignAudio.js). The starter rows below are the migrated
+ * seed — bundled beds lead every mood queue, YouTube alternates follow, and
+ * a DJ adds offline files through the Music view editor.
+ *
  * Each mood maps to one or more YouTube videos (verified public & embeddable
  * at time of writing). Any DJ (GM or player) can replace a track by pasting a
  * YouTube URL in the Music view editor; overrides persist per-campaign in the
@@ -13,8 +28,10 @@ export const MOODS = [
     label: 'Town',
     icon: 'fa-house-chimney',
     tracks: [
-      { videoId: 'q9yaKpYS9qc', title: 'Village | D&D/TTRPG Ambience (Bardify)' },
-      { videoId: 'o-b5nMCj5hI', title: 'Medieval City Sounds | Market Day (Danny Fortress Fantasy Music)' }
+      { kind: 'local', src: '/audio/town-theme.mp3', title: 'Town Theme | Harps & Recorders (Cynic Music, CC0)' },
+      { kind: 'local', src: '/audio/fishing-village.mp3', title: 'Fishing Village | Warm Atmosphere (Man of Steel, CC0)' },
+      { kind: 'youtube', src: 'q9yaKpYS9qc', title: 'Village | D&D/TTRPG Ambience (Bardify)' },
+      { kind: 'youtube', src: 'o-b5nMCj5hI', title: 'Medieval City Sounds | Market Day (Danny Fortress Fantasy Music)' }
     ]
   },
   {
@@ -22,8 +39,10 @@ export const MOODS = [
     label: 'Outdoors',
     icon: 'fa-tree',
     tracks: [
-      { videoId: '6Em9tLXbhfo', title: 'D&D Ambience - Forest Daytime (Sword Coast Soundscapes)' },
-      { videoId: '4Y6n-1XQSfE', title: 'Mysterious Forest | D&D/TTRPG Music (Bardify)' }
+      { kind: 'local', src: '/audio/birds-wind.mp3', title: 'Birds & Wind | Long Ambient Bed (Spring-Spring, CC0)' },
+      { kind: 'local', src: '/audio/forest-ambience.mp3', title: 'Forest Ambience | Seamless Loop (Tiny Worlds, CC0)' },
+      { kind: 'youtube', src: '6Em9tLXbhfo', title: 'D&D Ambience - Forest Daytime (Sword Coast Soundscapes)' },
+      { kind: 'youtube', src: '4Y6n-1XQSfE', title: 'Mysterious Forest | D&D/TTRPG Music (Bardify)' }
     ]
   },
   {
@@ -31,8 +50,10 @@ export const MOODS = [
     label: 'Combat',
     icon: 'fa-khanda',
     tracks: [
-      { videoId: 't3B802PIuB0', title: 'D&D/RPG Combat Music Mix (Travis Savoie)' },
-      { videoId: 'rfC3wkZ43Jg', title: 'Born For This | Epic Orchestral Battle Music (Epic Music Mix)' }
+      { kind: 'local', src: '/audio/battle-theme.mp3', title: 'Battle Theme | Orchestral Tension (Wolfgang, CC0)' },
+      { kind: 'local', src: '/audio/determined-pursuit.mp3', title: 'Determined Pursuit | Loopable Battle Cue (Emma Ma, CC0)' },
+      { kind: 'youtube', src: 't3B802PIuB0', title: 'D&D/RPG Combat Music Mix (Travis Savoie)' },
+      { kind: 'youtube', src: 'rfC3wkZ43Jg', title: 'Born For This | Epic Orchestral Battle Music (Epic Music Mix)' }
     ]
   },
   {
@@ -40,8 +61,10 @@ export const MOODS = [
     label: 'Dungeon',
     icon: 'fa-dungeon',
     tracks: [
-      { videoId: 'bxoRRobHtGM', title: 'Dark Dungeon Ambience (AMBIENT METHOD)' },
-      { videoId: 'W2NAblVD70Q', title: 'Dungeon of the Dark Pyramid (Soundscapes & Ambience)' }
+      { kind: 'local', src: '/audio/dungeon-ambient.mp3', title: 'Dungeon Ambience | Wind & Drips (Jaggedstone, CC0)' },
+      { kind: 'local', src: '/audio/forgotten-tomb.mp3', title: 'Forgotten Tomb | Dark Ambience (Kindland, CC0)' },
+      { kind: 'youtube', src: 'bxoRRobHtGM', title: 'Dark Dungeon Ambience (AMBIENT METHOD)' },
+      { kind: 'youtube', src: 'W2NAblVD70Q', title: 'Dungeon of the Dark Pyramid (Soundscapes & Ambience)' }
     ]
   },
   {
@@ -49,8 +72,9 @@ export const MOODS = [
     label: 'Tavern',
     icon: 'fa-beer-mug-empty',
     tracks: [
-      { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
-      { videoId: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
+      { kind: 'local', src: '/audio/old-tower-inn.mp3', title: 'The Old Tower Inn | Medieval Tavern (Randommind, CC0)' },
+      { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+      { kind: 'youtube', src: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
     ]
   }
 ];

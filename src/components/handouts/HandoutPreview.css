@@ -1,0 +1,111 @@
+/* ============ Handout preview shell (print & handouts backlog Item 4) ============ */
+
+/* The paper sheet. Light-face law (F7 / Chronicle): the print surface is
+   ALWAYS white paper with black ink, so the same light tokens are applied
+   unconditionally — on screen the preview is a truthful WYSIWYG of paper
+   even in dark theme, and print inherits it. The app green survives only
+   as sparse section-heading ink that stays legible in grayscale. */
+.handout-page {
+    --color-text: #111;
+    --color-header: #14532d;
+    --color-section-heading: #14532d;
+    --color-text-muted: #555;
+    --background-color-card: #fff;
+    --background-color-main: #fff;
+    /* The global thead/tbody rules (index.css) paint these two tokens — on
+       paper they must be light or the roster table prints ink-black. */
+    --background-color-header: #efefef;
+    --background-color-body: #fff;
+    --color-body: #111;
+    --border-color: #767676;
+    --border-color-light: #999;
+    --color-primary: #1b7a2f;
+    --color-warning: #8a6d1a;
+
+    background-color: #fff;
+    color: #111;
+    width: min(7.6in, 100%);
+    margin: 0 auto;
+    padding: 28px 34px;
+    border: 1px solid #999;
+    box-shadow: 0 3px 16px rgba(0, 0, 0, 0.35);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+/* Screen-only sheet framing inside the dark preview modal: the modal body
+   provides the desk behind the paper. Specificity follows the kit tiers
+   (.ct-container .ct-modal …) so these previews override, not bleed. */
+.ct-container .handout-preview-modal {
+    max-width: 8.6in;
+    width: 92vw;
+}
+
+.ct-container .handout-preview-modal .ct-modal-body {
+    background-color: #4a4a4a;
+    padding: 20px 12px;
+}
+
+.handout-footer {
+    margin-top: 12px;
+    padding-top: 6px;
+    border-top: 1px solid #999;
+    color: #555;
+    font-size: 0.8em;
+    text-align: right;
+    break-before: avoid;
+}
+
+/* --- Print isolation lane: the factored `ct-modal` print-only trick.
+   The portal root is a direct child of <body>; while a handout preview is
+   open, every OTHER body child (the whole app shell, other overlays, the
+   mc-overlay bestiary theatre) leaves the paper. :has() keys the lane to
+   the preview's presence, so Ctrl+P with no preview open still prints the
+   underlying view exactly as before. --- */
+@media print {
+    body:has(.handout-preview-portal) > :not(.handout-preview-portal) {
+        display: none;
+    }
+
+    /* Paper canvas: the shell's dark body background must never print behind
+       the sheet (F7 light-face law, Chronicle idiom). */
+    body:has(.handout-preview-portal) {
+        background-color: #fff;
+    }
+
+    /* The portal carries .ct-container, so App.css's print-only modal trick
+       already opens the overlay static full-width — these tiers win the
+       sheet-specific overrides over that shared lane by specificity. */
+    .ct-container.handout-preview-portal .ct-modal .ct-modal-body {
+        overflow: visible;
+        padding: 0;
+        background: none;
+    }
+
+    .handout-page {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: none;
+        box-shadow: none;
+    }
+
+    /* Long markdown bodies flow to page 2; headings never strand at a page
+       foot and one-line rules never split across sheets. */
+    .handout-page h1,
+    .handout-page h2,
+    .handout-page h3,
+    .handout-page h4 {
+        break-after: avoid;
+    }
+
+    .handout-page .handout-rule,
+    .handout-page .handout-abilities,
+    .handout-page .handout-ability,
+    .handout-page .handout-action,
+    .handout-page .handout-roster-row,
+    .handout-page .handout-quest,
+    .handout-page .handout-checklist-item {
+        break-inside: avoid;
+    }
+}

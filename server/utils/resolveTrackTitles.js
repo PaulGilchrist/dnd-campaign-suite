@@ -1,13 +1,18 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai: 2026-11-25
 /**
  * Resolve human-readable track titles for music overrides at save time
- * (backlog 2026-10-24: editor parseTrackList stamps title = raw video ID).
+ * (backlog 2026-10-24: editor parseTrackList stamps title = raw video ID;
+ * Item 3 2026-11-25 canonicalized rows to { kind, src, title }).
  *
  * Runs server-side in the POST /api/campaigns/:campaign/music save path —
  * the browser cannot CORS-hit YouTube oEmbed. Each lookup is a bounded
  * network fetch (AbortSignal, 5s/video — the permitted timer category, same
  * idiom as server/services/ai/providers/localProvider.js) and all lookups
  * for one save resolve in parallel.
+ *
+ * Only kind:'youtube' rows are resolved — a kind:'local' row's title is the
+ * uploaded filename, stamped by the upload route, and passes through
+ * untouched (an offline table may not reach oEmbed at all).
  *
  * Failure is graceful and NEVER rejects: a timeout / non-200 / title-less
  * oEmbed response logs console.error and keeps the raw video ID as the
@@ -21,8 +26,14 @@ function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+// The lane only ever enriches canonical YouTube rows; local rows are
+// already titled by their filename and any other shape passes through.
+function isYoutubeRow(track) {
+    return !!track && track.kind === 'youtube' && typeof track.src === 'string' && track.src !== '';
+}
+
 function hasRealTitle(track) {
-    return typeof track.title === 'string' && track.title.trim() !== '' && track.title !== track.videoId;
+    return typeof track.title === 'string' && track.title.trim() !== '' && track.title !== track.src;
 }
 
 /**
@@ -48,8 +59,8 @@ function indexStoredTitles(storedOverrides) {
     for (const tracks of Object.values(storedOverrides)) {
         if (!Array.isArray(tracks)) continue;
         for (const track of tracks) {
-            if (track && typeof track.videoId === 'string' && hasRealTitle(track)) {
-                known.set(track.videoId, track.title);
+            if (isYoutubeRow(track) && hasRealTitle(track)) {
+                known.set(track.src, track.title);
             }
         }
     }
@@ -84,8 +95,9 @@ async function fetchTitles(videoIds) {
 }
 
 /**
- * Return a NEW overrides map ({ [mood]: [{videoId, title}] }) with every
- * raw-ID title replaced by the real YouTube title where resolvable.
+ * Return a NEW overrides map ({ [mood]: [{kind,src,title}] }) with every
+ * raw-ID title on a kind:'youtube' row replaced by the real YouTube title
+ * where resolvable; kind:'local' rows pass through untouched.
  *
  * Stampede guard: a videoId whose STORED overrides already carry a resolved
  * title is reused without re-fetching (re-saving the same mood must not
@@ -101,18 +113,18 @@ export async function resolveOverrideTitles(overrides, storedOverrides = {}) {
     const need = new Set();
 
     const resolveTrack = (track) => {
-        if (!track || typeof track.videoId !== 'string' || !track.videoId) return track;
+        if (!isYoutubeRow(track)) return track;
         if (hasRealTitle(track)) return track;
-        if (known.has(track.videoId)) return { ...track, title: known.get(track.videoId) };
-        need.add(track.videoId);
+        if (known.has(track.src)) return { ...track, title: known.get(track.src) };
+        need.add(track.src);
         return { ...track };
     };
 
     const staged = mapOverrideTracks(overrides, resolveTrack);
     const fetched = await fetchTitles(need);
     return mapOverrideTracks(staged, (track) => (
-        track && typeof track.videoId === 'string' && fetched.has(track.videoId)
-            ? { ...track, title: fetched.get(track.videoId) }
+        isYoutubeRow(track) && fetched.has(track.src)
+            ? { ...track, title: fetched.get(track.src) }
             : track
     ));
 }

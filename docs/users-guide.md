@@ -2,7 +2,7 @@
 
 A full-stack virtual tabletop for D&D 5e (2014) and the 2024 Essentials rules. One person (or machine) runs the app as the **host**; everyone else joins with a browser — no accounts, no installs, no logins. Everything syncs in real time: character sheets, initiative, maps, fog of war, spell overlays, dice, and the campaign log.
 
-The app is designed to be used **as much or as little as you want**. It supports five levels of assistance, and you choose yours per campaign. Levels 1–4 are the classic experience (the app helps, the GM decides). Level 5 adds optional rule enforcement and a local AI that can reduce — or remove — the need for a GM. **With Level 5 switched off, the app behaves exactly as the classic tool it always was.**
+The app is designed to be used **as much or as little as you want**. Section 3 walks through five *illustrative ways tables play* — examples, not fixed modes: nothing in the app locks you into one, you mix freely, and your sidebar itself is adjustable per session (§18). The optional rule enforcement and local AI are plain switches — **with every switch off, the app behaves exactly as the classic tool it always was.**
 
 ---
 
@@ -10,7 +10,7 @@ The app is designed to be used **as much or as little as you want**. It supports
 
 1. [How it works](#1-how-it-works)
 2. [Starting the app](#2-starting-the-app)
-3. [The five levels of assistance](#3-the-five-levels-of-assistance)
+3. [Five illustrative ways to play](#3-five-illustrative-ways-to-play)
 4. [Quick start — a one-shot tonight](#4-quick-start--a-one-shot-tonight)
 5. [Quick start — building a full campaign](#5-quick-start--building-a-full-campaign)
 6. [A guide for players](#6-a-guide-for-players)
@@ -58,11 +58,11 @@ If port 80 is taken: `PORT=3000 npm start`. If players can't connect, check the 
 
 ---
 
-## 3. The five levels of assistance
+## 3. Five illustrative ways to play
 
-Every level builds on the one below it, and every level stays available forever. You choose your level per campaign, mostly by simply using — or not using — the features it offers. Levels 5's optional controls live in **Admin → Enforcement & Referee** and **Admin → AI Referee**, and every one of them defaults to **off**.
+These are **examples of how tables use the app, not modes you select** — nothing here is a setting, and every table mixes freely from night to night (one session might lean on example 1 with printed sheets, the next on the full digital spread). Each example naturally builds on the ones before it, and everything stays available forever. You mostly pick your mix simply by using — or not using — the features it offers. The optional controls from the fifth example live in **Admin → Enforcement & Referee** and **Admin → AI Referee**, and every one of them defaults to **off**.
 
-| Level | Name | What you get | Typical table |
+| Example | Style | What you get | Typical table |
 |---|---|---|---|
 | **1** | **Pre-game only** | Build campaigns, maps, encounters, quests, NPCs, settlements; create and level up characters; print everything. | Paper + real dice on game night. The app is your prep bench. |
 | **2** | **Minimal game use** | The Initiative tracker on a TV or monitor: whose turn it is, who's hurt, who's buffed, round counter — with a dedicated **TV presentation mode** (spotlight, up-next strip, damage floaters, victory banner). | Paper play with a live turn order on screen. |
@@ -70,7 +70,7 @@ Every level builds on the one below it, and every level stays available forever.
 | **4** | **Combat** | The rules run with you: to-hit vs target AC, damage auto-rolls with criticals, resistances/immunity notices, conditions with action-blocking, saves, spell automation, loot and XP, full PvE **and** PvP / NPC-vs-NPC / ally / arena matchups. | Fully digital play; the GM adjudicates anything unusual. |
 | **5** | **GM-optional** | Optional enforcement (turn lock, action economy, movement budgets, line of sight, cover, zones, opportunity attacks, auto-encounters, auto-rewards) plus a **local AI** that can propose NPC decisions, adjudicate rules questions, and maintain world continuity — always through the same engine lanes a human click uses. | The app referees the rules and can run NPCs; a human referee is optional, and can take over at any moment with one button. |
 
-**The promise:** every level-5 capability is a switch, default off. With all switches off the app is byte-for-byte the classic levels 1–4 experience — no gates, no prompts, no AI traffic.
+**The promise:** every optional capability (enforcement, AI, auto-rewards) is a switch, default off. With all switches off the app is byte-for-byte the classic experience — no gates, no prompts, no AI traffic.
 
 ---
 
@@ -84,7 +84,7 @@ Every level builds on the one below it, and every level stays available forever.
 6. **Advance turns** with **Next →** / **← Prev** (or arrow keys). **Clear** ends combat; the party returns to camp and you can re-arm the next fight.
 7. **Award the loot.** **Generate Loot** on the tracker scales treasure to the monsters' CR; **Complete Encounter** splits XP evenly among the party.
 
-That's it — nothing to enable, nothing to configure. This is levels 2–4 working out of the box.
+That's it — nothing to enable, nothing to configure. This is the tracker, the maps, and the combat engine working out of the box.
 
 ### Arena play in one click (disposable campaigns)
 
@@ -161,7 +161,7 @@ Players can't manage campaigns, edit maps, or touch enforcement — those live o
 
 ## 7. Running combat
 
-Combat runs the same at every level; enforcement switches (§8) only decide *who says no* when rules are broken.
+Combat runs the same however deeply you use the app; enforcement switches (§8) only decide *who says no* when rules are broken.
 
 1. **Who goes first:** the tracker sorts by initiative. The active creature is highlighted on every screen.
 2. **Players act:** select a target (the Target dropdown on the tracker card, or click a token), then click the attack/spell on your sheet. The engine rolls to-hit, compares to AC, rolls damage on a hit (doubling dice on a natural 20), applies resistances/immunity notes, and pushes the result everywhere.
@@ -365,8 +365,9 @@ All campaign state lives as JSON files under `public/campaigns/<name>/` — plai
 - **Attacks:** clicking a hit bonus rolls against the current target's AC; on a hit the damage auto-rolls and applies (crit doubles the dice); resistance/immunity notices appear.
 - **Dice tray** (sidebar): d4–d100 quick rolls in a popup (press Escape to dismiss).
 - **Spell sheets, actions, custom actions:** everything dice-related comes from defined sheet content — to roll something bespoke, add it as a custom action.
-- **Music panel:** five moods (Town, Outdoors, Combat, Dungeon, Tavern) — selecting a mood auto-plays an ambience track (YouTube-backed; offline tables get silence), with pause/volume and per-mood track editing.
+- **Music panel:** five moods (Town, Outdoors, Combat, Dungeon, Tavern) — selecting a mood auto-plays an ambience track, with pause/volume and per-mood track editing. Every mood **opens with bundled CC0 beds committed in the app itself** (an offline, internet-less table has sound on first boot — no downloads, no uploads), followed by YouTube-backed alternates; you can also upload **locally-hosted audio files** per campaign from the track editor (mp3/ogg/m4a/wav served from the GM's machine).
 - **Spell overlays, rulers, items:** see §11.
+- **Your sidebar, your table's toolbelt:** the GM can hide any sidebar view **per campaign** so each session shows only the tools the table actually uses — printed sheets and real dice one night, the full digital spread the next. The **Sidebar** button in the sidebar footer (GM only) opens a dialog with a checkbox per view plus one-click **starting points** ("Everything", "Print & real dice", "Theater of the mind", "Full digital"). Those buttons just batch-set the checkboxes — nothing is a fixed mode, every box stays editable, and hiding a view deletes nothing: showing it again brings it straight back. The chosen set syncs to **every device in the campaign** (players see exactly the nav the GM picked, live), and GM-only views stay hidden from players regardless of what's ticked. Other tabs' "try next" suggestions never invite you into a hidden view.
 
 ---
 

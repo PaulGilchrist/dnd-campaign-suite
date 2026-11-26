@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore, setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),

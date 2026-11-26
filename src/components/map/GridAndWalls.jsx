@@ -7,8 +7,13 @@ const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
 
     return (
         <>
-            {/* Grid background */}
-            <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" style={{ fill: bgFill || '#1a1a1a' }} />
+            {/* Grid background — an AUTHORED bgFill is map content and always
+                wins; with no authored fill the face is theme-owned CSS (.grid-bg,
+                Map.css): dark board in the dark theme, parchment paper under
+                light chrome (Item 7 F4 paper-face parity — the audit-era inline
+                `bgFill || '#1a1a1a'` hardcode was what made the indoor board
+                ignore the light theme entirely). */}
+            <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" style={bgFill ? { fill: bgFill } : undefined} />
 
             {/* Machine-readable cell hitboxes: data-cell="gx,gy" lets automation
                 locate a cell by id instead of measuring grid-bg viewBox math.

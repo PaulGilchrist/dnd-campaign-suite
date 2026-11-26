@@ -10,9 +10,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -261,7 +261,10 @@ describe('MusicPlayer campaign-specific categories', () => {
 
       // Editor save PATCHes overrides only (title lane untouched by this feature).
       fireEvent.click(screen.getByTitle('Play Crypt ambience'));
-      expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['vyg5jJrZ42s']);
+      expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(
+        [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }],
+        'test-campaign'
+      );
       expect(musicState()).toMatchObject({ mood: 'custom-crypt', playing: true });
       expect(mockAddEntry).toHaveBeenCalledWith(
         'test-campaign',
@@ -298,7 +301,7 @@ describe('MusicPlayer campaign-specific categories', () => {
 
     it('removes category and tracks in one PATCH after dialog confirm', async () => {
       const { posts, server } = mount({
-        overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ videoId: 'b', title: 'b' }] },
+        overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ kind: 'youtube', src: 'b', title: 'b' }] },
         customCategories: { 'custom-crypt': { label: 'Crypt' } },
       });
 
@@ -309,8 +312,8 @@ describe('MusicPlayer campaign-specific categories', () => {
       expect(confirmSpy).not.toHaveBeenCalled();
       const patch = posts[posts.length - 1];
       expect(patch.customCategories).toEqual({});
-      expect(patch.overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
-      expect(server().overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
+      expect(patch.overrides).toEqual({ tavern: [{ kind: 'youtube', src: 'b', title: 'b' }] });
+      expect(server().overrides).toEqual({ tavern: [{ kind: 'youtube', src: 'b', title: 'b' }] });
       expect(screen.queryByTitle('Play Crypt ambience')).toBeNull();
       expect(mockAddEntry).toHaveBeenCalledWith(
         'test-campaign',
@@ -343,7 +346,7 @@ describe('MusicPlayer campaign-specific categories', () => {
     it('deleting the ACTIVE mood stops playback and un-arms the transport first', async () => {
       const { server } = mount({
         mood: 'custom-crypt', playing: true,
-        overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }] },
+        overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'aAAAAAAAAAA', title: 'a' }] },
         customCategories: { 'custom-crypt': { label: 'Crypt' } },
       });
 
@@ -351,7 +354,7 @@ describe('MusicPlayer campaign-specific categories', () => {
       fireEvent.click(dialogConfirm());
       await waitFor(() => expect(musicState().mood).toBeNull());
 
-      expect(youtubePlayer.stop).toHaveBeenCalled();
+      expect(ambiencePlayer.stop).toHaveBeenCalled();
       // transport un-arm write precedes the config PATCH; server truth agrees
       expect(server()).toMatchObject({ mood: null, playing: false });
       expect(server().customCategories).toEqual({});

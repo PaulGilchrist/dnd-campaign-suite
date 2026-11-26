@@ -1,5 +1,47 @@
 
 import { Fragment, useState } from 'react';
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { hasTokenStatusIndicators } from '../../services/combat/conditions/tokenStatus.js';
+import {
+    TOKEN_COSMETICS_KEY,
+    getTokenRingClass,
+    normalizeTokenCosmetics,
+} from '../../config/tokenCosmetics.js';
+
+// Item 5 token face on the HEX surface: the hex board carries ONE shared
+// party marker ("P"), not per-character tokens — the marching-order avatar
+// row is therefore a character's token face on this map family. It honours
+// all three cosmetics read-only from the SAME canonical home as the indoor
+// board (the character runtime bucket, config/tokenCosmetics.js): the
+// personal ring color (CSS class, never inline styles), label visibility,
+// and the uniform dashed condition ring driven by the one shared predicate
+// (hasTokenStatusIndicators — chips detail stays the indoor lane; here the
+// uniform treatment is all the surface has). Render-only: zero writes here;
+// the editing UI is the indoor token context menu (PlayerContextMenu), on
+// both origins under the same ownership law.
+function MarchingOrderIdentity({ name, char, campaignName }) {
+    const cosmetics = normalizeTokenCosmetics(
+        useRuntimeValue(name, TOKEN_COSMETICS_KEY, campaignName),
+    );
+    const activeConditions = useRuntimeValue(name, 'activeConditions', campaignName);
+    const targetEffects = useRuntimeValue('campaign', 'targetEffects', campaignName);
+    const ringClass = getTokenRingClass(cosmetics.ringColor);
+    const statusClass = hasTokenStatusIndicators(name, activeConditions, targetEffects)
+        ? ' token-condition-ring'
+        : '';
+    return (
+        <>
+            <div className={`marching-order-avatar${ringClass ? ` ${ringClass}` : ''}${statusClass}`}>
+                {char?.imagePath ? (
+                    <img src={char.imagePath.startsWith('http') ? char.imagePath : (campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath)} alt={name} className="marching-order-img" />
+                ) : (
+                    <span className="marching-order-initial">{name.charAt(0).toUpperCase()}</span>
+                )}
+            </div>
+            {!cosmetics.hideLabel && <span className="marching-order-name">{name}</span>}
+        </>
+    );
+}
 
 function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClose, campaignName }) {
     // Which row (0-based) currently shows its inline "insert before" picker (null = closed).
@@ -77,14 +119,11 @@ function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClo
                             {insertAt === i && notInOrder.length > 0 && insertPicker}
                             <div className={`marching-order-row ${i === 0 ? 'marching-order-leader' : ''}`}>
                                 <span className="marching-order-rank">{i + 1}</span>
-                                <div className="marching-order-avatar">
-                                        {char?.imagePath ? (
-                                            <img src={char.imagePath.startsWith('http') ? char.imagePath : (campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath)} alt={name} className="marching-order-img" />
-                                    ) : (
-                                        <span className="marching-order-initial">{name.charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
-                                <span className="marching-order-name">{name}</span>
+                                <MarchingOrderIdentity
+                                    name={name}
+                                    char={char}
+                                    campaignName={campaignName}
+                                />
                                 <div className="marching-order-controls">
                                     {notInOrder.length > 0 && (
                                         <button

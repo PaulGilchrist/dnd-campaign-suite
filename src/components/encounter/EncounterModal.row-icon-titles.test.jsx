@@ -79,17 +79,22 @@ describe('EncounterModal load-pool row icon titles', () => {
         expect(rows).toHaveLength(2);
         rows.forEach((row) => {
             const buttons = Array.from(row.querySelectorAll('button'));
-            // Load, Rename, Delete — the full row action set.
-            expect(buttons).toHaveLength(3);
+            // Load, Rename, Print, Delete — the full row action set
+            // (Item 4 added the labeled Print verb).
+            expect(buttons).toHaveLength(4);
             buttons.forEach((btn) => {
                 const iconOnly = btn.textContent.trim() === '';
                 if (iconOnly) {
                     // Rename/Delete: <i> only — title must mirror aria-label.
                     expect(btn).toHaveAttribute('title', btn.getAttribute('aria-label'));
-                } else {
+                } else if (/^Load "/.test(btn.getAttribute('aria-label'))) {
                     // Load keeps visible text and gains no title (minimal change).
-                    expect(btn.getAttribute('aria-label')).toMatch(/^Load "/);
                     expect(btn).not.toHaveAttribute('title');
+                } else {
+                    // Print (Item 4): labeled verb; title mirrors aria-label like
+                    // the icon tier (both name the raw quoted row).
+                    expect(btn.getAttribute('aria-label')).toMatch(/^Print sheet for "/);
+                    expect(btn).toHaveAttribute('title', btn.getAttribute('aria-label'));
                 }
             });
         });

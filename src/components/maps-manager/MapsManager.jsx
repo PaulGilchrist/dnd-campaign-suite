@@ -12,6 +12,7 @@ import { regenerateMapDocument, describeGenerationOpts } from '../../services/ma
 import './MapsManager.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 import GMCopilot from '../GMCopilot/GMCopilot.jsx';
+import { getViewLabel } from '../../services/ui/sidebarNav.js';
 
 const GENERATE_BUTTONS = {
     indoor: {
@@ -202,7 +203,7 @@ function MapToggleNotice({ message }) {
     );
 }
 
-function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
+function MapsManager({ campaignName, onOpenMap, onMapDeleted, isLocalhost = true }) {
     const [maps, setMaps] = useState([]);
     const setMapsGuarded = useSSEEqualityGuard(setMaps);
     const [loading, setLoading] = useState(true);
@@ -518,7 +519,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
             <div className="maps-manager-header">
-                <h2>Maps</h2>
+                {/* F13 (Item 7): header names the view the visitor's nav names
+                    it — "Map" on network origins, "Maps" for the GM. */}
+                <h2>{getViewLabel('mapsManager', isLocalhost)}</h2>
             </div>
 
             <GMCopilot

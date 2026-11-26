@@ -6,6 +6,7 @@
  * Setting activeView to a view name automatically hides any other view.
  * Wizards are overlays and do not affect activeView.
  */
+import { VIEW_LABELS, NAV_ITEMS } from '../services/ui/sidebarNav.js';
 
 /**
  * View definitions — the canonical list of every view in the application.
@@ -110,6 +111,13 @@ export const VIEWS = {
     component: 'Log',
     description: 'Campaign dice roll and activity log'
    },
+  CHRONICLE: {
+    name: 'chronicle',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'Chronicle',
+    description: 'Read-only campaign story composed from the log, grouped by session, with Markdown export'
+  },
   GM_SCREEN: {
     name: 'gmScreen',
     stateVar: 'activeView',
@@ -167,32 +175,17 @@ export const VIEWS = {
 };
 
 /**
- * Sidebar button definitions.
+ * Sidebar button definitions — DELETED (Item 7, F13): this list drifted from
+ * the live nav (it said "Encounter" while the sidebar said "Encounters",
+ * and "Log" while the Log header said "Campaign Log"). The canonical label
+ * source is VIEW_LABELS in src/services/ui/sidebarNav.js, which the sidebar
+ * itself renders; getDocumentTitle below derives from it directly.
  */
-export const SIDEBAR_BUTTONS = [
-  { label: 'Character', icon: 'fa-user', view: 'charSheet' },
-  { label: 'Encounter', icon: 'fa-skull-crossbones', view: 'encounter' },
-  { label: 'Factions', icon: 'fa-handshake', view: 'factions' },
-  { label: 'GM Screen', icon: 'fa-eye', view: 'gmScreen' },
-  { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
-  { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
-  { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
-  { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
-  { label: 'Quest Board', icon: 'fa-list-check', view: 'questBoard' },
-  { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
-  { label: 'Sessions', icon: 'fa-calendar-check', view: 'sessions' },
-  { label: 'Inventory', icon: 'fa-boxes-stacked', view: 'partyInventory' },
-  { label: 'Settlements', icon: 'fa-city', view: 'settlements' },
-  { label: 'Drafts', icon: 'fa-wand-magic-sparkles', view: 'campaignBuilder' },
-  { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' },
-  { label: 'Music', icon: 'fa-music', view: 'music' },
-  { label: 'Admin', icon: 'fa-gears', view: 'campaignRepair' }
-];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'questBoard', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'gmScreen', 'music', 'campaignRepair'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'questBoard', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'chronicle', 'gmScreen', 'music', 'campaignRepair'];
 
 /**
  * Neutral app name — matches index.html's static <title> so the
@@ -200,10 +193,18 @@ export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encount
  */
 export const APP_TITLE = 'CharSheets';
 
-// View-name → sidebar label, derived from SIDEBAR_BUTTONS (single source of
-// truth for how each view is named in the UI).
-const VIEW_TITLE_LABELS = SIDEBAR_BUTTONS.reduce((labels, { view, label }) => {
-  labels[view] = label;
+// View-name → sidebar label, derived from VIEW_LABELS in sidebarNav.js — the
+// single source of truth for how each view is named (Item 7 F13; the old
+// duplicated SIDEBAR_BUTTONS list drifted and was deleted).
+const VIEW_TITLE_LABELS = Object.fromEntries(
+  Object.entries(VIEW_LABELS).map(([view, { label }]) => [view, label])
+);
+
+// Visitor-side naming law: NAV_ITEMS playerLabel renames a view for network
+// clients (visitor "Map" vs GM "Maps"); the tab title follows the nav the
+// user actually sees (F13).
+const PLAYER_TITLE_LABELS = NAV_ITEMS.reduce((labels, { view, playerLabel }) => {
+  if (view && playerLabel) labels[view] = playerLabel;
   return labels;
 }, {});
 
@@ -217,11 +218,11 @@ const VIEW_TITLE_LABELS = SIDEBAR_BUTTONS.reduce((labels, { view, label }) => {
  * activeView may still hold a stale view) gets the neutral app name, never
  * a stale campaign.
  */
-export function getDocumentTitle({ campaignName, showCampaignSelection, activeView, characterName }) {
+export function getDocumentTitle({ campaignName, showCampaignSelection, activeView, characterName, isLocalhost = true }) {
   if (!campaignName || showCampaignSelection) return APP_TITLE;
   if (activeView === VIEWS.CHAR_SHEET.name && characterName) {
     return `${campaignName} — ${characterName}`;
   }
-  const label = VIEW_TITLE_LABELS[activeView];
+  const label = (!isLocalhost && PLAYER_TITLE_LABELS[activeView]) || VIEW_TITLE_LABELS[activeView];
   return label ? `${campaignName} — ${label}` : campaignName;
 }

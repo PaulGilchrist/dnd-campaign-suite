@@ -542,3 +542,37 @@ button.ally-badge {
     flex-wrap: wrap;
     gap: 4px;
 }
+
+/* F20 (visual audit 2026-11-25, Item 7): Inspiration token chip — replaces
+   the bare checkbox square that read as an interactive-looking value slot.
+   Held = green ready language; spent = muted dashed ghost. */
+.inspiration-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--border-color-light);
+  background: var(--background-color-tag);
+  color: var(--color-text-secondary);
+  font-size: 0.85em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.inspiration-token .fa-star {
+  color: var(--color-text-muted);
+}
+
+.inspiration-token.inspiration-held {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.inspiration-token.inspiration-held .fa-star {
+  color: var(--color-primary);
+}

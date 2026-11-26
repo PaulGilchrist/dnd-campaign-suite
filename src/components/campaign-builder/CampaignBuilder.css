@@ -38,7 +38,8 @@
 }
 
 .campaign-builder-empty {
-  color: var(--color-text-secondary);
+  /* F14 (Item 7): the face standardizes on the kit .ct-empty-state (icon +
+     guidance, App.css); only the italic voice stays component-local. */
   font-style: italic;
 }
 

@@ -20,7 +20,7 @@ function SessionMetaBadges({ played, isActive }) {
   );
 }
 
-function SessionListItem({ session, isActive = false, onEdit }) {
+function SessionListItem({ session, isActive = false, onEdit, onPrint = null }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       onEdit(session);
@@ -68,6 +68,21 @@ function SessionListItem({ session, isActive = false, onEdit }) {
           <span className="sessions-list-notes" title="Has notes" aria-label="Has notes">
             <i className="fa-solid fa-note-sticky" />
           </span>
+        )}
+        {/* Item 4 handout (F12: labeled): the saved row prints as-is — pure
+            presentation, no planner open, no writes. */}
+        {onPrint && (
+          <button
+            className="sessions-print-btn ct-btn ct-btn-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrint(session);
+            }}
+            title={`Print ${session.name}'s one-pager`}
+            aria-label={`Print one-pager for ${session.name}`}
+          >
+            <i className="fa-solid fa-print" /> Print One-Pager
+          </button>
         )}
       </div>
       {preview && <p className="ct-list-preview">{preview}</p>}

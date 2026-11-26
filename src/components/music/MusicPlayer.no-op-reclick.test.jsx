@@ -20,10 +20,10 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 import { MOODS } from '../../services/ui/musicConfig.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -57,7 +57,7 @@ function stubMusicServer() {
   return { server: () => server, musicPosts: () => musicPosts };
 }
 
-const trackIds = (moodKey) => MOODS.find(m => m.key === moodKey).tracks.map(t => t.videoId);
+const trackRows = (moodKey) => MOODS.find(m => m.key === moodKey).tracks;
 const setAmbienceRows = () => mockAddEntry.mock.calls
   .map(([, entry]) => entry)
   .filter(entry => entry.action === 'set_ambience');
@@ -81,17 +81,17 @@ describe('MusicPlayer no-op re-click guard', () => {
     fireEvent.click(townButton());
     expect(server.musicPosts()).toHaveLength(1);
     expect(setAmbienceRows()).toHaveLength(1);
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1);
 
     fireEvent.click(townButton());
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1);
     fireEvent.click(townButton());
 
     expect(server.musicPosts()).toHaveLength(1); // no second POST — the arm write stays the only one
     expect(setAmbienceRows()).toHaveLength(1);   // no duplicate `Set ambience: …` row
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1); // playlist never restarts
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
-    expect(youtubePlayer.pause).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1); // playlist never restarts
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.pause).not.toHaveBeenCalled();
     expect(getStore('campaign').get('music')).toMatchObject({ mood: 'town', playing: true });
   });
 
@@ -105,7 +105,7 @@ describe('MusicPlayer no-op re-click guard', () => {
     expect(server.musicPosts()).toHaveLength(2);
     expect(setAmbienceRows()).toHaveLength(2);
     expect(setAmbienceRows()[1]).toMatchObject({ mood: 'combat' });
-    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('combat'));
+    expect(ambiencePlayer.playTracks).toHaveBeenLastCalledWith(trackRows('combat'), 'test-campaign');
     expect(getStore('campaign').get('music')).toMatchObject({ mood: 'combat', playing: true });
   });
 
@@ -119,8 +119,8 @@ describe('MusicPlayer no-op re-click guard', () => {
 
     expect(server.musicPosts()).toHaveLength(3); // arm + pause + re-arm all ride the /music lane
     expect(setAmbienceRows()).toHaveLength(2);
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(2);
-    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('town'));
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(2);
+    expect(ambiencePlayer.playTracks).toHaveBeenLastCalledWith(trackRows('town'), 'test-campaign');
     expect(getStore('campaign').get('music')).toMatchObject({ mood: 'town', playing: true });
   });
 
@@ -133,7 +133,7 @@ describe('MusicPlayer no-op re-click guard', () => {
 
     expect(server.musicPosts()).toHaveLength(1);
     expect(setAmbienceRows()).toHaveLength(1);
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1);
   });
 
   it('back-to-back clicks in ONE tick (no React flush between them) still arm exactly once', () => {
@@ -153,6 +153,6 @@ describe('MusicPlayer no-op re-click guard', () => {
 
     expect(server.musicPosts()).toHaveLength(1);
     expect(setAmbienceRows()).toHaveLength(1);
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1);
   });
 });

@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore, setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -118,17 +118,25 @@ describe('MusicPlayer deleted-category editor-mood reset', () => {
     await typeAndSave('dQw4w9WgXcQ');
 
     // Write lands under the DISPLAYED mood; the deleted key never appears.
+    // Item 3b: the whole draft saves — the pasted row plus Town's two seeded
+    // bundled beds.
     expect(document.querySelector('.music-toast').textContent).toContain('Town tracks saved');
     const savePatch = posts[posts.length - 1];
-    expect(savePatch.overrides).toEqual({ town: [{ videoId: 'dQw4w9WgXcQ', title: 'dQw4w9WgXcQ' }] });
+    expect(savePatch.overrides).toEqual({
+      town: [
+        { kind: 'youtube', src: 'dQw4w9WgXcQ', title: 'dQw4w9WgXcQ' },
+        { kind: 'local', src: '/audio/town-theme.mp3', title: 'Town Theme | Harps & Recorders (Cynic Music, CC0)' },
+        { kind: 'local', src: '/audio/fishing-village.mp3', title: 'Fishing Village | Warm Atmosphere (Man of Steel, CC0)' },
+      ],
+    });
     expect(server().overrides['custom-crypt']).toBeUndefined();
     expect(musicState().overrides['custom-crypt']).toBeUndefined();
-    expect(server().overrides.town).toHaveLength(1);
+    expect(server().overrides.town).toHaveLength(3);
   });
 
   it('chip-× delete with the editor CLOSED still resets a previously selected mood', async () => {
     mount({
-      overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }] },
+      overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'aAAAAAAAAAA', title: 'a' }] },
       customCategories: { 'custom-crypt': { label: 'Crypt' } },
     });
 

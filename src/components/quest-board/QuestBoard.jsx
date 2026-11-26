@@ -4,6 +4,8 @@ import { loadFactionStandings } from '../../services/campaign/factionsService.js
 import Subscriber from '../common/Subscriber.jsx';
 import FactionStandingStrip from './FactionStandingStrip.jsx';
 import QuestBoardCard from './QuestBoardCard.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import QuestBoardHandout from '../handouts/QuestBoardHandout.jsx';
 import { groupQuestsForBoard } from './questBoardData.js';
 import './QuestBoard.css';
 
@@ -62,6 +64,10 @@ function QuestBoard({ campaignName }) {
   }, [campaignName, loadQuestRows, loadStandingRows]);
 
   const groups = groupQuestsForBoard(quests);
+  // Item 4: the board's rows arrive field-whitelisted from /quests/board,
+  // so what the GM flipped to Completed and what the players see on paper
+  // are the same server-filtered rows — notes cannot be in this state.
+  const [printBoardOpen, setPrintBoardOpen] = useState(false);
 
   return (
     <div className="ct-container quest-board">
@@ -71,6 +77,20 @@ function QuestBoard({ campaignName }) {
         <h2 className="ct-title">
           <i className="fa-solid fa-scroll" /> Quest Board
         </h2>
+        {/* Item 4 handout (F12: labeled). Nothing on the board yet → honest
+            disabled face naming the cause. */}
+        <button
+          className="ct-btn quest-board-print-btn"
+          onClick={() => setPrintBoardOpen(true)}
+          disabled={loading || groups.length === 0}
+          title={loading
+            ? 'Loading the quest board…'
+            : groups.length === 0
+              ? 'No quests on the board to print yet'
+              : 'Print the quest board as a one-pager'}
+        >
+          <i className="fa-solid fa-print" /> Print Quest Board
+        </button>
       </div>
 
       <FactionStandingStrip factions={standings} error={standingsError} />
@@ -110,6 +130,16 @@ function QuestBoard({ campaignName }) {
           </div>
         </section>
       ))}
+
+      {printBoardOpen && (
+        <HandoutPreview
+          label="Quest Board"
+          campaignName={campaignName}
+          onClose={() => setPrintBoardOpen(false)}
+        >
+          <QuestBoardHandout quests={quests} />
+        </HandoutPreview>
+      )}
     </div>
   );
 }

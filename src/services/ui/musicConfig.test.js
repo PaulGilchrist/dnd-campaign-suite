@@ -23,6 +23,8 @@
  * so freeze + copy retire the pollution hole with zero behavior change.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import * as musicConfig from './musicConfig.js';
 import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from './musicConfig.js';
 
@@ -56,8 +58,10 @@ describe('MOODS catalogue — shipped inline bytes verbatim', () => {
         label: 'Town',
         icon: 'fa-house-chimney',
         tracks: [
-          { videoId: 'q9yaKpYS9qc', title: 'Village | D&D/TTRPG Ambience (Bardify)' },
-          { videoId: 'o-b5nMCj5hI', title: 'Medieval City Sounds | Market Day (Danny Fortress Fantasy Music)' }
+          { kind: 'local', src: '/audio/town-theme.mp3', title: 'Town Theme | Harps & Recorders (Cynic Music, CC0)' },
+          { kind: 'local', src: '/audio/fishing-village.mp3', title: 'Fishing Village | Warm Atmosphere (Man of Steel, CC0)' },
+          { kind: 'youtube', src: 'q9yaKpYS9qc', title: 'Village | D&D/TTRPG Ambience (Bardify)' },
+          { kind: 'youtube', src: 'o-b5nMCj5hI', title: 'Medieval City Sounds | Market Day (Danny Fortress Fantasy Music)' }
         ]
       },
       {
@@ -65,8 +69,10 @@ describe('MOODS catalogue — shipped inline bytes verbatim', () => {
         label: 'Outdoors',
         icon: 'fa-tree',
         tracks: [
-          { videoId: '6Em9tLXbhfo', title: 'D&D Ambience - Forest Daytime (Sword Coast Soundscapes)' },
-          { videoId: '4Y6n-1XQSfE', title: 'Mysterious Forest | D&D/TTRPG Music (Bardify)' }
+          { kind: 'local', src: '/audio/birds-wind.mp3', title: 'Birds & Wind | Long Ambient Bed (Spring-Spring, CC0)' },
+          { kind: 'local', src: '/audio/forest-ambience.mp3', title: 'Forest Ambience | Seamless Loop (Tiny Worlds, CC0)' },
+          { kind: 'youtube', src: '6Em9tLXbhfo', title: 'D&D Ambience - Forest Daytime (Sword Coast Soundscapes)' },
+          { kind: 'youtube', src: '4Y6n-1XQSfE', title: 'Mysterious Forest | D&D/TTRPG Music (Bardify)' }
         ]
       },
       {
@@ -74,8 +80,10 @@ describe('MOODS catalogue — shipped inline bytes verbatim', () => {
         label: 'Combat',
         icon: 'fa-khanda',
         tracks: [
-          { videoId: 't3B802PIuB0', title: 'D&D/RPG Combat Music Mix (Travis Savoie)' },
-          { videoId: 'rfC3wkZ43Jg', title: 'Born For This | Epic Orchestral Battle Music (Epic Music Mix)' }
+          { kind: 'local', src: '/audio/battle-theme.mp3', title: 'Battle Theme | Orchestral Tension (Wolfgang, CC0)' },
+          { kind: 'local', src: '/audio/determined-pursuit.mp3', title: 'Determined Pursuit | Loopable Battle Cue (Emma Ma, CC0)' },
+          { kind: 'youtube', src: 't3B802PIuB0', title: 'D&D/RPG Combat Music Mix (Travis Savoie)' },
+          { kind: 'youtube', src: 'rfC3wkZ43Jg', title: 'Born For This | Epic Orchestral Battle Music (Epic Music Mix)' }
         ]
       },
       {
@@ -83,8 +91,10 @@ describe('MOODS catalogue — shipped inline bytes verbatim', () => {
         label: 'Dungeon',
         icon: 'fa-dungeon',
         tracks: [
-          { videoId: 'bxoRRobHtGM', title: 'Dark Dungeon Ambience (AMBIENT METHOD)' },
-          { videoId: 'W2NAblVD70Q', title: 'Dungeon of the Dark Pyramid (Soundscapes & Ambience)' }
+          { kind: 'local', src: '/audio/dungeon-ambient.mp3', title: 'Dungeon Ambience | Wind & Drips (Jaggedstone, CC0)' },
+          { kind: 'local', src: '/audio/forgotten-tomb.mp3', title: 'Forgotten Tomb | Dark Ambience (Kindland, CC0)' },
+          { kind: 'youtube', src: 'bxoRRobHtGM', title: 'Dark Dungeon Ambience (AMBIENT METHOD)' },
+          { kind: 'youtube', src: 'W2NAblVD70Q', title: 'Dungeon of the Dark Pyramid (Soundscapes & Ambience)' }
         ]
       },
       {
@@ -92,25 +102,52 @@ describe('MOODS catalogue — shipped inline bytes verbatim', () => {
         label: 'Tavern',
         icon: 'fa-beer-mug-empty',
         tracks: [
-          { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
-          { videoId: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
+          { kind: 'local', src: '/audio/old-tower-inn.mp3', title: 'The Old Tower Inn | Medieval Tavern (Randommind, CC0)' },
+          { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+          { kind: 'youtube', src: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
         ]
       }
     ]);
   });
 
-  it('every catalogue id survives the player paste/queue path (extractVideoId round-trip)', () => {
-    // MusicPlayer feeds ids through extractVideoId in parseTrackList and
-    // queues tracks.map(t => t.videoId) — a catalogue id that failed the
-    // 11-char law would silently vanish from playback.
-    const ids = [];
+  // Item 3b bundled-bed law: every starter mood OPENS with at least one
+  // root-absolute /audio/ local bed (an offline table's first-boot autoplay
+  // lands on a bundled file), and every bundled src exists on disk next to
+  // its CREDITS.md provenance record.
+  it('bundled CC0 beds head every mood and exist on disk', () => {
+    const BUNDLED_SRC = /^\/audio\/[a-z0-9][a-z0-9-]*\.mp3$/;
     for (const mood of MOODS) {
-      ids.push(...mood.tracks.map(t => t.videoId));
-      for (const track of mood.tracks) {
-        expect(extractVideoId(track.videoId)).toBe(track.videoId);
+      expect(mood.tracks[0].kind, mood.key).toBe('local');
+      const bundled = mood.tracks.filter(t => t.kind === 'local');
+      expect(bundled.length, mood.key).toBeGreaterThan(0);
+      for (const track of bundled) {
+        expect(track.src, mood.key).toMatch(BUNDLED_SRC);
+        expect(
+          fs.existsSync(path.join(process.cwd(), 'public', track.src)),
+          `bundled bed ${track.src} must be committed under public/`
+        ).toBe(true);
       }
     }
-    expect(new Set(ids).size).toBe(ids.length); // no duplicate videos
+    expect(fs.existsSync(path.join(process.cwd(), 'public/audio/CREDITS.md'))).toBe(true);
+  });
+
+  it('every catalogue id survives the player paste/queue path (extractVideoId round-trip)', () => {
+    // MusicPlayer feeds ids through extractVideoId in parseTrackList and
+    // queues tracks.map(t => t.src) — a catalogue id that failed the
+    // 11-char law would silently vanish from playback. Local rows skip the
+    // parser (they ride the <audio> arm) and must be well-formed /audio/ srcs.
+    const ids = [];
+    for (const mood of MOODS) {
+      ids.push(...mood.tracks.map(t => t.src));
+      for (const track of mood.tracks) {
+        if (track.kind === 'youtube') {
+          expect(extractVideoId(track.src)).toBe(track.src);
+        } else {
+          expect(track.src).toMatch(/^\/audio\/[a-z0-9][a-z0-9-]*\.mp3$/);
+        }
+      }
+    }
+    expect(new Set(ids).size).toBe(ids.length); // no duplicate sources
   });
 });
 
@@ -129,7 +166,7 @@ describe('getMood', () => {
 
 describe('getTracksForMood — override precedence law', () => {
   it('override arrays win by identity, even for keys outside the catalogue', () => {
-    const override = [{ videoId: 'aaaaaaaaaaa', title: 'Custom' }];
+    const override = [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'Custom' }];
     expect(getTracksForMood('town', { town: override })).toBe(override); // not copied
     // quirk pinned: overrides are consulted BEFORE catalogue lookup, so a
     // fabricated mood key with a non-empty array still resolves.
@@ -184,27 +221,27 @@ describe('frozen config law (fix#352(c)) — mutation throws, copies isolate', (
     expect(() => MOODS.pop()).toThrow(TypeError);
     expect(() => MOODS[0] = null).toThrow(TypeError);
     expect(() => getMood('town').label = 'LOL').toThrow(TypeError);
-    expect(() => getMood('town').tracks.push({ videoId: 'abuseabuse1' })).toThrow(TypeError);
+    expect(() => getMood('town').tracks.push({ kind: 'youtube', src: 'abuseabuse1' })).toThrow(TypeError);
     expect(() => getMood('town').tracks[0].videoId = 'evilid').toThrow(TypeError);
     expect(MOODS).toHaveLength(5); // untouched after every attempted abuse
   });
 
   it('copy isolation: pushing/splicing the returned array cannot pollute the catalogue, even across many pushes', () => {
     const tracks = getTracksForMood('town', null);
-    tracks.push({ videoId: 'abuseabuse1', title: 'pollution attempt' }); // legal on the COPY
+    tracks.push({ kind: 'youtube', src: 'abuseabuse1', title: 'pollution attempt' }); // legal on the COPY
     tracks.splice(0, 1); // removes the copy's first element, not the appended abuse row
-    expect(tracks.map(t => t.videoId)).toEqual(['o-b5nMCj5hI', 'abuseabuse1']); // local, whatever
+    expect(tracks.map(t => t.src)).toEqual(['/audio/fishing-village.mp3', 'q9yaKpYS9qc', 'o-b5nMCj5hI', 'abuseabuse1']); // local, whatever
     // The catalogue never saw any of it:
-    expect(getMood('town').tracks.map(t => t.videoId)).toEqual(['q9yaKpYS9qc', 'o-b5nMCj5hI']);
+    expect(getMood('town').tracks.map(t => t.src)).toEqual(['/audio/town-theme.mp3', '/audio/fishing-village.mp3', 'q9yaKpYS9qc', 'o-b5nMCj5hI']);
     const fresh = getTracksForMood('town', null);
     expect(fresh).not.toBe(tracks);
-    expect(fresh.map(t => t.videoId)).toEqual(['q9yaKpYS9qc', 'o-b5nMCj5hI']);
+    expect(fresh.map(t => t.src)).toEqual(['/audio/town-theme.mp3', '/audio/fishing-village.mp3', 'q9yaKpYS9qc', 'o-b5nMCj5hI']);
     // Writing a row of the copy is still refused — rows are frozen shared refs:
     expect(() => { fresh[0].title = 'rewritten'; }).toThrow(TypeError);
   });
 
   it('override arm stays caller-owned pass-through (identity) — the copy law covers config only', () => {
-    const override = [{ videoId: 'aaaaaaaaaaa', title: 'Custom' }];
+    const override = [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'Custom' }];
     expect(getTracksForMood('town', { town: override })).toBe(override);
     expect(getTracksForMood('nope', { nope: override })).toBe(override);
   });

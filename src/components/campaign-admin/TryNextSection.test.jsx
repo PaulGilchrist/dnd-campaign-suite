@@ -98,4 +98,32 @@ describe('TryNextSection', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('toolbelt respect: an invitation never invites into a hidden view', async () => {
+    // Every precondition genuinely holds (encounters + empty board, maps
+    // with none active) — ONLY the hidden set may kill the cards.
+    mockLanes({
+      encounters: [{ name: 'Ambush' }],
+      maps: [{ fileName: 'arena.json', name: 'Arena', isActive: false }],
+    });
+    renderSection({ hiddenViews: ['encounter', 'mapsManager'] });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(screen.queryByRole('note', { name: /Try next: Try running combat/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('note', { name: /Try next: Put a battlefield/ })).not.toBeInTheDocument();
+  });
+
+  it('toolbelt respect: the TV invite folds when Initiative is hidden — and stands when it is not', async () => {
+    mockLanes({
+      changeData: { combatSummary: { creatures: [{ name: 'Goblin' }, { name: 'Hero' }] } },
+    });
+    renderSection({ hiddenViews: [] });
+    expect(await screen.findByRole('note', { name: /Try next: Dress the board/ })).toBeInTheDocument();
+    cleanup();
+    mockLanes({
+      changeData: { combatSummary: { creatures: [{ name: 'Goblin' }, { name: 'Hero' }] } },
+    });
+    renderSection({ hiddenViews: ['initiative'] });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(screen.queryByRole('note', { name: /Try next: Dress the board/ })).not.toBeInTheDocument();
+  });
 });

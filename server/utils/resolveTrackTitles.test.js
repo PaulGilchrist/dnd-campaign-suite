@@ -57,14 +57,14 @@ describe('resolveOverrideTitles', () => {
         ));
         const resolved = await resolveOverrideTitles({
             tavern: [
-                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
-                { videoId: '2P8J7Cx1plA', title: '2P8J7Cx1plA' }
+                { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { kind: 'youtube', src: '2P8J7Cx1plA', title: '2P8J7Cx1plA' }
             ]
         });
 
         expect(resolved.tavern).toEqual([
-            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern' },
-            { videoId: '2P8J7Cx1plA', title: 'Tavern Ambience' }
+            { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern' },
+            { kind: 'youtube', src: '2P8J7Cx1plA', title: 'Tavern Ambience' }
         ]);
         expect(consoleError).not.toHaveBeenCalled();
     });
@@ -72,20 +72,20 @@ describe('resolveOverrideTitles', () => {
     it('keeps the raw ID as fallback when oEmbed times out — never rejects, logs the failure', async () => {
         fetchMock.mockRejectedValue(timeoutError());
         const resolved = await resolveOverrideTitles({
-            outdoors: [{ videoId: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]
+            outdoors: [{ kind: 'youtube', src: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]
         });
 
-        expect(resolved.outdoors).toEqual([{ videoId: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]);
+        expect(resolved.outdoors).toEqual([{ kind: 'youtube', src: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]);
         expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('6Em9tLXbhfo'), expect.anything());
     });
 
     it('keeps the raw ID as fallback on a non-200 oEmbed response', async () => {
         fetchMock.mockResolvedValue(failResponse(401));
         const resolved = await resolveOverrideTitles({
-            dungeon: [{ videoId: 'bxoRRobHtGM', title: 'bxoRRobHtGM' }]
+            dungeon: [{ kind: 'youtube', src: 'bxoRRobHtGM', title: 'bxoRRobHtGM' }]
         });
 
-        expect(resolved.dungeon).toEqual([{ videoId: 'bxoRRobHtGM', title: 'bxoRRobHtGM' }]);
+        expect(resolved.dungeon).toEqual([{ kind: 'youtube', src: 'bxoRRobHtGM', title: 'bxoRRobHtGM' }]);
         expect(consoleError).toHaveBeenCalledTimes(1);
     });
 
@@ -97,21 +97,21 @@ describe('resolveOverrideTitles', () => {
         });
         const resolved = await resolveOverrideTitles({
             tavern: [
-                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
-                { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' },
-                { videoId: 'bBBBBBBBBBB', title: 'bBBBBBBBBBB' }
+                { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { kind: 'youtube', src: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' },
+                { kind: 'youtube', src: 'bBBBBBBBBBB', title: 'bBBBBBBBBBB' }
             ]
         });
 
         expect(resolved.tavern).toEqual([
-            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern' },
-            { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' }, // timeout → fallback
-            { videoId: 'bBBBBBBBBBB', title: 'bBBBBBBBBBB' }  // 404   → fallback
+            { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern' },
+            { kind: 'youtube', src: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' }, // timeout → fallback
+            { kind: 'youtube', src: 'bBBBBBBBBBB', title: 'bBBBBBBBBBB' }  // 404   → fallback
         ]);
         expect(consoleError).toHaveBeenCalledTimes(2); // one per failed video, no silent swallow
     });
 
-    it('fetches every unique videoId once, in parallel', async () => {
+    it('fetches every unique video id once, in parallel', async () => {
         let inflight = 0;
         let maxInflight = 0;
         fetchMock.mockImplementation(async () => {
@@ -122,18 +122,18 @@ describe('resolveOverrideTitles', () => {
             return okResponse('Whatever');
         });
         await resolveOverrideTitles({
-            town: [{ videoId: 'q9yaKpYS9qc', title: 'q9yaKpYS9qc' }, { videoId: 'q9yaKpYS9qc', title: 'q9yaKpYS9qc' }],
-            outdoors: [{ videoId: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]
+            town: [{ kind: 'youtube', src: 'q9yaKpYS9qc', title: 'q9yaKpYS9qc' }, { kind: 'youtube', src: 'q9yaKpYS9qc', title: 'q9yaKpYS9qc' }],
+            outdoors: [{ kind: 'youtube', src: '6Em9tLXbhfo', title: '6Em9tLXbhfo' }]
         });
 
         expect(fetchMock).toHaveBeenCalledTimes(2); // 3 rows, 2 unique ids
         expect(maxInflight).toBe(2);              // both lookups run concurrently
     });
 
-    it('stampede guard: a videoId already resolved in stored overrides is reused without re-fetch', async () => {
-        const stored = { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }] };
+    it('stampede guard: a video id already resolved in stored overrides is reused without re-fetch', async () => {
+        const stored = { tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }] };
         const resolved = await resolveOverrideTitles(
-            { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] }, // editor re-stamped raw ID
+            { tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] }, // editor re-stamped raw ID
             stored
         );
 
@@ -143,11 +143,11 @@ describe('resolveOverrideTitles', () => {
 
     it('trusts a real title supplied by the client — no fetch', async () => {
         const resolved = await resolveOverrideTitles({
-            tavern: [{ videoId: 'vyg5jJrZ42s', title: 'Client Known Title' }]
+            tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Client Known Title' }]
         });
 
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(resolved.tavern).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'Client Known Title' }]);
+        expect(resolved.tavern).toEqual([{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Client Known Title' }]);
     });
 
     it('passes through malformed payloads untouched', async () => {
@@ -156,9 +156,9 @@ describe('resolveOverrideTitles', () => {
 
         const resolved = await resolveOverrideTitles({
             town: 'not-an-array',
-            tavern: [{ title: 'no videoId here' }]
+            tavern: [{ title: 'no kind here' }]
         });
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(resolved).toEqual({ town: 'not-an-array', tavern: [{ title: 'no videoId here' }] });
+        expect(resolved).toEqual({ town: 'not-an-array', tavern: [{ title: 'no kind here' }] });
     });
 });

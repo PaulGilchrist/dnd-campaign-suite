@@ -103,10 +103,10 @@ describe('GenerateTerrainModal', () => {
       expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
     });
 
-    it('does not close when the overlay background is clicked', () => {
+    it('closes when the overlay background is clicked (F11 kit convergence)', () => {
       render(<GenerateTerrainModal {...props} />);
       fireEvent.click(screen.getByRole('heading', { name: 'Generate Terrain Map' }).closest('.maps-manager-modal-overlay'));
-      expect(props.onClose).not.toHaveBeenCalled();
+      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -320,6 +320,49 @@ describe('GenerateTerrainModal', () => {
       terrainMocks.generateHexTerrain.mockImplementationOnce(() => { throw new Error(); });
       generateWith();
       await screen.findByText('Failed to generate terrain');
+    });
+  });
+
+  // F11 family law (Item 7 re-sweep 2026-11-25): twin of the dungeon modal —
+  // shared useModalDismiss Escape/backdrop close, inert mid-generate.
+  describe('Escape/backdrop dismissal (useModalDismiss lane)', () => {
+    const renderOpen = () => {
+      render(<GenerateTerrainModal {...props} />);
+      return props.onClose;
+    };
+
+    it('Escape on the overlay closes', () => {
+      const onClose = renderOpen();
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a body-targeted Escape still closes (window rescue lane)', () => {
+      const onClose = renderOpen();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('backdrop click closes; a click inside the panel does not', () => {
+      const onClose = renderOpen();
+      fireEvent.click(document.querySelector('.maps-manager-modal'));
+      expect(onClose).not.toHaveBeenCalled();
+      const overlay = document.querySelector('.maps-manager-modal-overlay');
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('Escape is inert while a generation is in flight', async () => {
+      let release;
+      mapsServiceMocks.createMap.mockImplementationOnce(() => new Promise((res) => { release = res; }));
+      const onClose = renderOpen();
+      typeMapName('Hex');
+      clickGenerate();
+      await waitFor(() => expect(terrainMocks.generateHexTerrain).toHaveBeenCalled());
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+      release({});
     });
   });
 });

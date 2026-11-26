@@ -9,6 +9,15 @@ const TOGGLE_TOOLS = [
     { tool: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
 ];
 
+// F17 (visual audit 2026-11-25, Item 7): every map-toolbar button carries a
+// hover tooltip next to its aria-label — icon-only controls were the view's
+// biggest discoverability cost.
+const TOOL_TITLES = {
+    paint: 'Paint walls and doors on the grid',
+    erase: 'Erase walls and doors from the grid',
+    select: 'Marquee-select walls and items to move them as a group',
+};
+
 // Hoisted out of the component body — the toolbar sits one branch under its
 // ESLint complexity cap (backlog 2026-11-01 BB mount-condition widening).
 const hasActiveOverlays = (overlays) => overlays?.length > 0;
@@ -221,6 +230,7 @@ const MapToolbar = ({
                             className={tool === t ? 'active' : ''}
                             aria-label={label}
                             aria-pressed={tool === t}
+                            title={TOOL_TITLES[t]}
                             onClick={() => {
                                 const next = tool === t ? 'none' : t;
                                 setTool(next);
@@ -241,6 +251,7 @@ const MapToolbar = ({
                         className={spellMode ? 'active' : ''}
                         aria-label="Spell"
                         aria-pressed={!!spellMode}
+                        title="Place a spell-effect zone on the board"
                         onClick={toggleSpellMode}
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
@@ -253,6 +264,7 @@ const MapToolbar = ({
                         className={rulerMode ? 'active' : ''}
                         aria-label="Ruler"
                         aria-pressed={!!rulerMode}
+                        title="Measure distance — click two points on the grid"
                         onClick={() => setRulerMode(!rulerMode)}
                     >
                         <i className="fa-solid fa-ruler"></i> Ruler
@@ -272,16 +284,16 @@ const MapToolbar = ({
                         presentational shell (players pass nothing → no button). */}
                     {dressButton}
                     {isLocalhost && (
-                        <button onClick={() => setItemsPanelOpen(prev => !prev)} aria-label="Items">
+                        <button onClick={() => setItemsPanelOpen(prev => !prev)} aria-label="Items" title="Open the placed-items panel (drag props and tokens onto the board)">
                             <i className="fa-solid fa-box"></i> Items
                         </button>
                     )}
                     <LastKnownModeToggle isLocalhost={isLocalhost} active={!!lastKnownMode} onToggle={onToggleLastKnown} />
                     <LightingToggle isLocalhost={isLocalhost} active={!!lightingMode} onToggle={onToggleLighting} />
-                    <button onClick={zoomIn} aria-label="Zoom in">
+                    <button onClick={zoomIn} aria-label="Zoom in" title="Zoom in">
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>
-                    <button onClick={zoomOut} aria-label="Zoom out">
+                    <button onClick={zoomOut} aria-label="Zoom out" title="Zoom out">
                         <i className="fa-solid fa-magnifying-glass-minus"></i>
                     </button>
                     {isLocalhost ? (

@@ -52,14 +52,14 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
         seedMusic({ ...STOPPED });
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
-            .send({ overrides: { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
+            .send({ overrides: { tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
 
         expect(res.status).toBe(200);
         const saved = characterChangeData.get('test-campaign').music;
         expect(saved.playing).toBe(false);
         expect(saved.mood).toBeNull();
         expect(saved.volume).toBe(0.6);
-        expect(saved.overrides.tavern).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }]);
+        expect(saved.overrides.tavern).toEqual([{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }]);
         // response echoes merged truth so the client can pin its local store
         expect(res.body.music).toEqual(saved);
         expect(markDirty).toHaveBeenCalledWith('test-campaign');
@@ -71,7 +71,7 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
         // stale-tab PATCH: no playing key at all in the payload (editor intent)
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
-            .send({ value: { overrides: { town: [{ videoId: 'q9yaKpYS9qc', title: 'x' }] } } });
+            .send({ value: { overrides: { town: [{ kind: 'youtube', src: 'q9yaKpYS9qc', title: 'x' }] } } });
 
         expect(res.status).toBe(200);
         expect(res.body.music.playing).toBe(false);
@@ -79,10 +79,10 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
     });
 
     it('reset PATCH (overrides minus mood) clears that mood live and keeps transport fields', async () => {
-        seedMusic({ mood: null, playing: false, volume: 0.4, overrides: { tavern: [{ videoId: 'a', title: 'a' }], town: [{ videoId: 'b', title: 'b' }] } });
+        seedMusic({ mood: null, playing: false, volume: 0.4, overrides: { tavern: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'a' }], town: [{ kind: 'youtube', src: 'bbbbbbbbbbb', title: 'b' }] } });
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
-            .send({ overrides: { town: [{ videoId: 'b', title: 'b' }] } });
+            .send({ overrides: { town: [{ kind: 'youtube', src: 'bbbbbbbbbbb', title: 'b' }] } });
 
         expect(res.status).toBe(200);
         expect(res.body.music.overrides.tavern).toBeUndefined();
@@ -102,7 +102,7 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
     });
 
     it('GET /music returns the merged doc without a {value} unwrap quirk', async () => {
-        seedMusic({ ...STOPPED, overrides: { tavern: [{ videoId: 'a', title: 'a' }] } });
+        seedMusic({ ...STOPPED, overrides: { tavern: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'a' }] } });
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/music');
         expect(res.status).toBe(200);
         expect(res.body.music.playing).toBe(false);
@@ -121,7 +121,7 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
     it('seeds defaults when the campaign has no stored music yet', async () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
-            .send({ overrides: { town: [{ videoId: 'q9yaKpYS9qc', title: 'x' }] } });
+            .send({ overrides: { town: [{ kind: 'youtube', src: 'q9yaKpYS9qc', title: 'x' }] } });
 
         expect(res.status).toBe(200);
         expect(res.body.music).toMatchObject({ mood: null, playing: false, volume: 0.6 });
@@ -147,27 +147,27 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
         });
 
         it('delete PATCH (map minus entry, overrides minus tracks) removes both atomically', async () => {
-            seedMusic({ mood: null, playing: false, volume: 0.6, overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ videoId: 'b', title: 'b' }] }, customCategories: { 'custom-crypt': { label: 'Crypt' }, 'custom-tar': { label: 'Tar' } } });
+            seedMusic({ mood: null, playing: false, volume: 0.6, overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ kind: 'youtube', src: 'bbbbbbbbbbb', title: 'b' }] }, customCategories: { 'custom-crypt': { label: 'Crypt' }, 'custom-tar': { label: 'Tar' } } });
             const res = await request(createTestApp())
                 .post('/api/campaigns/test-campaign/music')
                 .send({
                     customCategories: { 'custom-tar': { label: 'Tar' } },
-                    overrides: { tavern: [{ videoId: 'b', title: 'b' }] }
+                    overrides: { tavern: [{ kind: 'youtube', src: 'bbbbbbbbbbb', title: 'b' }] }
                 });
 
             expect(res.status).toBe(200);
             expect(res.body.music.customCategories).toEqual({ 'custom-tar': { label: 'Tar' } });
-            expect(res.body.music.overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
+            expect(res.body.music.overrides).toEqual({ tavern: [{ kind: 'youtube', src: 'bbbbbbbbbbb', title: 'b' }] });
         });
 
         it('tracks PATCH for a custom key rides the overrides lane (title resolution included)', async () => {
             seedMusic({ ...STOPPED, customCategories: { 'custom-crypt': { label: 'Crypt' } } });
             const res = await request(createTestApp())
                 .post('/api/campaigns/test-campaign/music')
-                .send({ overrides: { 'custom-crypt': [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
+                .send({ overrides: { 'custom-crypt': [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
 
             expect(res.status).toBe(200);
-            expect(res.body.music.overrides['custom-crypt']).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }]);
+            expect(res.body.music.overrides['custom-crypt']).toEqual([{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }]);
             expect(res.body.music.customCategories).toEqual({ 'custom-crypt': { label: 'Crypt' } });
         });
 
@@ -340,14 +340,14 @@ describe('campaigns-changedata - POST music oEmbed title resolution', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
             .send({ overrides: { tavern: [
-                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
-                { videoId: '2P8J7Cx1plA', title: '2P8J7Cx1plA' }
+                { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { kind: 'youtube', src: '2P8J7Cx1plA', title: '2P8J7Cx1plA' }
             ] } });
 
         expect(res.status).toBe(200);
         const expected = [
-            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
-            { videoId: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
+            { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+            { kind: 'youtube', src: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
         ];
         expect(characterChangeData.get('test-campaign').music.overrides.tavern).toEqual(expected);
         expect(res.body.music.overrides.tavern).toEqual(expected);
@@ -367,28 +367,28 @@ describe('campaigns-changedata - POST music oEmbed title resolution', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
             .send({ overrides: { tavern: [
-                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
-                { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' }
+                { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { kind: 'youtube', src: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' }
             ] } });
 
         expect(res.status).toBe(200);
         expect(res.body.music.overrides.tavern).toEqual([
-            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
-            { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' } // graceful fallback, save never blocked
+            { kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+            { kind: 'youtube', src: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' } // graceful fallback, save never blocked
         ]);
         expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('aAAAAAAAAAA'), expect.anything());
         consoleError.mockRestore();
     });
 
-    it('re-save of an already-resolved videoId skips re-fetch (no oEmbed stampede)', async () => {
-        seedMusic({ ...STOPPED, overrides: { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }] } });
+    it('re-save of an already-resolved video id skips re-fetch (no oEmbed stampede)', async () => {
+        seedMusic({ ...STOPPED, overrides: { tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }] } });
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign/music')
-            .send({ overrides: { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
+            .send({ overrides: { tavern: [{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
 
         expect(res.status).toBe(200);
         expect(fetchMock).not.toHaveBeenCalled();
         // stored readable title survives the editor's raw-ID re-stamp
-        expect(res.body.music.overrides.tavern).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }]);
+        expect(res.body.music.overrides.tavern).toEqual([{ kind: 'youtube', src: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }]);
     });
 });

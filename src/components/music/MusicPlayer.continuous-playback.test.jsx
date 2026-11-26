@@ -10,9 +10,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -77,8 +77,8 @@ describe('MusicPlayer continuous playback across views', () => {
 
     expect(townButton()).toBeNull(); // panel hidden
     expect(frame(document.body)).not.toBeNull(); // iframe survives
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
-    expect(youtubePlayer.dispose).not.toHaveBeenCalled();
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.dispose).not.toHaveBeenCalled();
     expect(stub.posts).toHaveLength(postsAfterPlay); // no disarm POST
     expect(musicState()).toMatchObject({ mood: 'town', playing: true }); // still armed
     expect(mockAddEntry).not.toHaveBeenCalledWith(
@@ -99,9 +99,9 @@ describe('MusicPlayer continuous playback across views', () => {
 
     expect(townButton()).toHaveClass('active'); // honest live state on return
     expect(frame(document.body)).not.toBeNull();
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(1); // no replay on return
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
-    expect(youtubePlayer.dispose).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(1); // no replay on return
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.dispose).not.toHaveBeenCalled();
     expect(stub.posts).toHaveLength(postsAfterPlay);
   });
 
@@ -110,7 +110,7 @@ describe('MusicPlayer continuous playback across views', () => {
     const { rerender } = render(<MusicPlayer campaignName="test-campaign" visible />);
     fireEvent.click(townButton());
     fireEvent.click(screen.getByTitle('Stop'));
-    expect(youtubePlayer.stop).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).toHaveBeenCalledTimes(1);
     expect(musicState()).toMatchObject({ mood: null, playing: false });
 
     // A later view switch with nothing playing writes nothing extra.

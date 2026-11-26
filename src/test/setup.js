@@ -81,6 +81,15 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 });
 
+// jsdom ships no ResizeObserver — the rails' overflow measurement lane
+// (hooks/ui/useRailClipped, Item 7 F19) guards on it so effect mounts stay
+// inert in tests instead of throwing ReferenceError.
+global.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // Cleanup after each test
 afterEach(() => {
   cleanup();

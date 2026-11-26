@@ -138,6 +138,44 @@ function pressBudgetRegion({ campaignName, unconstrained, player, obstacles, map
     });
 }
 
+/**
+ * Drop-time redirect toast copy (display-only, hoisted to keep handlePointerUp
+ * under the lint complexity cap). Two redirect legs share the one .map-toast
+ * channel, one honest toast per drop:
+ * - L5-002 budget clamp (copy law, backlog 2026-11-09): a zero-cost snap means
+ *   the token never left its cell (0 ft of budget left at drop) — nothing was
+ *   clamped back, so name the full block truthfully; otherwise the copy names
+ *   BOTH quantities (feet moved this move vs feet requested) or the whole-turn
+ *   cap, so no bare number ever reads as "remaining movement". The
+ *   enforcement_denied log row stays byte-identical on every leg.
+ * - Item 6 #1 occupied-cell honesty: a drop landing on another token's cell
+ *   redirects to the nearest free reachable cell (or back to the turn-start
+ *   cell when none is free). It used to happen with zero message, so the drag
+ *   read as swallowed. Name the landing cell on the same display-only lane.
+ */
+function showDropRedirectToast({ showSnapToast, budget, dropOccupied, clampedGridX, clampedGridY, targetX, targetY, dragging, player }) {
+    if (budget.snapped) {
+        if (budget.moveCostFeet === 0) {
+            showSnapToast(`${budget.creatureName} cannot move — no movement left this turn.`);
+        } else if (budget.moveCostFeet >= budget.speedFeet) {
+            // This move charged the creature's entire per-turn budget
+            // (e.g. 30 ft off a fresh 30): the number is the total-at-cap,
+            // never a remaining figure.
+            showSnapToast(`${budget.creatureName}'s movement used up at ${budget.speedFeet} ft.`);
+        } else {
+            showSnapToast(`${budget.creatureName} moved only ${budget.moveCostFeet} ft of ${budget.requestedFeet} requested.`);
+        }
+        return;
+    }
+    if (!dropOccupied || (targetX === clampedGridX && targetY === clampedGridY)) return;
+    const moverName = player.name || player.id;
+    const startGridX = dragging.startX ?? player.gridX;
+    const startGridY = dragging.startY ?? player.gridY;
+    showSnapToast(targetX === startGridX && targetY === startGridY
+        ? `Cell occupied — ${moverName} stayed at (${targetX},${targetY}).`
+        : `Cell occupied — ${moverName} moved to (${targetX},${targetY}).`);
+}
+
 export default function usePlayerDragging({
     svgRef,
     mapData,
@@ -332,6 +370,7 @@ export default function usePlayerDragging({
                 .filter((c) => c.id !== dragging.playerId)
                 .map((c) => `${c.gridX},${c.gridY}`)
         );
+        const dropOccupied = occupiedSquares.has(`${clampedGridX},${clampedGridY}`);
 
         let targetX;
         let targetY;
@@ -357,27 +396,11 @@ export default function usePlayerDragging({
         const budget = resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName, characters });
         targetX = budget.targetX;
         targetY = budget.targetY;
-        // Visual counterpart of the enforcement_denied log: the token lands on
-        // the snapped cell, so say so before it reads as a stuck drag. A
-        // zero-cost snap means the token never left its cell (0 ft of budget
-        // left at drop) — nothing was clamped back, so name the full block
-        // truthfully. Otherwise the copy names BOTH quantities (feet moved
-        // this move vs feet requested) or the whole-turn cap, so no bare
-        // number ever reads as "remaining movement" (backlog 2026-11-09).
-        // The log row stays byte-identical on every leg; only this toast copy
-        // branches.
-        if (budget.snapped) {
-            if (budget.moveCostFeet === 0) {
-                showSnapToast(`${budget.creatureName} cannot move — no movement left this turn.`);
-            } else if (budget.moveCostFeet >= budget.speedFeet) {
-                // This move charged the creature's entire per-turn budget
-                // (e.g. 30 ft off a fresh 30): the number is the total-at-cap,
-                // never a remaining figure.
-                showSnapToast(`${budget.creatureName}'s movement used up at ${budget.speedFeet} ft.`);
-            } else {
-                showSnapToast(`${budget.creatureName} moved only ${budget.moveCostFeet} ft of ${budget.requestedFeet} requested.`);
-            }
-        }
+        // Visual counterpart of the enforcement_denied log + the occupied-
+        // snap honesty fix (Item 6 #1): the token lands on a redirected cell,
+        // so say so BEFORE it reads as a stuck drag. Copy law lives in
+        // showDropRedirectToast above.
+        showDropRedirectToast({ showSnapToast, budget, dropOccupied, clampedGridX, clampedGridY, targetX, targetY, dragging, player });
 
         setMapData((prev) => ({
             ...prev,

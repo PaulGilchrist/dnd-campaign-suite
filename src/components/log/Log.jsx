@@ -154,8 +154,10 @@ function LogComposer({ isLocalhost, authorGroups, author, composeType, noteText,
         />
         {/* .ct-* kit convergence (tranche 2): the post button rides the kit's
             primary tier; the pinned .log-add-btn token survives as the test/
-            locator hook while its bespoke App-level skin was retired. */}
-        <button className="log-add-btn ct-btn ct-btn-primary" onClick={onPost} disabled={!canPost || !noteText.trim()} title={copy.post} aria-label={copy.post}><i className="fas fa-plus"></i></button>
+            locator hook while its bespoke App-level skin was retired.
+            F12 (Item 7): the view's main verb gets its label — an unlabeled
+            `+` square read as a form with no submit. */}
+        <button className="log-add-btn ct-btn ct-btn-primary" onClick={onPost} disabled={!canPost || !noteText.trim()} title={copy.post} aria-label={copy.post}><i className="fas fa-plus" aria-hidden="true"></i> Post</button>
       </div>
       {!canPost && (
         <div className="log-post-disabled-hint no-print">
@@ -259,7 +261,9 @@ export default function Log({ campaignName, characters, isLocalhost }) {
   return (
     <div className="campaign-tool log-view ct-container" data-testid="campaign-log-view">
       <div className="log-toolbar">
-        <h2><i className="fas fa-scroll"></i> Campaign Log</h2>
+        {/* F13 (Item 7): one label per view — the header names the view the
+            sidebar names it ("Log"). */}
+        <h2><i className="fas fa-scroll"></i> Log</h2>
       </div>
 
         <LogComposer
@@ -291,12 +295,14 @@ export default function Log({ campaignName, characters, isLocalhost }) {
 
       {/* View-level empty/loading faces ride the kit's .ct-empty-state; the
           pinned .log-loading/.log-empty tokens survive as test hooks. */}
-      {!initialized && <div className="log-loading ct-empty-state no-print">Loading log...</div>}
+      {!initialized && <div className="log-loading ct-empty-state no-print"><i className="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Loading log...</div>}
       {initialized && logEntries.length === 0 && (
-        <div className="log-empty ct-empty-state no-print">No entries yet. Roll dice or add a note to get started.</div>
+        // F14 (Item 7): empty faces standardize on the Sessions icon+guidance
+        // pattern (the .ct-empty-state icon tier, App.css).
+        <div className="log-empty ct-empty-state no-print"><i className="fa-solid fa-book-journal-whills" aria-hidden="true"></i> No entries yet. Roll dice or add a note to get started.</div>
       )}
       {initialized && logEntries.length > 0 && filteredEntries.length === 0 && (
-        <div className="log-empty ct-empty-state no-print">No entries match the current filters.</div>
+        <div className="log-empty ct-empty-state no-print"><i className="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i> No entries match the current filters.</div>
       )}
 
       <div className="log-entries">

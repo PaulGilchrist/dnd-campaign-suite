@@ -3,9 +3,11 @@
 // GET always answers a resolved type (explicit meta file → 'standard' default;
 // the meta file is the ONLY type channel since the no-legacy sweep 2026-11-16
 // retired the starter-seed-existence inference and stamped every campaign
-// folder); PUT is GM-only (localhost) with an enum guard so only
-// known badge types ever land on disk. A corrupt meta file must degrade to
-// the standard default, never 500.
+// folder) plus the sidebar toolbelt (an absent/malformed stored field answers
+// the canonical all-visible { hiddenViews: [] }); PUT is GM-only (localhost),
+// a PARTIAL upsert of { type } and/or { toolbelt } with an enum guard on type
+// and a shape guard on toolbelt, so neither write can clobber the other field.
+// A corrupt meta file must degrade to the standard default, never 500.
 import express from 'express';
 import fs from 'fs';
 import { request } from '../test-utils/localhostSupertest.js';
@@ -59,7 +61,7 @@ describe('campaign meta GET', () => {
     it('answers standard when nothing marks the campaign', async () => {
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ type: 'standard' });
+        expect(res.body).toEqual({ type: 'standard', toolbelt: { hiddenViews: [] } });
     });
 
     it('returns the stored type (open to LAN readers too)', async () => {
@@ -68,14 +70,14 @@ describe('campaign meta GET', () => {
             .get('/api/campaigns/test-campaign/meta')
             .set('Host', FOREIGN_HOST);
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ type: 'arena' });
+        expect(res.body).toEqual({ type: 'arena', toolbelt: { hiddenViews: [] } });
     });
 
     it('a starter-seed document does NOT type the campaign (meta file is the only channel)', async () => {
         mockFsState.exists.add(SEED_FILE);
         expect(resolveCampaignType('test-campaign')).toBe('standard');
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
-        expect(res.body).toEqual({ type: 'standard' });
+        expect(res.body).toEqual({ type: 'standard', toolbelt: { hiddenViews: [] } });
     });
 
     it('reads a corrupt meta file as absent and still answers a type', async () => {
@@ -83,7 +85,7 @@ describe('campaign meta GET', () => {
         mockFsState.exists.add(SEED_FILE);
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ type: 'standard' });
+        expect(res.body).toEqual({ type: 'standard', toolbelt: { hiddenViews: [] } });
     });
 
     it('ignores an unknown stored type (standard default wins)', () => {
@@ -118,6 +120,101 @@ describe('campaign meta PUT', () => {
             expect(fs.writeFileSync).not.toHaveBeenCalled();
         },
     );
+});
+
+describe('campaign meta toolbelt lane', () => {
+    // The sidebar toolbelt is the per-campaign set of hidden views
+    // (learnability backlog Item 1). Absent field = all-visible default;
+    // the PUT is a PARTIAL upsert so a toolbelt write never erases the type
+    // and a type stamp never erases the toolbelt.
+    it('GET passes a stored toolbelt through', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({
+            type: 'standard',
+            toolbelt: { hiddenViews: ['music', 'partyInventory'] },
+        }));
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ type: 'standard', toolbelt: { hiddenViews: ['music', 'partyInventory'] } });
+    });
+
+    it('a corrupt stored toolbelt degrades to the all-visible default (never 500)', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ type: 'standard', toolbelt: { hiddenViews: 'music' } }));
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
+        expect(res.status).toBe(200);
+        expect(res.body.toolbelt).toEqual({ hiddenViews: [] });
+    });
+
+    it('PUT toolbelt writes the hidden set, dedupes, and keeps the stored type', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ type: 'starter' }));
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ toolbelt: { hiddenViews: ['music', 'music', 'campaignLog'] } });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            message: 'Campaign meta saved successfully',
+            type: 'starter',
+            toolbelt: { hiddenViews: ['music', 'campaignLog'] },
+        });
+        expect(JSON.parse(mockFsState.files.get(META_FILE))).toEqual({
+            type: 'starter',
+            toolbelt: { hiddenViews: ['music', 'campaignLog'] },
+        });
+    });
+
+    it('an empty hiddenViews array is the canonical all-visible write', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ type: 'standard', toolbelt: { hiddenViews: ['music'] } }));
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ toolbelt: { hiddenViews: [] } });
+        expect(res.status).toBe(200);
+        expect(JSON.parse(mockFsState.files.get(META_FILE))).toEqual({ type: 'standard', toolbelt: { hiddenViews: [] } });
+    });
+
+    it('a type-only PUT keeps a stored toolbelt intact', async () => {
+        mockFsState.files.set(META_FILE, JSON.stringify({ type: 'standard', toolbelt: { hiddenViews: ['music'] } }));
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ type: 'arena' });
+        expect(res.status).toBe(200);
+        expect(JSON.parse(mockFsState.files.get(META_FILE))).toEqual({
+            type: 'arena',
+            toolbelt: { hiddenViews: ['music'] },
+        });
+    });
+
+    it.each([
+        ['missing hiddenViews', { toolbelt: {} }],
+        ['non-array hiddenViews', { toolbelt: { hiddenViews: 'music' } }],
+        ['non-string entry', { toolbelt: { hiddenViews: [7] } }],
+        ['blank entry', { toolbelt: { hiddenViews: ['  '] } }],
+        ['non-object toolbelt', { toolbelt: ['music'] }],
+    ])('refuses a %s toolbelt payload with 400 and leaves disk untouched', async (_label, body) => {
+        const res = await request(createTestApp()).put('/api/campaigns/test-campaign/meta').send(body);
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/hiddenViews/);
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('403s a network client writing the toolbelt and leaves disk untouched', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .set('Host', FOREIGN_HOST)
+            .send({ toolbelt: { hiddenViews: ['music'] } });
+        expect(res.status).toBe(403);
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('publishes campaigns-list (updated) on a toolbelt write so mounted tabs converge live', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ toolbelt: { hiddenViews: ['music'] } });
+        expect(res.status).toBe(200);
+        expect(publishSpy).toHaveBeenCalledWith(
+            'campaigns-list',
+            { action: 'updated', campaign: 'test-campaign' },
+            'test-campaign'
+        );
+    });
 });
 
 describe('campaign meta PUT live-sync broadcast', () => {

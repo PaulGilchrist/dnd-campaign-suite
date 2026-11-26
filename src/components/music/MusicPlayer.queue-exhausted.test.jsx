@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-11-20
 /* Lane: mood un-arm on 'music-queue-exhausted' (bug-music-dead-track-infinite-skip-loop).
- * When youtubePlayer reports every track failed back-to-back, the component
+ * When ambiencePlayer reports every track failed back-to-back, the component
  * must flip the synced 'music' key to { mood:null, playing:false } (honest
  * server-first write, not a local lie), toast naming the mood, and log a
  * no_playable_tracks campaign row. The fetch stub mirrors the server music
@@ -12,9 +12,9 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -57,9 +57,9 @@ function musicState() {
 const townButton = () => screen.getByTitle('Play Town ambience');
 const toastNode = () => document.querySelector('.music-toast');
 
-function dispatchExhausted(videoIds) {
+function dispatchExhausted(srcs) {
   act(() => {
-    window.dispatchEvent(new CustomEvent('music-queue-exhausted', { detail: { videoIds } }));
+    window.dispatchEvent(new CustomEvent('music-queue-exhausted', { detail: { srcs } }));
   });
 }
 
@@ -109,7 +109,7 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     // The un-arm is a stop: setPlayerMounted(false) → mount-effect cleanup
     // disposes the embed, so frame-count stays a trustworthy ownership witness.
     expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(0);
-    expect(youtubePlayer.dispose).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.dispose).toHaveBeenCalledTimes(1);
     // shared bytes land exactly as before the fix: arm POST then stopCommit POST
     expect(musicState()).toMatchObject({ mood: null, playing: false });
     expect(stub.posts).toHaveLength(2);
@@ -124,7 +124,7 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     // re-arming after the released frame freshly re-mounts exactly one frame
     fireEvent.click(townButton());
     expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(1);
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(2);
+    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledTimes(2);
   });
 
   it('a fresh mood click after exhaustion re-arms and replays the queue normally', () => {
@@ -136,7 +136,7 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
 
     fireEvent.click(townButton());
 
-    expect(youtubePlayer.playTracks).toHaveBeenCalledTimes(2);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(2);
     expect(musicState()).toMatchObject({ mood: 'town', playing: true });
     expect(townButton()).toHaveClass('active');
   });

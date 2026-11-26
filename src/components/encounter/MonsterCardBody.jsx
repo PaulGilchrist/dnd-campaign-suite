@@ -40,7 +40,7 @@ function buildTargetArm({ onTargetChange, creatures, creature, isLocalhost, isPl
   return <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={creatures} overlays={[]} onTargetChange={onTargetChange} />;
 }
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, spatialGatePending = false, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, spatialGatePending = false, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl, onPrintCard = null }) {
 
   // MA-1014: spells.json name index for the spell_save_dc-only utility-row
   // chip arm (Ice Devil "Ice Wall") — resolved here so every card gets it
@@ -109,7 +109,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
-        <MonsterCardHeader monster={monster} monsterName={monsterName} campaignName={campaignName} avatarImageUrl={avatarImageUrl} onAvatarClick={openZoom} onClose={onClose} targetArm={targetArm} />
+        <MonsterCardHeader monster={monster} monsterName={monsterName} campaignName={campaignName} avatarImageUrl={avatarImageUrl} onAvatarClick={openZoom} onClose={onClose} targetArm={targetArm} onPrintCard={onPrintCard} />
         <div className="mc-body">
           <MonsterCardStats monster={monster} creatureTempHp={creatureTempHp} shieldOfFaithBonus={shieldOfFaithBonus} condEffects={condEffects} handleInitiative={handleInitiative} />
           {monsterConditions.length > 0 && (
@@ -145,7 +145,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         <MonsterAvatarZoom open={showZoom} name={monsterName} src={avatarImageUrl} campaignName={campaignName} onClose={closeZoom} />
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, spatialGatePending, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack, onTargetChange, creatures, isLocalhost, isPlayerSummoned, avatarImageUrl, showZoom, openZoom, closeZoom]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, spatialGatePending, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack, onTargetChange, creatures, isLocalhost, isPlayerSummoned, avatarImageUrl, showZoom, openZoom, closeZoom, onPrintCard]);
 
   return content;
 }
@@ -190,7 +190,7 @@ function MonsterAvatarZoom({ open, name, src, campaignName, onClose }) {
   return <AvatarModal name={name} imagePath={src} campaignName={campaignName} onClose={onClose} />;
 }
 
-function MonsterCardHeader({ monster, monsterName, campaignName, avatarImageUrl = null, onAvatarClick, onClose, targetArm = null }) {
+function MonsterCardHeader({ monster, monsterName, campaignName, avatarImageUrl = null, onAvatarClick, onClose, targetArm = null, onPrintCard = null }) {
   return (
     <div className="mc-header" onClick={onClose}>
       {/* Header avatar (improvement 2026-11-16): same click-to-zoom lane as the
@@ -217,6 +217,23 @@ function MonsterCardHeader({ monster, monsterName, campaignName, avatarImageUrl 
           closes the modal out from under the GM (improvement 2026-11-16 XD). */}
       {targetArm && (
         <div className="mc-header-arm no-print" onClick={(e) => e.stopPropagation()}>{targetArm}</div>
+      )}
+      {/* Printed stat card (Item 4 handout lane): labeled screen button (F12
+          law) opening the WYSIWYG paper preview for THIS monster — pure
+          presentation, zero state writes. */}
+      {onPrintCard && (
+        <button
+          type="button"
+          className="mc-print-btn ct-btn ct-btn-sm no-print"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPrintCard();
+          }}
+          title={`Print ${monsterName}'s stat card`}
+          aria-label={`Print stat card for ${monsterName}`}
+        >
+          <i className="fa-solid fa-print" /> Print Card
+        </button>
       )}
       <button className="mc-close" onClick={onClose} aria-label="Close">&times;</button>
     </div>

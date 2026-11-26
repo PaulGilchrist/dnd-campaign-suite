@@ -43,6 +43,9 @@ import { resolveLairRow } from '../../services/encounters/monsterLairActions.js'
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import { resolveRoarStageAction } from '../../services/rules/features/roarService.js';
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import MonsterStatCard from '../handouts/MonsterStatCard.jsx';
+import { useHandoutPreview } from '../../hooks/ui/useHandoutPreview.js';
 import './MonsterCardModal.css';
 
 // MA-0031/MA-0035: a save row whose authored description names a cone or a
@@ -2467,12 +2470,33 @@ function useActiveMapFetch(campaignName, mapName) {
   return [mapData, mapPending];
 }
 
+// Item 4 handout lane: the printed paper face of THIS modal's monster — the
+// same monsters.json row the interactive card runs, rendered through the
+// shared stat-block print layout. Null while closed; zero state writes.
+function MonsterPrintPreview({ open, monster, monsterName, campaignName, onClose }) {
+  if (!open || !monster) return null;
+  return (
+    <HandoutPreview
+      label={`Monster Stat Card — ${monsterName}`}
+      campaignName={campaignName}
+      onClose={onClose}
+    >
+      <MonsterStatCard monster={monster} />
+    </HandoutPreview>
+  );
+}
+
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const creatureTempHp = getRuntimeValue(monsterName, 'tempHp', campaignName) || 0;
   const fallbackCsRef = useRef(null);
   const [mapData, mapPending] = useActiveMapFetch(campaignName, mapName);
   const [evasionSelection, setEvasionSelection] = useState(null);
+  // Item 4 handout lane: header Print Card opens the paper preview portal.
+  // Pure per-client display flags (useHandoutPreview) — printing never
+  // touches the store; stable callback identities feed MonsterCardBody's
+  // content memo without churn.
+  const printCard = useHandoutPreview();
   const [showAllyModal, setShowAllyModal] = useState(false);
   const [allyModalCreatures, setAllyModalCreatures] = useState([]);
   const currentAllies = resolveCurrentAllies(useRuntimeValue(monsterName, 'selectedAllies', campaignName), monsterName);
@@ -3245,6 +3269,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         isLocalhost={isLocalhost}
         isPlayerSummoned={isPlayerSummoned}
         imageUrl={imageUrl}
+        onPrintCard={printCard.openPreview}
       />
       {/* Host stays mounted while the modal is open (GK 2026-11-17 guarded
           close-focus): its stamped tabindex="-1" wrapper is the Popup tier's
@@ -3334,6 +3359,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         monsterName={monsterName}
         onResolve={(form) => resolveShapeShiftSelection({ chooser: shapeShiftChooser, form, monsterName, campaignName, setPopupHtml, setChooser: setShapeShiftChooser })}
         onSkip={() => declineShapeShiftSelection({ chooser: shapeShiftChooser, monsterName, campaignName, setChooser: setShapeShiftChooser })}
+      />
+      <MonsterPrintPreview
+        open={printCard.open}
+        monster={monster}
+        monsterName={monsterName}
+        campaignName={campaignName}
+        onClose={printCard.closePreview}
       />
     </>
   );

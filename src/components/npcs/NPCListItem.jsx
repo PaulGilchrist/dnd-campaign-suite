@@ -3,7 +3,7 @@ import { getAttitudeStyle } from '../../services/npcs/npcFormUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
 import DraftFlag from '../common/DraftFlag.jsx';
 
-function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
+function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative, onPrintNPC }) {
   const hasStats = npcHasStatBlock(npc);
   const hasAttacks = npcHasAttacks(npc);
   const initButtonLabel = hasStats
@@ -69,6 +69,15 @@ function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
               <i className="fa-solid fa-hand-fist" /> No attacks
             </span>
           )}
+          {/* F21 (Item 7): the disabled Add-to-Initiative used to differ from
+              the enabled one only by a whisper of dimness, with the cause
+              tooltip-only. The cause now reads beside the button (same
+              cause-naming copy as the title/aria-label). */}
+          {!hasStats && (
+            <span className="npcs-init-cause" title="Why this button is disabled">
+              <i className="fa-solid fa-circle-exclamation" /> Fill in AC and HP (Stats tab) first
+            </span>
+          )}
           <button
             className="npcs-init-btn ct-btn ct-btn-sm"
             disabled={!hasStats}
@@ -80,6 +89,19 @@ function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
             aria-label={initButtonLabel}
           >
             <i className="fa-solid fa-shield-alt" /> Add {npc.name} to Initiative
+          </button>
+          {/* Handout lane (Item 4): every NPC earns a card — lore-only rows
+              print a clean roleplay card, so this button is never gated. */}
+          <button
+            className="npcs-print-btn ct-btn ct-btn-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrintNPC(npc);
+            }}
+            title={`Print ${npc.name}'s handout card`}
+            aria-label={`Print card for ${npc.name}`}
+          >
+            <i className="fa-solid fa-print" /> Print Card
           </button>
         </div>
       </div>

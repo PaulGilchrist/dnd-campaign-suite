@@ -47,10 +47,20 @@ html {
     --color-header: #48A948;
     --color-header-inner: #fff;
     --color-section-heading: #6fd66f;
+    /* Band ink for the .sectionHeader family (see the [data-theme="light"]
+       block for the two-token law). Dark face unchanged from the audit-era
+       #6fd66f on the #0c481a band. */
+    --color-band-heading: #6fd66f;
     --color-text: #eee;
     --color-text-secondary: #aaa;
     --color-text-muted: #666;
     --color-text-inverse: #fff;
+    /* Disabled/ghost control family (Item 7, audit F9/F21): ink + border for
+       disabled inputs/selects and dashed ghost add-buttons. Light mode needs
+       a REAL mid-gray on the near-white card/input faces — the old pattern
+       (white-translucent borders + opacity ghosts) vanished on white. */
+    --color-disabled-text: #8a8a8a;
+    --color-disabled-border: #6f6f6f;
     --color-link: #48A948;
     --color-link-hover: #747bff;
 
@@ -209,20 +219,22 @@ input[type="checkbox"] {
 }
 
 .sectionHeader {
-    color: var(--color-header);
+    /* The band-family heading (sits on background-color-header via the
+       char-sheet lane rules) — ink rides the dedicated band token, never
+       the page-surface --color-section-heading (see the light block). */
+    color: var(--color-band-heading);
     font-size: 1.05em;
     font-weight: 800;
 }
 
-.sectionHeader {
-    color: var(--color-section-heading);
-}
-
-@media (prefers-color-scheme: light) {
-    body:not([data-theme="dark"]) .sectionHeader {
-        color: var(--color-section-heading-light);
-    }
-}
+/* F1 (visual audit 2026-11-25): the old `prefers-color-scheme: light`
+   .sectionHeader rule here pointed at `--color-section-heading-light`, a
+   token defined NOWHERE — the invalid var made `color` inherit body ink
+   (#222), unreadable on the dark-green band. Every light face now rides
+   the token cascade: explicit light via `[data-theme="light"]
+   --color-band-heading` / `--color-section-heading` above, system light
+   via the `body:not([data-theme])` fallback block further down (#040 on
+   the #bbb fallback band). No legacy rule to keep. */
 
 .text-muted {
     opacity: 0.5;
@@ -307,10 +319,30 @@ th {
     --color-body: #000;
     --color-header: rgb(123, 200, 123);
     --color-header-inner: #070;
+    /* F1 fix (visual audit 2026-11-25). Two heading tokens, two surfaces:
+       - --color-band-heading = ink ON the deep-green band
+         (--background-color-header #093613, which stays a DARK surface in
+         this theme): pale green matching the app's standard band pairing
+         thead/GM party table already ride (~6.7:1 on the band).
+       - --color-section-heading = section-heading ink on the PAGE surface
+         (Chronicle session headers): deep green on white (~9:1), matching
+         the Chronicle/Handout print-face vocabulary (#14532d).
+       One color cannot clear AA on BOTH surfaces (the band and the page
+       sit on opposite ends of the luminance range in light mode), so the
+       band family got its own token. Previously the light theme left the
+       heading token undefined AND a dead `--color-section-heading-light`
+       media rule (now removed) made .sectionHeader inherit body ink #222 —
+       1.3:1, unreadable. */
+    --color-band-heading: rgb(123, 200, 123);
+    --color-section-heading: #14532d;
     --color-text: #222;
     --color-text-secondary: #444;
     --color-text-muted: #555;
     --color-text-inverse: #fff;
+    /* F9 light face: gray ink ~4.8:1 on the #f9f9f9 card/input surfaces,
+       visible gray border on the same faces (contract-pinned AA pairs). */
+    --color-disabled-text: #6b7280;
+    --color-disabled-border: #7d858c;
     --color-link: #070;
     --color-link-hover: #747bff;
 
@@ -411,10 +443,13 @@ th {
         --color-header: #070;
         --color-header-inner: #070;
         --color-section-heading: #040;
+        --color-band-heading: #040;
         --color-text: #222;
         --color-text-secondary: #444;
         --color-text-muted: #555;
         --color-text-inverse: #fff;
+        --color-disabled-text: #6b7280;
+        --color-disabled-border: #7d858c;
         --color-link: #070;
         --color-link-hover: #747bff;
 
@@ -484,6 +519,7 @@ th {
         --color-main: black;
         --color-body: black;
         --color-section-heading: black;
+        --color-band-heading: black;
         --border-color-light: black;
         font-size: 12px;
     }

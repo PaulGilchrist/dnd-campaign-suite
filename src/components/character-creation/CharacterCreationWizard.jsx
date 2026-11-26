@@ -1,6 +1,4 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import cloneDeep from 'lodash/cloneDeep';
-import isEqual from 'lodash/isEqual';
 import './CharacterCreationWizard.css';
 import { validateStep, validateFinalFormData, validateAbilityTotals, validateSelectionCaps } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
@@ -9,6 +7,7 @@ import WizardFooter from './WizardFooter.jsx';
 import WizardSidebar from './WizardSidebar.jsx';
 import { WIZARD_STEPS, getVisibleSteps, getSaveCauseTitle } from '../../config/steps-config.js';
 import useWizardForm from '../../hooks/wizard/useWizardForm.js';
+import useWizardCloseGuard from '../../hooks/wizard/useWizardCloseGuard.js';
 import useWizardData from '../../hooks/wizard/useWizardData.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 import useWizardSkills from '../../hooks/wizard/useWizardSkills.js';
@@ -185,30 +184,14 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     resetErrors,
    } = useWizardForm(characterData, isEditing);
 
-  // Unsaved-changes guard: deep-compare formData against the initial draft
-  // snapshot on any close request (footer Cancel / header ×). A modified
-  // draft asks for confirmation that names the character (house NAMED-confirm
-  // pattern, mirrors the delete confirms); an unmodified draft closes
-  // silently. Post-save the parent unmounts the wizard, so no double-prompt.
-  const initialSnapshotRef = useRef(null);
-  if (initialSnapshotRef.current === null) {
-    initialSnapshotRef.current = cloneDeep(formData);
-  }
-
-  const handleRequestClose = useCallback(() => {
-    if (!isEqual(formData, initialSnapshotRef.current)) {
-      const trimmedName = (formData.name || '').trim();
-      const message = isEditing
-        ? `Discard changes to "${trimmedName || characterData?.name || 'this character'}"?`
-        : trimmedName
-          ? `Discard changes to "${trimmedName}"?`
-          : 'Discard this new character draft?';
-      if (!window.confirm(message)) {
-        return;
-      }
-    }
-    onCancel();
-  }, [formData, isEditing, characterData, onCancel]);
+  // Unsaved-changes guard + Escape lane (F11): see useWizardCloseGuard for
+  // the DiscardDraftDialog conversion notes.
+  const { discardDialog, handleRequestClose } = useWizardCloseGuard({
+    formData,
+    isEditing,
+    characterData,
+    onCancel,
+  });
 
   // Ruleset state (needed by data hook)
   const [ruleset, setRuleset] = useState(characterData?.rules ?? null);
@@ -738,6 +721,10 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
             }}
           />
         )}
+        {/* Shared keep/discard toll (× / Cancel / Escape lane; null when
+            idle). Sibling of the overlay so its backdrop dismisses only the
+            toll (EncounterModal.delete-confirm-modal law). */}
+        {discardDialog}
       </div>
      );
 }

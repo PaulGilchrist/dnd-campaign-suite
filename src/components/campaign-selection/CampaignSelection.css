@@ -10,8 +10,18 @@
 
 .campaign-selection h1 {
   font-size: 2.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   color: var(--color-header);
+}
+
+/* F15 (visual audit 2026-11-25, Item 7): the create verbs share one
+   horizontal row (tighter vertical rhythm). */
+.campaign-selection .campaign-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
 }
 
 .campaign-selection.loading p,
@@ -48,21 +58,35 @@
   max-width: 800px;
 }
 
+/* F15 (Item 7 kit convergence): entering a campaign is the NEUTRAL CARD
+   language (card tokens + green hover rail), not a solid-blue button — blue
+   is the buff color app-wide. Green primary stays the CREATE verb above.
+   Campaign type rides the chip, not the whole tile face. */
 .campaign-selection .campaign-button {
-  background-color: #4a90d9;
-  color: var(--color-text-inverse);
-  border: none;
+  background-color: var(--background-color-card);
+  color: var(--color-text);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem 2rem;
   font-size: 1.1rem;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
   min-width: 200px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.campaign-selection .campaign-launch-icon {
+  color: var(--color-header);
 }
 
 .campaign-selection .campaign-button:hover:not(:disabled) {
-  background-color: #357abd;
-  color: var(--color-text-inverse);
+  background-color: var(--background-color-card-hover);
+  border-color: var(--color-primary);
+  color: var(--color-text);
   transform: translateY(-2px);
 }
 
@@ -95,7 +119,6 @@
   padding: 0.75rem 1.5rem;
   font-size: 1.1rem;
   cursor: pointer;
-  margin-bottom: 1.5rem;
   transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
@@ -153,7 +176,7 @@
 
 .campaign-selection .modal-input:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--border-color-focus);
 }
 
 /* Inline quick-create denial (backlog 2026-11-11 LZ): a refused create (e.g.
@@ -200,13 +223,15 @@
   color: var(--color-text-inverse);
 }
 
+/* F15 (Item 7): the create-modal primary + focus ring converge on the app's
+   green-primary/focus language (was off-kit blue #4a90d9). */
 .campaign-selection .modal-content .modal-btn-primary {
-  background-color: #4a90d9;
+  background-color: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
 .campaign-selection .modal-content .modal-btn-primary:hover:not(:disabled) {
-  background-color: #357abd;
+  background-color: var(--color-primary-hover);
   color: var(--color-text-inverse);
 }
 
@@ -235,11 +260,9 @@
   font-weight: bold;
 }
 
-/* Seeded quick-create buttons (Arena/Starter) — same button tier as "Add",
-   separated by an accent icon; note text under the modal heading. */
-.campaign-selection .new-campaign-button--seeded {
-  margin-left: 0.5rem;
-}
+/* Seeded quick-create buttons (Arena/Starter) — same row tier as "Add",
+   separated by an accent icon; note text under the modal heading. (The old
+   margin-left separator retired with the F15 gap-row layout.) */
 
 .campaign-selection .seeded-campaign-note {
   color: var(--color-text-secondary, inherit);
@@ -248,30 +271,10 @@
 }
 
 /* Campaign-type badges (Arena/Starter) — a row reads as its type before it
-   is opened. Standard campaigns keep the neutral button with no badge. */
-.campaign-selection .campaign-button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.campaign-selection .campaign-button--arena {
-  background-color: #b0413e;
-}
-
-.campaign-selection .campaign-button--arena:hover:not(:disabled) {
-  background-color: #93362f;
-}
-
-.campaign-selection .campaign-button--starter {
-  background-color: #3d8b5f;
-}
-
-.campaign-selection .campaign-button--starter:hover:not(:disabled) {
-  background-color: #32714d;
-}
-
+   is opened. Standard campaigns keep the neutral card with no badge.
+   F15 (Item 7): the TYPE rides the chip — the tile face no longer paints
+   red/green (the old whole-tile tint competed with the card language).
+   Chip colors mirror the sidebar header chip (Sidebar.css). */
 .campaign-selection .campaign-type-badge {
   display: inline-flex;
   align-items: center;
@@ -282,6 +285,14 @@
   text-transform: uppercase;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.campaign-selection .campaign-type-badge--arena {
+  background-color: #b0413e;
+  color: var(--color-text-inverse);
+}
+
+.campaign-selection .campaign-type-badge--starter {
+  background-color: #3d8b5f;
   color: var(--color-text-inverse);
 }

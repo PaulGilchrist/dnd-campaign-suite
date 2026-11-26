@@ -393,6 +393,10 @@ button.hidden {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  /* F5 (visual audit 2026-11-25, Item 7): meta segments (subtitle, tag row,
+     preview) are flex siblings — without a gap they concatenated mid-word
+     ("...dwarven-influencedA bustling town..."). */
+  gap: 2px 12px;
 }
 
 .ct-container .ct-list-preview {
@@ -601,10 +605,39 @@ button.hidden {
    ≈ 6.9:1, light #444-on-#f5f5f5 ≈ 8.9:1. Specificity (0-3-0) outranks the
    -primary/-danger variants (0-2-0), so every disabled button shares it. */
 .ct-container .ct-btn:disabled {
+  /* Item 7 F9/F21: disabled controls ride the dedicated disabled tokens — a
+     visible border + gray ink instead of "just-dimmer" (the audit could not
+     tell Marta's disabled Add-to-Initiative from Cap's enabled one). */
   background: var(--background-color-disabled);
-  color: var(--color-text-secondary);
-  border-color: var(--border-color);
+  color: var(--color-disabled-text);
+  border-color: var(--color-disabled-border);
   cursor: not-allowed;
+}
+
+/* Horizontal-scroll affordance law (Item 7, audit F3/F19): content areas
+   that clip wider children (GM party table, Initiative carousel) must SHOW
+   they scroll — macOS overlay scrollbars are invisible until a two-finger
+   swipe, so silent clipping read as lost data. The styled always-when-
+   overflow scrollbar (WebKit) + thin bar (Firefox) appear exactly when the
+   content overflows and never when it fits. */
+.ct-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-disabled-border) transparent;
+}
+
+.ct-scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+.ct-scroll-x::-webkit-scrollbar-track {
+  background: var(--background-color-surface);
+  border-radius: 5px;
+}
+
+.ct-scroll-x::-webkit-scrollbar-thumb {
+  background: var(--color-disabled-border);
+  border-radius: 5px;
 }
 
 .ct-container .ct-btn-primary {

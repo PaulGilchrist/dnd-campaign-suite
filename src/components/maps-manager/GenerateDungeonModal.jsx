@@ -6,6 +6,7 @@ import * as mapsService from '../../services/maps/mapsService.js';
 import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
 import './GenerateDungeonModal.css';
 import './gen-modal-shared.css';
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 
 const MODE_OPTIONS = [
     { value: 'bsp', label: 'BSP Dungeon', icon: 'fa-solid fa-grid-2' },
@@ -40,6 +41,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     const [roomSize, setRoomSize] = useState('standard'); // 'cramped' | 'standard' | 'spacious'
     const [corridorLength, setCorridorLength] = useState('compact');
     const [layoutStyle, setLayoutStyle] = useState('balanced');
+
+    // F11 family law (Item 7): shared Escape/backdrop dismiss, blocked while a
+    // generation is in flight (mirrors the disabled Cancel button mid-create).
+    const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } = useModalDismiss(
+        onClose,
+        { disabled: generating, panelSelector: '.maps-manager-modal' }
+    );
 
     // Editing any field clears a stale error banner so it never lingers next
     // to now-valid inputs (TE backlog 2026-11-12).
@@ -135,7 +143,16 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     };
 
     return (
-        <div className="maps-manager-modal-overlay">
+        // F11 family law (Item 7 re-sweep 2026-11-25): this bespoke overlay was
+        // the one modal that trapped Escape — it now rides the shared
+        // useModalDismiss lane (Escape + pure-backdrop close, blocked while a
+        // generation is in flight, exactly like the disabled Cancel button).
+        <div
+            className="maps-manager-modal-overlay"
+            onKeyDown={handleKeyDown}
+            onMouseDown={handleOverlayMouseDown}
+            onClick={handleOverlayClick}
+        >
             <div className="maps-manager-modal dungeon-gen-modal">
                 <h3>Generate Dungeon Map</h3>
 

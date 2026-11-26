@@ -1,0 +1,113 @@
+/* Token cosmetics (learnability backlog Item 5) — the CSS half of the ONE
+   palette (ids live in tokenCosmetics.js; never duplicate the hex list in
+   a second stylesheet or component). Every color is an existing token of
+   the app's badge/status language: the bright half is the chip FILL / ring
+   color CreatureBadge + TokenStatusIndicators already use (dark board),
+   the deep half is their paired STROKE (light/paper faces, mirroring the
+   gold→#B8860B selection precedent in Map.css). Surfaces consume the two
+   custom properties so one swatch definition drives the indoor disc, the
+   menu swatch, and the hex marching-order avatar identically.
+
+   Ring language across surfaces (ONE consistent style everywhere):
+   • personal ring color = the token's own inner ring (indoor: the disc
+     stroke; hex avatar: a tight box-shadow ring);
+   • condition treatment = a dashed outer ring (the app's condition red
+     family, same "dashed = stateful overlay" grammar as the existing
+     selection/not-group-select rings);
+   • absent cosmetics = zero DOM/CSS change from the pre-Item-5 bytes. */
+
+:root {
+    --token-condition-ring: #dc2626;
+}
+
+[data-theme="light"] {
+    --token-condition-ring: #991b1b;
+}
+
+/* ── Palette definitions (bright face + deep light/paper variant) ── */
+.token-ring-ember  { --token-ring: #ef4444; --token-ring-deep: #991b1b; }
+.token-ring-crimson { --token-ring: #dc2626; --token-ring-deep: #7f1d1d; }
+.token-ring-amber  { --token-ring: #f59e0b; --token-ring-deep: #92400e; }
+.token-ring-gold   { --token-ring: #fbbf24; --token-ring-deep: #B8860B; }
+.token-ring-leaf   { --token-ring: #22c55e; --token-ring-deep: #166534; }
+.token-ring-azure  { --token-ring: #3b82f6; --token-ring-deep: #1e40af; }
+.token-ring-violet { --token-ring: #8b5cf6; --token-ring-deep: #5b21b6; }
+.token-ring-slate  { --token-ring: #64748b; --token-ring-deep: #334155; }
+
+/* ── Indoor board: the personal ring IS the disc stroke ──
+   Overrides the default #2c5f8a stroke (Map.css .creature-circle) and thickens
+   a hair so the color reads at normal zoom. Drag/invalid/selected classes
+   keep their own stroke rules below (specificity order): the transient drag
+   and selection states always out-shout a cosmetic. */
+.map .creature-circle[class*="token-ring-"] {
+    stroke: var(--token-ring);
+    stroke-width: 3;
+}
+
+[data-theme="light"] .map .creature-circle[class*="token-ring-"] {
+    stroke: var(--token-ring-deep);
+}
+
+/* ── Condition treatment — indoor SVG ring ──
+   Painted by TokenStatusIndicators (the hoisted token-status layer, which
+   already owns the per-creature live subscription, fog/ghost/hidden laws and
+   the stacking transform) — drawn LAST so the dashed ring is never buried
+   under a later token disc, and carries the buried-stack transform with the
+   chips it accompanies. */
+.map .token-condition-ring {
+    fill: none;
+    stroke: var(--token-condition-ring);
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* ── Context-menu swatches ──
+   The menu plate is a fixed dark #2a2a2a rect on BOTH themes, so swatches
+   always wear the bright palette face (the light override above is scoped
+   to the board surfaces only, never here). */
+.map .token-ring-swatch {
+    fill: var(--token-ring);
+    stroke: #555;
+    stroke-width: 1;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.map .token-ring-swatch-default {
+    /* miniature of the untouched token: the default disc face itself */
+    fill: #4a90d9;
+    stroke: #2c5f8a;
+}
+
+.map .token-ring-swatch-active {
+    fill: none;
+    stroke: #FFD700;
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+[data-theme="light"] .map .token-ring-swatch-active {
+    stroke: #B8860B;
+}
+
+.map .token-ring-swatches:focus {
+    outline: 1px solid #6ab0f0;
+}
+
+/* ── Hex surface: the marching-order avatar IS the character's token face ──
+   (the hex board carries one shared party marker, not per-character tokens —
+   see MarchingOrderPanel.jsx). box-shadow/outline keep the 24px disc layout
+   byte-identical when unset (transparent shadow paints nothing). The panel
+   is an always-dark surface in BOTH themes (hard #333 rows, like the context
+   menu plate), so avatars always wear the bright palette face — no light
+   override here. */
+.marching-order-avatar[class*="token-ring-"] {
+    box-shadow: 0 0 0 2px var(--token-ring);
+}
+
+.marching-order-avatar.token-condition-ring {
+    outline: 2px dashed var(--token-condition-ring);
+    outline-offset: 2px;
+}

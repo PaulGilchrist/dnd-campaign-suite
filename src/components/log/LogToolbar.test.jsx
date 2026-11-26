@@ -37,7 +37,7 @@ describe('Log toolbar', () => {
   it('GM tab: renders heading, note-add controls, and grouped census defaulting to GM', () => {
     setup(Log, []);
     expect(q('.log-toolbar')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Campaign Log' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Log' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Add a note to the log...')).toBeInTheDocument();
     expect(q('.log-add-btn')).toBeInTheDocument();
     expect(authorSelect()).toHaveValue('GM');

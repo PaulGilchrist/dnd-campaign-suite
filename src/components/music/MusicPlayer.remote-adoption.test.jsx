@@ -18,9 +18,9 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore, setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -80,12 +80,12 @@ describe('MusicPlayer remote-state adoption', () => {
     stubMusicServer();
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton()); // this tab owns the frame
-    expect(youtubePlayer.pause).not.toHaveBeenCalled();
+    expect(ambiencePlayer.pause).not.toHaveBeenCalled();
 
     remoteMusic({ mood: 'town', playing: false, volume: 0.6, overrides: {} });
 
-    expect(youtubePlayer.pause).toHaveBeenCalledTimes(1); // module actually commanded
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.pause).toHaveBeenCalledTimes(1); // module actually commanded
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
     expect(frame(container)).not.toBeNull(); // pause keeps the frame for resume
     // the remote echo itself logs nothing — the acting tab owns the log row
     expect(loggedActions()).toEqual(['set_ambience']);
@@ -96,10 +96,10 @@ describe('MusicPlayer remote-state adoption', () => {
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton());
     fireEvent.click(screen.getByTitle('Pause')); // local pause
-    expect(youtubePlayer.pause).toHaveBeenCalledTimes(1); // once by handler, not twice by echo
+    expect(ambiencePlayer.pause).toHaveBeenCalledTimes(1); // once by handler, not twice by echo
     fireEvent.click(screen.getByTitle('Play')); // local resume
-    expect(youtubePlayer.resume).toHaveBeenCalledTimes(1);
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.resume).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
   });
 
   it('releases this tab\'s frame when another tab starts ambience (no double audio)', () => {
@@ -110,9 +110,9 @@ describe('MusicPlayer remote-state adoption', () => {
 
     remoteMusic({ mood: 'combat', playing: true, volume: 0.6, overrides: {} });
 
-    expect(youtubePlayer.stop).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).toHaveBeenCalledTimes(1);
     expect(frame(container)).toBeNull(); // unmounted → mount-effect cleanup disposes
-    expect(youtubePlayer.dispose).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('stops and unmounts when another tab stops the ambience', () => {
@@ -122,7 +122,7 @@ describe('MusicPlayer remote-state adoption', () => {
 
     remoteMusic({ mood: null, playing: false, volume: 0.6, overrides: {} });
 
-    expect(youtubePlayer.stop).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.stop).toHaveBeenCalledTimes(1);
     expect(frame(container)).toBeNull();
   });
 
@@ -133,8 +133,8 @@ describe('MusicPlayer remote-state adoption', () => {
     remoteMusic({ mood: 'town', playing: true, volume: 0.6, overrides: {} });
 
     expect(frame(container)).toBeNull();
-    expect(youtubePlayer.playTracks).not.toHaveBeenCalled();
-    expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).not.toHaveBeenCalled();
+    expect(ambiencePlayer.ensurePlayer).not.toHaveBeenCalled();
   });
 
   it('mounting on a persisted playing state is a baseline — commands nothing and mounts nothing', () => {
@@ -142,8 +142,8 @@ describe('MusicPlayer remote-state adoption', () => {
     getStore('campaign').set('music', { mood: 'town', playing: true, volume: 0.6, overrides: {} });
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
 
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
-    expect(youtubePlayer.pause).not.toHaveBeenCalled();
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.pause).not.toHaveBeenCalled();
     expect(frame(container)).toBeNull();
   });
 
@@ -191,13 +191,13 @@ describe('MusicPlayer volume adoption', () => {
     stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton()); // this tab owns the player
-    youtubePlayer.setVolume.mockClear();
+    ambiencePlayer.setVolume.mockClear();
 
     remoteMusic({ mood: 'town', playing: true, volume: 0.25, overrides: {} });
 
     expect(volumeInput().value).toBe('25');
-    expect(youtubePlayer.setVolume).toHaveBeenCalledTimes(1);
-    expect(youtubePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.25));
+    expect(ambiencePlayer.setVolume).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.25));
   });
 
   it('never re-commands the player for this tab\'s own volume echo, yet still adopts remote volume', () => {
@@ -206,15 +206,15 @@ describe('MusicPlayer volume adoption', () => {
     fireEvent.click(townButton());
 
     fireEvent.change(volumeInput(), { target: { value: '30' } }); // local commit → 0.3
-    expect(youtubePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.3));
-    youtubePlayer.setVolume.mockClear();
+    expect(ambiencePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.3));
+    ambiencePlayer.setVolume.mockClear();
 
     remoteMusic({ mood: 'town', playing: true, volume: 0.3, overrides: {} }); // self echo
-    expect(youtubePlayer.setVolume).not.toHaveBeenCalled(); // echo skipped, in-flight state intact
+    expect(ambiencePlayer.setVolume).not.toHaveBeenCalled(); // echo skipped, in-flight state intact
 
     remoteMusic({ mood: 'town', playing: true, volume: 0.45, overrides: {} }); // foreign change
     expect(volumeInput().value).toBe('45');
-    expect(youtubePlayer.setVolume).toHaveBeenCalledTimes(1);
-    expect(youtubePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.45));
+    expect(ambiencePlayer.setVolume).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.45));
   });
 });

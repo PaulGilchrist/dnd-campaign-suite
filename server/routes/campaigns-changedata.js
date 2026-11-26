@@ -3,6 +3,7 @@ import lodash from 'lodash';
 import { publish, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
+import { pruneUnreferencedAudio, LOCAL_TRACK_SRC_PATTERN, BUNDLED_TRACK_SRC_PATTERN } from '../utils/campaignAudio.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
 import { isInvalidCampaignName } from '../utils/campaignReadGuard.js';
 import { addEntry as addLogEntry } from './log.js';
@@ -190,12 +191,58 @@ function validateTransportFields(incoming, customCategories) {
     return null;
 }
 
+// Canonical track row (offline-ambience backlog Item 3 + Item 3b bundled beds):
+// every override row is exactly { kind: 'youtube', src: <11-char video id>,
+// title } or { kind: 'local', src: 'audio/<upload name>' | '/audio/<bundled
+// bed>', title }. The discriminator is strict — one canonical shape, no legacy
+// {videoId} leniency anywhere.
+const YOUTUBE_SRC = /^[a-zA-Z0-9_-]{11}$/;
+const MAX_TRACK_TITLE = 200;
+
+function validateTrackRow(where, row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+        return `${where} must be a track object ({ kind, src, title })`;
+    }
+    if (row.kind === 'youtube') {
+        if (typeof row.src !== 'string' || !YOUTUBE_SRC.test(row.src)) {
+            return `${where}.src must be an 11-character YouTube video id for kind "youtube"`;
+        }
+    } else if (row.kind === 'local') {
+        if (typeof row.src !== 'string' || (!LOCAL_TRACK_SRC_PATTERN.test(row.src) && !BUNDLED_TRACK_SRC_PATTERN.test(row.src))) {
+            return `${where}.src must be a campaign audio upload (audio/amb-…<mp3|ogg|oga|m4a|wav>) or a bundled app-audio bed (/audio/<name>.<mp3|m4a>) for kind "local" — upload the file first`;
+        }
+    } else {
+        return `${where}.kind must be "youtube" or "local" (got ${JSON.stringify(row.kind)})`;
+    }
+    if (typeof row.title !== 'string' || row.title.trim() === '' || row.title.length > MAX_TRACK_TITLE) {
+        return `${where}.title must be a non-empty string (max ${MAX_TRACK_TITLE} chars)`;
+    }
+    return null;
+}
+
+function validateOverrides(overrides) {
+    for (const [mood, tracks] of Object.entries(overrides)) {
+        if (!Array.isArray(tracks)) {
+            return `music.overrides.${mood} must be an array of track rows`;
+        }
+        for (let i = 0; i < tracks.length; i += 1) {
+            const error = validateTrackRow(`music.overrides.${mood}[${i}]`, tracks[i]);
+            if (error) return error;
+        }
+    }
+    return null;
+}
+
 function validateMusicPayload(incoming, customCategories) {
     if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
         return 'music payload must be an object';
     }
     if ('overrides' in incoming && (!incoming.overrides || typeof incoming.overrides !== 'object' || Array.isArray(incoming.overrides))) {
         return 'music.overrides must be an object';
+    }
+    if ('overrides' in incoming) {
+        const overridesError = validateOverrides(incoming.overrides);
+        if (overridesError) return overridesError;
     }
     if ('customCategories' in incoming) {
         const categoriesError = validateCustomCategories(incoming.customCategories);
@@ -250,6 +297,14 @@ router.post('/api/campaigns/:campaign/music', asyncHandler(async (req, res) => {
 
     // Broadcast merged truth
     publish(`change-${campaign}-music`, merged, campaign);
+
+    // Superseded-audio prune (offline-ambience Item 3, token-art prune
+    // discipline): local rows that VANISHED from the overrides map (editor
+    // removed a track, Reset, category delete) have their uploads unlinked.
+    // Runs after the write succeeded; never throws; never silent.
+    if ('overrides' in incoming) {
+        pruneUnreferencedAudio(campaign, base.overrides, merged.overrides);
+    }
 
     res.json({ music: merged, message: 'Music saved successfully' });
 }));

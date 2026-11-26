@@ -47,13 +47,24 @@ const wallFacts = (container) => Array.from(container.querySelectorAll('rect.wal
 }));
 
 describe('GridAndWalls', () => {
+    // Item 7 F4 theme law: an authored bgFill is content and always paints;
+    // WITHOUT one the rect carries no inline fill, so the theme-owned CSS
+    // faces in Map.css (.grid-bg: dark board / light parchment) take over.
+    // The old `bgFill || '#1a1a1a'` inline hardcode is what made the indoor
+    // board ignore the light theme.
+    it('paints an authored bgFill verbatim', () => {
+        const { container } = renderComponent({ gridSize: 2, bgFill: '#ff0000' });
+        expect(container.querySelector('rect.grid-bg')).toHaveStyle({ fill: '#ff0000' });
+    });
+
     it.each([
-        { name: 'a custom color', bgFill: '#ff0000', expected: '#ff0000' },
-        { name: 'undefined', bgFill: undefined, expected: '#1a1a1a' },
-        { name: 'empty string', bgFill: '', expected: '#1a1a1a' },
-    ])('paints the grid background $expected when bgFill is $name', ({ bgFill, expected }) => {
+        { name: 'undefined', bgFill: undefined },
+        { name: 'empty string', bgFill: '' },
+    ])('leaves the background theme-owned (no inline fill) when bgFill is $name', ({ bgFill }) => {
         const { container } = renderComponent({ gridSize: 2, bgFill });
-        expect(container.querySelector('rect.grid-bg')).toHaveStyle({ fill: expected });
+        const bg = container.querySelector('rect.grid-bg');
+        expect(bg).toHaveClass('grid-bg');
+        expect(bg.getAttribute('style') || '').not.toContain('fill');
     });
 
     it.each([

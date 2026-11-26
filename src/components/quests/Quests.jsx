@@ -14,6 +14,8 @@ import Subscriber from '../common/Subscriber.jsx';
 import './Quests.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
+import HandoutPreview from '../handouts/HandoutPreview.jsx';
+import QuestBoardHandout from '../handouts/QuestBoardHandout.jsx';
 
 const STATUS_OPTIONS = QUEST_STATUSES;
 
@@ -224,6 +226,10 @@ function Quests({ campaignName, isLocalhost }) {
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
+  // Item 4 handout preview open flag (display-only). The sheet itself reads
+  // player-facing fields only — GM `notes` never reach paper even from these
+  // raw planner rows (whitelist + pin in QuestBoardHandout).
+  const [printBoardOpen, setPrintBoardOpen] = useState(false);
   // Shared pendingDelete staging for the role="dialog" delete tier (QA backlog
   // 2026-11-24, mirrors Notes/Sessions.jsx): the DeleteConfirmModal's confirm
   // is the ONLY writer, so Cancel/Escape/backdrop fire zero requests.
@@ -391,6 +397,11 @@ function Quests({ campaignName, isLocalhost }) {
     }
   };
 
+  // Quests printable on paper (Item 4): draft rows are the GM's unpublished
+  // work — the same filter the /quests/board lane applies server-side. The
+  // handout component whitelists the fields; this owns the honest CTA gate.
+  const printableQuests = quests.filter(q => q && q.draft !== true);
+
   return (
     <div className="ct-container">
       <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
@@ -401,6 +412,18 @@ function Quests({ campaignName, isLocalhost }) {
         </h2>
         <button className="ct-new-btn" onClick={handleNewQuest}>
           <i className="fa-solid fa-plus" /> New Quest
+        </button>
+        {/* Item 4 handout (F12: labeled, never icon-only). Honest disabled
+            face names the cause when there is nothing player-facing to print. */}
+        <button
+          className="ct-btn quests-print-btn"
+          onClick={() => setPrintBoardOpen(true)}
+          disabled={printableQuests.length === 0}
+          title={printableQuests.length === 0
+            ? 'No player-facing quests to print yet'
+            : 'Print the player-facing quest board (GM notes never print)'}
+        >
+          <i className="fa-solid fa-print" /> Print Quest Board
         </button>
       </div>
 
@@ -495,6 +518,16 @@ function Quests({ campaignName, isLocalhost }) {
           editor; their backdrops dismiss only themselves. */}
       <DeleteQuestModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
       {discardDialog}
+
+      {printBoardOpen && (
+        <HandoutPreview
+          label="Quest Board"
+          campaignName={campaignName}
+          onClose={() => setPrintBoardOpen(false)}
+        >
+          <QuestBoardHandout quests={quests} />
+        </HandoutPreview>
+      )}
     </div>
   );
 }

@@ -202,3 +202,23 @@ describe('NPCListItem — AI draft badge (campaign-authoring Phase 3)', () => {
     expect(live.querySelector('.ct-draft-flag')).toBeNull();
   });
 });
+
+describe('NPCListItem — disabled-cause text (Item 7, F21)', () => {
+  const row = (npc) => render(
+    <NPCListItem npc={npc} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
+  );
+
+  it('names the cause beside the disabled Add-to-Initiative on a statless row', () => {
+    const { container } = row({ name: 'Marta' });
+    const cause = container.querySelector('.npcs-init-cause');
+    expect(cause).not.toBeNull();
+    expect(cause.textContent).toMatch(/Fill in AC and HP \(Stats tab\) first/);
+    expect(container.querySelector('.npcs-init-btn')).toBeDisabled();
+  });
+
+  it('shows no cause chip when the row already has stats', () => {
+    const { container } = row({ name: 'Cap', armorClass: 15, hitPoints: '30', actions: [{ name: 'Mace', attack_bonus: '+4' }] });
+    expect(container.querySelector('.npcs-init-cause')).toBeNull();
+    expect(container.querySelector('.npcs-init-btn')).toBeEnabled();
+  });
+});

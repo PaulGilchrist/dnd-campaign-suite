@@ -64,6 +64,23 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
     // Full scene rebuild: structural map inputs only. Overlays and the
     // Labels/Torch toggles have their own lightweight effects below — they
     // must NOT tear down (and re-frame) the whole scene.
+    //
+    // Token cosmetics (Item 5) are DELIBERATELY NOT honored here — stated
+    // precisely so the deviation is documented, not silent: per-token ring
+    // color, per-token label visibility, and the dashed condition ring are
+    // 2D-only in 3D. Why: those three all read the per-character RUNTIME
+    // buckets (tokenCosmetics / activeConditions + campaign targetEffects)
+    // through React's useRuntimeValue subscription lane; the scene-build
+    // lane consumes plain map-document props filtered by the PURE shared
+    // predicates in map3dVisibility.js (fog/hidden laws) and holds no store
+    // access — feeding per-creature store values across the WebGL boundary
+    // would mean fabricating a second cosmetics/conditions plumbing lane
+    // whose every edit also tears down the full scene via the buildMap dep
+    // array (expensive, and against the never-a-second-source-of-truth law
+    // this file's census pattern exists to protect). The 3D board keeps its
+    // OWN honest global Labels toggle (scene.setToggles), which is view
+    // state, not personalization; the 2D/3D parity the app promises covers
+    // the visibility/fog/ghost laws (map3dCensus), not per-token cosmetics.
     useEffect(() => {
         const scene = sceneRef.current;
         if (!ready || !scene || !mapData) return;

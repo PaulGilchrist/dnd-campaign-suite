@@ -779,15 +779,17 @@ describe('App.css', () => {
         '.ct-container .ct-btn-danger:hover:not(:disabled)',
         'background'
       );
-      // Disabled canon (backlog drafts-panel-contrast-family): token-muted,
-      // never opacity-dimmed — dimming compounded below WCAG AA on dark
-      // surfaces. The label token must be the readable secondary text token
-      // and opacity must stay full-strength.
+      // Disabled canon (backlog drafts-panel-contrast-family; re-canonized by
+      // Item 7 F9/F21 onto the dedicated --color-disabled-text token, which
+      // the index.css.test.jsx contract pins ≥4.5:1 on the card/input faces
+      // of EVERY theme — the audit found the old secondary-ink + card-tint
+      // pair reading as "just-dimmer" in light). Never opacity-dimmed.
       const disabled = styleFor('.ct-container .ct-btn:disabled');
       expectStyles('.ct-container .ct-btn:disabled', {
         cursor: 'not-allowed',
         background: 'var(--background-color-disabled)',
-        color: 'var(--color-text-secondary)',
+        color: 'var(--color-disabled-text)',
+        'border-color': 'var(--color-disabled-border)',
       });
       expect(disabled.opacity ?? '1', 'disabled ct-btn must not opacity-dim').toBe('1');
       // The disabled rule outranks both variants on specificity (0-3-0 vs

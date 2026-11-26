@@ -6,7 +6,7 @@ export default function TvToggleButton({ tvMode, onToggle }) {
     return (
         <button
             type='button'
-            className={`tv-toggle-button${tvMode ? ' tv-toggle-on' : ''}`}
+            className={`no-print tv-toggle-button${tvMode ? ' tv-toggle-on' : ''}`}
             onClick={onToggle}
             aria-pressed={tvMode}
             title={tvMode

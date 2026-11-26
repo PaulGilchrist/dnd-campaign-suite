@@ -16,9 +16,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -209,7 +209,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
       .toHaveTextContent('Town tracks saved — keep editing'));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']); // Item 3b: bundled beds ride the whole-draft save
     // Editor mounted, content persisted (backlog 2026-11-08 EM).
     expect(textarea()).toBeInTheDocument();
     expect(textarea().value).toBe('https://youtu.be/aaaaaaaaaaa');
@@ -231,7 +231,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(confirmSpy).not.toHaveBeenCalled();
     // Write landed exactly once; nothing was discarded on close.
     expect(stub.posts).toHaveLength(1);
-    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
   });
 
   it('re-saving the SAME content in the still-open editor succeeds with an idempotent second write', async () => {
@@ -250,7 +250,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(document.querySelector('.music-editor-error')).toBeNull();
     expect(textarea()).toBeInTheDocument();
     expect(textarea().value).toBe('aaaaaaaaaaa');
-    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
 
     // And the re-baseline held through the second save: Cancel stays silent.
     fireEvent.click(cancelButton());
@@ -259,10 +259,10 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
   });
 
   it('Reset lane unchanged and re-baselines: Reset then Cancel is dialog-free', async () => {
-    stubMusicServer({ overrides: { town: [{ videoId: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
+    stubMusicServer({ overrides: { town: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
     getStore('campaign').set('music', {
       mood: null, playing: false, volume: 0.6,
-      overrides: { town: [{ videoId: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] },
+      overrides: { town: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] },
     });
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor(); // seeds the override 'aaaaaaaaaaa'
@@ -286,8 +286,8 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
     typeDraft('draft only');
-    expect(youtubePlayer.playTracks).not.toHaveBeenCalled();
-    expect(youtubePlayer.stop).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).not.toHaveBeenCalled();
+    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
     expect(stub.posts).toHaveLength(0);
   });
 });

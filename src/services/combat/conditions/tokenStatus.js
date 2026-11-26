@@ -22,6 +22,11 @@ import {
 /** Corner chips stay legible at normal zoom — beyond this rides a "+N" chip. */
 export const TOKEN_STATUS_VISIBLE_LIMIT = 3
 
+/** Radius of the uniform condition ring (SVG surfaces): the shared token disc
+ * radius (20, Players.jsx / PlacedItems.jsx) + clearance, so the dashed ring
+ * encircles the art without touching it (Item 5 — ONE treatment everywhere). */
+export const TOKEN_CONDITION_RING_RADIUS = 24
+
 /** Badge-lane target resolution: te.target may be a name or a name array. */
 function resolveTeTarget(te) {
   return Array.isArray(te.target) ? te.target[0] : te.target
@@ -84,4 +89,15 @@ export function buildTokenStatusIndicators(creatureName, activeConditions, targe
   for (const te of targetEffects || []) push(effectIndicator(te, creatureName))
 
   return indicators
+}
+
+/**
+ * The uniform "wears a condition ring" predicate (Item 5): TRUE when the
+ * creature's indicator set — the SAME registry derivation the chips use,
+ * conditions + campaign targetEffects aimed at it — is non-empty. Every
+ * surface reads THIS one helper (indoor chip layer, hex marching-order
+ * avatars); no surface re-implements "has conditions?" off the raw buckets.
+ */
+export function hasTokenStatusIndicators(creatureName, activeConditions, targetEffects) {
+  return buildTokenStatusIndicators(creatureName, activeConditions, targetEffects).length > 0
 }

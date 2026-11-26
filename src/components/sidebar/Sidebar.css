@@ -68,8 +68,11 @@
 }
 
 .sidebar-link.active {
+  /* F18: twin of the nav-row selected affordance (one language, both lists). */
   color: var(--color-primary);
+  background-color: var(--background-color-selected);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 .sidebar-link.add-character {
@@ -198,8 +201,15 @@
 }
 
 .sidebar-section-header.active {
+  /* F18 (visual audit 2026-11-25, Item 7): the ONE selected affordance —
+     green ink + selected-face wash + inset green rail — shared verbatim by
+     the nav list and the character roster (the old plain bold-green text
+     competed with the browser focus ring, which read as a second blue
+     "selected" language). The blue focus outline stays keyboard-only. */
   color: var(--color-primary);
+  background-color: var(--background-color-selected);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 /* Sidebar footer area — separates admin from dice tray */

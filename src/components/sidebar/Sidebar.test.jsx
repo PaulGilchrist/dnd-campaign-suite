@@ -13,6 +13,7 @@ const NAV_BUTTONS = [
   { label: 'Initiative', view: 'initiative', handler: 'onInitiativeClick' },
   { label: 'Inventory', view: 'partyInventory', handler: 'onInventoryClick' },
   { label: 'Log', view: 'campaignLog', handler: 'onLogClick' },
+  { label: 'Chronicle', view: 'chronicle', handler: 'onChronicleClick' },
   { label: 'Maps', view: 'mapsManager', handler: 'onMapsClick', playerLabel: 'Map' },
   { label: 'Music', view: 'music', handler: 'onMusicClick' },
   { label: 'Notes', view: 'notes', handler: 'onNotesClick', localhostOnly: true },

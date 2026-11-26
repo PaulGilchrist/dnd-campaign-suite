@@ -1,10 +1,16 @@
 /**
- * Campaign-type metadata lane — client side of server/routes/campaigns-meta.js.
+ * Campaign meta lane — client side of server/routes/campaigns-meta.js.
  *
- * The type ('standard' | 'arena' | 'starter') is recorded once by the
- * seeded-campaign orchestrator so list/sidebar surfaces can badge a campaign
- * BEFORE it is opened. Reads are defensive (mirror campaignService): the lane
- * answers a default rather than bricking a view over a failed fetch.
+ * The meta document carries two fields: the preset type
+ * ('standard' | 'arena' | 'starter', recorded once at seed time so list and
+ * sidebar surfaces can badge a campaign) and the sidebar TOOLBELT
+ * (`{ hiddenViews: [...] }` — the per-campaign set of hidden views,
+ * learnability backlog Item 1). Absent toolbelt = all views visible.
+ *
+ * READ POLICY: a failed read THROWS here; the defaulting policy lives in the
+ * single consumer (useCampaignMeta) — all-visible on first load, last-known
+ * value kept on a later refresh — so no caller can silently render defaults
+ * over live data mid-session.
  */
 
 // Shared badge vocabulary for every surface that shows a campaign type
@@ -29,17 +35,42 @@ export const getCampaignTypes = async () => {
   }
 };
 
-/** Single-campaign type for in-app surfaces (Sidebar); 'standard' on failure. */
-export const loadCampaignType = async (campaignName) => {
-  try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/meta`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch campaign meta');
-    }
-    const data = await response.json();
-    return data.type || 'standard';
-  } catch (error) {
-    console.error('Error fetching campaign meta:', error);
-    return 'standard';
+/**
+ * Full meta for one campaign: `{ type, hiddenViews }`. The server always
+ * answers a resolved type and a normalized toolbelt (absent stored field →
+ * `{ hiddenViews: [] }`), so this is a plain read; it throws on a failed
+ * fetch/network error and the hook decides the fallback.
+ */
+export const loadCampaignMeta = async (campaignName) => {
+  const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/meta`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign meta (${response.status})`);
   }
+  const data = await response.json();
+  // Defensive SHAPE read (the lane's carried law: a meta answer never bricks
+  // a view): the server always resolves { type, toolbelt }, but malformed
+  // payloads normalize to the documented defaults instead of crashing a
+  // caller. A failed REQUEST still throws — the hook owns that fallback.
+  return {
+    type: data.type || 'standard',
+    hiddenViews: data.toolbelt?.hiddenViews ?? [],
+  };
+};
+
+/**
+ * GM-only toolbelt write (PUT /meta is a partial upsert — the stored type is
+ * left untouched). Rejects with the server's plain-English error so the
+ * settings dialog can name the failure honestly.
+ */
+export const saveCampaignToolbelt = async (campaignName, hiddenViews) => {
+  const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/meta`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toolbelt: { hiddenViews } }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to save the sidebar toolbelt (${response.status})`);
+  }
+  return response.json();
 };

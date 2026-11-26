@@ -555,7 +555,21 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     }, [handlePointerMove, handleItemPointerMove, handleGridPointerMove, handleSelectPointerMove, handlePanMove, handleSpellPointerMove, handleSpellDragMove, handleRulerPointerMove, setMapData, painting, tool, spellDraft, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay, rulerMode, rulerStart, rulerEnd]);
 
     const handleToolPointerUp = useCallback((e) => {
-        flushSave();
+        // Token-drag persistence-order fix (Item 6 #1, witnessed live 2026-11-25):
+        // the player-drag lane is the ONLY stroke lane that rewrites the document
+        // AT RELEASE (occupied-cell/wall snaps redirect the token in
+        // handlePointerUp). Flushing FIRST serialized the stale pre-commit ghost
+        // document; that PUT's own map-data SSE echo then overwrote the snapped
+        // commit and the newer pending write was cancelled as zero-edit churn —
+        // the token landed on the snap cell for a heartbeat, then teleported back
+        // onto the occupier (same root-cause family as L5-002's budget race,
+        // whose ghost-side gate can never cover the occupied legs: walking OVER
+        // occupied cells mid-drag is legal). While a token drag completes this
+        // pointer-up, skip the pre-commit flush; the committed doc rides the
+        // normal 1s autosave (and the pagehide safety net). Every other stroke —
+        // paint/walls/items/select, whose final write already happened during
+        // pointermove — keeps the up-time flush byte-identically.
+        if (!dragging) flushSave();
         handlePointerUp(e);
         handleItemPointerUpHook(e);
         handleGridPointerUp(e);
@@ -564,7 +578,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         handleSpellPointerUp(e, spellDraft, spellMode, addOverlay, shapeParams);
         handleSpellDragEnd(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, svgRef);
         handleRulerPointerUp(e, rulerMode, svgRef);
-    }, [flushSave, handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
+    }, [dragging, flushSave, handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
 
     const handleToolPointerLeave = useCallback((e) => {
         flushSave();
@@ -919,6 +933,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     handleRemovePlayer={handleRemovePlayer}
                     handleCyclePlayerLight={handleCyclePlayerLight}
                     setSelectedPlayer={setSelectedPlayer}
+                    // Token cosmetics (Item 5): the menu gates its sections on
+                    // the real origin (authoring rows GM-only; the visitor's
+                    // own-token open shows only the cosmetics controls, which
+                    // write the character runtime bucket — a lane every origin
+                    // can genuinely persist) and on this device's sidebar
+                    // identity (localCharacterName) for the ownership law.
+                    campaignName={campaignName}
+                    isLocalhost={isLocalhost}
+                    localCharacterName={localCharacterName}
                 />
 
                 {/* POI right-click menu (Hide/Show + Delete → in-app named

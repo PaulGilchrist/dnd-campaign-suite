@@ -61,6 +61,9 @@ function CampaignListArea({ foldersError, onRetry, campaigns, campaignTypes, sel
             onClick={() => onSelect(campaign)}
             disabled={selecting}
           >
+            {/* F15 (Item 7): tiles carry a launch icon + inline type chip so
+                a row reads as a card, not a blue pill. */}
+            <i className="fa-solid fa-dice-d20 campaign-launch-icon" aria-hidden="true"></i>
             {campaign}
             {badge && (
               <span className={`campaign-type-badge campaign-type-badge--${badge.cls}`}>
@@ -417,19 +420,25 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
            </div>
          )}
          <DeleteNotice message={deletedMessage} />
+         {/* F15 (Item 7): the create verbs form one horizontal primary row
+             (tighter rhythm — the old stacked trio anchored the screen);
+             entering a campaign below is the neutral card family, so the two
+             button languages now split by VERB, not by accident. */}
          {isLocalhost && (
+         <div className="campaign-create-row">
            <button className="new-campaign-button" onClick={openNewCampaignModal} disabled={modalOpen}><i className="fas fa-plus"></i> New Campaign</button>
+           {Object.entries(SEEDED_PRESETS).map(([presetKey, cfg]) => (
+             <button
+               key={presetKey}
+               className="new-campaign-button new-campaign-button--seeded"
+               onClick={() => openSeedModal(presetKey)}
+               disabled={modalOpen}
+             >
+               <i className={cfg.icon}></i> {cfg.button}
+             </button>
+           ))}
+         </div>
          )}
-         {isLocalhost && Object.entries(SEEDED_PRESETS).map(([presetKey, cfg]) => (
-           <button
-             key={presetKey}
-             className="new-campaign-button new-campaign-button--seeded"
-             onClick={() => openSeedModal(presetKey)}
-             disabled={modalOpen}
-           >
-             <i className={cfg.icon}></i> {cfg.button}
-           </button>
-         ))}
           <CampaignListArea
             foldersError={foldersError}
             onRetry={loadCampaigns}

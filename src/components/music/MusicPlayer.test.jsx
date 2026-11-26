@@ -3,10 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 import { MOODS } from '../../services/ui/musicConfig.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -31,7 +31,7 @@ function musicState() {
 }
 
 function trackIds(moodKey) {
-  return MOODS.find(m => m.key === moodKey).tracks.map(t => t.videoId);
+  return MOODS.find(m => m.key === moodKey).tracks;
 }
 
 beforeEach(() => {
@@ -57,13 +57,13 @@ describe('MusicPlayer', () => {
   it('lazy-mounts the iframe on first mood play, queues tracks, stores state, and logs', () => {
     const { container } = renderPlayer();
     expect(container.querySelector('.yt-music-frame')).toBeNull();
-    expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
+    expect(ambiencePlayer.ensurePlayer).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTitle('Play Town ambience'));
 
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
+    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
     expect(container.querySelector('#yt-music-frame')).not.toBeNull();
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'));
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'), 'test-campaign');
     expect(musicState()).toMatchObject({ mood: 'town', playing: true });
     expect(mockAddEntry).toHaveBeenCalledWith(
       'test-campaign',
@@ -78,10 +78,10 @@ describe('MusicPlayer', () => {
 
     fireEvent.click(screen.getByTitle('Play'));
 
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
+    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
     expect(container.querySelector('#yt-music-frame')).not.toBeNull();
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'));
-    expect(youtubePlayer.resume).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'), 'test-campaign');
+    expect(ambiencePlayer.resume).not.toHaveBeenCalled();
     expect(musicState().playing).toBe(true);
   });
 
@@ -91,18 +91,18 @@ describe('MusicPlayer', () => {
     const frame = container.querySelector('.yt-music-frame');
 
     fireEvent.click(screen.getByTitle('Pause'));
-    expect(youtubePlayer.pause).toHaveBeenCalled();
+    expect(ambiencePlayer.pause).toHaveBeenCalled();
     expect(musicState().playing).toBe(false);
 
     fireEvent.click(screen.getByTitle('Play'));
-    expect(youtubePlayer.resume).toHaveBeenCalled();
+    expect(ambiencePlayer.resume).toHaveBeenCalled();
     expect(musicState().playing).toBe(true);
     expect(container.querySelector('.yt-music-frame')).toBe(frame);
 
     fireEvent.click(screen.getByTitle('Play Combat ambience'));
     expect(container.querySelector('.yt-music-frame')).toBe(frame);
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(1);
-    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('combat'));
+    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledTimes(1);
+    expect(ambiencePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('combat'), 'test-campaign');
   });
 
   it('highlights the active mood button only while playing', () => {
@@ -118,7 +118,7 @@ describe('MusicPlayer', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Play Dungeon ambience'));
     fireEvent.click(screen.getByTitle('Stop'));
-    expect(youtubePlayer.stop).toHaveBeenCalled();
+    expect(ambiencePlayer.stop).toHaveBeenCalled();
     expect(musicState()).toMatchObject({ mood: null, playing: false });
     expect(mockAddEntry).toHaveBeenCalledWith(
       'test-campaign',
@@ -129,7 +129,7 @@ describe('MusicPlayer', () => {
   it('forwards volume changes to the player and store', () => {
     renderPlayer();
     fireEvent.change(screen.getByTitle('Volume'), { target: { value: '40' } });
-    expect(youtubePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.4));
+    expect(ambiencePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.4));
     expect(musicState().volume).toBeCloseTo(0.4);
   });
 
@@ -145,21 +145,38 @@ describe('MusicPlayer', () => {
     });
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
+    // Item 3b: starter moods seed bundled /audio/ beds — clear the seeded
+    // local rows so this scenario pins the PASTE lane end-to-end alone.
+    let removeBtn;
+    while ((removeBtn = document.querySelector('.music-editor-local-tracks button'))) {
+      fireEvent.click(removeBtn);
+    }
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), {
       target: { value: 'https://youtu.be/aaaaaaaaaaa\nhttps://www.youtube.com/watch?v=bbbbbbbbbbb' }
     });
     fireEvent.click(screen.getByText('Save'));
 
-    await waitFor(() => expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']));
+    await waitFor(() => expect(musicState().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']));
 
     fireEvent.click(screen.getByTitle('Play Town ambience'));
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(
+      [
+        { kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' },
+        { kind: 'youtube', src: 'bbbbbbbbbbb', title: 'bbbbbbbbbbb' }
+      ],
+      'test-campaign'
+    );
     globalThis.fetch.mockRestore();
   });
 
   it('ignores unparseable editor input', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
+    // Item 3b: drop the seeded bundled beds so the draft is truly empty.
+    let removeBtn;
+    while ((removeBtn = document.querySelector('.music-editor-local-tracks button'))) {
+      fireEvent.click(removeBtn);
+    }
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), { target: { value: 'not a url' } });
     // Invalid input drops at console.debug (backlog 2026-11-08 EK: user-input
     // validation is not console-noise); console.error stays reserved for

@@ -2,27 +2,35 @@
 // Fetch-level contract for useCharacterWizard: wizard visibility toggles, create/edit
 // HTTP calls (POST/PUT URL + body incl. rename filename sanitization), runtime
 // lineage/legacy stamp wiring on subrace change (CLA-118/CLA-139, one merged write),
-// and alert/refresh internals on failure (delegated here by App.runtime-events.test.jsx).
+// and the in-app error dialog/refresh internals on failure (delegated here by
+// App.runtime-events.test.jsx). Item 7 retired the native alert: failures arm
+// the hook's wizardDialog (DeleteConfirmModal 'Save Failed' face).
 // NOT the donning seam (save-then-strip ordering) — that lives in
 // useCharacterWizard.donning.test.js; handler stamp internals live in the lineage
 // handler suites.
 import { renderHook, act } from '@testing-library/react';
 import { useCharacterWizard } from './useCharacterWizard.js';
 
-const originalAlert = window.alert;
 const originalConsoleError = console.error;
 
 beforeEach(() => {
   vi.clearAllMocks();
   global.fetch = vi.fn();
-  window.alert = vi.fn();
   console.error = vi.fn();
 });
 
 afterEach(() => {
-  window.alert = originalAlert;
   console.error = originalConsoleError;
 });
+
+// The in-app save-failure face (Item 7 native-dialog retirement): children
+// carries the message VERBATIM (single-owner prefix law lives here too).
+function expectErrorDialog(result, message) {
+  const dialog = result.current.wizardDialog;
+  expect(dialog, 'expected the in-app Save Failed dialog to be armed').not.toBeNull();
+  expect(dialog.props.title).toBe('Save Failed');
+  expect(dialog.props.children).toBe(message);
+}
 
 function createWrapper(campaignName) {
   return () => useCharacterWizard(campaignName);
@@ -105,7 +113,7 @@ describe('useCharacterWizard', () => {
   });
 
   describe('handleWizardComplete error paths', () => {
-    it('alerts when campaign name is missing', async () => {
+    it('arms the in-app Save Failed dialog when the campaign name is missing', async () => {
       const { result } = renderHook(createWrapper(null));
 
       await act(async () => {
@@ -113,13 +121,13 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      // Single-owner prefix law (mirrors the delete lane): the hook alerts the
+      // Single-owner prefix law (mirrors the delete lane): the hook surfaces the
       // Error message VERBATIM — no hook-side "Failed to create character: " wrap.
-      expect(window.alert).toHaveBeenCalledWith('No campaign selected');
+      expectErrorDialog(result, 'No campaign selected');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('alerts with server error details on non-ok response', async () => {
+    it('arms the dialog with server error details on non-ok response', async () => {
       const campaignName = 'TestCampaign';
       const characterData = { name: 'TestChar' };
 
@@ -136,11 +144,11 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      // The SERVICE owns the single prefix; verbatim alert (no doubling).
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Internal Server Error');
+      // The SERVICE owns the single prefix; verbatim message (no doubling).
+      expectErrorDialog(result, 'Failed to create character: Internal Server Error');
     });
 
-    it('alerts on fetch rejection', async () => {
+    it('arms the dialog on fetch rejection', async () => {
       const campaignName = 'TestCampaign';
       const characterData = { name: 'TestChar' };
 
@@ -153,10 +161,10 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Network failure');
+      expectErrorDialog(result, 'Network failure');
     });
 
-    it('alerts on second fetch failure (after successful create)', async () => {
+    it('arms the dialog on second fetch failure (after successful create)', async () => {
       const campaignName = 'TestCampaign';
       const characterData = { name: 'TestChar' };
       const setActiveCharacter = vi.fn();
@@ -179,7 +187,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Second fetch failed');
+      expectErrorDialog(result, 'Second fetch failed');
     });
   });
 
@@ -375,7 +383,7 @@ describe('useCharacterWizard', () => {
   });
 
   describe('handleEditWizardComplete error paths', () => {
-    it('alerts when campaign name is missing', async () => {
+    it('arms the in-app Save Failed dialog when the campaign name is missing', async () => {
       const { result } = renderHook(createWrapper(null));
 
       act(() => {
@@ -388,11 +396,11 @@ describe('useCharacterWizard', () => {
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
       // Single-owner prefix law (mirrors the delete lane): verbatim message.
-      expect(window.alert).toHaveBeenCalledWith('No campaign selected');
+      expectErrorDialog(result, 'No campaign selected');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('alerts with server error details on non-ok response', async () => {
+    it('arms the dialog with server error details on non-ok response', async () => {
       const campaignName = 'TestCampaign';
 
       global.fetch.mockResolvedValueOnce({
@@ -412,12 +420,12 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      // The SERVICE owns the single prefix; the alert carries it EXACTLY once
+      // The dialog carries it EXACTLY once
       // (bug-face "Failed to update character: Failed to update character: …").
-      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Bad Request');
+      expectErrorDialog(result, 'Failed to update character: Bad Request');
     });
 
-    it('alerts on fetch rejection', async () => {
+    it('arms the dialog on fetch rejection', async () => {
       const campaignName = 'TestCampaign';
 
       global.fetch.mockRejectedValueOnce(new Error('Network failure'));
@@ -433,7 +441,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Network failure');
+      expectErrorDialog(result, 'Network failure');
     });
   });
 });

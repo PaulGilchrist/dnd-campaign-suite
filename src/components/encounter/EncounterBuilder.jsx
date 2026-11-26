@@ -16,6 +16,7 @@ import { formatEncounterName } from '../../services/encounters/encountersService
 import { consumePendingEncounterLoad, subscribeToEncounterLoad } from '../../services/ui/encounterLoadSignal.js';
 import { addMonstersToInitiative } from '../../services/encounters/encounterToInitiative.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounters/encounterGenerator.js';
+import { DIFFICULTY_LABELS, calculateDifficultyIndex } from '../../services/encounters/difficultyBands.js';
 import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
 import { addEntry } from '../../services/ui/logService.js';
 // Shared bestiary search/filter/cap helpers (2026-11-19 quick-monster-spawn):
@@ -24,16 +25,7 @@ import { addEntry } from '../../services/ui/logService.js';
 import { filterMonsters, isBestiaryNarrowed, capBestiaryRows, compareMonsters } from '../../services/encounters/monsterBestiarySearch.js';
 import './EncounterBuilder.css';
 
-const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];
-
-function calculateDifficultyIndex(effectiveXP, totalThreshold) {
-  if (!totalThreshold) return 0;
-  const ratio = effectiveXP / totalThreshold;
-  if (ratio < 0.5) return 0;
-  if (ratio < 1) return 1;
-  if (ratio < 1.5) return 2;
-  return 3;
-}
+const difficultyLabels = DIFFICULTY_LABELS;
 
 function calculateTotalMonsterXP(selectedMonsters) {
   return selectedMonsters.reduce((sum, m) => sum + (m.xp || 0) * (m.qty || 1), 0);
@@ -817,6 +809,9 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
         onRename={handleRenameEncounter}
         encounters={encounters}
         loading={encounterLoading}
+        monsters={monsters}
+        playerLevels={filter.playerLevels}
+        campaignName={campaignName}
       />
 
       {/* Encounter Generator Modal */}

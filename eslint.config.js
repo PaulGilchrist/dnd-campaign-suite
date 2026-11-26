@@ -8,7 +8,10 @@ import requireSyncedState from './eslint-plugin-custom/rules/require-synced-stat
 import complexityBaseline from './config/complexity-baseline.js';
 
 export default [
-  { ignores: ['dist', 'coverage/', 'coverage-report/', '.eslintrc.cjs'] },
+  // .playwright-mcp/ is the Playwright MCP tool's git-ignored scratch folder
+  // (audit/probe scripts dropped at repo root by live verification runs) —
+  // tool debris must never gate the repo lint.
+  { ignores: ['dist', 'coverage/', 'coverage-report/', '.eslintrc.cjs', '.playwright-mcp/'] },
   js.configs.recommended,
   {
     files: ['**/*.mjs'],

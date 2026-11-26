@@ -447,6 +447,23 @@ describe('Map container - tool routing on pointerdown', () => {
         expect(handlers.rulerPointerUp).toHaveBeenCalledWith(UP, false, expect.any(Object));
     });
 
+    it('token-drag pointer-up skips the pre-commit flush but still runs the drop commit', async () => {
+        // Item 6 #1 stale-echo pin (live-witnessed 2026-11-25): the player-drag
+        // lane is the only stroke lane that rewrites the document AT RELEASE
+        // (occupied-cell/wall snaps). Flushing before handlePointerUp PUT the
+        // stale pre-snap ghost document, and that PUT's own map-data SSE echo
+        // overwrote the snapped commit — the redirected token teleported back
+        // onto the occupier. While dragging is active the up-flush is skipped;
+        // the committed doc persists through the 1s autosave/pagehide lanes.
+        // Every non-drag pointer-up keeps the up-time flush (row above).
+        mockState.dragging = { playerId: 'p1', pointerId: 1 };
+        const { container } = await act(async () => renderMap());
+        fireEvent.pointerUp(container.querySelector('svg'), { button: 0 });
+
+        expect(handlers.flushSave).not.toHaveBeenCalled();
+        expect(handlers.playerPointerUp).toHaveBeenCalledWith(UP);
+    });
+
     it('pointerleave flushes and ends select/wall painting only - never fires token-drop or pan end', async () => {
         const { container } = await act(async () => renderMap());
         fireEvent.pointerLeave(container.querySelector('svg'));

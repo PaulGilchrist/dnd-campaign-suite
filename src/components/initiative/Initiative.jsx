@@ -22,6 +22,7 @@ import LootRevealModal from './LootRevealModal.jsx'
 import GMCopilot from '../GMCopilot/GMCopilot.jsx'
 import DenialExplainer from '../GMCopilot/DenialExplainer.jsx'
 import { useGmCopilot } from '../../hooks/management/useGmCopilot.js'
+import useRailClipped from '../../hooks/ui/useRailClipped.js'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/popup.jsx'
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx'
@@ -238,6 +239,30 @@ function effectAdderTitleSuffix(target) {
 // every other campaign).
 function boardHasSubjects(combatSummary, characters) {
     return characters.length > 0 || creaturesOrEmpty(combatSummary).length > 0
+}
+
+// F19 (Item 7): carousel container classes — the clipped variant arms the
+// CSS edge-fade cue (see Initiative.css + useRailClipped). Module-scope
+// helper so the conditional never spends Initiative's complexity budget.
+function railClass(clipped) {
+    return 'carousel-container ct-scroll-x' + (clipped ? ' carousel-rail-clipped' : '')
+}
+
+// F19 (visual audit 2026-11-25, Item 7): the rail's last card used to be
+// chopped mid-name with zero cue that the rail scrolls (macOS hides overlay
+// scrollbars). This wrapper owns the clipped Measurement (useRailClipped —
+// re-measures on roster churn via `revision` and on container resize, never
+// on a timer) and renders the sticky edge-fade child; Initiative's own body
+// stays inside its statement ceiling (module-component precedent:
+// InitiativeEmptyState).
+function CarouselRail({ carouselRef, revision, children }) {
+    const clipped = useRailClipped(carouselRef, revision)
+    return (
+        <div className={railClass(clipped)} ref={carouselRef}>
+            {children}
+            <div className='carousel-rail-fade' aria-hidden='true'></div>
+        </div>
+    )
 }
 
 // Empty-state face for the boardHasSubjects false branch (zero characters and
@@ -1137,7 +1162,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  // the header face is space-constrained (showGmHint omitted).
                  gmMovement={isActiveEconomyRowGmDriven(combatSummary, activeCreatureName)}
              />
-             <div className='carousel-container' ref={carouselRef}>
+             <CarouselRail carouselRef={carouselRef} revision={displayCreatures.length}>
                   {displayCreatures.map((creature) => {
                     const isActive = creature.name === activeCreatureName
                     const character = characters.find(ch => utils.getName(ch.name) === (creature.holderName || creature.name))
@@ -1205,7 +1230,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                         />
                     )
                 })}
-            </div>
+                {/* F19 (Item 7): the edge-fade cue child lives inside the
+                    CarouselRail wrapper (useRailClipped measurement). */}
+            </CarouselRail>
               {/* GM (localhost) only — the initiative control row mutates shared
                   turn state (Clear/+NPC/Prev/Next/End Turn all cascade through the
                   same write lane the fog-write gate in Map.jsx:234 protects on the

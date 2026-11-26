@@ -4,7 +4,8 @@
 // this?" with a "<campaign> — <view>" pattern while a campaign is mounted,
 // and stay neutral (app name) on the campaign-select screen.
 import { describe, it, expect } from 'vitest';
-import { APP_TITLE, SIDEBAR_BUTTONS, VIEWS, getDocumentTitle } from './config.js';
+import { APP_TITLE, VIEWS, getDocumentTitle } from './config.js';
+import { VIEW_LABELS } from '../services/ui/sidebarNav.js';
 
 const CAMPAIGN = 'test-campaign';
 
@@ -51,23 +52,36 @@ describe('getDocumentTitle', () => {
   });
 
   it('should never render a bare character name or CharSheets-alone while a campaign is mounted', () => {
-    const titles = SIDEBAR_BUTTONS.map(button => getDocumentTitle({
+    const views = Object.keys(VIEW_LABELS);
+    const titles = views.map(view => getDocumentTitle({
       campaignName: CAMPAIGN,
-      activeView: button.view,
+      activeView: view,
       characterName: 'Aragorn',
     }));
-    titles.forEach((title, i) => {
+    titles.forEach(title => {
       expect(title.startsWith(`${CAMPAIGN} — `)).toBe(true);
-      expect(title).not.toBe(SIDEBAR_BUTTONS[i].label);
     });
     expect(titles).not.toContain(APP_TITLE);
   });
 
-  it('should give every sidebar button view a "<campaign> — <label>" title (consistency with the sidebar)', () => {
+  it('should give every sidebar view a "<campaign> — <label>" title (F13: one label per view)', () => {
     // No characterName passed: even the sheet view falls back to its label.
-    SIDEBAR_BUTTONS.forEach(button => {
-      expect(getDocumentTitle({ campaignName: CAMPAIGN, activeView: button.view }))
-        .toBe(`${CAMPAIGN} — ${button.label}`);
+    // The label law: the tab title is DERIVED FROM THE SIDEBAR config — the
+    // old duplicated list (SIDEBAR_BUTTONS) drifted ("Encounter" vs the
+    // sidebar's "Encounters") and was deleted.
+    Object.entries(VIEW_LABELS).forEach(([view, { label }]) => {
+      expect(getDocumentTitle({ campaignName: CAMPAIGN, activeView: view }))
+        .toBe(`${CAMPAIGN} — ${label}`);
     });
+    expect(getDocumentTitle({ campaignName: CAMPAIGN, activeView: 'encounter' }))
+      .toBe('test-campaign — Encounters');
+  });
+
+  it('should follow the visitor nav label where one exists (F13: visitor "Map")', () => {
+    expect(getDocumentTitle({ campaignName: CAMPAIGN, activeView: 'mapsManager', isLocalhost: false }))
+      .toBe('test-campaign — Map');
+    // GM origin keeps the manager label.
+    expect(getDocumentTitle({ campaignName: CAMPAIGN, activeView: 'mapsManager', isLocalhost: true }))
+      .toBe('test-campaign — Maps');
   });
 });

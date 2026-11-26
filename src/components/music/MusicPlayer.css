@@ -86,6 +86,9 @@
   flex: 1;
   min-width: 0;
   cursor: pointer;
+  /* F14 light-face note (Item 7): green-primary thumb instead of the
+     browser-default blue. */
+  accent-color: var(--color-primary);
 }
 
 .music-editor {
@@ -235,6 +238,52 @@
   font-size: 0.8em;
   padding: 4px;
   box-sizing: border-box;
+}
+
+/* Locally-hosted ambience editor lane (offline-ambience Item 3, 2026-11-25):
+   upload row (kit button + visually-hidden file input + muted hint, the
+   .music-remote-note idiom) and the draft's local-track list, each row a kit
+   danger button for removal — same family chrome as the mood-chip ×. */
+.music-editor-upload {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.music-editor-upload .music-upload-input {
+  display: none;
+}
+
+.music-editor-upload-note {
+  color: var(--color-text-secondary);
+  font-size: 0.75em;
+  font-style: italic;
+}
+
+.music-editor-local-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.music-editor-local-tracks li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.8em;
+}
+
+.music-editor-local-tracks .music-editor-local-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Hidden YouTube iframe — kept tiny but rendered so playback works */

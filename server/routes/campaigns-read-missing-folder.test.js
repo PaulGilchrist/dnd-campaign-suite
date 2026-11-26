@@ -137,10 +137,10 @@ describe('invalid campaign names keep 400 precedence over the 404', () => {
 // ─── existing-but-empty folder → honest 200 defaults ─────────────────────────
 
 describe('existing-but-empty campaign folder stays 200 with its defaults', () => {
-    it('meta resolves the standard default', async () => {
+    it('meta resolves the standard default (with the all-visible toolbelt twin)', async () => {
         const res = await request(createTestApp()).get(`/api/campaigns/${EMPTY}/meta`);
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ type: 'standard' });
+        expect(res.body).toEqual({ type: 'standard', toolbelt: { hiddenViews: [] } });
     });
 
     it('change-data is an empty object, log an empty array', async () => {

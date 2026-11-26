@@ -256,10 +256,14 @@ describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () 
 
   it('mounts exactly one cue lane per campaign session and cues in the sheet view', async () => {
     await renderInCampaign();
-    // One subscription, for this campaign — the sheet view is active, the
-    // Initiative tracker is not mounted anywhere.
-    expect(subscribeToSSE).toHaveBeenCalledTimes(1);
-    expect(subscribeToSSE).toHaveBeenCalledWith('test-campaign', expect.any(Function));
+    // Two campaign-level subscribers share the ONE sseClient singleton: the
+    // cue lane (this suite's subject) and the campaign-meta/toolbelt live
+    // lane (Item 1). The cue law is that the CUE subscriber is singular —
+    // the count may only be 2, never 3.
+    expect(subscribeToSSE).toHaveBeenCalledTimes(2);
+    const [cueCall, metaCall] = subscribeToSSE.mock.calls;
+    expect(cueCall[0]).toBe('test-campaign');
+    expect(metaCall[0]).toBe('test-campaign');
 
     await emitLogAppend({ id: 'app-1', type: 'roll', rollType: 'save', saveResult: 'success', message: 'probe' });
     expect(cuesPlayed()).toEqual(['save-success']);
@@ -271,8 +275,9 @@ describe('App - combat cue lane (App-level mount, owner ruling 2026-11-20)', () 
     await waitFor(() => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
-    // The tracker mounted, yet the lane was NOT re-subscribed by it.
-    expect(subscribeToSSE).toHaveBeenCalledTimes(1);
+    // The tracker mounted, yet the lane was NOT re-subscribed by it
+    // (still exactly the cue + meta pair from the shell — Item 1 law).
+    expect(subscribeToSSE).toHaveBeenCalledTimes(2);
 
     await emitLogAppend({ id: 'app-2', type: 'hp_change', threshold: 'dead', targetName: 'Goblin', message: 'probe' });
     expect(cuesPlayed()).toEqual(['monster-death']);

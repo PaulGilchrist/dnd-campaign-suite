@@ -1,23 +1,29 @@
 // @maintained-by-ai
 /**
  * Close-guard lane for CharacterCreationWizard — pins the unsaved-changes
- * guard on the two close paths (footer Cancel / header ×):
- *  - modified draft + close → NAMED native confirm (house pattern, mirrors
- *    `Delete Note "X"?`); dismiss keeps the wizard open, accept closes.
- *  - unmodified draft + close → closes silently, NO confirm (no friction).
- *  - deep dirty-check via lodash isEqual against the initial formData
- *    snapshot (edit reverted → clean → no prompt).
- *  - edit mode: prefilled draft closes silently; an edit prompts naming the
+ * toll on the three close paths (footer Cancel / header × / Escape, F11):
+ *  - modified draft + close → the IN-APP named keep-progress toll
+ *    (shared useReloadGuard + DiscardDraftDialog over DeleteConfirmModal —
+ *    Item 7 F11 retired the wizard's surviving native window.confirm, whose
+ *    unhandled dialog wedged every automated driver call): Keep (Cancel /
+ *    Escape / backdrop) keeps the wizard open with the draft fully intact
+ *    and zero writes; `Yes, Discard` answers the close.
+ *  - unmodified draft + close → closes silently, NO toll (no friction).
+ *  - deep dirty-check via the guard's lodash isEqual against the initial
+ *    formData snapshot (edit reverted → clean → no toll).
+ *  - edit mode: prefilled draft closes silently; an edit tolls naming the
  *    prefilled character even after the name field is cleared.
- * Footer note: the Cancel label only renders on the FIRST visible step
- * (create = step 1 ruleset, edit = step 2 Basic Info); mid-wizard the
- * left button is Previous, so modified-create Cancel flows route the
- * dirty-edit through step 2, walk Previous back to step 1, then Cancel.
+ * Footer note: the Cancel label renders only on the FIRST visible step
+ * (create = step 1 ruleset, edit = step 2 Basic Info); mid-wizard the left
+ * button is Previous, so modified-create Cancel flows route the dirty-edit
+ * through step 2, walk Previous back to step 1, then Cancel. While the toll
+ * is open TWO "Cancel" buttons exist (footer + dialog) — dialog locators
+ * scope through within(dialog).
  * The mock scaffolding mirrors CharacterCreationWizard.integration.test.jsx
  * (data-loading boundary only; the wizard logic under test stays real).
  */
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { DEFAULT_FORM_DATA } from '../../config/constants.js';
@@ -45,8 +51,6 @@ const jsonResponse = (body) => Promise.resolve({
   json: () => Promise.resolve(body),
 });
 
-let confirmSpy;
-
 beforeEach(() => {
   global.fetch = vi.fn((path) => {
     if (path === '/data/alignments.json') {
@@ -54,11 +58,6 @@ beforeEach(() => {
     }
     return jsonResponse([]);
   });
-  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-});
-
-afterEach(() => {
-  confirmSpy.mockRestore();
 });
 
 function renderWizard(props = {}) {
@@ -91,89 +90,137 @@ function typeName(value) {
 const cancelBtn = () => screen.getByRole('button', { name: 'Cancel' });
 const closeX = () => screen.getByRole('button', { name: 'Close character wizard' });
 
-describe('CharacterCreationWizard - unsaved-changes guard', () => {
+// The shared toll face: role=dialog, named message, Cancel + Yes, Discard.
+const expectToll = async (message) => {
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent(message);
+  expect(dialog).toHaveTextContent('Discard Changes?');
+  return dialog;
+};
+const tollKeep = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+const tollDiscard = (dialog) => fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Discard' }));
+const expectNoToll = () => expect(screen.queryByRole('dialog')).toBeNull();
+const expectWizardOpen = (container) => expect(container.querySelector('.character-creation-wizard-overlay')).toBeInTheDocument();
+
+describe('CharacterCreationWizard - unsaved-changes toll', () => {
   describe('create flow', () => {
-    it('unmodified draft: Cancel closes instantly with no confirm', () => {
+    it('unmodified draft: Cancel closes instantly with no toll', async () => {
       const { onCancel } = renderWizard();
 
       fireEvent.click(cancelBtn());
 
-      expect(confirmSpy).not.toHaveBeenCalled();
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('unmodified draft: × closes instantly with no confirm', () => {
+    it('unmodified draft: × closes instantly with no toll', async () => {
       const { onCancel } = renderWizard();
 
       fireEvent.click(closeX());
 
-      expect(confirmSpy).not.toHaveBeenCalled();
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('modified draft: Cancel asks a NAMED confirm and accept closes', async () => {
+    it('modified draft: Cancel arms the NAMED toll and Yes-Discard closes', async () => {
       const { onCancel } = renderWizard();
       await enterBasicStep();
       typeName('Aragorn');
       // Cancel renders only on the first step — walk back with Previous.
       fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
-      confirmSpy.mockReturnValue(true);
 
       fireEvent.click(cancelBtn());
+      const dialog = await expectToll('Discard changes to "Aragorn"?');
+      expect(onCancel).not.toHaveBeenCalled();
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
-      expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Aragorn"?');
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      tollDiscard(dialog);
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('modified draft: dismissing the confirm keeps the wizard open with the draft intact', async () => {
+    it('modified draft: Keep dismisses the toll and the draft survives intact', async () => {
       const { onCancel, container } = renderWizard();
       await enterBasicStep();
       typeName('Aragorn');
       fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
-      confirmSpy.mockReturnValue(false);
 
       fireEvent.click(cancelBtn());
+      const dialog = await expectToll('Discard changes to "Aragorn"?');
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      tollKeep(dialog);
+      await waitFor(() => expectNoToll());
       expect(onCancel).not.toHaveBeenCalled();
-      expect(container.querySelector('.character-creation-wizard-overlay')).toBeInTheDocument();
-      // Draft survived the dismissed confirm — sidebar tab walks back to the
-      // Basic step (the ruleset was already picked here, so footer Next would
-      // advance too; the tab click is this test's direct route).
+      expectWizardOpen(container);
+      // Draft survived the Keep — the sidebar tab walks back to the Basic
+      // step with the typed name intact.
       fireEvent.click(screen.getByRole('button', { name: /Basic Information/ }));
       await screen.findByText('Step 2: Basic Information');
       expect(screen.getByRole('textbox')).toHaveValue('Aragorn');
     });
 
-    it('modified draft: × routes through the same guard (dismiss stays open, accept closes)', async () => {
+    it('modified draft: × routes through the same toll (Keep stays open, Discard closes)', async () => {
       const { onCancel } = renderWizard();
       await enterBasicStep();
       typeName('Aragorn');
 
       fireEvent.click(closeX());
-      expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Aragorn"?');
+      const dialog = await expectToll('Discard changes to "Aragorn"?');
+      tollKeep(dialog);
+      await waitFor(() => expectNoToll());
       expect(onCancel).not.toHaveBeenCalled();
       expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
 
-      confirmSpy.mockReturnValue(true);
       fireEvent.click(closeX());
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      tollDiscard(await expectToll('Discard changes to "Aragorn"?'));
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('modified with no name yet: confirm names the operation (new-character draft)', async () => {
+    it('modified with no name yet: the toll names the operation (new-character draft)', async () => {
       const { onCancel } = renderWizard();
       await enterBasicStep();
       // Dirty WITHOUT a name: pick a non-default alignment (rules pick of
       // '5e' is a no-op — DEFAULT_FORM_DATA.rules is already '5e').
       fireEvent.change(document.querySelector('select'), { target: { value: 'Chaotic Evil' } });
-      confirmSpy.mockReturnValue(true);
 
       fireEvent.click(closeX());
+      const dialog = await expectToll('Discard this new character draft?');
+      tollDiscard(dialog);
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    });
 
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
-      expect(confirmSpy).toHaveBeenCalledWith('Discard this new character draft?');
-      expect(onCancel).toHaveBeenCalledTimes(1);
+    // F11 (visual audit 2026-11-25, Item 7): Escape rides the SAME close lane
+    // as × / Cancel — the wizard was the only overlay that trapped it.
+    it('Escape on an unmodified draft closes silently, no toll', async () => {
+      const { onCancel } = renderWizard();
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    });
+
+    it('Escape on a modified draft arms the named toll; its own Escape answers KEEP', async () => {
+      const { onCancel, container } = renderWizard();
+      await enterBasicStep();
+      typeName('Aragorn');
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      const dialog = await expectToll('Discard changes to "Aragorn"?');
+      expect(onCancel).not.toHaveBeenCalled();
+
+      // Escape while the toll is open belongs to the toll (its panel lane
+      // answers KEEP — the browser routes keydown from the focused dialog up
+      // through the window, so dispatch on the dialog). The wizard lane stays
+      // suppressed behind the role="dialog" guard on the same event.
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      await waitFor(() => expectNoToll());
+      expect(onCancel).not.toHaveBeenCalled();
+      expectWizardOpen(container);
+      expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
+
+      // And the wizard's Escape still reaches the toll for the verdict.
+      fireEvent.keyDown(window, { key: 'Escape' });
+      tollDiscard(await expectToll('Discard changes to "Aragorn"?'));
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
   });
 
@@ -191,42 +238,45 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
     const backToFirstStep = () =>
       fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
 
-    it('prefilled unmodified draft: Cancel closes with no confirm', () => {
+    it('prefilled unmodified draft: Cancel closes with no toll', async () => {
       const { onCancel } = renderWizard({ characterData, isEditing: true });
 
       backToFirstStep();
       fireEvent.click(cancelBtn());
 
-      expect(confirmSpy).not.toHaveBeenCalled();
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('prefilled unmodified draft: × closes with no confirm', () => {
+    it('prefilled unmodified draft: × closes with no toll', async () => {
       const { onCancel } = renderWizard({ characterData, isEditing: true });
 
       fireEvent.click(closeX());
 
-      expect(confirmSpy).not.toHaveBeenCalled();
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('edited draft: confirm names the character; cancel-dismiss keeps it open', () => {
-      const { onCancel } = renderWizard({ characterData, isEditing: true });
+    it('edited draft: the toll names the character; Keep keeps it open', async () => {
+      const { onCancel, container } = renderWizard({ characterData, isEditing: true });
 
       fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '3' } });
 
       backToFirstStep();
       fireEvent.click(cancelBtn());
-      expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Edgin"?');
+      const dialog = await expectToll('Discard changes to "Edgin"?');
+      tollKeep(dialog);
+      await waitFor(() => expectNoToll());
       expect(onCancel).not.toHaveBeenCalled();
-      expect(document.querySelector('.character-creation-wizard-overlay')).toBeInTheDocument();
+      expectWizardOpen(container);
 
-      confirmSpy.mockReturnValue(true);
+      // Still on step 1 (where Cancel renders) — re-ask and discard.
       fireEvent.click(cancelBtn());
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      tollDiscard(await expectToll('Discard changes to "Edgin"?'));
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('deep check: an edit reverted back to the initial value is clean — no prompt', () => {
+    it('deep check: an edit reverted back to the initial value is clean — no toll', async () => {
       const { onCancel } = renderWizard({ characterData, isEditing: true });
 
       typeName('Edgin the Wise');
@@ -235,20 +285,19 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
       backToFirstStep();
       fireEvent.click(cancelBtn());
 
-      expect(confirmSpy).not.toHaveBeenCalled();
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      expectNoToll();
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('cleared name on an edited draft still names the prefilled character', () => {
+    it('cleared name on an edited draft still names the prefilled character', async () => {
       const { onCancel } = renderWizard({ characterData, isEditing: true });
 
       typeName('   ');
-      confirmSpy.mockReturnValue(true);
 
       fireEvent.click(closeX());
-
-      expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Edgin"?');
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      const dialog = await expectToll('Discard changes to "Edgin"?');
+      tollDiscard(dialog);
+      await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
   });
 });

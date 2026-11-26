@@ -9,9 +9,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
+import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -25,6 +25,15 @@ vi.mock('../../services/ui/logService.js', () => ({
   getLog: vi.fn().mockResolvedValue([]),
   addEntry: vi.fn().mockResolvedValue({}),
 }));
+
+// Item 3b: starter moods seed bundled /audio/ beds; scenarios here pin the
+// YouTube paste lane, so clear the seeded rows before saving.
+function clearSeededRows() {
+  let btn;
+  while ((btn = document.querySelector('.music-editor-local-tracks button'))) {
+    fireEvent.click(btn);
+  }
+}
 
 function openEditor() {
   fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
@@ -74,14 +83,16 @@ describe('MusicPlayer editor save/reset toasts', () => {
   it('toasts "Town tracks saved" (naming the mood) after a successful Save', async () => {
     const stub = stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.change(openEditor(), { target: { value: 'https://youtu.be/aaaaaaaaaaa' } });
+    const textarea = openEditor();
+    clearSeededRows();
+    fireEvent.change(textarea, { target: { value: 'https://youtu.be/aaaaaaaaaaa' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
     expect(toastNode()).not.toHaveClass('music-toast-error');
     // overrides persisted; editor STAYS OPEN with its content intact
     // (backlog 2026-11-08 EM — stay-open save face)
-    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
     expect(screen.getByText('Save')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('One YouTube URL or video ID per line').value)
       .toBe('https://youtu.be/aaaaaaaaaaa');
@@ -90,7 +101,9 @@ describe('MusicPlayer editor save/reset toasts', () => {
   it('Save while stopped PATCHes overrides only and leaves playing:false server-side', async () => {
     const stub = stubMusicServer({ mood: null, playing: false });
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.change(openEditor(), { target: { value: 'aaaaaaaaaaa' } });
+    const textarea = openEditor();
+    clearSeededRows();
+    fireEvent.change(textarea, { target: { value: 'aaaaaaaaaaa' } });
     fireEvent.click(screen.getByText('Save'));
     await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
 
@@ -112,12 +125,12 @@ describe('MusicPlayer editor save/reset toasts', () => {
     expect('playing' in stub.posts.at(-1)).toBe(false);
     expect(stub.server().playing).toBe(true);
     // editing town while tavern plays — the transport is never touched
-    expect(youtubePlayer.playTracks).not.toHaveBeenCalled();
+    expect(ambiencePlayer.playTracks).not.toHaveBeenCalled();
   });
 
   it('toasts "Tavern overrides reset to defaults" (naming the mood) after Reset', async () => {
-    const stub = stubMusicServer({ overrides: { tavern: [{ videoId: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
-    getStore('campaign').set('music', { mood: null, playing: false, volume: 0.6, overrides: { tavern: [{ videoId: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
+    const stub = stubMusicServer({ overrides: { tavern: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
+    getStore('campaign').set('music', { mood: null, playing: false, volume: 0.6, overrides: { tavern: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
     fireEvent.change(document.querySelector('.music-editor select'), { target: { value: 'tavern' } });

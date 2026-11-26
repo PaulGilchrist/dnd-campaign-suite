@@ -236,6 +236,19 @@
 .encounter-builder .summary-value-hard { color: #fd7e14; }
 .encounter-builder .summary-value-deadly { color: var(--color-error); }
 
+/* F10 (visual audit 2026-11-25, Item 7): the verdict box is BOTH highlight
+   and difficulty-tinted — the highlight's white ink on the pale tint was
+   ~2:1 in light. The difficulty color itself now names the verdict (badge
+   language: colored ink on its own tint), theme-verified per face. */
+.encounter-builder .summary-item-difficulty-easy .summary-value { color: var(--color-success); }
+.encounter-builder .summary-item-difficulty-medium .summary-value { color: #ffc107; }
+.encounter-builder .summary-item-difficulty-hard .summary-value { color: #fd7e14; }
+.encounter-builder .summary-item-difficulty-deadly .summary-value { color: #ef5350; }
+
+[data-theme="light"] .encounter-builder .summary-item-difficulty-medium .summary-value { color: #92400e; }
+[data-theme="light"] .encounter-builder .summary-item-difficulty-hard .summary-value { color: #9a3412; }
+[data-theme="light"] .encounter-builder .summary-item-difficulty-deadly .summary-value { color: #b91c1c; }
+
 /* ============ Monster Table ============ */
 .encounter-builder .encounter-monster-table-section {
   margin-bottom: 16px;

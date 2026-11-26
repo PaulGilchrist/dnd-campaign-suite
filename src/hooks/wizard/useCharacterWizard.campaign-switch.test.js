@@ -18,17 +18,14 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useCharacterWizard } from './useCharacterWizard.js';
 
-const originalAlert = window.alert;
 const originalConsoleError = console.error;
 
 beforeEach(() => {
   global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
-  window.alert = vi.fn();
   console.error = vi.fn();
 });
 
 afterEach(() => {
-  window.alert = originalAlert;
   console.error = originalConsoleError;
 });
 
@@ -119,8 +116,11 @@ describe('useCharacterWizard - campaign-switch seam (wizard reset + captured edi
 
     expect(result.current.showEditCharacterWizard).toBe(true);
     expect(result.current.editingCharacter).toMatchObject({ name: 'War_Cleric' });
-    // Single-owner prefix: the alert carries the service prefix exactly once.
-    expect(window.alert).toHaveBeenCalledWith('Failed to update character: Not Found');
+    // Item 7: the failure now rides the in-app Save Failed dialog (never a
+    // native alert); the message carries the service prefix exactly once.
+    expect(result.current.wizardDialog).not.toBeNull();
+    expect(result.current.wizardDialog.props.title).toBe('Save Failed');
+    expect(result.current.wizardDialog.props.children).toBe('Failed to update character: Not Found');
   });
 
   it('re-editing a different character rebinds the seed to the new target (no stale binding)', () => {

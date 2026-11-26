@@ -117,6 +117,12 @@ describe('CampaignBuilder', () => {
         render(<CampaignBuilder campaignName="test-campaign" />);
         expect(await screen.findByText(/Nothing is drafted right now/)).toBeTruthy();
         expect(screen.queryByText('Approve all (0)')).toBeNull();
+        // F14 (Item 7): the face is the kit icon+guidance pattern; F13: the
+        // header carries the sidebar label ("Drafts").
+        const empty = document.querySelector('.campaign-builder-empty.ct-empty-state');
+        expect(empty).not.toBeNull();
+        expect(empty.querySelector('i')).not.toBeNull();
+        expect(screen.getByRole('heading', { name: 'Drafts' })).toBeInTheDocument();
     });
 
     it('load failure shows the error banner instead of a dead panel', async () => {

@@ -145,7 +145,7 @@ describe('CharSummary - Inspiration Toggle', () => {
         renderSummary();
 
         const checkbox = screen.getByRole('checkbox');
-        expect(checkbox.checked).toBe(false);
+        expect(checkbox).toHaveAttribute('aria-checked', 'false');
 
         fireEvent.click(checkbox);
 

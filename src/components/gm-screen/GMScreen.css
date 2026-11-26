@@ -41,6 +41,23 @@
     font-style: italic;
 }
 
+/* F3 (Item 7): top-of-table clip hint — rides the amber advisory vocabulary
+   at the smallest tier (the scroll container's own scrollbar parks far below
+   a tall table, and macOS overlay scrollbars stay invisible until a swipe). */
+.gm-table-scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px 0;
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+
+.gm-table-scroll-hint i {
+    color: var(--color-primary);
+}
+
 /* Wide tables scroll horizontally on the laptop profile instead of
    squashing columns (no fragile absolute layout anywhere). */
 .gm-table-scroll {
@@ -114,9 +131,20 @@
     margin: 0 8px 2px 0;
 }
 
+/* F16 (Item 7): expertise = bold + amber star (the ruler/hint gold), not the
+   buff-blue --color-info-hover the previous rule borrowed — blue reads as
+   live buff state app-wide. The (expertise) tooltip stays the exact wording. */
 .gm-skill-expert {
     font-weight: 700;
-    color: var(--color-info-hover);
+}
+
+.gm-skill-star {
+    color: #ffcc00;
+    margin-right: 2px;
+}
+
+[data-theme="light"] .gm-skill-star {
+    color: #b45309;
 }
 
 .gm-cell-hp {

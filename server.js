@@ -25,6 +25,7 @@ import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsStarterSeed from './server/routes/campaigns-starter-seed.js';
 import campaignsMeta from './server/routes/campaigns-meta.js';
 import tokenImageRoutes from './server/routes/token-image.js';
+import campaignAudioRoutes from './server/routes/campaign-audio.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
@@ -227,6 +228,11 @@ app.use(campaignsMeta);
 // Per-token custom art upload (deferred plan D) — BEFORE campaignsChangedata
 // for the same wildcard-capture reason.
 app.use(tokenImageRoutes);
+
+// Campaign audio uploads (offline ambience, Item 3) — BEFORE
+// campaignsChangedata so POST/DELETE /:campaign/audio never falls into the
+// generic :campaign/:key change-data wildcard.
+app.use(campaignAudioRoutes);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);

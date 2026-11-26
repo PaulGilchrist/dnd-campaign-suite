@@ -1,0 +1,274 @@
+/* Chronicle (backlog Item 2) — read-only story page. All rules scoped to
+   .chronicle-view; shared tiers ride the kit (.ct-container / .ct-btn /
+   .ct-empty-state from App.css). Theme-agnostic: every colour is a token. */
+.chronicle-view.ct-container {
+    padding: 20px 32px 20px 20px;
+    max-width: 900px;
+}
+
+/* --- Header row: title + export/print verbs --- */
+.chronicle-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.chronicle-toolbar h2 {
+    margin: 0;
+    color: var(--color-header);
+    font-size: 1.4em;
+}
+
+.chronicle-toolbar h2 i {
+    margin-right: 8px;
+    color: var(--color-primary);
+}
+
+.chronicle-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+/* --- Session sections --- */
+.chronicle-session {
+    margin-bottom: 28px;
+}
+
+.chronicle-session-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 10px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--color-section-heading);
+    font-size: 1.15em;
+}
+
+.chronicle-session-header i {
+    color: var(--color-primary);
+    font-size: 0.85em;
+}
+
+.chronicle-session-date {
+    margin-left: auto;
+    font-size: 0.75em;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.chronicle-section-beats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* --- Beats --- */
+.chronicle-beat {
+    break-inside: avoid;
+}
+
+.chronicle-prose {
+    line-height: 1.65;
+    color: var(--color-text);
+    font-size: 1rem;
+    padding: 0 4px;
+}
+
+.chronicle-prose p {
+    margin: 0 0 8px 0;
+}
+
+.chronicle-prose p:last-child {
+    margin-bottom: 0;
+}
+
+.chronicle-prose b,
+.chronicle-prose strong {
+    color: var(--color-header);
+}
+
+.chronicle-prose blockquote {
+    margin: 6px 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--border-color);
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* Recap beats ride the log's gold recap voice, as a titled card. */
+.chronicle-recap {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid #d4a017;
+    border-radius: 6px;
+    background: var(--background-color-card);
+}
+
+.chronicle-recap-title {
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #d4a017;
+}
+
+.chronicle-recap-title i {
+    margin-right: 6px;
+}
+
+.chronicle-speaker {
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--color-text-muted);
+}
+
+/* One-line beats (milestones, encounter seams, loot, rests, travel). */
+.chronicle-line {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color-light);
+    border-radius: 6px;
+    background: var(--background-color-card);
+    font-size: 0.88rem;
+}
+
+.chronicle-line-icon {
+    width: 18px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.chronicle-line-label {
+    font-weight: 700;
+    color: var(--color-header);
+    white-space: nowrap;
+}
+
+.chronicle-line-text {
+    flex: 1;
+    min-width: 0; /* narrow-viewport law: flexed text shrinks honestly */
+    color: var(--color-text);
+    word-break: break-word;
+}
+
+.chronicle-beat-time {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.chronicle-milestone {
+    border-left-color: var(--color-primary);
+}
+
+.chronicle-encounter-started {
+    border-left-color: #e87040;
+}
+
+.chronicle-encounter-completed {
+    border-left-color: #d4a017;
+}
+
+.chronicle-loot {
+    border-left-color: var(--color-warning);
+}
+
+.chronicle-loot-xp {
+    color: var(--color-warning);
+    font-weight: 600;
+}
+
+.chronicle-loot-items {
+    margin: 4px 0 0 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.chronicle-rest-short {
+    border-left-color: #2ecc71;
+}
+
+.chronicle-rest-long {
+    border-left-color: #8e44ad;
+}
+
+.chronicle-travel {
+    border-left-color: #4a90d9;
+}
+
+.chronicle-travel-event {
+    width: 100%;
+    padding-left: 26px;
+    font-style: italic;
+    color: var(--color-text-muted);
+}
+
+/* --- Print face: a light reading page whatever the on-screen theme
+       (F7 lesson: print media gets its own light face; token overrides in
+       this scope, no !important) --- */
+@media print {
+    .chronicle-view.ct-container {
+        --color-text: #111;
+        --color-header: #14532d;
+        --color-section-heading: #14532d;
+        --color-text-muted: #555;
+        --background-color-card: #fff;
+        --background-color-main: #fff;
+        --border-color: #bbb;
+        --border-color-light: #999;
+        --color-primary: #1b7a2f;
+        --color-warning: #8a6d1a;
+        /* Paint the content area white so even background-printing dialogs
+           (F7 light-face law) never keep the dark screen behind the text. */
+        background: var(--background-color-main);
+        padding: 0;
+        max-width: 7.75in;
+    }
+
+    .chronicle-line {
+        border-width: 0 0 0 2px;
+        border-radius: 0;
+        padding: 2px 0 2px 10px;
+    }
+
+    .chronicle-recap {
+        border-width: 0 0 0 3px;
+        border-radius: 0;
+        padding: 2px 0 2px 12px;
+    }
+
+    .chronicle-session {
+        break-inside: auto;
+    }
+
+    .chronicle-session-header {
+        break-after: avoid;
+    }
+
+    /* Gold accents stay legible on paper. */
+    .chronicle-recap,
+    .chronicle-encounter-completed {
+        border-left-color: #8a6d1a;
+    }
+}
+
+/* Paper canvas: the shell's dark body background must not print behind the
+   story when a print dialog paints backgrounds (F7 light-face law). :has()
+   keeps this chronicle-scoped — no other view is touched. */
+@media print {
+    body:has(.chronicle-view) {
+        background-color: #fff;
+    }
+}

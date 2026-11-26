@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../services/ui/youtubePlayer.js', () => ({
+vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
   playTracks: vi.fn(),
   pause: vi.fn(),
@@ -38,6 +38,16 @@ function openEditor(container) {
   return container.querySelector('#music-editor-urls');
 }
 
+// Item 3b: starter moods now seed bundled /audio/ beds — the zero-valid
+// rejection lanes below only fire when NOTHING is queued, so remove the
+// seeded local rows first (upload/discard lanes unaffected).
+function clearLocalRows(container) {
+  let btn;
+  while ((btn = container.querySelector('.music-editor-local-tracks button'))) {
+    fireEvent.click(btn);
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getStore('campaign').delete('music');
@@ -47,6 +57,7 @@ describe('MusicPlayer invalid-save inline error', () => {
   it('shows a visible inline error when Save rejects unparseable input', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     // Invalid user input must NOT hit console.error (backlog 2026-11-08 EK):
     // the inline error below is the feedback; the drop leaves only a
@@ -75,6 +86,7 @@ describe('MusicPlayer invalid-save inline error', () => {
   it('clears the inline error on the next keystroke', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
@@ -89,6 +101,7 @@ describe('MusicPlayer invalid-save inline error', () => {
   it('clears the inline error when the editor is closed and reopened', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
@@ -120,6 +133,7 @@ describe('MusicPlayer invalid-save inline error', () => {
     });
     const { container } = renderPlayer();
     const textarea = openEditor(container);
+    clearLocalRows(container);
 
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
@@ -136,7 +150,7 @@ describe('MusicPlayer invalid-save inline error', () => {
     // Stay-open save (backlog 2026-11-08 EM): editor holds, content persisted.
     expect(container.querySelector('.music-editor')).not.toBeNull();
     expect(container.querySelector('#music-editor-urls').value).toBe('https://youtu.be/aaaaaaaaaaa');
-    expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    expect(musicState().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
     globalThis.fetch.mockRestore();
   });
 });

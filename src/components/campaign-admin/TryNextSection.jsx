@@ -18,8 +18,11 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
  *   server-first in the shared `gmCopilot` key).
  * - A failed lane read renders no invitation for it — an honest absence beats
  *   a fabricated nudge.
+ * - Toolbelt respect (Item 1): an invitation NEVER targets a view the GM has
+ *   hidden from this campaign's sidebar — an invite into a surface the table
+ *   chose not to show is a contradiction, so that card simply does not fire.
  */
-function TryNextSection({ campaignName, characters = [], onNavigate }) {
+function TryNextSection({ campaignName, characters = [], onNavigate, hiddenViews = [] }) {
   const [counts, setCounts] = React.useState(null);
 
   React.useEffect(() => {
@@ -43,13 +46,16 @@ function TryNextSection({ campaignName, characters = [], onNavigate }) {
 
   if (!counts || !onNavigate) return null;
   const vars = { encounters: counts.encounters, maps: counts.maps };
+  // Toolbelt gate: a hidden target view kills that card's precondition — no
+  // invitation can invite the GM into a surface this campaign hides.
+  const notHidden = (view) => !hiddenViews.includes(view);
   return (
     <>
       <GMCopilot
         campaignName={campaignName}
         tipId="try-combat"
         vars={vars}
-        when={characters.length > 0 && counts.encounters > 0 && counts.board === 0}
+        when={notHidden('encounter') && characters.length > 0 && counts.encounters > 0 && counts.board === 0}
         onAction={() => onNavigate('encounter')}
         actionLabel="Open Encounter Builder"
       />
@@ -57,14 +63,14 @@ function TryNextSection({ campaignName, characters = [], onNavigate }) {
         campaignName={campaignName}
         tipId="try-maps"
         vars={vars}
-        when={counts.mapLaneOk && counts.maps > 0 && !counts.activeMap}
+        when={notHidden('mapsManager') && counts.mapLaneOk && counts.maps > 0 && !counts.activeMap}
         onAction={() => onNavigate('mapsManager')}
         actionLabel="Open Maps"
       />
       <GMCopilot
         campaignName={campaignName}
         tipId="try-tv"
-        when={counts.board >= 2}
+        when={notHidden('initiative') && counts.board >= 2}
         onAction={() => onNavigate('initiative')}
         actionLabel="Open Initiative"
       />

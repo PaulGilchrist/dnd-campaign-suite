@@ -1,29 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
+import { ToolbeltSettings } from './ToolbeltSettings.jsx';
 import { addEntry } from '../../services/ui/logService.js';
 import { CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
+import { VIEW_LABELS, NAV_ITEMS, getViewLabel } from '../../services/ui/sidebarNav.js';
 import { useSmallScreen } from '../../hooks/ui/useSmallScreen.js';
 import './Sidebar.css';
-
-const VIEW_LABELS = {
-    charSheet: { label: 'Character', icon: 'fa-user' },
-    encounter: { label: 'Encounters', icon: 'fa-dragon' },
-    factions: { label: 'Factions', icon: 'fa-handshake' },
-    gmScreen: { label: 'GM Screen', icon: 'fa-eye' },
-    initiative: { label: 'Initiative', icon: 'fa-shield-alt' },
-    partyInventory: { label: 'Inventory', icon: 'fa-boxes-stacked' },
-    campaignLog: { label: 'Log', icon: 'fa-book-journal-whills' },
-    mapsManager: { label: 'Maps', icon: 'fa-map' },
-    music: { label: 'Music', icon: 'fa-music' },
-    notes: { label: 'Notes', icon: 'fa-book' },
-    npcs: { label: 'NPCs', icon: 'fa-users' },
-    quests: { label: 'Quests', icon: 'fa-scroll' },
-    questBoard: { label: 'Quest Board', icon: 'fa-list-check' },
-    sessions: { label: 'Sessions', icon: 'fa-calendar-check' },
-    settlements: { label: 'Settlements', icon: 'fa-city' },
-    campaignBuilder: { label: 'Drafts', icon: 'fa-wand-magic-sparkles' },
-    campaignRepair: { label: 'Admin', icon: 'fa-gears' },
-};
 
 const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
 
@@ -39,43 +21,6 @@ const RULES_TOAST_AUTO_HIDE_MS = 2500;
 // intercepts clicks (mirrors the .music-toast auto-hide idiom).
 const DICE_POPUP_AUTO_HIDE_MS = 4000;
 
-const NAV_ITEMS = [
-    // NAV_ITEMS render verbatim — the nav-order test pins alphabetical-by-label,
-    // so a new view slots by its label, not by insertion time.
-    // arenaHidden: an arena battle is a one-off fight sandbox, so campaign-only
-    // planning views drop out of the nav while one is open (campaignType gate).
-    { view: 'campaignBuilder', onClick: 'onCampaignBuilderClick', localhostOnly: true, arenaHidden: true },
-    { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
-    { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true, arenaHidden: true },
-    // Pure-read GM lookup panel — localhost-only like the other GM views. NOT
-    // arenaHidden: it is an in-combat lookup (party saves/status/quick ref),
-    // not a campaign planning view, so an arena battle keeps it.
-    { view: 'gmScreen', onClick: 'onGMScreenClick', localhostOnly: true },
-    // In-app help drawer (learnability plan Phase 3): opens an overlay, not a
-    // view. Slotted gmScreen→initiative so the nav stays alphabetical (pinned
-    // by Sidebar.test 'renders nav buttons in alphabetical order by label').
-    { help: true, icon: 'fa-circle-question', label: 'Help' },
-    { view: 'initiative', onClick: 'onInitiativeClick' },
-    { view: 'partyInventory', onClick: 'onInventoryClick', arenaHidden: true },
-    { view: 'campaignLog', onClick: 'onLogClick' },
-    { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
-    // Ambience duty is delegable, so the music panel is open to players too
-    // (main content area, activeView 'music').
-    { view: 'music', onClick: 'onMusicClick' },
-    { view: 'notes', onClick: 'onNotesClick', localhostOnly: true, arenaHidden: true },
-    { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
-    // Player chrome (Item 9): the read-only quest board is open to visitors —
-    // it renders only the field-whitelisted /quests/board + /factions/standings
-    // lanes. localhost sees it too (same shared table — the GM's authoring
-    // stays in the separate GM-only "Quests" planner). arenaHidden like the
-    // planner: campaign-progress theatre, not part of an arena fight sandbox.
-    { view: 'questBoard', onClick: 'onQuestBoardClick', arenaHidden: true },
-    { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true, arenaHidden: true },
-    { external: true, icon: 'fa-book', label: 'Rules' },
-    { view: 'sessions', onClick: 'onSessionsClick', localhostOnly: true, arenaHidden: true },
-    { view: 'settlements', onClick: 'onSettlementsClick', localhostOnly: true, arenaHidden: true },
-];
-
 function openRules(showBlockedToast) {
     const popup = window.open(RULES_URL, '_blank');
     // Blocked popups return falsy — without this the click looked dead
@@ -87,16 +32,22 @@ function activeClass(activeView, view) {
     return `sidebar-section-header${activeView === view ? ' active' : ''}`;
 }
 
-function getActiveInfo(activeView, activeCharacter) {
+function getActiveInfo(activeView, activeCharacter, isLocalhost) {
     if (activeView === 'charSheet' && activeCharacter) {
         return { label: activeCharacter.name, icon: 'fa-user' };
     }
-    const viewInfo = VIEW_LABELS[activeView];
-    return { label: viewInfo?.label || '', icon: viewInfo?.icon || '' };
+    // F13 (Item 7): the nav drawer's active-view banner honors the visitor
+    // playerLabel too ("Map"), so it never names the view differently from the
+    // nav button that opened it.
+    return { label: getViewLabel(activeView, isLocalhost), icon: VIEW_LABELS[activeView]?.icon || '' };
 }
 
-function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRulesToast, onNavigate }) {
+function NavButton({ item, activeView, handlers, isLocalhost, hiddenViews = [], rulesToast, showRulesToast, onNavigate }) {
     if (item.localhostOnly && !isLocalhost) return null;
+    // Toolbelt (Item 1): a GM-hidden view disappears for EVERY device in the
+    // campaign. localhostOnly runs FIRST — a visitor never sees GM views
+    // whatever the toolbelt says, and hiding never un-hides anything.
+    if (item.view && hiddenViews.includes(item.view)) return null;
 
     const { label, icon } = VIEW_LABELS[item.view] || item;
     const displayLabel = !isLocalhost && item.playerLabel ? item.playerLabel : label;
@@ -196,7 +147,50 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onHelpClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
+// GM-only sidebar footer (Admin row + the toolbelt opener/dialog). Extracted
+// as a module-level renderer (NavButton/CharacterList precedent) so the
+// toolbelt's conditional rows live HERE and Sidebar stays inside its
+// complexity budget. The dialog open flag is per-client UI state.
+function SidebarFooter({ isLocalhost, activeView, hiddenViews = [], onRepairClick, onSaveHiddenViews }) {
+    const [toolbeltOpen, setToolbeltOpen] = useState(false);
+    if (!isLocalhost) return null;
+    return (
+        <>
+            <div className="sidebar-footer">
+                {/* Admin stays a nav row (honors the toolbelt); the "Sidebar"
+                    gear is the toolbelt opener itself — always present on GM,
+                    never hideable, or a GM could lock themselves out of the
+                    settings. */}
+                {!hiddenViews.includes('campaignRepair') && (
+                    <button
+                        className={activeClass(activeView, 'campaignRepair')}
+                        onClick={onRepairClick}
+                    >
+                        <i className="fa-solid fa-gears"></i> Admin
+                    </button>
+                )}
+                {onSaveHiddenViews && (
+                    <button
+                        className="sidebar-section-header"
+                        onClick={() => setToolbeltOpen(true)}
+                        title="Choose which views appear in the sidebar for this campaign"
+                    >
+                        <i className="fa-solid fa-pen-to-square"></i> Sidebar
+                    </button>
+                )}
+            </div>
+            {toolbeltOpen && (
+                <ToolbeltSettings
+                    hiddenViews={hiddenViews}
+                    onClose={() => setToolbeltOpen(false)}
+                    onSave={onSaveHiddenViews}
+                />
+            )}
+        </>
+    );
+}
+
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onQuestBoardClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onChronicleClick, onRepairClick, onHelpClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard', hiddenViews, onSaveHiddenViews }) {
     const [diceResult, setDiceResult] = useState(null);
     // Collapsible small-screen nav (backlog 2026-11-23 collapsible-sidebar):
     // below SMALL_SCREEN_MAX_PX the fixed sidebar docks off-canvas (Sidebar.css
@@ -266,7 +260,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
         }).catch((e) => { console.error('[Sidebar] Failed to log dice tray roll:', e); });
       };
 
-    const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
+    const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter, isLocalhost);
     // Every destination pick (nav header, roster link, Add Character, Rules,
     // Help, Campaigns exit, Admin) also closes the small-screen drawer, so
     // selecting a view returns the content area to full width. On desktop
@@ -276,7 +270,8 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
     const navHandlers = {
         onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick,
         onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onQuestBoardClick,
-        onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onHelpClick,
+        onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick,
+        onChronicleClick, onHelpClick,
     };
     for (const key of Object.keys(navHandlers)) navHandlers[key] = selectAndClose(navHandlers[key]);
     const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
@@ -293,7 +288,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
             {smallScreen && (
                 <button
                     ref={toggleRef}
-                    className="sidebar-nav-toggle"
+                    className="sidebar-nav-toggle no-print"
                     onClick={() => (navOpen ? closeNav() : setNavOpen(true))}
                     aria-expanded={navOpen}
                     aria-controls="sidebar-nav"
@@ -349,21 +344,19 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         activeView={activeView}
                         handlers={navHandlers}
                         isLocalhost={isLocalhost}
+                        hiddenViews={hiddenViews}
                         rulesToast={rulesToast}
                         showRulesToast={showRulesToast}
                         onNavigate={closeNav}
                     />
                 ))}
-                {isLocalhost && (
-                    <div className="sidebar-footer">
-                        <button
-                            className={activeClass(activeView, 'campaignRepair')}
-                            onClick={selectAndClose(onRepairClick)}
-                        >
-                            <i className="fa-solid fa-gears"></i> Admin
-                        </button>
-                    </div>
-                )}
+                <SidebarFooter
+                    isLocalhost={isLocalhost}
+                    activeView={activeView}
+                    hiddenViews={hiddenViews}
+                    onRepairClick={selectAndClose(onRepairClick)}
+                    onSaveHiddenViews={onSaveHiddenViews}
+                />
                 <DiceTray onRoll={handleDiceRoll} />
             </nav>
             {diceResult && <DicePopup result={diceResult} onClose={() => setDiceResult(null)} />}

@@ -79,13 +79,20 @@
     gap: 8px;
 }
 
+/* F8 (Item 7 kit convergence): the mode buttons and option pills ride the
+   same token vocabulary as the global .ct-btn kit, with the app's GREEN
+   PRIMARY as the selected language. The old solid blue (#4a90d9/#4a7db5)
+   borrowed the buff-effect color for a selection state and both themes
+   needed bespoke hardcoded override blocks — every color here is a token
+   now, so the light/system-light faces cascade from index.css and those
+   blocks are gone. */
 .maps-manager-modal-overlay .gen-modal-mode-btn {
     flex: 1;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: #2a2a2a;
-    color: #ccc;
+    background: var(--background-color-button-secondary);
+    color: var(--color-text);
     font-size: 13px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
@@ -96,14 +103,14 @@
 }
 
 .maps-manager-modal-overlay .gen-modal-mode-btn:hover {
-    background: #3a3a3a;
-    border-color: #555;
+    background: var(--background-color-button-secondary-hover);
+    border-color: var(--border-color-light);
 }
 
 .maps-manager-modal-overlay .gen-modal-mode-btn.active {
-    background: #4a90d9;
-    border-color: #2c5f8a;
-    color: #fff;
+    background: var(--color-primary);
+    border-color: var(--color-primary-dark);
+    color: var(--color-text-inverse);
 }
 
 /* Option group (pill-style buttons) */
@@ -117,22 +124,22 @@
     padding: 4px 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: #2a2a2a;
-    color: #ccc;
+    background: var(--background-color-button-secondary);
+    color: var(--color-text);
     font-size: 12px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .maps-manager-modal-overlay .gen-modal-option-btn:hover {
-    background: #3a3a3a;
-    border-color: #555;
+    background: var(--background-color-button-secondary-hover);
+    border-color: var(--border-color-light);
 }
 
 .maps-manager-modal-overlay .gen-modal-option-btn.active {
-    background: #4a7db5;
-    border-color: #3a6a9a;
-    color: #fff;
+    background: var(--color-primary);
+    border-color: var(--color-primary-dark);
+    color: var(--color-text-inverse);
 }
 
 .maps-manager-modal-overlay .gen-modal-generate-btn {
@@ -150,84 +157,22 @@
     opacity: 0.9;
 }
 
-/* ===== Light theme overrides ===== */
-
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn {
-    background: #e8e8e8;
-    border-color: #ccc;
-    color: #333;
+/* F8 (Item 7): native OS number spinners are off-kit (the audit's "native
+   spinner" nit) — both twins keep plain numeric fields the modal's own size,
+   arrows gone. */
+.maps-manager-modal-overlay .gen-modal-field input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
 }
 
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn:hover {
-    background: #d8d8d8;
-    border-color: #aaa;
+.maps-manager-modal-overlay .gen-modal-field input[type="number"]::-webkit-outer-spin-button,
+.maps-manager-modal-overlay .gen-modal-field input[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
 }
 
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn.active {
-    background: #4a7db5;
-    border-color: #3a6a9a;
-    color: #fff;
-}
-
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn {
-    background: #e8e8e8;
-    border-color: #ccc;
-    color: #333;
-}
-
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn:hover {
-    background: #d8d8d8;
-    border-color: #aaa;
-}
-
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn.active {
-    background: #4a7db5;
-    border-color: #3a6a9a;
-    color: #fff;
-}
-
-[data-theme="light"] .maps-manager-modal-overlay .gen-modal-generate-btn {
-    background: #4a7db5 !important;
-    color: #fff !important;
-}
-
-@media (prefers-color-scheme: light) {
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn {
-        background: #e8e8e8;
-        border-color: #ccc;
-        color: #333;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn:hover {
-        background: #d8d8d8;
-        border-color: #aaa;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn.active {
-        background: #4a7db5;
-        border-color: #3a6a9a;
-        color: #fff;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn {
-        background: #e8e8e8;
-        border-color: #ccc;
-        color: #333;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn:hover {
-        background: #d8d8d8;
-        border-color: #aaa;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn.active {
-        background: #4a7db5;
-        border-color: #3a6a9a;
-        color: #fff;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-generate-btn {
-        background: #4a7db5 !important;
-        color: #fff !important;
-    }
+/* F8: the density/range slider wore the browser's default BLUE thumb — the
+   whole modal now speaks the green-primary language. */
+.maps-manager-modal-overlay .gen-modal-field input[type="range"] {
+    accent-color: var(--color-primary);
 }

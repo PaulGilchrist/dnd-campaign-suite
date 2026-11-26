@@ -5,6 +5,7 @@ import { parseSeedInput, SEED_INPUT_PLACEHOLDER } from '../../services/maps/seed
 import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
 import './gen-modal-shared.css';
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 
 function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
@@ -12,6 +13,13 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
     const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
+
+    // F11 family law (Item 7): shared Escape/backdrop dismiss, blocked while a
+    // generation is in flight (mirrors the disabled Cancel button mid-create).
+    const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } = useModalDismiss(
+        onClose,
+        { disabled: generating, panelSelector: '.maps-manager-modal' }
+    );
 
     // Editing any field clears a stale error banner so it never lingers next
     // to now-valid inputs (TE backlog 2026-11-12).
@@ -84,7 +92,15 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
     };
 
     return (
-        <div className="maps-manager-modal-overlay">
+        // F11 family law (Item 7 re-sweep 2026-11-25): the twin of the dungeon
+        // modal above — same shared useModalDismiss lane (Escape + pure-backdrop
+        // close, blocked while generating).
+        <div
+            className="maps-manager-modal-overlay"
+            onKeyDown={handleKeyDown}
+            onMouseDown={handleOverlayMouseDown}
+            onClick={handleOverlayClick}
+        >
             <div className="maps-manager-modal terrain-gen-modal">
                 <h3>Generate Terrain Map</h3>
 
