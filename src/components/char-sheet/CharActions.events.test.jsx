@@ -1,38 +1,38 @@
-// @maintained-by-ai 2026-10-16
-// Pins CharActions' window event-bus contract (via useCharActionsEventListeners +
-// inline CLA-230 listener): popup HTML formatting, modal-state passthrough,
-// damage-type choice/skip flow, and listener teardown on unmount.
+// @maintained-by-ai 2026-11-27
+// Pins CharActions' window event-bus contract at the component seam (via
+// useCharActionsEventListeners + the inline CLA-230 listener): popup HTML
+// formatting copy, modal-show events → modalState routing (incl. the
+// potent-spellcasting → secondaryTargetModal consumer, whose producer side is
+// pinned in useLoggedDiceRollDamage.potent-spell.test.js), the damage_type_choice
+// popup armed through DiceRollContext (choice rolls once, latches usedKey with
+// the component's OWN campaignName, clears; live skip only clears), CLA-230
+// moonlight-step-restore → automation dispatch, and full listener teardown on
+// unmount. The listener add/remove ledger, reopen/stack and post-unmount
+// silences for damage-type-choice/skip are pinned stronger at the hook seam in
+// useCharActionsEventListeners.cleanup.test.jsx — not restated here.
+// Mock hygiene (run2 #1825/#1842 canon): the REAL useSyncedState.js runs
+// against the mocked useRuntimeState.js primitives (no mirrored store
+// re-implementation; the phantom `useSyncedState` export previously mocked ON
+// useRuntimeState.js is removed — that module does not export it).
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { executeHandler } from '../../services/automation/index.js';
 
+const CAMPAIGN = 'test-campaign';
+
+// Shared backing Map: the real useSyncedState.js reads/writes it through the
+// mocked getStore/setRuntimeValue primitives; the mocked useCharActionModals
+// setModalState records its latest argument here as a sentinel capture.
 const _syncedStore = new Map();
-
-vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, newValue);
-    });
-    return [value, setter];
-  }),
-}));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, newValue);
-    });
-    return [value, setter];
-  }),
   useRuntimeValue: vi.fn((_, key, _campaignName) => {
     const hasValue = _syncedStore.has(key);
     return hasValue ? _syncedStore.get(key) : null;
@@ -40,11 +40,15 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   listeners: new Map(),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
+const { diceRollDefaults } = vi.hoisted(() => ({
+  diceRollDefaults: () => ({
     popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(),
     rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })),
+  }),
+}));
+
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => diceRollDefaults()),
 }));
 
 vi.mock('../../services/automation/index.js', () => ({
@@ -158,6 +162,9 @@ vi.mock('./CharActionSpellPopups.jsx', () => ({
   default: vi.fn(() => <div data-testid="char-action-spell-popups">CharActionSpellPopups</div>),
 }));
 
+// Complete against CharActions.jsx's actual destructuring (run2 #1826/#1843
+// class): every key the component pulls is present. setModalState records its
+// latest argument into the store sentinel so bus-routing tests can observe it.
 vi.mock('./useCharActionModals.js', () => ({
   default: vi.fn(() => ({
     pendingDamage: null,
@@ -166,6 +173,7 @@ vi.mock('./useCharActionModals.js', () => ({
       _syncedStore.set('modalState', state);
     }),
     resolveAttackDamage: vi.fn(),
+    resumeAttackPipeline: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
     handleWeaponKindMasteryClose: vi.fn(),
@@ -185,6 +193,10 @@ vi.mock('./useCharActionModals.js', () => ({
     handleCombatSuperiorityConfirm: vi.fn(),
     handleAttackRiderManeuverUse: vi.fn(),
     handleAttackRiderManeuverSkip: vi.fn(),
+    handleFlurryOfBlowsConfirm: vi.fn(),
+    handleFlurryOfBlowsSkip: vi.fn(),
+    handleOpenHandFromFlurryConfirm: vi.fn(),
+    handleOpenHandFromFlurrySkip: vi.fn(),
   })),
 }));
 
@@ -228,6 +240,18 @@ function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
+// Flat info shape as produced by automationInfoBuilder/resource.js and collected
+// into playerStats.automation.actions (CLA-230 moonlight-step-restore source).
+const poolAction = {
+  type: 'resource_pool',
+  name: 'Moonlight Step',
+  description: 'Teleport 60 feet.',
+  resource: 'moonlightStepUses',
+  uses_expression: 'WIS modifier',
+  conversion: 'spell_slot_to_moonlight_step',
+  conversionRate: 'level_2_plus',
+};
+
 function renderWithWrapper(component, wrapper) {
   return act(async () => render(component, { wrapper }));
 }
@@ -240,16 +264,18 @@ function makeWrapper(mockSetPopupHtml, popupHtmlValue = null) {
   );
 }
 
-// Render CharActions with a fresh rollDamage mock wired through useLoggedDiceRoll.
-// Returns the rollDamage spy plus unmount so cleanup lanes can tear the tree down.
-async function renderWithDiceRoll(mockSetPopupHtml, popupHtmlValue = null) {
+// Render CharActions with a fresh rollDamage spy wired through useLoggedDiceRoll
+// and (optionally) a staged popup in DiceRollContext. Returns the rollDamage spy
+// plus unmount so cleanup lanes can tear the tree down.
+async function renderWithDiceRoll(mockSetPopupHtml, popupHtmlValue = null, campaignName = CAMPAIGN) {
   const mockRollDamage = vi.fn();
   useLoggedDiceRoll.mockReturnValue({
-    popupHtml: popupHtmlValue, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(),
-    rollDamage: mockRollDamage, rollSkillCheck: vi.fn(),
-    rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
+    ...diceRollDefaults(), popupHtml: popupHtmlValue, setPopupHtml: mockSetPopupHtml, rollDamage: mockRollDamage,
   });
-  const view = await renderWithWrapper(<CharActions playerStats={createStats()} />, makeWrapper(mockSetPopupHtml, popupHtmlValue));
+  const view = await renderWithWrapper(
+    <CharActions playerStats={createStats()} campaignName={campaignName} />,
+    makeWrapper(mockSetPopupHtml, popupHtmlValue)
+  );
   return { rollDamage: mockRollDamage, unmount: view.unmount };
 }
 
@@ -265,31 +291,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   _syncedStore.clear();
+  // clearAllMocks does NOT drop mockReturnValue overrides — re-seed the shared
+  // dice-roll fixture so per-test seams cannot leak (run2 #1825 class).
+  useLoggedDiceRoll.mockReturnValue(diceRollDefaults());
   globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
 });
 
 describe('CharActions popup events → popup HTML formatting', () => {
   it.each([
     {
-      name: 'healing popup with roll info',
-      event: 'healing-popup',
-      detail: { targetName: 'Ally1', healingName: 'Healing Word', rollInfo: '7+3', maximizeHealingDice: false, popupText: 'Restores hit points' },
-      expected: '<b>Healing Word</b> on Ally1 [7+3]<br/><br/>Restores hit points',
-    },
-    {
-      name: 'maximized healing popup with roll info',
+      name: 'maximized healing popup with roll info (both annotation branches)',
       event: 'healing-popup',
       detail: { targetName: 'Ally2', healingName: 'Cure Wounds', rollInfo: '2d4+3', maximizeHealingDice: true, popupText: 'Maximized healing' },
       expected: '<b>Cure Wounds</b> on Ally2 [2d4+3] (maximized)<br/><br/>Maximized healing',
     },
     {
-      name: 'maximized healing popup without roll info',
-      event: 'healing-popup',
-      detail: { targetName: 'Ally2', healingName: 'Cure Wounds', rollInfo: null, maximizeHealingDice: true, popupText: 'Maximized healing' },
-      expected: '<b>Cure Wounds</b> on Ally2 (maximized)<br/><br/>Maximized healing',
-    },
-    {
-      name: 'healing popup without roll info',
+      name: 'plain healing popup without roll info',
       event: 'healing-popup',
       detail: { targetName: 'Ally3', healingName: 'Lay on Hands', rollInfo: null, maximizeHealingDice: false, popupText: 'Heals wounds' },
       expected: '<b>Lay on Hands</b> on Ally3<br/><br/>Heals wounds',
@@ -315,6 +332,7 @@ describe('CharActions popup events → popup HTML formatting', () => {
     await waitFor(() => {
       expect(mockSetPopupHtml).toHaveBeenCalledWith(expected);
     });
+    expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -342,9 +360,30 @@ describe('CharActions modal-show events → setModalState passthrough', () => {
       );
     });
   });
+
+  // Producer side (the save-damage dispatch) is pinned in
+  // useLoggedDiceRollDamage.potent-spell.test.js; this is the only consumer pin.
+  // The mocked combat context has no creatures, so ally targets map to empty.
+  it('potent-spellcasting-temp-hp opens the secondary-target modal with a default confirm label', async () => {
+    await renderWithWrapper(<CharActions playerStats={createStats()} />, makeWrapper(vi.fn()));
+
+    dispatchCustomEvent('potent-spellcasting-temp-hp', {
+      title: 'Potent Spellcasting', tempHp: 5, campaignName: CAMPAIGN, attackerName: 'TestCharacter',
+    });
+
+    await waitFor(() => {
+      expect(_syncedStore.get('modalState')).toEqual(expect.objectContaining({
+        secondaryTargetModal: expect.objectContaining({
+          title: 'Potent Spellcasting',
+          confirmLabel: 'Grant Temp HP',
+          targets: [],
+        }),
+      }));
+    });
+  });
 });
 
-describe('CharActions damage-type-choice popup flow', () => {
+describe('CharActions damage_type_choice popup armed through DiceRollContext', () => {
   const choicePopup = {
     type: 'damage_type_choice',
     bonusFormula: '1d6',
@@ -357,102 +396,53 @@ describe('CharActions damage-type-choice popup flow', () => {
     name: 'Blessed Strikes',
   };
 
-  it('damage-type-choice rolls the chosen type, latches usedKey, and clears the popup', async () => {
+  it('choice rolls the bonus once, latches usedKey with the component campaignName, clears the popup; live skip only clears', async () => {
     const mockSetPopupHtml = vi.fn();
     const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
-    const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
 
     dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
 
     await waitFor(() => {
-      expect(mockRollDamage).toHaveBeenCalledWith({
-        name: 'Blessed Strikes', formula: '1d6', total: 3, rolls: [3], modifier: 0,
-        context: expect.objectContaining({ damageType: 'Radiant', targetName: 'Goblin', attackerName: 'TestCharacter' }),
-      });
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'test_key', 1, undefined);
       expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
     });
-  });
+    expect(mockRollDamage).toHaveBeenCalledTimes(1);
+    expect(mockRollDamage).toHaveBeenCalledWith({
+      name: 'Blessed Strikes', formula: '1d6', total: 3, rolls: [3], modifier: 0,
+      context: expect.objectContaining({ damageType: 'Radiant', targetName: 'Goblin', attackerName: 'TestCharacter' }),
+    });
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'test_key', 1, CAMPAIGN);
 
-  it('damage-type-skip clears the popup without rolling', async () => {
-    const mockSetPopupHtml = vi.fn();
-    const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
-    const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-
+    // Skip while a popup is still armed: dismisses without rolling or latching.
+    // (No-active-popup and post-unmount silences are ledger-pinned at the hook
+    // seam in useCharActionsEventListeners.cleanup.test.jsx.)
     dispatchCustomEvent('damage-type-skip');
 
     await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
+      expect(mockSetPopupHtml).toHaveBeenCalledTimes(2);
     });
-    expect(mockRollDamage).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('ignores damage-type-choice when no damage_type_choice popup is active', async () => {
-    const mockSetPopupHtml = vi.fn();
-    const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml);
-
-    dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
-    dispatchCustomEvent('damage-type-skip');
-    await flush();
-
-    expect(mockRollDamage).not.toHaveBeenCalled();
-    expect(mockSetPopupHtml).not.toHaveBeenCalled();
-  });
-
-  // Leak pin (run2 #5, test-maintain-bugs.md:82): pre-fix the choice/skip
-  // listeners were registered without effect cleanup, so after unmount a stale
-  // closure survived on window and a click re-rolled the dead popup's bonus
-  // damage. Cleanup now tears both listeners down at unmount.
-  it('stops responding to damage-type-choice/skip after unmount (no stale-closure re-roll)', async () => {
-    const mockSetPopupHtml = vi.fn();
-    const { rollDamage: mockRollDamage, unmount } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
-    const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-
-    unmount();
-
-    dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
-    dispatchCustomEvent('damage-type-skip');
-    await flush();
-
-    expect(mockRollDamage).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(mockSetPopupHtml).not.toHaveBeenCalled();
+    expect(mockSetPopupHtml).toHaveBeenNthCalledWith(2, null);
+    expect(mockRollDamage).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('CharActions moonlight-step-restore bus event — CLA-230', () => {
-  // Flat info shape as produced by automationInfoBuilder/resource.js and collected
-  // into playerStats.automation.actions.
-  const poolAction = {
-    type: 'resource_pool',
-    name: 'Moonlight Step',
-    description: 'Teleport 60 feet.',
-    resource: 'moonlightStepUses',
-    uses_expression: 'WIS modifier',
-    conversion: 'spell_slot_to_moonlight_step',
-    conversionRate: 'level_2_plus',
-  };
-
   it('dispatches the resource_pool conversion automation when the bus event fires', async () => {
-    const { executeHandler } = await import('../../services/automation/index.js');
-
     const stats = createStats({ automation: { actions: [poolAction], passives: [] } });
     await renderWithWrapper(<CharActions playerStats={stats} />, makeWrapper(vi.fn()));
 
     dispatchCustomEvent('moonlight-step-restore');
 
     await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Moonlight Step', automation: poolAction }),
-        stats, undefined, undefined, undefined
-      );
+      expect(executeHandler).toHaveBeenCalledTimes(1);
     });
+    const [action, statsArg] = executeHandler.mock.calls[0];
+    expect(action).toEqual(expect.objectContaining({ name: 'Moonlight Step', automation: poolAction }));
+    expect(statsArg).toEqual(stats);
   });
 
   it('is a no-op when the character has no spell_slot_to_moonlight_step automation', async () => {
-    const { executeHandler } = await import('../../services/automation/index.js');
-
     const stats = createStats({ automation: { actions: [], passives: [] } });
     await renderWithWrapper(<CharActions playerStats={stats} />, makeWrapper(vi.fn()));
 
@@ -464,10 +454,11 @@ describe('CharActions moonlight-step-restore bus event — CLA-230', () => {
 });
 
 describe('CharActions event listener cleanup on unmount', () => {
-  it('stops responding to bus events after unmount', async () => {
+  it('stops responding to bus events (hook + inline CLA-230) after unmount', async () => {
     const mockSetPopupHtml = vi.fn();
+    const stats = createStats({ automation: { actions: [poolAction], passives: [] } });
     const { unmount } = await renderWithWrapper(
-      <CharActions playerStats={createStats()} />, makeWrapper(mockSetPopupHtml)
+      <CharActions playerStats={stats} />, makeWrapper(mockSetPopupHtml)
     );
     expect(screen.getByText('Actions')).toBeInTheDocument();
 
@@ -476,9 +467,11 @@ describe('CharActions event listener cleanup on unmount', () => {
     dispatchCustomEvent('healing-popup', { targetName: 'Ally1', healingName: 'Healing Word', rollInfo: '7+3', popupText: 'stale' });
     dispatchCustomEvent('damage-popup', { targetName: 'Goblin', spellName: 'Fire Bolt', popupText: 'stale' });
     dispatchCustomEvent('rally-choice-modal-show', { rallyAmount: 5 });
+    dispatchCustomEvent('moonlight-step-restore');
     await flush();
 
     expect(mockSetPopupHtml).not.toHaveBeenCalled();
     expect(_syncedStore.get('modalState')).toBeUndefined();
+    expect(executeHandler).not.toHaveBeenCalled();
   });
 });

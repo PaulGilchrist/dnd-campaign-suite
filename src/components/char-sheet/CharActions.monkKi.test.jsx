@@ -1,17 +1,19 @@
-// @maintained-by-ai 2026-10-16
-// CharActions integration: monk Focus Point lane verified end-to-end by clicking the
-// rendered feature rows on the sheet. The skip/spend/refuse decision matrix itself is
-// unit-tested at the hook level (useCharActionsAutomation.test.js and
-// useCharActionsAutomation.test.early-returns.js); this file pins only what only the
-// component can prove: a real row click wires playerStats.specialActions, the
-// cloak_of_shadows activeBuff, and the runtime store focusPoints write together.
-//
-// CLA-159 (as amended by the HoH pre-spend-at-full-HP improve): standalone
-// 'Hand of Healing' STILL charges 1 FP — at COMMIT inside healingHandler (sole FP
-// writer); the row-click seam only gates pool exhaustion. The FP-free HoH
-// exemption is only for HoH used AS PART of Flurry (bonusAttacksHandler lane,
-// CLA-144/CLA-158). CLA-166: the row-click skip list is flurry rows only
-// ('Flurry of Blows', 'Heightened Flurry of Blows').
+// @maintained-by-ai 2026-11-27
+// CharActions monk Focus Point lane — component wiring only. The full
+// skip/spend/refuse decision matrix is byte-pinned at the hook seam
+// (useCharActionsAutomation.test.js 'Focus Point cost lane' +
+// .test.early-returns.js). What ONLY the real mount can prove lives here:
+// (1) a row click reaches the store with the component's OWN name/campaign
+//     ('TestCharacter'/'test-campaign' — the hook seam uses TestFighter/'test-map');
+// (2) playerStats.specialActions and the activeBuffs runtime read actually
+//     thread into the hook (exempt Flurry spends nothing yet dispatches);
+// (3) CLA-159 as amended by the HoH pre-spend-at-full-HP improve: standalone
+//     'Hand of Healing' never pre-spends at row click (healingHandler
+//     .performMonkHeal is the sole FP writer; the seam keeps only the
+//     exhausted-pool gate);
+// (4) an exhausted pool blocks the click end-to-end (popup + zero dispatch).
+// The exemption skip list is flurry rows ONLY (CLA-166); the FP-free HoH
+// exemption applies only to HoH inside Flurry (bonusAttacksHandler lane).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -26,12 +28,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => { _syncedStore.set(key, newValue); });
-    return [value, setter];
-  }),
   useRuntimeValue: vi.fn((_, key, _campaignName) => {
     const hasValue = _syncedStore.has(key);
     return hasValue ? _syncedStore.get(key) : null;
@@ -88,10 +84,6 @@ vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
   useSpellUpcastFlow: vi.fn(() => ({ buildUpcastLevels: vi.fn(() => []) })),
 }));
 
-vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => ({
-  isExhausted: vi.fn(() => false),
-}));
-
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn(() => ({ saveDcBonus: 0 })),
 }));
@@ -99,6 +91,7 @@ vi.mock('../../services/combat/buffs/buffService.js', () => ({
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
+  getAttackerTargetName: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({
@@ -208,7 +201,10 @@ async function clickActionRow(actionName) {
   await act(async () => { fireEvent.click(screen.getByText(`${actionName}:`)); });
 }
 
-describe('CharActions monk focus point lane (row-click integration)', () => {
+// focusPoints writes only (other runtime lanes may legitimately write).
+const focusWrites = () => setRuntimeValue.mock.calls.filter(([, key]) => key === 'focusPoints');
+
+describe('CharActions monk focus point lane (row-click component wiring)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -218,41 +214,59 @@ describe('CharActions monk focus point lane (row-click integration)', () => {
     executeHandler.mockResolvedValue({ type: 'popup', payload: 'Action executed' });
   });
 
-  // CLA-166 skip list vs CLA-159 charge: FP-free exemptions apply to flurry rows
-  // ONLY. HoH pre-spend-at-full-HP improve moved the standalone Hand of Healing
-  // spend to the COMMIT lane (healingHandler.performMonkHeal — sole FP writer, so
-  // a full-HP target can be refused with zero spend): the row-click seam still
-  // GATES pool exhaustion but no longer writes focusPoints itself. Exempted and
-  // non-exempted HoH clicks both just dispatch now.
-  it.each([
-    { actionName: 'Flurry of Blows', exemption: 'Flurry of Healing and Harm', expectation: 'skips the focus point spend', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: false },
-    { actionName: 'Flurry of Blows', exemption: 'Cloak of Shadows', expectation: 'skips the focus point spend', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: false },
-    { actionName: 'Hand of Healing', exemption: 'Flurry of Healing and Harm', expectation: 'never pre-spends (commit lane owns the spend)', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: false },
-    { actionName: 'Hand of Healing', exemption: 'Cloak of Shadows', expectation: 'never pre-spends (commit lane owns the spend)', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: false },
-  ])('clicking $actionName with $exemption active $expectation but always executes the action', async ({ actionName, specialActions, buffs, spendsFP }) => {
-    mountCharActions({ actionName, specialActions, buffs });
-
-    await clickActionRow(actionName);
-
-    await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalled();
-    });
-    if (spendsFP) {
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'focusPoints', 1, 'test-campaign');
-    } else {
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), 'test-campaign');
-    }
-  });
-
-  it('blocks a focus-spending row at 0 FP with a "No Focus Points remaining" popup for the 2024 ruleset', async () => {
-    const setPopupHtml = mountCharActions({ actionName: 'Flurry of Blows', rules: '2024', focusPoints: 0 });
+  it('pre-spends exactly 1 Focus Point with the sheet-owned name/campaign before dispatching a Ki row', async () => {
+    mountCharActions({ actionName: 'Flurry of Blows' });
 
     await clickActionRow('Flurry of Blows');
 
     await waitFor(() => {
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(focusWrites()).toEqual([['TestCharacter', 'focusPoints', 1, 'test-campaign']]);
+  });
+
+  // CLA-166 skip list vs CLA-159: exemptions apply to flurry rows ONLY. Proves
+  // the two exemption feeds (playerStats.specialActions / activeBuffs runtime
+  // read) survive the real mount: with 2 FP banked the click spends NOTHING and
+  // still dispatches once. (Hook seam covers FP=0 and the
+  // Heightened-Flurry/array-membership twin.)
+  it.each([
+    { exemption: 'Flurry of Healing and Harm', specialActions: ['Flurry of Healing and Harm'], buffs: [] },
+    { exemption: 'Cloak of Shadows', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }] },
+  ])('skips the spend for Flurry of Blows at FP=2 when $exemption is active, yet dispatches', async ({ specialActions, buffs }) => {
+    mountCharActions({ actionName: 'Flurry of Blows', specialActions, buffs });
+
+    await clickActionRow('Flurry of Blows');
+
+    await waitFor(() => {
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(focusWrites()).toHaveLength(0);
+  });
+
+  it('never pre-spends for standalone Hand of Healing (commit lane is the sole FP writer)', async () => {
+    // At FP=2 with NO exemption active: any spend here would have to come from
+    // this seam, so a zero-write proves the CLA-159 retire, not a skip-list hit.
+    mountCharActions({ actionName: 'Hand of Healing' });
+
+    await clickActionRow('Hand of Healing');
+
+    await waitFor(() => {
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(focusWrites()).toHaveLength(0);
+  });
+
+  it('blocks a focus-spending row at 0 FP with an exhausted-pool popup and zero dispatch', async () => {
+    const setPopupHtml = mountCharActions({ actionName: 'Flurry of Blows', rules: '2024', focusPoints: 0 });
+
+    await clickActionRow('Flurry of Blows');
+
+    // Ruleset wording (5e/2024) is byte-pinned at the hook seam; shape only here.
+    await waitFor(() => {
       expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Focus Points remaining'));
     });
     expect(executeHandler).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), 'test-campaign');
+    expect(focusWrites()).toHaveLength(0);
   });
 });

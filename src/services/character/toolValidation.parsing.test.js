@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 improve-and-trim: same-branch cosmetic twins collapsed (guards, prefix rejects, fall-through, type-reject, no-description, crafter 'one'-count); added whitespace-only, bare 'Choose kind of', and non-'(see' paren legs; full normalization table still pinned through parse outputs per .test.js seam.
 // toolValidation PARSING lane (#2063): pure-string regex parsing of parseToolChoiceString
 // ('Choose N ...' extraction + category-name normalization) and parseFeatToolProficiency
 // (2024 feat benefit descriptions). ZERO mocks: neither export ever fetches — the module's
@@ -10,12 +10,18 @@
 //   is owned there, not here.
 // - .services.test.js (#2064) — getToolsByCategory units (computeSkilledToolUsage lane retired with its dead export).
 // - .test.js (#2065) — normalizeCategory direct-unit lane (null/''/whitespace-only);
-//   here normalization is pinned only through parse outputs.
+//   here normalization is pinned only through parse outputs: every non-identity table hit
+//   ('Gaming Set'→'Gaming Sets', 'Musical Instruments'→'Musical Instrument') plus the
+//   unknown-category verbatim pass-through ('Gaming Tool') and the case-sensitive miss.
 // Disk honesty: fixtures are verbatim public/data/2024/{backgrounds,classes,feats}.json
 // (bg "Choose one kind of Gaming Set", Bard "Choose 3 Musical Instruments (see chapter 6)",
 // Cleric "Choose one type of Artisan's Tools or Musical Instrument", Crafter/Musician/Skilled
 // feat descs). No disk string uses digit counts or 'two/three different <non-Artisan>' forms,
 // so digit-fallback and extra count rows are clearly-labeled fabricated defensive pins.
+// Branch discipline: one row per distinct return/regex branch; same-branch cosmetic twins
+// (e.g. two startsWith rejects, null-vs-undefined guard) are collapsed. 'one <word>' counts
+// are NOT pinned for parseFeatToolProficiency: wordToNum.one===1 is indistinguishable from
+// the `|| 1` fallback, so only non-1 words and the digit-fallback table carry signal.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 
@@ -31,19 +37,17 @@ const diskFeat = (name) => diskFeats.find((f) => f.name === name);
 
 describe('toolValidation - parseToolChoiceString', () => {
   it.each([
-    // non-string / empty guards
-    [null], [123], [{}], [[]], [''],
-    // bare tool/category names are not choice strings (flow upstream to preSelected)
-    ['Gaming Sets'], ["Artisan's Tools"],
-    // case boundary: the 'Choose' prefix is strict-cased ('elf'≠'Elf' idiom) —
-    // while the interior regexes are case-insensitive (pinned as a row below)
-    ['choose one type of Gaming Sets'], ['CHOOSE 2 Gaming Sets'],
-    // odd-string class: never a 'Choose' command
-    ['may grant proficiency with these tools'],
-    // truncated or unrecognized tails
-    ['Choose'], ['Choose 1'], ['Choose something weird'],
-    // word-number without 'kind': count needs digits, 'choose one X' alone does not parse
-    ['Choose one Gaming Tools of your choice'],
+    // guard branch (`!x || typeof`): one falsy string, one undefined (missing-field face),
+    // one number, one object — '' is the required empty-string boundary
+    [undefined], [123], [{}], [''],
+    // strict-cased 'Choose' prefix branch: bare names are not choice strings (they flow
+    // upstream to preSelected); lowercase and uppercase near-misses pin the case boundary
+    ['Gaming Sets'], ['choose one type of Gaming Sets'], ['CHOOSE 2 Gaming Sets'],
+    // whitespace-only passes the guard, trim('   ')→'' then fails the prefix test
+    ['   '],
+    // final fall-through branch: 'Choose 1' pins the tail requirement after \d+,
+    // 'choose one X' pins that word-counts need digits (countMatch \d+ boundary)
+    ['Choose 1'], ['Choose one Gaming Tools of your choice'],
   ])('returns the no-choice default for %j', (input) => {
     expect(parseToolChoiceString(input)).toEqual(NO_CHOICE);
   });
@@ -55,9 +59,9 @@ describe('toolValidation - parseToolChoiceString', () => {
     ["Choose one type of Artisan's Tools or Musical Instrument", { count: 1, categories: ["Artisan's Tools", 'Musical Instrument'], isChoice: true }],
     // disk verbatim: Gaming Set background (singular normalized to the category name)
     ['Choose one kind of Gaming Set', { count: 1, categories: ['Gaming Sets'], isChoice: true }],
-    // fabricated: or-format with both halves singular
-    ['Choose one type of Gaming Set or Musical Instrument', { count: 1, categories: ['Gaming Sets', 'Musical Instrument'], isChoice: true }],
-    // fabricated: 'of your choice' suffix stripped; multi-digit N
+    // kindMatch's optional 'one' group: the bare 'Choose kind of X' alternative
+    ['Choose kind of Gaming Sets', { count: 1, categories: ['Gaming Sets'], isChoice: true }],
+    // fabricated: 'of your choice' suffix stripped; multi-digit N pins parseInt
     ["Choose 2 Artisan's Tools of your choice", { count: 2, categories: ["Artisan's Tools"], isChoice: true }],
     ['Choose 12 Gaming Sets', { count: 12, categories: ['Gaming Sets'], isChoice: true }],
     // interior case-insensitivity (prefix stays strict, see default table above)
@@ -75,6 +79,9 @@ describe('toolValidation - parseToolChoiceString', () => {
     // QUIRK (probed): interior whitespace is not collapsed, so the
     // normalization table misses and the raw run of spaces survives
     ['Choose  3   Gaming   Sets', { count: 3, categories: ['Gaming   Sets'], isChoice: true }],
+    // QUIRK (probed): the suffix strip only recognizes '(see …)' — any other
+    // parenthetical fails the strip and survives verbatim inside the category
+    ['Choose 2 Gaming Sets (handout)', { count: 2, categories: ['Gaming Sets (handout)'], isChoice: true }],
   ])('pins documented parsing quirks for %j', (input, expected) => {
     expect(parseToolChoiceString(input)).toEqual(expected);
   });
@@ -82,19 +89,19 @@ describe('toolValidation - parseToolChoiceString', () => {
 
 describe('toolValidation - parseFeatToolProficiency', () => {
   it.each([
-    // feat / benefits guards
-    [null], [undefined], [{}], [{ benefits: [] }],
-    // non-proficiency benefit types never qualify, even with a tool-perfect description
-    [{ benefits: [{ type: 'ability_score_increase', description: '+1 STR' }] }],
+    // guards: falsy feat (undefined) vs truthy-feat-missing-benefits ({});
+    // { benefits: [] } passes both guards and dies at the find (next branch)
+    [undefined], [{}], [{ benefits: [] }],
+    // type filter: even a keyword-perfect description fails without type 'proficiency'
     [{ benefits: [{ type: 'utility', description: 'You gain proficiency with three Musical Instruments of your choice' }] }],
-    // proficiency benefit missing/empty description
+    // proficiency benefit with no description
     [{ benefits: [{ type: 'proficiency' }] }],
-    [{ benefits: [{ type: 'proficiency', description: '' }] }],
     // keyword filter: proficiency text without tool/instrument
     [{ benefits: [{ type: 'proficiency', description: 'You gain proficiency in a skill' }] }],
-    // keyword passes but no numeric-quantifier pattern can extract
+    // keyword passes but no numeric-quantifier pattern can extract:
+    // 'these tools' lacks both a count word and 'of your choice'
     [{ benefits: [{ type: 'proficiency', description: 'You are proficient with these tools' }] }],
-    [{ benefits: [{ type: 'proficiency', description: "Proficient with woodcarver's tools" }] }],
+    // 'of your choice' present but no numWords count before the category
     [{ benefits: [{ type: 'proficiency', description: 'You gain proficiency with a set of tool of your choice' }] }],
   ])('returns null for %j', (feat) => {
     expect(parseFeatToolProficiency(feat)).toBeNull();
@@ -115,15 +122,14 @@ describe('toolValidation - parseFeatToolProficiency', () => {
   });
 
   it.each([
-    // fabricated count variations on the three extraction branches
-    ["You gain proficiency with one different Artisan's Tools of your choice", { count: 1, categories: ["Artisan's Tools"], isAny: false }],
+    // fabricated non-disk counts, one per extraction branch (Crafter/Skilled/generic;
+    // the generic row also pins the optional 'different' leg of that regex)
     ["You gain proficiency with two different Artisan's Tools of your choice", { count: 2, categories: ["Artisan's Tools"], isAny: false }],
     ['You gain proficiency in any combination of two skills or tools of your choice', { count: 2, categories: [], isAny: true }],
     ['You gain proficiency with two different Musical Instruments of your choice', { count: 2, categories: ['Musical Instrument'], isAny: false }],
     // QUIRK (probed): generic categories pass through normalizeCategory —
-    // 'Gaming Tool'/'Gaming Tools' are not in the table and survive verbatim
+    // 'Gaming Tool' is not in the table and survives verbatim
     ['You gain proficiency with one Gaming Tool of your choice', { count: 1, categories: ['Gaming Tool'], isAny: false }],
-    ['You gain proficiency with three Gaming Tools of your choice', { count: 3, categories: ['Gaming Tools'], isAny: false }],
     // QUIRK (probed): keyword match is case-insensitive but the normalization
     // table is case-sensitive — a lowercase description yields an unnormalized category
     ['you gain proficiency with two musical instruments of your choice', { count: 2, categories: ['musical instruments'], isAny: false }],

@@ -1,10 +1,19 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// CharBonusActions rendering lane: bonus-action section visibility, attack /
+// feature / spell row display (level, range, to-hit, save DC, exhaustion,
+// badges, Mastery column), and the absent-numeric ?? 0 collapse (NaN class).
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
+// Full shape of the mocked useSpellMetamagicFlow return — every key the
+// component destructures at CharBonusActions.jsx:884 (22 keys; the old
+// 10-key inline mock arrived 15 undefined silently and pinned three
+// keys the flow no longer even returns — run2#1826 class).
+// resetAllMocks in beforeEach restores this default implementation, so
+// per-test mockReturnValue overrides never leak.
+const { flowShape } = vi.hoisted(() => ({
+  flowShape: () => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
@@ -12,10 +21,26 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null,
-    handleGreaterRestorationConfirm: vi.fn(),
-    handleGreaterRestorationSkip: vi.fn(),
-  })),
+    pendingBarkskin: null,
+    handleBarkskinConfirm: vi.fn(),
+    handleBarkskinSkip: vi.fn(),
+    pendingHealingWord: null,
+    handleHealingWordConfirm: vi.fn(),
+    handleHealingWordSkip: vi.fn(),
+    pendingSanctuary: null,
+    handleSanctuaryConfirm: vi.fn(),
+    handleSanctuarySkip: vi.fn(),
+    pendingHex: null,
+    handleHexConfirm: vi.fn(),
+    handleHexSkip: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+  }),
+}));
+
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => flowShape()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -54,19 +79,12 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../hooks/combat/useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 10),
-  getMaxSorceryPoints: vi.fn(() => 10),
-  spendSorceryPoints: vi.fn(),
-}));
-
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
@@ -105,14 +123,14 @@ vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
 }));
 
 vi.mock('./popups/MetamagicPopup.jsx', () => ({
-  default: vi.fn((_props) => <div data-testid="metamagic-popup">{_props.spell?.name || 'MetamagicPopup'}</div>),
+  default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
 }));
 
 vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-  default: vi.fn((_props) => <div data-testid="spell-detail-popup">SpellDetailPopup</div>),
+  default: vi.fn(() => <div data-testid="spell-detail-popup">SpellDetailPopup</div>),
 }));
 
-vi.mock('./HexAbilityModal.jsx', () => ({
+vi.mock('./modals/HexAbilityModal.jsx', () => ({
   default: vi.fn((props) => <div data-testid="hex-ability-modal"><button onClick={props.onCancel}>Cancel</button></div>),
 }));
 
@@ -132,6 +150,7 @@ vi.mock('../../services/rules/core/spellDamageUtils.js', () => ({
 
 vi.mock('../../services/ui/spellSectionUtils.js', () => ({
   getBonusActionSpellNames: vi.fn(() => new Set()),
+  applyPotentSpellcasting: vi.fn((damage) => damage),
 }));
 
 vi.mock('../../services/character/featureCategories.js', () => ({
@@ -184,7 +203,6 @@ function createStats(overrides = {}) {
 describe('CharBonusActions - Rendering', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    localStorage.clear();
   });
 
   describe('section visibility', () => {
@@ -236,7 +254,7 @@ describe('CharBonusActions - Rendering', () => {
       type: 'Bonus Action',
     };
 
-    it('displays name, level, range, hit bonus, damage, and damage type', () => {
+    it('displays name, range, hit bonus, damage, and damage type', () => {
       render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} exhaustionPenalty={0} />);
       expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText('5 ft.')).toBeInTheDocument();
@@ -252,15 +270,24 @@ describe('CharBonusActions - Rendering', () => {
     });
 
     it.each([
-      { saveDcBonus: 0, expected: 'DC 14 CON' },
-      { saveDcBonus: 1, expected: 'DC 15 CON' },
-    ])('save DC attacks show $expected in the hit column with sorcery bonus $saveDcBonus', ({ saveDcBonus, expected }) => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus });
+      {
+        label: 'with sorcery bonus 1',
+        arm: () => vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 1 }),
+        expected: 'DC 15 CON',
+      },
+      {
+        label: 'with saveDcBonus absent (?? 0 collapse)',
+        arm: () => vi.mocked(getInnateSorceryBonus).mockReturnValue({}),
+        expected: 'DC 14 CON',
+      },
+    ])('save DC attacks show $expected $label without a to-hit bonus', ({ arm, expected }) => {
+      arm();
       const saveDcAttack = { name: 'Cone of Cold', range: 60, saveDc: 14, saveType: 'CON', damage: '8d8', damageType: 'Cold', type: 'Bonus Action' };
       render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} exhaustionPenalty={0} />);
       expect(screen.getByText(expected)).toBeInTheDocument();
       // A save DC row never shows a to-hit bonus.
       expect(screen.queryByText('+5')).not.toBeInTheDocument();
+      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
     });
 
     it.each([
@@ -327,7 +354,7 @@ describe('CharBonusActions - Rendering', () => {
         playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack], automation: { passives } })}
         getWeaponMastery={() => null}
       />);
-      expect((!!screen.queryByText('Mastery'))).toBe(label === 'with');
+      expect(!!screen.queryByText('Mastery')).toBe(label === 'with');
     });
   });
 
@@ -364,18 +391,10 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
     });
 
-    it('save DC attack cell renders DC 14 CON when saveDcBonus is absent', () => {
-      // getInnateSorceryBonus always returns numeric 0|1 in production
-      // (buffService.js:16); the ?? 0 guard pins absent-equals-zero symmetry
-      // with the saveDcBonus: 0 arm above.
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({});
-      const saveDcAttack = { name: 'Cone of Cold', range: 60, saveDc: 14, saveType: 'CON', damage: '8d8', damageType: 'Cold', type: 'Bonus Action' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
-      expect(screen.getByText('DC 14 CON')).toBeInTheDocument();
-      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
-    });
-
     it('bonus spell DC cell renders without NaN when spellAbilities.saveDc and saveDcBonus are absent', () => {
+      // Absent spellAbilities.saveDc collapses to 0 via the same ?? 0 guard
+      // (the save-DC attack row's absent-saveDcBonus arm is pinned in the
+      // save DC it.each above).
       vi.mocked(getInnateSorceryBonus).mockReturnValue({});
       const spell = { name: 'Hex', level: 1, range: '90 ft.', casting_time: '1 bonus action', dc: { dc_type: 'CON' } };
       vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set([spell.name]));

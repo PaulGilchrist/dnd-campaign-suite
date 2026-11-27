@@ -1,10 +1,15 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 sweep: merged 3 mismatch-buff rows into one exact-pair row; dead-fixture legs (Druid/Monk buffs off-grid) made live; dropped same-branch restatements (solo-attacker row, skipRangeCheck attacker/self sub-legs, gridless off-roster/NPC-only/no-buff/self-target/edited-flip rows); merged betrayal pair; null-combat-summary + missing-creatures consolidated.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
 }));
 
+// Unlike corona, this module never touches coordinates or distance math: the
+// name-based isWithinRange(bearer, target, 5) is its ONLY comparator, so a
+// full mock is honest here (edge math is pinned in rangeCheck.test.js, the
+// auraOfProtection precedent). Ally primitives run REAL through the runtime
+// mock's 'selectedAllies' reads.
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(async () => false),
 }));
@@ -34,7 +39,10 @@ import { getCombatContext } from '../../rules/combat/damageUtils.js';
 // rather than fabricating a refusal (house law §44). skipRangeCheck keeps the gridless
 // convention (enemy gate applies, distance unmeasured); every gridless production caller
 // (resolveWolfAura in contextBuilder-sync.js, plus the map lane's unplaced-target branch)
-// passes it. Pattern-siblings: lionAuraUtils.test.js / duplicityAuraUtils.test.js.
+// passes it. The bearer-side attacker gate mirrors auraOfProtection's Phase 3.2 betrayal
+// gate (an EDITED bearer only supports creatures on its list). Caller wiring is pinned in
+// contextBuilder-sync.wolf-aura.test.js / contextBuilder-map.test.js. Pattern-siblings:
+// lionAuraUtils.test.js / auraOfProtection.test.js / coronaAuraUtils.test.js.
 const CAMPAIGN = 'test-campaign';
 
 const grid = (...names) => ({ players: names.map(name => ({ name, gridX: 0, gridY: 0 })) });
@@ -102,12 +110,9 @@ describe('getWolfAdvantageAgainst — grid lane (bearer↔target axis)', () => {
   });
 
   it.each([
-    ['attacker is the only Wolf holder', { buffs: { Attacker: [wolf()] } }, vs()],
-    ['Rage of the Wilds without the Wolf optionName', { buffs: { Barbarian: [{ name: 'Rage of the Wilds' }] } }, vs()],
-    ['Wolf optionName without the Rage of the Wilds name', { buffs: { Barbarian: [{ optionName: 'Wolf' }] } }, vs()],
-    ['near-miss names (Bear sibling, similarly named buffs)', { buffs: { Barbarian: [bear()], Druid: [{ name: 'Wrath of the Wilds', optionName: 'Wolf' }] } }, vs()],
-    ['non-array buff values survive iteration (list guard, not member guard)', { buffs: { Barbarian: 'not-an-array', Druid: null, Monk: 42 } }, vs()],
-    ['solo attacker grid', {}, vs({ mapData: grid('Attacker') })],
+    ['attacker is the only Wolf holder (the self-skip also covers the skipRangeCheck lane)', { buffs: { Attacker: [wolf()] } }, vs()],
+    ['no buff matches the exact name+optionName pair: right name/no option, option under no name, Bear sibling, look-alike name', { buffs: { Barbarian: [{ name: 'Rage of the Wilds' }, { optionName: 'Wolf' }, bear(), { name: 'Wrath of the Wilds', optionName: 'Wolf' }] } }, vs()],
+    ['non-array, null and numeric buff values skip the candidate (every seeded holder is a live candidate)', { buffs: { Barbarian: 'not-an-array', Druid: null, Monk: 42 } }, vs({ mapData: grid('Attacker', 'Barbarian', 'Druid', 'Monk') })],
     ['mapData without players never falls back to the combat context', {}, vs({ mapData: { placedItems: [] } })],
     ['legacy split: a party PC token as target is an ally, never an enemy (measured before range)', { buffs: { Barbarian: [wolf()] }, inRange: true }, vs({ targetName: 'OtherPc', mapData: grid('Attacker', 'Barbarian', 'OtherPc') })],
     ['edited ally list naming the target keeps it a friendly', { buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian', 'Attacker', 'Target'] }, inRange: true }, vs()],
@@ -135,20 +140,15 @@ describe('getWolfAdvantageAgainst — grid lane (bearer↔target axis)', () => {
     expect(isWithinRange).toHaveBeenCalledTimes(2); // Stale measured-and-failed, First measured-and-won; Second never reached
   });
 
-  it('skipRangeCheck grants an enemy target from the first matching holder without measuring range', async () => {
+  it('skipRangeCheck grants an enemy target from the first matching holder without measuring', async () => {
+    // The self/enemy/attacker gates run BEFORE the skip branch (pinned above),
+    // and the gridless lane's refusals below run under skipRangeCheck — proof
+    // the skip never bypasses the target-enemy gate.
     seed({ buffs: { Barbarian: [wolf()], Druid: [wolf()] }, inRange: false });
 
     expect(await getWolfAdvantageAgainst(vs({ mapData: grid('Attacker', 'Barbarian', 'Druid'), skipRangeCheck: true })))
       .toEqual({ advantage: true, source: 'Barbarian' });
     expect(isWithinRange).not.toHaveBeenCalled();
-
-    // the attacker is still skipped even unmeasured
-    expect(await getWolfAdvantageAgainst(vs({ mapData: grid('Attacker'), targetName: 'Target', skipRangeCheck: true })))
-      .toEqual({ advantage: false });
-
-    // …and skipRangeCheck does NOT bypass the target-enemy gate
-    expect(await getWolfAdvantageAgainst(vs({ targetName: 'Barbarian', skipRangeCheck: true })))
-      .toEqual({ advantage: false }); // self-target
   });
 
   it('a null targetName stays lenient: grants without the target gate or any range measurement (house law §44)', async () => {
@@ -159,13 +159,13 @@ describe('getWolfAdvantageAgainst — grid lane (bearer↔target axis)', () => {
     // a target, but leniency must never fabricate a refusal)
     expect(await getWolfAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
       .toEqual({ advantage: true, source: 'Barbarian' });
-    // skipRangeCheck shape (phantorm/tokenless target)
+    // skipRangeCheck shape (phantom/tokenless target)
     expect(await getWolfAdvantageAgainst(vs({ targetName: null, skipRangeCheck: true })))
       .toEqual({ advantage: true, source: 'Barbarian' });
     expect(isWithinRange).not.toHaveBeenCalled();
 
     // leniency covers only the UNGATABLE target axis — the attacker-side betrayal
-    // gate still refuses a defector
+    // gate still refuses a defector (gate order: bearerSupports runs first)
     seed({ buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian'] } });
     expect(await getWolfAdvantageAgainst(vs({ targetName: null })))
       .toEqual({ advantage: false });
@@ -201,62 +201,43 @@ describe('getWolfAdvantageAgainst — gridless combat-context lane (always skipR
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('an off-roster (unknown, non-null) target is legacy-enemy and stays lenient', async () => {
-    getCombatContext.mockResolvedValue({ creatures: party });
+  it('refuses when the combat summary is unusable (null or without creatures) even with a Wolf holder seeded', async () => {
     seed({ buffs: { DraconicDragon: [wolf()] } });
 
-    expect(await getWolfAdvantageAgainst(sync({ targetName: 'OffRosterPhantom' })))
-      .toEqual({ advantage: true, source: 'DraconicDragon' });
-  });
-
-  it.each([
-    ['no combat context available', null, { 'Thug 1': [wolf()], DraconicDragon: [wolf()] }, sync()],
-    ['summary without creatures', {}, { 'Thug 1': [wolf()], DraconicDragon: [wolf()] }, sync()],
-    ['Wolf held only by an NPC', { creatures: party }, { 'Thug 1': [wolf()] }, sync()],
-    ['party holds no Wolf buff', { creatures: party }, {}, sync()],
-    ['legacy split: the target is a party PC (ally)', { creatures: party }, { DraconicDragon: [wolf()] }, sync({ targetName: 'OtherPc' })],
-    ['the bearer is the target (never its own enemy)', { creatures: party }, { DraconicDragon: [wolf()] }, sync({ targetName: 'DraconicDragon' })],
-  ])('%s → no advantage', async (_label, summary, buffs, call) => {
-    getCombatContext.mockResolvedValue(summary);
-    seed({ buffs });
-
-    expect(await getWolfAdvantageAgainst(call))
+    // default mock resolves null
+    expect(await getWolfAdvantageAgainst(sync()))
+      .toEqual({ advantage: false });
+    getCombatContext.mockResolvedValue({});
+    expect(await getWolfAdvantageAgainst(sync()))
       .toEqual({ advantage: false });
     expect(isWithinRange).not.toHaveBeenCalled();
   });
+
+  it('legacy split on the context lane: the cs player-filter ally set refuses a party-PC target under skipRangeCheck', async () => {
+    // Off-roster/non-player targets are the enemy arm pinned by the grant test
+    // above (Thug 1 is off partyNames); only membership in the gridless-built
+    // ally set is a distinct leg here.
+    getCombatContext.mockResolvedValue({ creatures: party });
+    seed({ buffs: { DraconicDragon: [wolf()] } });
+
+    expect(await getWolfAdvantageAgainst(sync({ targetName: 'OtherPc' })))
+      .toEqual({ advantage: false });
+  });
 });
 
-// Phase 3.2 betrayal validation (arena-starter §4) on BOTH axes: an EDITED ally
-// list on the bearer flips the pack benefit — self-only defection drops former
-// allies (attacker gate), a list omitting the target makes it an enemy (grant),
-// a list naming the target keeps it friendly (refuse). Unedited bearers stay
-// legacy party-by-type.
-describe('getWolfAdvantageAgainst — betrayal ally-list flip (attacker + target gates)', () => {
+// Phase 3.2 betrayal validation on the ATTACKER axis (the target-axis arms of the
+// same hasExplicitAllyList/getAllyList flip are pinned in the grid table above:
+// off-list grant + on-list refuse; the gridless lane shares that one code path).
+describe('getWolfAdvantageAgainst — bearer-side betrayal gate (attacker axis)', () => {
   beforeEach(resetMocks);
 
-  it('a defector bearer (self-only edited list) no longer grants the attacker advantage', async () => {
+  it('an edited list that drops the attacker refuses; one still naming the attacker keeps the pack benefit (target off-list = enemy)', async () => {
     seed({ buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian'] } });
     expect(await getWolfAdvantageAgainst(vs()))
       .toEqual({ advantage: false });
-  });
 
-  it('an edited list that still names the attacker keeps the pack benefit (target off-list = enemy)', async () => {
     seed({ buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian', 'Attacker'] } });
     expect(await getWolfAdvantageAgainst(vs()))
       .toEqual({ advantage: true, source: 'Barbarian' });
-  });
-
-  it('gridless: an edited bearer treats a target ON its list as friendly', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [{ name: 'DraconicDragon', type: 'player' }, { name: 'HexWarlock', type: 'player' }, { name: 'Thug 1', type: 'npc' }] });
-    seed({ buffs: { DraconicDragon: [wolf()] }, allies: { DraconicDragon: ['DraconicDragon', 'HexWarlock', 'Thug 1'] } });
-    expect(await getWolfAdvantageAgainst({ attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: CAMPAIGN, skipRangeCheck: true }))
-      .toEqual({ advantage: false });
-  });
-
-  it('gridless: an edited bearer treats a target OFF its list as enemy', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [{ name: 'DraconicDragon', type: 'player' }, { name: 'HexWarlock', type: 'player' }, { name: 'Thug 1', type: 'npc' }] });
-    seed({ buffs: { DraconicDragon: [wolf()] }, allies: { DraconicDragon: ['DraconicDragon', 'HexWarlock'] } });
-    expect(await getWolfAdvantageAgainst({ attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: CAMPAIGN, skipRangeCheck: true }))
-      .toEqual({ advantage: true, source: 'DraconicDragon' });
   });
 });

@@ -1,17 +1,23 @@
-// @maintained-by-ai 2026-10-16
-// ── regenerate QUARTET lane #1949 .test — handle() orchestration (closes family) ──
-// Seam map: regenerateHandler.active.test.js header (#1946). Lanes:
-//   #1946 .active — load guard; isRegenerateActive predicate DEAD, export flagged
-//                 for removal there.
+// @maintained-by-ai 2026-11-27
+// ── regenerate QUARTET lane #1949 .test — handle() orchestration + registration ──
+// Shared seam map lives in regenerateHandler.active.test.js header (#1946, audit
+// lane, RE-VERIFIED 2026-11-27). Lanes:
+//   #1946 .active — load guard + dead-export census; isRegenerateActive (source
+//                 L192-195) is a DEAD export, unpinned by tally precedent #1916
+//                 (delete recommended there; NOTHING here pins it either).
 //   #1947 .apply  — applyRegenerateEffect application incl. the exact one-write
-//                 regenerateActive pin (subject's only flag-write forward contract).
-//   #1948 .sp096 — fix locks: PC maxHp runtime truth, HP clamp, rolled notation.
-//   #1949 .test  (this) — handle() ONLY: cast gate, combat-context popup fallback,
-//                 regenerate_target_selection popup composition, purity guard.
+//                 regenerateActive flag census (subject's only flag-WRITE pin).
+//   #1948 .sp096  — fix locks: PC maxHp runtime truth, HP clamp, rolled notation.
+//   #1949 .test   (this) — handle() ONLY: cast gate, combat-context popup fallback,
+//                 regenerate_target_selection popup composition, purity guard,
+//                 plus the HANDLER_MAP registration wiring pin (unclaimed by the
+//                 generic mechanics lane #1997, which pins dispatcher mechanics,
+//                 never feature-specific routes — feature-lane precedent: psychic
+//                 #1996 / implosion #1998 / web #1999).
 // NOT here (do not re-add): application internals (#1947), fix-clause pins (#1948),
 // predicate pins (#1946 retired), turn-seam 1 HP ticks (turnStartEffects.js lanes —
-// applyTurnStartEffects.test.js L250-272 cited, cite-refreshed fix#336S/#1283). handle() never reads/writes the
-// regenerateActive flag; per #1946 handoff, no predicate or turn-tick pins here.
+// expirations_additional / applyTurnStartEffects homes, cite by NAME per run2
+// line-drift note). handle() never reads/writes the regenerateActive flag.
 //
 // Contract note: the trim queue brief listed "CON save prompt / save-outcome
 // dispatch / ability_use+save_result logs" lanes — they DO NOT exist in this
@@ -19,35 +25,36 @@
 // a pure popup composer (source L16-47): zero runtime writes, zero log entries,
 // zero rolls. The caster prompt IS the target-selection popup; application happens
 // on confirm through #1947's apply lane. Purity is pinned below, not fabricated.
+// Fire/cold damage-pause: BESTIARY TRAIT PROSE only; spell RAW has no such clause,
+// handler implements none — nothing to pin (per #1946 duration-policy PASS).
 //
-// Liveness audit (re-verified 2026-10-16, grep incl. string/dynamic dispatch):
-//   Registered surface: index.js import L14, HANDLER_MAP 'regenerate' L614.
-//   executeHandler (L702) resolves HANDLER_MAP[automation.type] ONLY (resolveHandler
-//   L675 — no name/index fallback; the spell row's "index":"regenerate" is NOT a
-//   dispatch key). Today NO live producer feeds automation.type==='regenerate':
-//   · 5e+2024 Regenerate spell rows carry type 'healing_start_of_turn' — no
-//     HANDLER_MAP key → executeHandler returns null. No 'regenerate' type in any
-//     public/data or public/campaigns JSON.
-//   · Live cast lane: spellGates.js gateRegenerate L639 → cfSetPending('regenerate')
-//     → useSimpleSpellHandlers runRegenerate L124 → regenerateService
-//     confirmRegenerate L25 → applyRegenerateEffect DIRECT — bypasses handle().
-//   · spellCastService/execution: triggerSpells.handleRegenerate L59 +
-//     helpers.applyRegenerateSpell L447 — parallel cast lane with its own impl
-//     (#1946 header's remove_regenerate_buff legacy-recipe flag stands).
+// Liveness audit (RE-VERIFIED 2026-11-27 against current bytes, grep incl. string
+// dispatch; previous pass carried line drift — names below are the contract):
+//   Registered surface: index.js import L14, HANDLER_MAP 'regenerate' L614
+//   (executeHandler → resolveHandler L675-699, table fallthrough L699 ONLY — the
+//   spell row's "index":"regenerate" is NOT a dispatch key). NO live producer
+//   feeds automation.type==='regenerate':
+//   · 5e+2024 Regenerate spell rows carry automation.type 'healing_start_of_turn'
+//     — no HANDLER_MAP key → executeHandler returns null. Pinned below as the
+//     DORMANT-LANE DATA PIN so silent re-arming of this route fails loudly.
+//   · Live modal cast lane: spellGates.js gateRegenerate L639 → cfSetPending
+//     ('regenerate') → useSimpleSpellHandlers runRegenerate L140 → regenerateService
+//     confirmRegenerate L21 → applyRegenerateEffect DIRECT — bypasses handle().
+//   · Live service cast lane: triggerSpells.js 'regenerate' shield L64 →
+//     handleRegenerate L67 → helpers.applyRegenerateSpell L511 — parallel impl,
+//     never enters handle() (grep-verified: no executeHandler call in that path).
 //   · The former ONLY dispatch edge into handle() — regenerateService.triggerRegenerate
-//     → executeHandler — was EXCISED by the #1398 dead-export census batch (2026-10-23):
-//     triggerRegenerate had ZERO prod callers repo-wide, and fix#211 (#1483/#1472) wired
-//     the LIVE lane WITHOUT it (shield 'regenerate' triggerSpells.js:64 → handleRegenerate
-//     arm → helpers.applyRegenerateSpell; modal lane via confirmRegenerate — route homes,
-//     cited never edited).
-//   · Popup type 'regenerate_target_selection' has ZERO component consumers.
+//     → executeHandler — was EXCISED by the #1398 dead-export census batch (2026-10-23);
+//     fix#211 (#1483/#1472) wired the LIVE lanes WITHOUT it.
+//   · Popup type 'regenerate_target_selection' has ZERO component consumers
+//     (grep 2026-11-27: only this handler composes it).
 //   VERDICT: handle is registered-but-currently-undispatched — legacy callable
 //   surface kept as fix#211's registry shield (index.js L614, owner constraint).
 //   Owner decision still needed: retire handle + index.js L614 together, or rewire
-//   the gate lane through handle. A test lane cannot settle that; this file pins the
-//   EXACT popup contract that the registry entry still composes against, so either
-//   direction is safe and any accidental contract drift while the lane sleeps fails
-//   loudly here.
+//   a cast lane through handle. A test lane cannot settle that; this file pins the
+//   EXACT popup contract AND that the registry route still resolves to this handle,
+//   so either direction is safe and any accidental contract drift while the lane
+//   sleeps fails loudly here.
 //
 // makeAction merge shape: fix #14 pattern — spell/automation shallow-merged into
 // defaults; remaining overrides spread exactly once (no whole-spell clobber).
@@ -89,6 +96,7 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 }));
 
 import { handle } from './regenerateHandler.js';
+import { executeHandler } from '../../index.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -96,6 +104,10 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationExp
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
+import spells5e from '../../../../../public/data/spells.json';
+import spells2024 from '../../../../../public/data/2024/spells.json';
+import classes5e from '../../../../../public/data/classes.json';
+import classes2024 from '../../../../../public/data/2024/classes.json';
 
 const campaignName = 'TestCampaign';
 
@@ -130,123 +142,197 @@ function makeAction(overrides = {}) {
     };
 }
 
+// [label, action] pairs for the refusal family.
+const REFUSAL_CASES = [
+    ['non-Regenerate spell', { name: 'Cure Wounds', automation: {}, spell: { name: 'Cure Wounds', range: 'Touch', level: 1 } }],
+    ['spell.name missing', { name: 'Regenerate', spell: {} }],
+    ['case-strict: lowercase name', makeAction({ spell: { name: 'regenerate' } })],
+    ['spell key absent entirely', { name: 'Regenerate' }],
+    ['spell.name null', makeAction({ spell: { name: null } })],
+];
+
 describe('regenerateHandler.handle — #1949 orchestration lane', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('cast gate (source L19-21)', () => {
-        it('returns null for every non-matching spell shape and short-circuits BEFORE touching combat context', async () => {
-            const cases = [
-                ['non-Regenerate spell', { name: 'Cure Wounds', automation: {}, spell: { name: 'Cure Wounds', range: 'Touch', level: 1 } }],
-                ['spell.name missing', { name: 'Regenerate', spell: {} }],
-                ['case-strict: lowercase name', makeAction({ spell: { name: 'regenerate' } })],
-                ['spell key absent entirely', { name: 'Regenerate' }],
-                ['spell.name null', makeAction({ spell: { name: null } })],
-            ];
-            for (const [, action] of cases) {
-                expect(await handle(action, makePlayerStats(), campaignName, null)).toBeNull();
-            }
-            // gate must run before any context fetch (ordering kill for a
-            // mutant that hoists getCombatContext above the name check)
-            expect(getCombatContext).not.toHaveBeenCalled();
+    it('cast gate: refuses every non-matching spell shape and short-circuits BEFORE touching combat context', async () => {
+        for (const [, action] of REFUSAL_CASES) {
+            expect(await handle(action, makePlayerStats(), campaignName, null)).toBeNull();
+        }
+        // full-array zero-spend census: gate runs before any context fetch
+        // (ordering kill for a mutant that hoists getCombatContext above the check)
+        expect(getCombatContext.mock.calls).toEqual([]);
+    });
+
+    it('no combat context: pops the exact automation_info payload and fetches context exactly once', async () => {
+        getCombatContext.mockResolvedValue(null);
+
+        const result = await handle(
+            // distinct outer name pins name: action.name passthrough (not a
+            // REGEN_NAME hardcode) AND that the gate keys on spell.name, not
+            // the outer action name
+            makeAction({ name: 'Regenerate (Scroll)' }),
+            makePlayerStats(),
+            campaignName,
+            null,
+        );
+
+        expect(getCombatContext.mock.calls).toEqual([[campaignName]]);
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Regenerate (Scroll)',
+                description: 'No combat context found. Cannot apply Regenerate.',
+            },
         });
     });
 
-    describe('combat-context fallback (source L23-33)', () => {
-        it('pops the exact automation_info payload when no combat context exists', async () => {
-            getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(
-                // distinct outer name pins name: action.name passthrough,
-                // not a REGEN_NAME hardcode
-                makeAction({ name: 'Regenerate (Scroll)' }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(getCombatContext).toHaveBeenCalledTimes(1);
-            expect(getCombatContext).toHaveBeenCalledWith(campaignName);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Regenerate (Scroll)',
-                    description: 'No combat context found. Cannot apply Regenerate.',
-                },
-            });
-        });
-    });
-
-    describe('regenerate_target_selection popup composition (source L35-46)', () => {
-        it('composes the exact payload: names-only ordered creatureTargets, range, automation passthrough', async () => {
-            getCombatContext.mockResolvedValue({
+    it('popup composition: exact regenerate_target_selection payload table (names-only ordered projection, name passthrough, range/automation fallbacks)', async () => {
+        const cases = [
+            {
+                label: 'names-only projection, source order, caster included; distinct outer name passes through',
                 creatures: [
                     { name: 'Goblin', currentHp: 7 },
                     { name: 'Orc' },
                     { name: 'Cleric1', type: 'player' },
                 ],
-            });
-            const action = makeAction({ automation: { type: 'regenerate', range: 'Touch' } });
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            // whole-payload strict table: exact map(c=>c.name) projection
-            // (caster included, source order), no key drift
-            expect(result).toEqual({
-                type: 'popup',
+                action: makeAction({
+                    name: 'Regenerate (Potion)',
+                    automation: { type: 'regenerate', range: 'Touch' },
+                }),
                 payload: {
                     type: 'regenerate_target_selection',
-                    name: action.name,
+                    name: 'Regenerate (Potion)',
                     creatureTargets: ['Goblin', 'Orc', 'Cleric1'],
                     range: 'Touch',
                     automation: { type: 'regenerate', range: 'Touch' },
                 },
-            });
-        });
-
-        it('applies range and automation fallback defaults per table', async () => {
-            getCombatContext.mockResolvedValue({ creatures: [] });
-            const cases = [
-                ['explicit range preserved', makeAction({ spell: { range: '60ft' } }), '60ft', {}],
-                ['range missing defaults to Touch', makeAction({ spell: {} }), 'Touch', {}],
-                ['automation absent defaults to {}', { name: 'Regenerate', spell: { name: 'Regenerate' } }, 'Touch', {}],
-                ['custom automation passes through untouched', makeAction({ automation: { customFlag: true } }), 'Touch', { customFlag: true }],
-            ];
-            for (const [, action, expectedRange, expectedAutomation] of cases) {
-                const result = await handle(action, makePlayerStats(), campaignName, null);
-                expect(result.type).toBe('popup');
-                expect(result.payload).toEqual({
+            },
+            {
+                label: 'explicit range preserved',
+                creatures: [],
+                action: makeAction({ spell: { range: '60ft' } }),
+                payload: {
                     type: 'regenerate_target_selection',
                     name: 'Regenerate',
                     creatureTargets: [],
-                    range: expectedRange,
-                    automation: expectedAutomation,
-                });
-            }
-        });
+                    range: '60ft',
+                    automation: {},
+                },
+            },
+            {
+                label: 'range missing defaults to Touch',
+                creatures: [],
+                action: makeAction({ spell: {} }),
+                payload: {
+                    type: 'regenerate_target_selection',
+                    name: 'Regenerate',
+                    creatureTargets: [],
+                    range: 'Touch',
+                    automation: {},
+                },
+            },
+            {
+                label: 'automation absent defaults to {}',
+                creatures: [],
+                // raw action: no automation key at all (source L44 fallback)
+                action: { name: 'Regenerate', spell: { name: 'Regenerate' } },
+                payload: {
+                    type: 'regenerate_target_selection',
+                    name: 'Regenerate',
+                    creatureTargets: [],
+                    range: 'Touch',
+                    automation: {},
+                },
+            },
+            {
+                label: 'custom automation passes through untouched',
+                creatures: [],
+                action: makeAction({ automation: { customFlag: true } }),
+                payload: {
+                    type: 'regenerate_target_selection',
+                    name: 'Regenerate',
+                    creatureTargets: [],
+                    range: 'Touch',
+                    automation: { customFlag: true },
+                },
+            },
+        ];
+        for (const { label, creatures, action, payload } of cases) {
+            getCombatContext.mockResolvedValue({ creatures });
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+            // whole-payload strict table: exact map(c=>c.name) projection, no key drift
+            expect(result, label).toEqual({ type: 'popup', payload });
+        }
+        expect(getCombatContext.mock.calls).toEqual(cases.map(() => [campaignName]));
     });
 
-    describe('purity guard (no game-state side effects on the cast prompt)', () => {
-        it('handle() reads combat context ONLY — zero flag writes, logs, expression eval, rolls, or healing', async () => {
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
+    it('purity guard: handle() reads combat context ONLY — zero flag reads/writes, logs, expression eval, rolls, or healing', async () => {
+        getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
 
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(getCombatContext).toHaveBeenCalledWith(campaignName);
-            // regenerateActive writes belong to apply (#1947 one-write table)
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(getRuntimeValue).not.toHaveBeenCalled();
-            // all ability_use/hp_change/spell_effect logging is #1947 apply-lane territory
-            expect(addEntry).not.toHaveBeenCalled();
-            // expression evaluation + rolling belong to apply rollInitialHeal (#1947/#1948)
-            expect(evaluateAutoExpression).not.toHaveBeenCalled();
-            expect(rollExpression).not.toHaveBeenCalled();
-            // handle awaits the async getCombatContext seam; sync getCombatSummary
-            // is apply's seam — pinning the two lanes stay distinct
-            expect(getCombatSummary).not.toHaveBeenCalled();
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(getCombatContext.mock.calls).toEqual([[campaignName]]);
+        // regenerateActive writes belong to apply (#1947 one-write table)
+        expect(setRuntimeValue.mock.calls).toEqual([]);
+        expect(getRuntimeValue.mock.calls).toEqual([]);
+        // all ability_use/hp_change/spell_effect logging is #1947 apply-lane territory
+        expect(addEntry.mock.calls).toEqual([]);
+        // expression evaluation + rolling belong to apply rollInitialHeal (#1947/#1948)
+        expect(evaluateAutoExpression.mock.calls).toEqual([]);
+        expect(rollExpression.mock.calls).toEqual([]);
+        // handle awaits the async getCombatContext seam; sync getCombatSummary
+        // is apply's seam — pinning the two lanes stay distinct
+        expect(getCombatSummary.mock.calls).toEqual([]);
+        expect(applyHealingToTarget.mock.calls).toEqual([]);
+    });
+
+    it('registration wiring: the REAL executeHandler dispatcher routes automation.type "regenerate" to this module\'s handle (index.js import L14 + HANDLER_MAP L614)', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin' }, { name: 'Cleric1', type: 'player' }],
         });
+        const action = makeAction({ automation: { type: 'regenerate', range: 'Touch' } });
+
+        const result = await executeHandler(action, makePlayerStats(), campaignName, null);
+
+        // exact composed popup proves dispatcher identity: 'regenerate_target_selection'
+        // is composed NOWHERE else repo-wide, so this payload can only come from
+        // this module's handle via the registry entry #1946 re-verifies as live.
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'regenerate_target_selection',
+                name: 'Regenerate',
+                creatureTargets: ['Goblin', 'Cleric1'],
+                range: 'Touch',
+                automation: { type: 'regenerate', range: 'Touch' },
+            },
+        });
+        expect(getCombatContext.mock.calls).toEqual([[campaignName]]);
+    });
+
+    it('dormant-lane data pin: no ruleset row dispatches type "regenerate" — the registry entry stays fix#211 shield, never a live cast route', () => {
+        // Both Regenerate spell rows pin their exact on-disk automation shape:
+        // type 'healing_start_of_turn' (turn-start subsystem, NOT this handler).
+        for (const doc of [spells5e, spells2024]) {
+            const row = doc.find(s => s.name === 'Regenerate');
+            expect(row).toBeDefined();
+            expect(row.automation).toEqual({
+                type: 'healing_start_of_turn',
+                healExpression: '1',
+                bodyPartRegrowMinutes: 2,
+            });
+        }
+        // Absence census across all four rules docs: re-arming this route (a row
+        // declaring type 'regenerate') must fail here, not silently wake a lane
+        // whose popup has zero component consumers.
+        const automationRows = docs => docs.flatMap(doc =>
+            doc.flatMap(s => Array.isArray(s.automation) ? s.automation : [s.automation].filter(Boolean)),
+        );
+        for (const row of automationRows([spells5e, spells2024, classes5e, classes2024])) {
+            expect(row.type).not.toBe('regenerate');
+        }
     });
 });

@@ -1,36 +1,37 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// Integration lane: renders the real CharActions (real useCharActionsAttackHandlers)
+// and presses the real attack row to verify the Reckless Attack / Brutal Strike
+// chooser is reached through the component's own wiring (props → hook deps →
+// setModalState fan-out to parent, campaignName/playerStats.name threading).
+// Mode selection, latch semantics, rider selection and the confirm/cancel flows
+// are covered by useCharActionsAttackHandlers*.test.js — CharActionModals is
+// mocked here, so confirm clicks live in that lane, not this one.
+// Mock hygiene (events-lane recipe, run2 #1853): the REAL useSyncedState.js
+// runs against the mocked useRuntimeState.js primitives (getStore/
+// setRuntimeValue/listeners) — no mirrored useSyncedState re-implementation.
+// All hook-return mocks match the component's own destructuring; vi.clearAllMocks
+// suffices (every mock returns constant objects, no per-test re-seeding).
 import { render, waitFor, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './CharActions.jsx';
-
-// Integration lane: renders the real CharActions (real useCharActionsAttackHandlers)
-// and clicks the real attack row to verify the Reckless Attack / Brutal Strike
-// chooser is reached through the component's own wiring (props → hook deps →
-// setModalState fan-out to parent). Mode selection, latch semantics, and the
-// confirm/cancel flows are covered by useCharActionsAttackHandlers*.test.js —
-// CharActionModals is mocked here, so confirm clicks live in that lane, not this one.
+import { toggleBuff } from '../../services/automation/common/buffToggle.js';
+import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 
 // --- Shared mock infrastructure ---
 
+// Single backing Map for every characterKey: the real useSyncedState.js and the
+// mocked useRuntimeValue/getRuntimeValue primitives all read/write it, so
+// seeding a key here is visible to both store lanes.
 const _syncedStore = new Map();
-let _setModalState = vi.fn();
+const _setModalState = vi.fn();
 const _rollAttack = vi.fn();
 
-vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, typeof newValue === 'function' ? newValue(_syncedStore.get(key)) : newValue);
-    });
-    return [value, setter];
-  }),
-}));
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn((_, key) => _syncedStore.get(key)),
   getRuntimeValue: vi.fn((_, key) => _syncedStore.get(key)),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
+  getStore: vi.fn(() => _syncedStore),
+  useRuntimeValue: vi.fn((_, key) => (_syncedStore.has(key) ? _syncedStore.get(key) : null)),
+  listeners: new Map(),
 }));
 
 vi.mock('../../services/character/featureCategories.js', () => ({
@@ -117,6 +118,7 @@ vi.mock('./useCharActionModals.js', () => ({
     setModalState: _setModalState,
     pendingDamage: null,
     resolveAttackDamage: vi.fn(),
+    resumeAttackPipeline: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
     handleWeaponKindMasteryClose: vi.fn(),
@@ -215,7 +217,12 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
   })),
 }));
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({ gateMetamagic: vi.fn() })),
+  useSpellMetamagicFlow: vi.fn(() => ({
+    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
+    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
+  })),
 }));
 
 // --- Helpers ---
@@ -272,19 +279,6 @@ function statsWithReckless({ passives = [] } = {}) {
   };
 }
 
-async function renderAndClickLongsword(props) {
-  const utils = render(<CharActions {...baseProps} {...props} />);
-  await waitFor(() => expect(utils.getByText('Longsword')).toBeInTheDocument());
-  await act(async () => { fireEvent.click(utils.getByText('Longsword')); });
-  return utils;
-}
-
-function recklessModalOpens() {
-  return _setModalState.mock.calls
-    .map(c => c[0]?.recklessAttackModal)
-    .filter(Boolean);
-}
-
 const baseProps = {
   playerStats: basePlayerStats,
   campaignName: 'test-campaign',
@@ -298,13 +292,25 @@ const baseProps = {
   spellModalState: {},
 };
 
+async function renderAndClickLongsword(props) {
+  const utils = render(<CharActions {...baseProps} {...props} />);
+  await waitFor(() => expect(utils.getByText('Longsword')).toBeInTheDocument());
+  await act(async () => { fireEvent.click(utils.getByText('Longsword')); });
+  return utils;
+}
+
+function recklessModalOpens() {
+  return _setModalState.mock.calls
+    .map(c => c[0]?.recklessAttackModal)
+    .filter(Boolean);
+}
+
 // --- Tests ---
 
 describe('CharActions — Reckless Attack / Brutal Strike chooser wiring', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     _syncedStore.clear();
-    _setModalState = vi.fn();
     setupFetchMock();
   });
 
@@ -312,41 +318,51 @@ describe('CharActions — Reckless Attack / Brutal Strike chooser wiring', () =>
     global.fetch = originalFetch;
   });
 
-  it.each([
-    { label: 'can act', cannotAct: false },
-    { label: 'cannot act', cannotAct: true },
-  ])('clicking the Longsword row when the attacker $label never rolls or buffs before the chooser is confirmed', async ({ cannotAct }) => {
+  it('pressing the Longsword row with the reckless feature opens the full chooser once and fans it to the parent', async () => {
     const onSpellModalStateChange = vi.fn();
-    const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
-
     await renderAndClickLongsword({
       playerStats: statsWithReckless(),
-      cannotAct,
       onSpellModalStateChange,
     });
 
+    // Full chooser opens exactly once, carrying the clicked attack, and the
+    // parent sheet receives the same modal state through the fan-out wrapper.
     const opens = recklessModalOpens();
-    if (cannotAct) {
-      expect(opens).toHaveLength(0);
-    } else {
-      // Full chooser opens exactly once, carrying the clicked attack, and the
-      // parent sheet receives the same modal state through the fan-out wrapper.
-      expect(opens).toHaveLength(1);
-      expect(opens[0]).toEqual(expect.objectContaining({
-        mode: 'full',
-        attack: expect.objectContaining({ name: 'Longsword' }),
-      }));
-      expect(onSpellModalStateChange).toHaveBeenCalledWith(expect.objectContaining({
-        recklessAttackModal: expect.objectContaining({ mode: 'full' }),
-      }));
-    }
-
-    // The chooser owns the attack: no roll and no reckless buff until confirm.
+    expect(opens).toHaveLength(1);
+    expect(opens[0]).toEqual(expect.objectContaining({
+      mode: 'full',
+      attack: expect.objectContaining({ name: 'Longsword' }),
+    }));
+    expect(onSpellModalStateChange).toHaveBeenCalledTimes(1);
+    expect(onSpellModalStateChange).toHaveBeenCalledWith(expect.objectContaining({
+      recklessAttackModal: expect.objectContaining({ mode: 'full' }),
+    }));
+    // Prop threading at the seam: playerStats.name + the campaignName prop
+    // reach the per-press hostile-action lane with real values.
+    expect(endFriendsOnHostileAction).toHaveBeenCalledTimes(1);
+    expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+    // The chooser owns the attack: no roll and no reckless buff before confirm.
     expect(_rollAttack).not.toHaveBeenCalled();
     expect(toggleBuff).not.toHaveBeenCalled();
   });
 
-  it('clicking the Longsword row while reckless is active opens the brutalOnly chooser with the rider payload', async () => {
+  it('pressing the Longsword row while cannotAct refuses before any commit — no chooser, roll, buff or hostile-action end', async () => {
+    const onSpellModalStateChange = vi.fn();
+    await renderAndClickLongsword({
+      playerStats: statsWithReckless(),
+      cannotAct: true,
+      onSpellModalStateChange,
+    });
+
+    expect(recklessModalOpens()).toHaveLength(0);
+    expect(onSpellModalStateChange).not.toHaveBeenCalled();
+    // The refusal happens before the committed-press side effects.
+    expect(endFriendsOnHostileAction).not.toHaveBeenCalled();
+    expect(_rollAttack).not.toHaveBeenCalled();
+    expect(toggleBuff).not.toHaveBeenCalled();
+  });
+
+  it('pressing the Longsword row while reckless is active routes to the brutalOnly chooser with a rider payload', async () => {
     const passives = [{
       name: 'Improved Brutal Strike',
       type: 'attack_rider',
@@ -360,15 +376,27 @@ describe('CharActions — Reckless Attack / Brutal Strike chooser wiring', () =>
 
     await renderAndClickLongsword({ playerStats: statsWithReckless({ passives }) });
 
+    // Routing/mode is this seam; exact rider selection is pinned at the hook
+    // seam (.improvedBrutalStrike/.brutalGate) — assert the payload SHAPE here.
     const opens = recklessModalOpens();
     expect(opens).toHaveLength(1);
     expect(opens[0]).toEqual(expect.objectContaining({
       mode: 'brutalOnly',
-      riderName: 'Improved Brutal Strike',
-      brutalStrikeOptions: passives[0].options,
+      hasBrutalStrike: true,
+      riderName: expect.any(String),
+      brutalStrikeOptions: expect.any(Array),
       attack: expect.objectContaining({ name: 'Longsword' }),
     }));
     // The chooser owns the attack: no roll until confirm.
     expect(_rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('pressing the Longsword row without the reckless feature bypasses the chooser and rolls directly', async () => {
+    // basePlayerStats carries NO reckless specialAction — the negative control
+    // proving the chooser interception is conditional on feature presence.
+    await renderAndClickLongsword();
+
+    expect(recklessModalOpens()).toHaveLength(0);
+    await waitFor(() => expect(_rollAttack).toHaveBeenCalledTimes(1));
   });
 });

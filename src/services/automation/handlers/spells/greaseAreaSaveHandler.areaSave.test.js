@@ -1,31 +1,57 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — IMPROVE-AND-TRIM pass (#1921): 17→13 cases; full-sequence commit/log censuses merged per outcome; real addCondition meta-stamp + gate-order + key-normalisation pins added; resetAllMocks-safe factories; header claims re-verified vs current bytes
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── PAIR seam map (greaseAreaSaveHandler.js — this file + handle.test.js) ─
 // THIS file (#1921) — processGreaseAreaSave lane, area-save CONTENT:
-//   tracking guards (exact-key `_grease_<caster>` lookup), in-area check
-//   (isWithinRange at tracking.radius), player-immunity + already-prone skip
+//   tracking guards (exact-key `_grease_<caster>` lookup incl. whitespace
+//   normalisation), in-area check (isWithinRange at tracking.radius), gate
+//   ORDER (area → immunity → prone), player-immunity + already-prone skip
 //   gates, per-creature DEX save via createSaveListener, prone-on-fail via
-//   REAL addCondition (conditionSaveService owns its internals), rollback
-//   ledger write (addTargetResult), ability_use/save_result logs, popup prose.
+//   REAL addCondition (conditionSaveService owns its internals: key dedupe,
+//   lowercase map, activeConditionMeta dc/ability stamp), rollback ledger
+//   write (addTargetResult), ability_use/save_result log census, popup prose.
 // SIBLING greaseAreaSaveHandler.handle.test.js (#1922) — handle()
 //   orchestration: buildSaveDc, caster map position (loadMapData), cast log,
 //   _grease_<caster> tracking STORE, addExpiration(remove_grease_area),
 //   setCondition modal payload.
-// Liveness (verified 2026-10-16; WIRED 2026-11-19 per owner "WIRE IT"):
+// Liveness (re-verified 2026-11-27 against current bytes; WIRED 2026-11-19
+//   per owner "WIRE IT"):
 //   handle() is LIVE — index.js:556 registers 'grease_area_save' (both
-//   rulesets' spells.json after the 2024 parity entry). processGreaseAreaSave
-//   is no longer a zero-caller lane: expireStaleEffects.js Phase 6 dispatches
-//   it at each grease-te carrier's turn start (SP-111/SP-126 zone pattern,
-//   pinned by expireStaleEffects.grease.test.js), and 'remove_grease_area'
-//   now has a clearExpirationEffects.js EXPIRATION_HANDLERS consumer that
-//   nulls the tracking key and strips the caster's grease tes (pinned by
-//   clearExpirationEffects.grease-sleet-zone-expiry.test.js). RAW SP-056
-//   enter/turn re-saves are served by the turn-start seam; these tests own
-//   the recurring-save CONTENT behind that seam.
+//   rulesets' spells.json after the 2024 parity entry; trio discrimination
+//   L556-558 is owned by index.webDispatch.test.js, not re-pinned here).
+//   processGreaseAreaSave is dispatched by expireStaleEffects.js Phase 6
+//   (:8 import, :131 processZoneTurnStartSaves effectKey 'grease',
+//   trackingPrefix 'grease') at each grease-te carrier's turn start
+//   (SP-111/SP-126 zone pattern, pinned by expireStaleEffects.grease.test.js),
+//   and 'remove_grease_area' has a clearExpirationEffects.js EXPIRATION_HANDLERS
+//   consumer (:590) that nulls the tracking key and strips the caster's grease
+//   tes (pinned by clearExpirationEffects.grease-sleet-zone-expiry.test.js).
+//   RAW SP-056 enter/turn re-saves are served by the turn-start seam; these
+//   tests own the recurring-save CONTENT behind that seam.
+// Family twins (areaSave .areaSave lanes): sleet/web/stinkingCloud share the
+//   guard skeleton (tracking → map → in-area → immunity → already-condition →
+//   save). Every assertion below pins grease-DISTINCT bytes ('_grease_<caster>'
+//   key, 'save-grease' rollType, Grease popup/log prose, hardcoded 'Prone').
+//   Where a sibling's assertion is identical except the handler name, a
+//   family-wide it.each consolidation is a REPORT-ONLY recommendation
+//   (cross-file, never implemented here).
+// Arity (per #1878): every getRuntimeValue CALL this lane makes is 3-arg in
+//   source bytes (:211 tracking, :158 activeConditions) while the real
+//   getRuntimeValue is 2-param (read-side campaignName is inert) — pins match
+//   the source call, not the signature. setRuntimeValue writes ARE 4-arg with
+//   campaignName threaded (write-side threading is real); the real addCondition
+//   callee's 2-arg activeConditions read routes through the same mocked getter.
+// Duration policy: this lane stores NO durations/expirations (handle-lane
+//   owns those). Divergence noted cross-file only: handle's '1_minute'→10
+//   rounds minutes×10 encoding (greaseAreaSaveHandler.js:106-112) predates the
+//   ≥1min-combat-scoped canon — handle.test.js should cite #1822 precedent.
 // Notes: processGreaseAreaSave never touches placedItems/players or loadMapData
-//   (position lives behind isWithinRange); the mapsService mock remains only to
-//   isolate module-import side effects of the paired handle() module graph.
+//   (position lives behind isWithinRange); the mapsService/expirations mocks
+//   remain only to isolate module-import side effects of the paired handle()
+//   graph. savePrompt.buildSaveDc is import-graph-only (process lane never
+//   calls it). Mock factories carry BASE implementations inline (vi.fn(async…))
+//   so they survive vi.resetAllMocks() — no *Once chains, no mid-test
+//   re-harness beyond the exact-key runtime router.
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -40,11 +66,11 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn().mockResolvedValue(undefined),
+  addExpiration: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -57,7 +83,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
   isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isWithinRange: vi.fn(async () => true),
 }));
 
 // Import-side-effect isolation only — processGreaseAreaSave never calls loadMapData.
@@ -135,7 +161,6 @@ function mockSaveOutcome(success, { promptId, ...rollExtras } = {}) {
 function setupInAreaMonsterSave(success, rollExtras = {}) {
   setupRuntime();
   setMonsterContext();
-  rangeCheck.isWithinRange.mockResolvedValue(true);
   mockSaveOutcome(success, rollExtras);
 }
 
@@ -143,11 +168,11 @@ function setupInAreaMonsterSave(success, rollExtras = {}) {
 
 describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks(); // factories carry inline base impls — nothing to reinstall
   });
 
   describe('tracking + map guards', () => {
-    it('reads tracking by exact key and returns null when tracking or map is missing', async () => {
+    it('returns null for missing/invalid tracking or missing map before touching any later channel, and normalises whitespace in the caster-key', async () => {
       setupRuntime({ tracking: null });
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
       expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(casterName, TRACKING_KEY, campaignName);
@@ -161,53 +186,73 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       setupRuntime({ tracking: makeGreaseTracking({ saveDc: undefined }) });
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
 
-      // valid tracking but no map → guard fires BEFORE any range check
+      // valid tracking but no map → guard fires BEFORE any range check or spend
       setupRuntime();
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, undefined)).toBeNull();
       expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+
+      // reader mirrors the writer's key normalisation (handle stores
+      // `_grease_${caster.replace(/\s+/g,'_')}`): 'Test Wizard' → _grease_Test_Wizard
+      setupRuntime();
+      expect(await processGreaseAreaSave('Test Wizard', 'Goblin', campaignName, mapName)).toBeNull();
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenLastCalledWith('Test Wizard', '_grease_Test_Wizard', campaignName);
     });
   });
 
   describe('area membership', () => {
-    it('checks the target against tracking.radius and skips the save when out of area', async () => {
+    it.each([
+      ['resolves false (target left the area)', async () => false],
+      ['rejects (area lookup failed)', async () => { throw new Error('range lookup failed'); }],
+    ])('skips the save entirely when the in-area check %s — gate-order pins: immunity context never fetched, zero spends', async (_case, impl) => {
       setupRuntime();
-      setMonsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(false);
+      rangeCheck.isWithinRange.mockImplementation(impl);
 
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
       expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(casterName, 'Goblin', 10);
+      // gate ORDER: the immunity gate (behind isWithinRange) is never reached
+      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+      expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
   describe('skip gates', () => {
-    it('returns null for already-prone targets, case-insensitively, without prompting', async () => {
+    it('already-prone target is skipped case-insensitively — no prompt, no logs, no writes', async () => {
       setupRuntime({ conditions: ['prone'] });
       setMonsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
 
       // mixed case still skips
       setupRuntime({ conditions: ['PrOnE'] });
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
 
+      // prone check reads the exact 3-arg key source uses (:158)
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', campaignName);
+      // monster row → immunity gate short-circuits on type, never consults the rule
+      expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('immune player is SKIPPED: no save prompt, no logs, no writes, gate receives the PASSED roster stats verbatim', async () => {
+    it('immune player is SKIPPED: gate receives the PASSED roster stats verbatim and immune=true short-circuits BEFORE the prone read', async () => {
       // LIVE PIN (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
       // the awaited ASYNC combat context resolves the PLAYER row so the immunity
       // branch is reachable exactly as in production, and the stats object is the
       // targetStats PARAMETER the expireStaleEffects sweep threads from the caller's
       // roster (`characters.find(...) → computedStats || character`) — never a
-      // runtime `computedStats` bucket (which has NO producer). A re-introduced
-      // bucket read fails the no-computedStats-key read census below; a
-      // {computedStats}-wrapped argument fails the call-shape pin.
+      // runtime `computedStats` bucket (which has NO producer). The exact-array
+      // read census below pins BOTH: no computedStats key read AND the immune
+      // return pre-empts the later activeConditions (prone) read — a re-ordered
+      // gate fails the census.
       const rosterStats = { name: 'Goblin', immunities: ['prone'] };
       setupRuntime();
       setPlayerContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
 
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats)).toBeNull();
@@ -217,63 +262,39 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
-      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
+      expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual([
+        [casterName, TRACKING_KEY, campaignName],
+      ]);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('non-immune player resolves normally (immunity false → save proceeds, prone applies on fail)', async () => {
-      const rosterStats = { name: 'Goblin', immunities: [] };
+    it.each([
+      ['roster-resolved stats', { name: 'Goblin', immunities: [] }],
+      ['absent roster target (undefined stats → the rule guard answers false)', undefined],
+    ])('non-immune player with %s proceeds to the save — gate receives the param verbatim, success applies nothing', async (_case, stats) => {
       setupRuntime();
       setPlayerContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
-      mockSaveOutcome(false);
-
-      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
-
-      expect(result.type).toBe('popup');
-      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
-        conditionKey: 'prone',
-        playerStats: rosterStats,
-        getRuntimeValue: expect.any(Function),
-        campaignName,
-      });
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['prone'],
-        campaignName,
-      );
-    });
-
-    it('target absent from the roster (no targetStats threaded) still resolves normally (undefined stats → rule guard false)', async () => {
-      setupRuntime();
-      setPlayerContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
       mockSaveOutcome(true);
 
-      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName, stats);
 
       expect(result.type).toBe('popup');
-      // undefined stats → playerIsImmuneToCondition's own guard answers false; the
-      // handler still hands it the (undefined) param so the call contract stays uniform.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: undefined,
+        playerStats: stats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
-      expect(savePrompt.createSaveListener).toHaveBeenCalled();
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('immunity leg is player-only: monster row with an immunity-carrying stats arg still saves', async () => {
-      // monster → immunity check skipped entirely, save proceeds
       setupRuntime();
       setMonsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
       mockSaveOutcome(true);
 
@@ -283,22 +304,14 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
     });
   });
 
-  describe('save processing', () => {
-    it('requests a DEX save at the tracked DC via createSaveListener', async () => {
-      setupInAreaMonsterSave(false);
+  describe('save outcome sequences', () => {
+    it('failed save — exact request, ordered log census (promptId-paired), popup, and ordered write census condition→meta→ledger', async () => {
+      setupInAreaMonsterSave(false, { roll: 4, total: 7, promptId: 'p-fail' });
+      setupRuntime({ lastAttack: { rollType: 'spell-save', targetResults: [] } });
 
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'DEX',
-        saveDc: 13,
-      });
-    });
-
-    it('returns the exact popup contract for failed and successful saves', async () => {
-      setupInAreaMonsterSave(false);
-      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toEqual({
+      expect(result).toEqual({
         type: 'popup',
         payload: {
           type: 'automation_info',
@@ -307,8 +320,58 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         },
       });
 
-      setupInAreaMonsterSave(true);
-      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toEqual({
+      // re-forced at the turn-start seam: DEX save at the tracked DC, ONE listener
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveType: 'DEX',
+        saveDc: 13,
+      });
+
+      // ordered full-array log census: ability_use carries the SAME promptId the
+      // listener returned (pairing), then the save_result outcome entry.
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Grease',
+          description: 'Goblin must make a DEX save (DC 13) or become Prone (Grease area).',
+          promptId: 'p-fail',
+        }],
+        [campaignName, {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-grease',
+          targetName: 'Goblin',
+          saveDc: 13,
+          saveType: 'DEX',
+          success: false,
+          description: 'Goblin failed DEX save against Grease. Becomes Prone.',
+        }],
+      ]);
+
+      // ordered full-array write census (4-arg, campaignName threaded):
+      // real addCondition writes the condition, stamps meta from the TRACKED
+      // dc/ability, then the handler writes the rollback-ledger entry.
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['Goblin', 'activeConditions', ['prone'], campaignName],
+        ['Goblin', 'activeConditionMeta', { prone: { dc: 13, ability: 'DEX' } }, campaignName],
+        ['campaign', 'lastAttack', expect.objectContaining({
+          targetResults: [{ targetName: 'Goblin', saveResult: 'failure', roll: 4, total: 7, conditions: ['prone'], appliedDamage: 0 }],
+          affectedTargets: ['Goblin'],
+          statusEffects: ['prone'],
+          damageApplied: false,
+        }), campaignName],
+      ]);
+    });
+
+    it('successful save — popup + logs only; condition/meta write census is EXACTLY the ledger entry (empty conditions)', async () => {
+      setupInAreaMonsterSave(true, { roll: 15, total: 18, promptId: 'p-ok' });
+      setupRuntime({ lastAttack: { rollType: 'spell-save', targetResults: [] } });
+
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+
+      expect(result).toEqual({
         type: 'popup',
         payload: {
           type: 'automation_info',
@@ -316,161 +379,83 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
           description: 'Goblin succeeded the DEX save (DC 13). Unaffected.',
         },
       });
+
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Grease',
+          description: 'Goblin must make a DEX save (DC 13) or become Prone (Grease area).',
+          promptId: 'p-ok',
+        }],
+        [campaignName, {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-grease',
+          targetName: 'Goblin',
+          saveDc: 13,
+          saveType: 'DEX',
+          success: true,
+          description: 'Goblin succeeded on DEX save against Grease.',
+        }],
+      ]);
+
+      // success leg: NO addCondition ran — the ledger write is the ONLY write
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['campaign', 'lastAttack', expect.objectContaining({
+          targetResults: [{ targetName: 'Goblin', saveResult: 'success', roll: 15, total: 18, conditions: [], appliedDamage: 0 }],
+          affectedTargets: ['Goblin'],
+          statusEffects: [],
+          damageApplied: false,
+        }), campaignName],
+      ]);
     });
 
-    it('writes the prone condition on a failed save only', async () => {
-      setupInAreaMonsterSave(false);
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['prone'],
-        campaignName,
-      );
-
-      setupInAreaMonsterSave(true);
-      useRuntimeState.setRuntimeValue.mockClear();
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.anything(),
-        campaignName,
-      );
-    });
-
-    it('maps tracking.condition to a lowercase, deduplicated condition key', async () => {
-      // addCondition (real callee) dedupes by conditionDef.key — this pins
-      // the handler's tracking.condition → key mapping, not callee internals.
-      setupRuntime({ tracking: makeGreaseTracking({ condition: 'Blinded' }), conditions: ['blinded', 'frightened'] });
+    it('tracking.condition/saveType/saveDc drive the key mapping, meta stamp and request (prose stays grease-hardcoded, pinned honestly)', async () => {
+      // addCondition (real callee) dedupes by conditionDef.key — this pins the
+      // handler's tracking→{key,dc,ability} mapping, not callee internals.
+      setupRuntime({
+        tracking: makeGreaseTracking({ condition: 'Blinded', saveType: 'CON', saveDc: 15 }),
+        conditions: ['blinded', 'frightened'],
+      });
       setMonsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       mockSaveOutcome(false);
 
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['frightened', 'blinded'],
-        campaignName,
-      );
-    });
-
-    it('records the save outcome on the spell-save rollback ledger', async () => {
-      // addTargetResult no-ops unless campaign lastAttack is a spell-save;
-      // seed it, then pin the handler-written entry shape exactly.
-      setupInAreaMonsterSave(false, { roll: 4, total: 7, promptId: 'fb' });
-      setupRuntime({ lastAttack: { rollType: 'spell-save', targetResults: [] } });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'lastAttack',
-        expect.objectContaining({
-          targetResults: [{ targetName: 'Goblin', saveResult: 'failure', roll: 4, total: 7, conditions: ['prone'], appliedDamage: 0 }],
-          affectedTargets: ['Goblin'],
-          statusEffects: ['prone'],
-          damageApplied: false,
-        }),
-        campaignName,
-      );
-
-      setupInAreaMonsterSave(true, { roll: 15, total: 18, promptId: 'ok' });
-      setupRuntime({ lastAttack: { rollType: 'spell-save', targetResults: [] } });
-      useRuntimeState.setRuntimeValue.mockClear();
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'lastAttack',
-        expect.objectContaining({
-          targetResults: [{ targetName: 'Goblin', saveResult: 'success', roll: 15, total: 18, conditions: [], appliedDamage: 0 }],
-        }),
-        campaignName,
-      );
-    });
-  });
-
-  describe('logs', () => {
-    it('logs the ability_use prompt trigger with full description and promptId', async () => {
-      setupInAreaMonsterSave(false, { promptId: 'p1' });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: casterName,
-        abilityName: 'Grease',
-        description: 'Goblin must make a DEX save (DC 13) or become Prone (Grease area).',
-        promptId: 'p1',
-      });
-    });
-
-    it('logs save_result with exact descriptions on failed and successful saves', async () => {
-      setupInAreaMonsterSave(false);
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      let saveResultCall = logService.addEntry.mock.calls.find(([, e]) => e.type === 'save_result');
-      expect(saveResultCall[1]).toEqual({
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-grease',
+      // 'blinded' ≠ 'prone' → the already-prone gate does NOT skip this target
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
-        saveDc: 13,
-        saveType: 'DEX',
-        success: false,
-        description: 'Goblin failed DEX save against Grease. Becomes Prone.',
+        saveType: 'CON',
+        saveDc: 15,
       });
+      // HONEST BYTE: the popup prose hardcodes 'Becomes Prone.' regardless of
+      // tracking.condition — grease's rules JSON only ever inflicts Prone, so
+      // this is a latent-only quirk; re-pin if conditionInflicted is parameterised.
+      expect(result.payload.description).toBe('Goblin failed the CON save (DC 15). Becomes Prone.');
 
-      logService.addEntry.mockClear();
-      setupInAreaMonsterSave(true);
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      saveResultCall = logService.addEntry.mock.calls.find(([, e]) => e.type === 'save_result');
-      expect(saveResultCall[1]).toEqual({
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-grease',
-        targetName: 'Goblin',
-        saveDc: 13,
-        saveType: 'DEX',
-        success: true,
-        description: 'Goblin succeeded on DEX save against Grease.',
-      });
+      // lowercase + dedupe reorder, meta stamped from tracked dc/ability;
+      // lastAttack is rollType:null here → addTargetResult no-ops (no 3rd write)
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['Goblin', 'activeConditions', ['frightened', 'blinded'], campaignName],
+        ['Goblin', 'activeConditionMeta', { blinded: { dc: 15, ability: 'CON' } }, campaignName],
+      ]);
     });
   });
 
   describe('error handling', () => {
-    it('returns null when the area check rejects', async () => {
+    it('save promise rejects → null with zero writes and no save_result log (only the paired ability_use was logged)', async () => {
       setupRuntime();
       setMonsterContext();
-      rangeCheck.isWithinRange.mockRejectedValue(new Error('range lookup failed'));
-
-      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('returns null and applies nothing when the save promise rejects', async () => {
-      setupRuntime();
-      setMonsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-reject',
         promise: Promise.reject(new Error('prompt lost')),
       });
 
       expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.anything(),
-        campaignName,
-      );
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(logService.addEntry.mock.calls[0][1].type).toBe('ability_use');
     });
 
     it('propagates errors thrown by the tracking lookup (guard sits outside the try)', async () => {

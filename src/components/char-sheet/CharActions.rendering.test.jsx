@@ -1,36 +1,37 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // CharActions: section rendering + attack-name click contract.
 // Deliberately NOT covered here (pinned by siblings):
 // - base-actions row text/clickables → CharActions.baseActions.test.jsx
 // - attack-context build rejection/recovery → CharActions.handlers.test.jsx
-// - disabled-attack row cell states → CharActions.sacredWeapon2024.test.jsx
+// - disabled-attack row CELL states, mastery column contents/popup, save-DC
+//   hit cells → CharActions.sacredWeapon2024.test.jsx
+// - feature-row click dispatch (popup/log/buff routing) → CharActions.automationHandler.test.jsx
+// - reckless chooser routing + hostile-action-end threading → CharActions.recklessAttack.test.jsx
 // - popup/event bus behaviour → CharActions.events.test.jsx
+// Mock hygiene (events-lane recipe, run2 #1853): the REAL useSyncedState.js
+// runs against the mocked useRuntimeState.js primitives (getStore/
+// setRuntimeValue/listeners) — the phantom `useSyncedState` export previously
+// mocked ON useRuntimeState.js is deleted (that module does not export it) and
+// with it the mirror whose setter resolved updater functions against a stale
+// value closure instead of the live store.
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 
+// Shared backing Map: the real useSyncedState.js reads/writes it through the
+// mocked getStore/setRuntimeValue primitives; the mocked useRuntimeValue
+// reads the same keys. No test seeds it — the store fixture just keeps the
+// real hook inert.
 const _syncedStore = new Map();
 const mockRollAttack = vi.fn();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, typeof newValue === 'function' ? newValue(value) : newValue);
-    });
-    return [value, setter];
-  }),
-  useRuntimeValue: vi.fn((_, key, _campaignName) => {
-    const hasValue = _syncedStore.has(key);
-    return hasValue ? _syncedStore.get(key) : null;
-  }),
+  useRuntimeValue: vi.fn((_, key) => (_syncedStore.has(key) ? _syncedStore.get(key) : null)),
   listeners: new Map(),
 }));
 
@@ -189,6 +190,8 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
   buildAttackContextSync: vi.fn(() => ({ hitBonus: 5 })),
 }));
 
+const CAMPAIGN = 'test-campaign';
+
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
   automation: { passives: [] },
@@ -200,6 +203,12 @@ function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
+async function renderCharActions(stats, props = {}) {
+  await act(async () => {
+    render(<CharActions playerStats={stats} campaignName={CAMPAIGN} {...props} />);
+  });
+}
+
 const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' };
 const shortbow = { name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action' };
 
@@ -208,7 +217,6 @@ describe('CharActions rendering and attack click', () => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
-    getRuntimeValue.mockImplementation(() => null);
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
   });
 
@@ -217,7 +225,7 @@ describe('CharActions rendering and attack click', () => {
     { cannotAct: true, cannotActReason: undefined, expectedLabel: '(Incapacitated)' },
     { cannotAct: true, cannotActReason: 'Stunned', expectedLabel: '(Stunned)' },
   ])('shows $expectedLabel in the cannot-act label (cannotAct=$cannotAct)', async ({ cannotAct, cannotActReason, expectedLabel }) => {
-    await act(async () => { render(<CharActions playerStats={createStats()} cannotAct={cannotAct} cannotActReason={cannotActReason} />); });
+    await renderCharActions(createStats(), { cannotAct, cannotActReason });
     const label = document.querySelector('.disabled-attack-label');
     if (expectedLabel) {
       expect(label).not.toBeNull();
@@ -229,7 +237,7 @@ describe('CharActions rendering and attack click', () => {
 
   it('renders one row per Action attack with clickable name, range, hit, damage and damage type', async () => {
     const stats = createStats({ attacks: [longsword, shortbow] });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
+    await renderCharActions(stats);
 
     expect(screen.getByText('Longsword')).toHaveClass('clickable');
     expect(screen.getByText('Shortbow')).toHaveClass('clickable');
@@ -246,33 +254,37 @@ describe('CharActions rendering and attack click', () => {
     { rules: '2024', passives: [{ type: 'weapon_kind_mastery' }], enabled: true },
     { rules: '2024', passives: [], enabled: false },
     { rules: '5e', passives: [{ type: 'weapon_kind_mastery' }], enabled: false },
-  ])('enables the mastery column class only for 2024 rules with the passive (rules=$rules)', async ({ rules, passives, enabled }) => {
-    await act(async () => { render(<CharActions playerStats={createStats({ rules, automation: { passives } })} />); });
+  ])('gates the mastery column (class + header) on 2024 rules with the passive (rules=$rules)', async ({ rules, passives, enabled }) => {
+    await renderCharActions(createStats({ rules, automation: { passives } }));
     const attacksDiv = document.querySelector('.attacks');
     expect(attacksDiv).not.toBeNull();
     if (enabled) {
       expect(attacksDiv).toHaveClass('mastery-enabled');
+      expect(screen.getByText('Mastery')).toBeInTheDocument();
     } else {
       expect(attacksDiv).not.toHaveClass('mastery-enabled');
+      expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
     }
   });
 
-  it('clicking an attack name rolls the attack and ends Friends/Invisibility', async () => {
+  it('clicking an attack name rolls once with the built context and ends Friends/Invisibility', async () => {
     const stats = createStats({ attacks: [longsword] });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
+    await renderCharActions(stats);
     await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
 
     expect(mockRollAttack).toHaveBeenCalledTimes(1);
     expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { hitBonus: 5 });
-    expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
-    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
+    expect(endFriendsOnHostileAction).toHaveBeenCalledTimes(1);
+    expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestCharacter', CAMPAIGN);
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledTimes(1);
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestCharacter', CAMPAIGN);
   });
 
   it.each([
     { action: { name: 'TestAction', details: 'Some details', description: 'A description', automation: null }, clickable: true },
     { action: { name: 'PlainAction', description: 'Plain description' }, clickable: false },
   ])('renders feature action "$action.name" clickable=$clickable', async ({ action, clickable }) => {
-    await act(async () => { render(<CharActions playerStats={createStats({ actions: [action] })} />); });
+    await renderCharActions(createStats({ actions: [action] }));
     const row = screen.getByText(`${action.name}:`);
     if (clickable) {
       expect(row).toHaveClass('clickable');

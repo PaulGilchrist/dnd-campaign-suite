@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharHitPoints from './CharHitPoints.jsx';
@@ -22,6 +22,12 @@ vi.mock('./DeathSavingThrows.jsx', () => ({
     <div>Death Saving Throws for {playerStats.name}</div>
   )),
 }));
+
+// Lane split: the onRollResult PRODUCER payload is pinned in
+// DeathSavingThrows.test.jsx and the chip host (callback + window-event roll
+// faces, hpWritten skip, cross-character skip) in
+// CharHitPoints.death-save-chip.test.jsx. This file owns the HP display /
+// commit-control surface only.
 
 import { setRuntimeValue, setRuntimeBatch, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
@@ -89,10 +95,10 @@ describe('CharHitPoints', () => {
 
   it.each([
     // [label, storedHp, commitTo, delta, isHealing, isUnconscious, resetsDeathSaves]
-    ['damage', null, 7, -3, false, false, true],
+    ['damage', 10, 7, -3, false, false, true],
     ['healing', 5, 10, 5, true, false, true],
-    ['dropping to 0 (unconscious)', null, 0, -10, false, true, false],
-    ['an unchanged value', null, 10, 0, false, false, true],
+    ['dropping to an explicit 0 (down state)', 10, 0, -10, false, true, false],
+    ['an unchanged value', 10, 10, 0, false, false, true],
   ])('committing %s writes HP, logs hp_change only when HP changed, and %s death saves',
     (_label, storedHp, newValue, delta, isHealing, isUnconscious, resets) => {
       mockRuntimeValues({ currentHitPoints: storedHp });
@@ -117,9 +123,15 @@ describe('CharHitPoints', () => {
           // card's 'GM HP override' so the row families are distinguishable).
           sourceName: 'sheet editor',
           delta,
+          currentHp: newValue,
+          maxHp: 10,
           isHealing,
           isUnconscious,
+          // Canonical player stamp: this lane only ever edits a player sheet
+          // and the log's downed copy discriminates off this byte.
+          isPlayer: true,
         }));
+        expect(addEntry).toHaveBeenCalledTimes(1);
       } else {
         expect(addEntry).not.toHaveBeenCalled();
       }
@@ -164,40 +176,19 @@ describe('CharHitPoints', () => {
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   });
 
-  it('still writes an explicitly typed 0 (down state) with an hp_change row', () => {
-    mockRuntimeValues({ currentHitPoints: 10 });
-    renderCharHitPoints();
-    commitHp('0');
-
-    expect(setRuntimeBatch).toHaveBeenCalledWith(NAME, { currentHitPoints: 0 }, CAMPAIGN);
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-      type: 'hp_change',
-      targetName: NAME,
-      sourceName: 'sheet editor',
-      delta: -10,
-      isUnconscious: true,
-    }));
-  });
-
-  it('restores current HP from a matching death-save-result event', () => {
+  // The matched-event legs that also paint a chip (roll face, hpWritten
+  // skip, bare-restore HP write, cross-character skip) are pinned in
+  // CharHitPoints.death-save-chip.test.jsx. This is the remaining branch:
+  // a matched target carrying neither a roll nor a restore must be a no-op.
+  it('ignores a death-save-result event with no roll and no restore', () => {
     renderCharHitPoints();
 
     window.dispatchEvent(new CustomEvent('death-save-result', {
-      detail: { targetName: NAME, restoredToHp: 8 },
+      detail: { targetName: NAME },
     }));
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'currentHitPoints', 8, CAMPAIGN);
-  });
-
-  it.each([
-    ['non-matching targetName', { targetName: 'OtherCharacter', restoredToHp: 8 }],
-    ['missing restoredToHp', { targetName: NAME }],
-  ])('ignores death-save-result event when %s', (_label, detail) => {
-    renderCharHitPoints();
-
-    window.dispatchEvent(new CustomEvent('death-save-result', { detail }));
-
     expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — web_area_save dispatch seam: 5→4 tests; source-text caller-liveness pin shed to webStamp behavioral cover; line cites re-verified
 // ── Registry QUINTET lane #1999 index.webDispatch.test.js — web_area_save row/dispatch family ──
 // (seam map: index.mistyWanderer.test.js header #1995, closed KEEP law; siblings
 // #1996 psychic route / #1997 index.test.js MAIN mechanics / #1998 implosion
@@ -13,17 +13,18 @@
 // slot + concentration were already paid. 'web_area_save' must dispatch to
 // handleWebAreaSave (index.js L557).
 //
-// THIS lane owns EXCLUSIVELY (seam verified against index.js 2026-10-16):
+// THIS lane owns EXCLUSIVELY (all seam claims re-verified against CURRENT
+// index.js bytes 2026-11-27):
 //   • registration row L557 'web_area_save': handleWebAreaSave — HANDLER_MAP is
 //     module-internal (L299), so registration identity pins through dispatch:
 //     the vi.mock'd module handle IS the function executeHandler invokes
 //     (import at index.js:271). Importers of webAreaSaveHandler.js are ONLY
-//     index.js:271 (handle) and expireStaleEffects.js:7 (processWebAreaSave) —
+//     index.js:271 (handle) and expireStaleEffects.js (processWebAreaSave) —
 //     expireStaleEffects is NOT in this test's import graph (grep index.js:
 //     zero hits), so the mock factory carries `handle` alone.
-//   • LIVE caller-shape fidelity: useSimpleSpellHandlers.js:345
+//   • LIVE caller-shape fidelity: useSimpleSpellHandlers.js:372
 //     { name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') }
-//     → areaExecute L78-84 calls executeHandler 5-ARG (action, playerStats,
+//     → areaExecute L78-83 calls executeHandler 5-ARG (action, playerStats,
 //     campaignName, null, d.characters) — the roster arg joined the call
 //     2026-11-24 for the stinking-cloud cast-time immunity gate and is arity-
 //     benign here (webAreaSaveHandler consumes 4 params) → registry forwards
@@ -33,12 +34,12 @@
 //     — the verbatim data row's shape/size/duration/conditionInflicted fields
 //     do NOT cross this seam (handler re-derives them from the `_web_<caster>`
 //     tracking store, .zone quintet #1993).
-//   • verbatim prod row verified on disk BOTH rulesets 2026-10-16:
-//     public/data/spells.json (Web, :10517) and public/data/2024/spells.json
-//     (Web, :14532) automation[1] — byte-identical six-key object, pinned
-//     below and dispatched intact (full-string pass-through pins).
+//   • verbatim prod row verified on disk BOTH rulesets 2026-11-27:
+//     public/data/spells.json (Web) and public/data/2024/spells.json (Web)
+//     automation[1] — byte-identical six-key objects (full automation arrays
+//     equal too), pinned below and dispatched intact.
 //     Registration-symmetry HONESTY: key MATCHED — live producers are the
-//     areaExecute stamp (:345) + both spells.json rows; no orphan key here.
+//     areaExecute stamp (:372) + both spells.json rows; no orphan key here.
 //   • family discrimination vs the trio rows L556-558 (grease_area_save /
 //     web_area_save / sleet_storm_area_save, cf. #1998 fingerprint-control
 //     pattern): exact-key table lookup — sleet/grease rows resolve to their
@@ -48,20 +49,19 @@
 //   • SP-126 fingerprint control: bare type 'web' (the broken pre-fix stamp)
 //     has no table row → null (L699 miss → L738-740, mechanics canonical
 //     #1997), web handler untouched, zero family fallback.
-// CONSUMER-PIN AUDIT (quintet citation check, honest resolution): the handler
-// quintet's "consumer routing pinned … :76 (exact 4-arg call + negative legs)"
-// citation resolves to expireStaleEffects.web.test.js:76 (processZoneTurnStart
-// Saves→processWebAreaSave 4-arg), VERIFIED PRESENT there — it does not live
-// in this file; nothing added here (no duplication).
-// Shed: generic null early-outs L703-705/L738-740, error-catch popup L745-748,
-// auto-array scan L716-734, 5-arg-forward mechanics L743 → #1997 index.test.js
-// MAIN exact-names canon; auto_effect route → #1996; save_attack fingerprint →
-// #1998; misty prefer → #1995. All handler behavior (saves, Restrained, zone
-// te, logs, tracking store) → the webAreaSaveHandler quintet above.
+// SHED 2026-11-27: the readFileSync source-text "caller liveness" pin — the
+// stamp + 5-arg call are behaviorally pinned stronger by
+// useSpellMetamagicFlow.webStamp.test.js (live hook → executeHandler with
+// web_area_save/DEX/real saveDc/targets/campaign) and by the 5-arg forward
+// census in test 1 below; source-string toContain pins break on whitespace.
+// Result pass-through L744, generic null early-outs L703-705/L738-740,
+// error-catch popup L745-748, auto-array scan L716-734, 5-arg-forward
+// mechanics L743 → #1997 index.test.js MAIN exact-names canon; auto_effect
+// route → #1996; save_attack fingerprint → #1998; misty prefer → #1995. All
+// handler behavior (saves, Restrained, zone te, logs, tracking store) → the
+// webAreaSaveHandler quintet above.
 // All three area handlers mocked → zero side effects; fetch spy guards.
 // No timers; turn-based row-click dispatch only; test-campaign only.
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { executeHandler } from './index.js';
@@ -118,31 +118,26 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
     });
 
     it('routes the areaExecute-stamped web_area_save action to handleWebAreaSave (live caller shape, 5-arg call → 5-arg forward)', async () => {
-        // exact shape of useSimpleSpellHandlers.js areaAction L69-76 output
+        // exact shape of useSimpleSpellHandlers.js areaAction L69-76 output —
+        // automation is EXACTLY three keys; data-row fields never cross this seam
         const action = {
             name: 'Web',
             spell: { name: 'Web', level: 6 },
             automation: { type: 'web_area_save', saveDc: 19, saveType: 'DEX' },
             metaCtx: { targets: ['Zombie 1'] },
         };
-        // areaExecute L84 calls executeHandler 5-ARG with the roster
+        // areaExecute :82 calls executeHandler 5-ARG with the roster
         // (stinking-cloud gate threading; web handler ignores the extra param)
         const roster = [{ name: 'Zombie 1' }];
-        const result = await executeHandler(action, playerStats, 'test-campaign', null, roster);
+        await executeHandler(action, playerStats, 'test-campaign', null, roster);
 
         expect(handleWebAreaSave).toHaveBeenCalledTimes(1);
         expect(handleWebAreaSave).toHaveBeenCalledWith(action, playerStats, 'test-campaign', null, roster);
-        // caller stamp is EXACTLY three keys — data-row fields never cross this seam
-        expect(handleWebAreaSave.mock.calls[0][0].automation).toEqual({
-            type: 'web_area_save',
-            saveDc: 19,
-            saveType: 'DEX',
-        });
-        expect(result).not.toBeNull();
-        expect(result.payload.description).toBe('WEB handler dispatch sentinel');
+        expect(handleSleetStorm).not.toHaveBeenCalled();
+        expect(handleGreaseAreaSave).not.toHaveBeenCalled();
     });
 
-    it('dispatches the verbatim spells.json web_area_save row intact — both rulesets identical, full strings pass through', async () => {
+    it('dispatches the verbatim spells.json web_area_save row intact — both rulesets identical', async () => {
         const web5e = spells5e.find(s => s.name === 'Web');
         const web2024 = spells2024.find(s => s.name === 'Web');
         expect(web5e.automation[1]).toEqual(WEB_ROW_VERBATIM);
@@ -150,15 +145,13 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
         expect(web2024.automation).toEqual(web5e.automation);
 
         const action = { name: 'Web', automation: web2024.automation[1], metaCtx: { targets: ['Zombie 1'] } };
-        const dispatched = await executeHandler(action, playerStats, 'test-campaign', null);
+        await executeHandler(action, playerStats, 'test-campaign', null);
         expect(handleWebAreaSave).toHaveBeenCalledTimes(1);
+        // pass-through: the verbatim row object reaches the handler by reference
         const [row, stats, campaign, mapName, characters] = handleWebAreaSave.mock.calls[0];
-        expect(row).toBe(action); // L744 pass-through: the verbatim row reaches the handler unchanged
-        expect(row.automation).toEqual(WEB_ROW_VERBATIM);
-        expect(row.automation.duration).toBe('Concentration, up to 1 hour');
-        expect(row.automation.conditionInflicted).toBe('Restrained');
+        expect(row).toBe(action);
+        expect(row.automation).toBe(web2024.automation[1]);
         expect([stats, campaign, mapName, characters]).toEqual([playerStats, 'test-campaign', null, undefined]);
-        expect(dispatched.payload.name).toBe('Web');
     });
 
     it('discriminates the area_save trio L556-558 by exact key — sleet/grease never enter the web lane', async () => {
@@ -166,14 +159,11 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
             { name: 'Sleet Storm', automation: { type: 'sleet_storm_area_save', saveDc: 15, saveType: 'DEX' } },
             playerStats, 'test-campaign', null,
         );
-        expect(handleSleetStorm).toHaveBeenCalledTimes(1);
-        expect(handleWebAreaSave).not.toHaveBeenCalled();
-
-        vi.clearAllMocks();
         await executeHandler(
             { name: 'Grease', automation: { type: 'grease_area_save', saveDc: 15, saveType: 'DEX' } },
             playerStats, 'test-campaign', null,
         );
+        expect(handleSleetStorm).toHaveBeenCalledTimes(1);
         expect(handleGreaseAreaSave).toHaveBeenCalledTimes(1);
         expect(handleWebAreaSave).not.toHaveBeenCalled();
     });
@@ -190,15 +180,5 @@ describe('executeHandler — web_area_save dispatch family (index.js L557, SP-12
         expect(handleWebAreaSave).not.toHaveBeenCalled();
         expect(handleSleetStorm).not.toHaveBeenCalled();
         expect(handleGreaseAreaSave).not.toHaveBeenCalled();
-    });
-
-    it('caller liveness: useSimpleSpellHandlers still stamps web_area_save/DEX through areaExecute → executeHandler', () => {
-        const src = readFileSync(
-            resolve(process.cwd(), 'src/hooks/combat/useSpellMetamagicFlow/useSimpleSpellHandlers.js'),
-            'utf8',
-        );
-        expect(src).toContain("{ name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') }");
-        expect(src).toContain('automation: { type, saveDc: computeSaveDc(d, pending), saveType },');
-        expect(src).toContain('await executeHandler(areaAction(d, pending, type, saveType, { targets: result }), d.playerStats, d.campaignName, null, d.characters)');
     });
 });

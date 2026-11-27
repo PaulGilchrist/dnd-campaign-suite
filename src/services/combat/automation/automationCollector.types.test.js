@@ -1,15 +1,26 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // Home of the automationRouter type→bucket breadth matrix — per the family map in
 // automationCollector.coverage.test.js ("router bucket tables → automationCollector.types.test.js").
 // Fixtures are synthetic shapes pinning dispatch machinery, not disk content from public/data.
 //
-// ATTACK_RIDER_OWNER-SPLIT-VERDICT (#2089): automationService.js:5 is a PURE re-export of
-// './automationCollector.js', so automationService.collection.test.js:196-210 executes the exact
-// same collectAutomationFromFeatures call chain as the attack_rider predicate table below — same
-// function, same code path, and that batch (trigger/chooseOne/maxEffects → passives) is a strict
-// subset of this matrix, which additionally pins oncePerTurn+passive → passives, plain → actions,
-// and per-row bucket exclusivity. Canonical import: direct './automationCollector.js' (here).
-// Removal of automationService.collection.test.js:196-210 is the reported rec for its queue turn.
+// ATTACK_RIDER_OWNER-SPLIT-VERDICT (#2089, EXECUTED): automationService.js:5 is a PURE re-export of
+// './automationCollector.js', so automationService.collection.test.js ran the exact same
+// collectAutomationFromFeatures chain as the attack_rider predicate table below; that strict-subset
+// batch has since been removed from collection.test.js. Canonical import: direct
+// './automationCollector.js' (here).
+//
+// BRANCH-COMPLETION PASS (2026-11-27): every routeX branch the whole suite previously never
+// reached is now pinned here — routeFireBurn (both legs; the three types appeared in ZERO tests),
+// routeMeta (both legs; the builder lane pins row bytes only, not buckets), routeCtPassiveOrReaction
+// 'passive'→specialActions, routeAutoReroll '1 action'/'passive' legs (its default→reactions leg is
+// the collection.test.js roster's), routeCtPassiveBonusOrAction 'passive'→specialActions (builder
+// must carry casting_time — extra_action does NOT, proven by the roster's Extra Action row),
+// routeSaveStyle's exact-string trigger disjunct (the regex disjunct was already pinned), and
+// routeDamageTypeChoice's elemental_affinity leg (the elementalAdept test is a passives-consumer
+// lane, not routing). Legs owned elsewhere and intentionally NOT re-pinned: routeSaveStyle/
+// routeCtPassiveBonusOrAction bonus legs (collection roster healing/buff_ally rows), primal_knowledge
+// spread (collection roster), grapple_damage (turnStartEffects lane), combat_superiority
+// bonusActionManeuvers spread (combatSuperiority* lanes), SPECIAL_AUTOMATIONS row bytes (coverage lane).
 import { describe, it, expect } from 'vitest'
 import { collectAutomationFromFeatures } from './automationCollector.js'
 import { makePlayerStats, makeFeature } from './automationService.test-utils.js'
@@ -56,8 +67,14 @@ describe('collectAutomationFromFeatures – save-style routing', () => {
 
     it.each(spellTypes)('routes %s to actions only', expectRoutedAll)
 
-    it('routes damage_bonus with a critical trigger to passives, not actions', () => {
-        expectRouted({ type: 'damage_bonus', trigger: 'on_critical' }, { passives: ['damage_bonus'] })
+    // routeSaveStyle trigger gate has two disjuncts: the /_crit|critical_/ regex and an
+    // exact-string match. Both legs positive here; the negative leg (no trigger → actions)
+    // is every spellTypes row above.
+    it.each([
+        ['regex disjunct', 'on_critical'],
+        ['exact-string disjunct', 'cunning_strike_poison_save_fail'],
+    ])('routes damage_bonus with %s (%s) to passives, not actions', (_leg, trigger) => {
+        expectRouted({ type: 'damage_bonus', trigger }, { passives: ['damage_bonus'] })
     })
 })
 
@@ -189,6 +206,23 @@ describe('collectAutomationFromFeatures – passive types', () => {
     it('routes auto_effect psychic_teleportation to bonusActions instead of passives', () => {
         expectRouted({ type: 'auto_effect', effect: 'psychic_teleportation' }, { bonusActions: ['auto_effect'] })
     })
+
+    // routeDamageTypeChoice effect gate: elemental_affinity diverts to specialActions;
+    // the default leg is the damage_type_choice row in the passiveTypes table above.
+    it('routes damage_type_choice effect elemental_affinity to specialActions instead of passives', () => {
+        expectRouted({ type: 'damage_type_choice', effect: 'elemental_affinity' }, { specialActions: ['damage_type_choice'] })
+    })
+})
+
+// ── routeMeta effect gate: both legs (the infoBuilder lane pins row bytes only) ──
+
+describe('collectAutomationFromFeatures – meta effect routing', () => {
+    it.each([
+        { effect: 'heroic_inspiration_on_long_rest', expected: { passives: ['meta'] } },
+        { effect: 'anything_else', expected: { specialActions: ['meta'] } },
+    ])('routes meta effect $effect', ({ effect, expected }) => {
+        expectRouted({ type: 'meta', effect }, expected)
+    })
 })
 
 // ── passive_rule effect-conditional routing (routePassiveRule branches) ──
@@ -246,6 +280,21 @@ describe('collectAutomationFromFeatures – casting_time conditional routing', (
         { automation: { type: 'lesser_restoration', casting_time: '1 action' }, expected: { actions: ['lesser_restoration'] } },
         { automation: { type: 'protection_from_poison', casting_time: '1 bonus_action' }, expected: { bonusActions: ['protection_from_poison'] } },
         { automation: { type: 'protection_from_poison' }, expected: { actions: ['protection_from_poison'] } },
+        // routeFireBurn: builder defaults casting_time to '1 action' → actions; anything else → passives.
+        { automation: { type: 'fire_burn' }, expected: { actions: ['fire_burn'] } },
+        { automation: { type: 'frosts_chill' }, expected: { actions: ['frosts_chill'] } },
+        { automation: { type: 'hills_tumble' }, expected: { actions: ['hills_tumble'] } },
+        { automation: { type: 'fire_burn', casting_time: 'passive' }, expected: { passives: ['fire_burn'] } },
+        // routeAutoReroll: action / passive legs (its default ''→reactions leg is the roster's in
+        // automationService.collection.test.js).
+        { automation: { type: 'auto_reroll', casting_time: '1 action' }, expected: { actions: ['auto_reroll'] } },
+        { automation: { type: 'auto_reroll', casting_time: 'passive' }, expected: { specialActions: ['auto_reroll'] } },
+        // routeCtPassiveOrReaction passive leg (default→reactions pinned by the psionic_strike row
+        // above and the collection roster's countercharm row).
+        { automation: { type: 'countercharm', casting_time: 'passive' }, expected: { specialActions: ['countercharm'] } },
+        // routeCtPassiveBonusOrAction passive leg via free_spell — extra_action's builder drops
+        // casting_time, so free_spell is the family member that can reach it.
+        { automation: { type: 'free_spell', casting_time: 'passive' }, expected: { specialActions: ['free_spell'] } },
     ])('$automation.type $automation.casting_time → $expected', ({ automation, expected }) => {
         expectRouted(automation, expected)
     })
@@ -263,8 +312,14 @@ describe('collectAutomationFromFeatures – attack_rider predicate routing', () 
         expectRouted(automation, { passives: ['attack_rider'] })
     })
 
-    it('routes plain attack_rider (no predicate hit) to actions only', () => {
-        expectRouted({ type: 'attack_rider' }, { actions: ['attack_rider'] })
+    // Boundary discriminations on the predicate's compound clauses: maxEffects is >1
+    // (not >=1), and oncePerTurn only counts while the normalized ct is 'passive'.
+    it.each([
+        { automation: { type: 'attack_rider', maxEffects: 1 } },
+        { automation: { type: 'attack_rider', oncePerTurn: true, casting_time: '1 action' } },
+        { automation: { type: 'attack_rider' } },
+    ])('routes attack_rider $automation (predicate miss) to actions only', ({ automation }) => {
+        expectRouted(automation, { actions: ['attack_rider'] })
     })
 })
 
@@ -290,12 +345,9 @@ describe('collectAutomationFromFeatures – CLA-357 single-row regression', () =
 // ── Contact Patron (CLA-061) regression ──
 
 describe('collectAutomationFromFeatures – Contact Patron (CLA-061)', () => {
-    it('collects both free_spell action and contact_patron_auto_save passive from array automation', () => {
+    it('routes array automation to one actions row and one passives row, nowhere else', () => {
         const contactPatronFeature = {
             name: 'Contact Patron',
-            description: 'You always have the Contact Other Plane spell prepared. With this feature, you can cast the spell without expending a spell slot to contact your patron, and you automatically succeed on the spell\'s saving throw. Once you cast the spell with this feature, you can\'t do so in this way again until you finish a Long Rest.',
-            level: 9,
-            type: 'class_feature',
             automation: [
                 {
                     type: 'free_spell',
@@ -313,21 +365,22 @@ describe('collectAutomationFromFeatures – Contact Patron (CLA-061)', () => {
             ],
         }
 
+        // Collection-shape fingerprint only: 2 rows, 2 buckets, exact placement,
+        // every other routed bucket empty. Row bytes (uses/usesMax resolution) are
+        // owned by the automationInfoBuilder/spell.js lane; the non-'passive'
+        // casting_time '1 minute or Ritual' (normalizeCastingTime returns it
+        // unchanged) is what keeps the free_spell row on the actions leg.
         const result = collectAutomationFromFeatures([contactPatronFeature], ps)
-
-        // free_spell should be in actions
-        expect(result.actions).toHaveLength(1)
-        expect(result.actions[0].type).toBe('free_spell')
-        expect(result.actions[0].spell).toBe('Contact Other Plane')
-        expect(result.actions[0].uses).toBe(1)
-        expect(result.actions[0].usesMax).toBe(1)
-        expect(result.actions[0].uses_expression).toBe('1')
-
-        // contact_patron_auto_save should be in passives
-        expect(result.passives).toHaveLength(1)
-        expect(result.passives[0].type).toBe('passive_rule')
-        expect(result.passives[0].effect).toBe('contact_patron_auto_save')
-        expect(result.passives[0].name).toBe('Contact Patron')
-        expect(result.passives[0].hasAutomation).toBe(true)
+        expect(Object.fromEntries(ROUTED_BUCKETS.map(b => [b, result[b].map(({ type, name }) => ({ type, name }))]))).toEqual({
+            actions: [{ type: 'free_spell', name: 'Contact Patron' }],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            passives: [{ type: 'passive_rule', name: 'Contact Patron' }],
+            autoEffects: [],
+            saveModifiers: [],
+            primalKnowledge: [],
+            ritualSpells: [],
+        })
     })
 })

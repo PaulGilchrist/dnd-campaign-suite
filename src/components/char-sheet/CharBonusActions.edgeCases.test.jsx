@@ -1,10 +1,18 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// CharBonusActions edge-cases lane: Nick mastery Light-row filtering (WM-003),
+// cannotAct damage-cell/delegation contract on bonus attack rows, and the Horde
+// Breaker conditional row (display predicate + secondary-target modal flow).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
+// Full shape of the mocked useSpellMetamagicFlow return — every key the
+// component destructures at CharBonusActions.jsx:884 (22 keys; the old
+// 7-key inline mock arrived 15 undefined silently — run2#1826 class).
+// resetAllMocks in beforeEach restores this default implementation, so
+// per-test mockReturnValue overrides never leak.
+const { flowShape } = vi.hoisted(() => ({
+  flowShape: () => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
@@ -12,7 +20,26 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
-  })),
+    pendingBarkskin: null,
+    handleBarkskinConfirm: vi.fn(),
+    handleBarkskinSkip: vi.fn(),
+    pendingHealingWord: null,
+    handleHealingWordConfirm: vi.fn(),
+    handleHealingWordSkip: vi.fn(),
+    pendingSanctuary: null,
+    handleSanctuaryConfirm: vi.fn(),
+    handleSanctuarySkip: vi.fn(),
+    pendingHex: null,
+    handleHexConfirm: vi.fn(),
+    handleHexSkip: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+  }),
+}));
+
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => flowShape()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -51,19 +78,12 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../hooks/combat/useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 10),
-  getMaxSorceryPoints: vi.fn(() => 10),
-  spendSorceryPoints: vi.fn(),
-}));
-
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
@@ -81,6 +101,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
+  rangeToFeet: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({
@@ -141,6 +162,7 @@ vi.mock('../../services/rules/core/spellDamageUtils.js', () => ({
 
 vi.mock('../../services/ui/spellSectionUtils.js', () => ({
   getBonusActionSpellNames: vi.fn(() => new Set()),
+  applyPotentSpellcasting: vi.fn((damage) => damage),
 }));
 
 vi.mock('../../services/character/featureCategories.js', () => ({
@@ -258,14 +280,15 @@ describe('CharBonusActions - Edge Cases', () => {
       type: 'Bonus Action',
     };
 
-    it.each([
-      { label: 'blocks damage rolls and marks the hit cell disabled', cannotAct: true, expectRolled: false },
-      { label: 'allows damage rolls and leaves the hit cell enabled', cannotAct: false, expectRolled: true },
-    ])('cannotAct $label', ({ cannotAct, expectRolled }) => {
+    // The cannotAct=true damage-cell arm (block + skip the roll) is covered
+    // STRONGER in CharBonusActions.cannotActPopup.test.jsx:168 (same fixture,
+    // plus the shared denial-popup copy and zero write/log dispatch) — this
+    // lane keeps the unblocked-roll arm and the delegation contract below.
+    it('cannotAct=false leaves the hit cell enabled and fires the damage roll', () => {
       const roll = vi.fn();
       vi.mocked(useSimpleDamageRoll).mockReturnValue(roll);
       const stats = createStats({ attacks: [bonusActionAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={vi.fn()} cannotAct={cannotAct} exhaustionPenalty={0} />);
+      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={vi.fn()} cannotAct={false} exhaustionPenalty={0} />);
 
       // Call-site contract pin (run2 #12): useSimpleDamageRoll must receive the
       // playerStats OBJECT — the hook re-reads .name internally, so passing the
@@ -275,20 +298,10 @@ describe('CharBonusActions - Edge Cases', () => {
 
       const hitCell = screen.getByText('+5');
       expect(hitCell).toHaveClass('clickable');
-      if (cannotAct) {
-        expect(hitCell).toHaveClass('disabled-attack', 'stat--penalized');
-      }
-      else {
-        expect(hitCell).not.toHaveClass('disabled-attack');
-      }
+      expect(hitCell).not.toHaveClass('disabled-attack', 'stat--penalized');
 
       fireEvent.click(screen.getByText('1d4+3'));
-      if (expectRolled) {
-        expect(roll).toHaveBeenCalledWith(expect.objectContaining({ name: 'Main Gauche', damage: '1d4+3' }));
-      }
-      else {
-        expect(roll).not.toHaveBeenCalled();
-      }
+      expect(roll).toHaveBeenCalledWith(expect.objectContaining({ name: 'Main Gauche', damage: '1d4+3' }));
     });
 
     it('hit-cell click during cannotAct delegates to the parent guard — zero local rolls (Run2 #22)', () => {
@@ -309,7 +322,7 @@ describe('CharBonusActions - Edge Cases', () => {
       render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={onAttackClick} cannotAct exhaustionPenalty={0} />);
 
       const hitCell = screen.getByText('+5');
-      expect(hitCell).toHaveClass('clickable', 'disabled-attack');
+      expect(hitCell).toHaveClass('clickable', 'disabled-attack', 'stat--penalized');
       fireEvent.click(hitCell);
       expect(onAttackClick).toHaveBeenCalledWith(expect.objectContaining({ name: 'Main Gauche', type: 'Bonus Action' }));
       expect(roll).not.toHaveBeenCalled();

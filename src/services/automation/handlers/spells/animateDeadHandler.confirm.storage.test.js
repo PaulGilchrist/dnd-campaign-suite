@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
  * animateDead SEXTET lane #1864 confirm.storage — per the seam map in
  * animateDeadHandler.confirm.details.test.js, this lane owns the confirm
@@ -23,8 +23,17 @@
  * (details lane), zero-total popup prose + spawn field spot-checks (#1865).
  *
  * Deterministic: every external seam mocked, caster's stated initiative '15'
- * makes resolveCasterInitiative roll-free, V8 stable sort keeps tie order.
+ * makes resolveCasterInitiative roll-free, V8 stable sort keeps tie order,
+ * Date.now frozen so both log outlets' timestamps pin exactly.
  * makeAction MERGES overrides (automation included) — never replaces wholesale.
+ *
+ * Honesty audit (run2 storage-lane sweep): the former inline mirrors of
+ * getMonsterSaveBonuses (stale — missed the ability_score_modifiers fallback
+ * and full-name saving_throws rows) and getNextUniqueMonsterName (verbatim
+ * copy) are replaced with the REAL pure helpers via importOriginal
+ * pass-through. Persisted-row toEqual pins only mean something against the
+ * source of truth (cf. run2#1820 details lane, run2#1821 createUndead —
+ * stale mirrors hid a wrong-name defect there).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -53,29 +62,12 @@ vi.mock('../../../ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(),
 }));
 
-vi.mock('../../../encounters/encounterToInitiative.js', () => ({
-    getMonsterSaveBonuses: vi.fn().mockImplementation((monster) => {
-        const map = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
-        for (const [abbr] of Object.entries(map)) {
-            if (monster.saving_throws?.[abbr]?.modifier != null) {
-                map[abbr] = monster.saving_throws[abbr].modifier;
-            }
-        }
-        return map;
-    }),
-    getNextUniqueMonsterName: (baseName, creatures) => {
-        const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const numberedPattern = new RegExp(`^${escaped} (\\d+)$`);
-        let maxNum = 0;
-        let hasExact = false;
-        for (const c of creatures) {
-            if (c.name === baseName) hasExact = true;
-            const m = c.name.match(numberedPattern);
-            if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
-        }
-        if (hasExact && maxNum === 0) return `${baseName} 1`;
-        return `${baseName} ${maxNum + 1}`;
-    },
+// REAL pure helpers, not mirrors: the persisted-row toEqual pins below only
+// mean something against the source of truth. Pass-through keeps the mock
+// resolve-verified while delegating both functions to the real module (its
+// own input semantics are owned by encounterToInitiative.test.js).
+vi.mock('../../../encounters/encounterToInitiative.js', async (importOriginal) => ({
+    ...(await importOriginal()),
 }));
 
 import { confirmAnimateDead } from './animateDeadHandler.js';
@@ -92,6 +84,7 @@ const mockPlayerStats = {
     abilities: [{ name: 'Charisma', bonus: 3 }],
 };
 const mockCampaignName = 'test-campaign';
+const FROZEN_TS = 1700000000000;
 
 const mockSkeleton = {
     index: 'skeleton',
@@ -102,7 +95,9 @@ const mockSkeleton = {
     damage_resistances: [],
     damage_immunities: [],
     immunities: [],
-    saving_throws: {},
+    // Real save modifier on the row: the persisted saveBonuses pin below
+    // proves the REAL helper's output lands in the stored bytes.
+    saving_throws: { dex: { modifier: 2 } },
     initiative_details: '+2',
 };
 
@@ -149,19 +144,24 @@ function targetEffectsWrite() {
 
 describe('confirmAnimateDead - storage, runtime writes and campaign log', () => {
     let consoleSpy;
+    let dateNowSpy;
 
     beforeEach(() => {
         vi.clearAllMocks();
         // clearAllMocks KEEPS mockImplementations — reset so per-test
-        // getRuntimeValue fakes (stored te / enforcement) never bleed forward.
+        // getRuntimeValue fakes (stored te / enforcement) never bleed forward,
+        // and re-install the log-sink default after any rejection test.
         getRuntimeValue.mockReset();
+        addEntry.mockResolvedValue({});
         summary();
         loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
+        dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(FROZEN_TS);
         consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
         consoleSpy.mockRestore();
+        dateNowSpy.mockRestore();
     });
 
     it('persists a detached clone of combatSummary with the spawn serialised', async () => {
@@ -197,7 +197,7 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
                     concentration: null,
                     maxHp: 13,
                     currentHp: 13,
-                    saveBonuses: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+                    saveBonuses: { str: 0, dex: 2, con: 0, int: 0, wis: 0, cha: 0 },
                     monsterIndex: 'skeleton',
                 },
             ],
@@ -235,8 +235,9 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
         );
     });
 
-    it('zero-total cast writes nothing: no storage, no runtime, no log, no event, metadata untouched', async () => {
+    it('zero-total cast writes nothing: no storage, runtime, log, dispatch, metadata', async () => {
         const action = makeAction();
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
         const result = await confirmAnimateDead(
             action,
@@ -249,7 +250,9 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
         expect(storage.set).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
         expect(action.metadata).toBeUndefined();
+        dispatchSpy.mockRestore();
     });
 
     it('dispatches exactly one bare combat-summary-updated event (board refresh only — never initiative-rolled, no detail payload)', async () => {
@@ -273,62 +276,35 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
         dispatchSpy.mockRestore();
     });
 
-    it('logs summons entry: full description string and exact spawn names', async () => {
-        await confirmAnimateDead(
+    it('logs summons entry with exact prose and names; returns logEntries identical to the persisted entry', async () => {
+        const result = await confirmAnimateDead(
             makeAction(),
             mockPlayerStats,
             mockCampaignName,
             { skeletonCount: 1, zombieCount: 2 },
         );
 
+        expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith(mockCampaignName, {
             type: 'summons',
             characterName: 'TestCaster',
             summonName: 'Animate Dead',
             description: 'TestCaster casts Animate Dead (slot level 3), creating 3 undead creature(s).',
             summonedCreatures: ['Skeleton 1', 'Zombie 1', 'Zombie 2'],
-            timestamp: expect.any(Number),
+            timestamp: FROZEN_TS,
         });
+        // One composition, two outlets: the returned entry deep-equals exactly
+        // what was persisted (frozen Date.now makes the timestamp pin exact).
+        expect(result.logEntries).toEqual([addEntry.mock.calls[0][1]]);
     });
 
-    it('returns logEntries identical to the persisted log entry', async () => {
-        const result = await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1, zombieCount: 1 },
-        );
-
-        expect(result.logEntries).toEqual([
-            expect.objectContaining({
-                type: 'summons',
-                characterName: 'TestCaster',
-                summonName: 'Animate Dead',
-                description: 'TestCaster casts Animate Dead (slot level 3), creating 2 undead creature(s).',
-                summonedCreatures: ['Skeleton 1', 'Zombie 1'],
-                timestamp: expect.any(Number),
-            }),
-        ]);
-        // Same prose as what went to the log service — one composition, two outlets.
-        expect(result.logEntries[0].description).toBe(addEntry.mock.calls[0][1].description);
-        expect(result.logEntries[0].summonedCreatures).toEqual(addEntry.mock.calls[0][1].summonedCreatures);
-    });
-
-    it('persists slot-derived maxTargets onto action.metadata (lv4 upcast ⇒ 3)', async () => {
-        const action = makeAction({ automation: { slotLevel: 4 } });
-
-        await confirmAnimateDead(
-            action,
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        expect(action.metadata).toEqual({ animateDeadMaxTargets: 3 });
-    });
-
-    it('merges metadata when it already exists', async () => {
-        const action = makeAction({ metadata: { existingKey: 'value' } });
+    it('persists slot-derived maxTargets merged onto existing action.metadata (lv4 upcast ⇒ 3)', async () => {
+        // Fresh-metadata and merge cases share the one spread line in source;
+        // existing-key survival and slot-derivation both pin in a single cast.
+        const action = makeAction({
+            metadata: { existingKey: 'value' },
+            automation: { slotLevel: 4 },
+        });
 
         await confirmAnimateDead(
             action,
@@ -339,7 +315,7 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
 
         expect(action.metadata).toEqual({
             existingKey: 'value',
-            animateDeadMaxTargets: 1,
+            animateDeadMaxTargets: 3,
         });
     });
 

@@ -1,9 +1,18 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 — save_only lane sweep: full-array commit/refusal censuses, dedup negative legs, promptId-gate zero-spend, stray-listener drain + re-fire double-spend detector.
 // saveOnlyHandler (dispatched as automation type `save_only` from
 // src/services/automation/index.js — distinct from saveAttackHandler).
-// Deterministic unit contract: popup shape, save-prompt delegation, and the
-// window 'save-result' listener's success/fail effect writes.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Lane map: popup/prompt construction, refusal-gate censuses (no_target /
+// cannot_target_self), and the promptId-gated 'save-result' commit paths
+// (success/fail) with exact ordered setRuntimeValue/addEntry/addExpiration
+// censuses. The save-dismissed detach family lives in
+// saveOnlyHandler.dismiss.test.js — do not cross-remove.
+// Known source defect pinned around (NOT laundered): saveOnlyHandler.js:96
+// and :188 call getRuntimeValue WITHOUT campaignName. Read-target assertions
+// here compare only the first two args so a future fix does not break them.
+// The hardcoded addExpiration on both branches (ignores custom
+// auto.effects, saveOnlyHandler.js:114-117/:136-138) is deliberately NOT
+// asserted in the custom-effect tests.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -43,12 +52,19 @@ import * as expirations from '../../../rules/effects/expirations.js';
 const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
 
-// Unique promptId per test: handle() registers a window listener that lives
-// until it sees ITS OWN promptId, so a shared id would leak listeners across
-// tests (every stale listener firing on every later matching dispatch).
-let promptCounter = 0;
+const FROZEN_NOW = 1_700_000_000_000;
 
-function makePlayerStats(overrides = {}) {
+// Unique promptId per mint: handle() registers window listeners gated on ITS
+// OWN promptId; shared ids across tests would re-fire stale handlers
+// (double-spend). The afterEach drain below is the belt to that braces.
+let promptCounter = 0;
+let lastDispatchedPromptId = null;
+
+const realAdd = window.addEventListener.bind(window);
+const realRemove = window.removeEventListener.bind(window);
+const strayHandlers = new Set();
+
+function makePlayerStats() {
   return {
     name: 'TestHero',
     level: 3,
@@ -57,14 +73,13 @@ function makePlayerStats(overrides = {}) {
       { name: 'CON', modifier: 2 },
       { name: 'CHA', modifier: 3 },
     ],
-    ...overrides,
   };
 }
 
 function makeAction(automation = {}) {
   return {
     name: 'Stunning Strike',
-    automation: { ...automation },
+    automation: { type: 'save_only', ...automation },
   };
 }
 
@@ -72,19 +87,16 @@ function setupMocks() {
   savePrompt.buildSaveDc.mockReturnValue(14);
   savePrompt.createSaveListener.mockImplementation((_campaignName, _config) => {
     // Real contract (savePrompt.js:105-145): returns { promptId, promise } —
-    // the old stub handed back promptId WITHOUT the promise the real service
-    // mints (a one-shot 'save-result' listener routed BY its own promptId,
-    // savePrompt.js:121-131). Ids stay unique-per-mint here (already true);
-    // the added promise self-resolves+removes exactly like the real seam so
-    // any future consumer awaiting it behaves as in prod.
+    // a one-shot 'save-result' listener routed BY its own promptId that
+    // self-resolves and detaches. Ids stay unique-per-mint so nothing leaks.
     const promptId = `save-guid-${++promptCounter}`;
     const promise = new Promise((resolve) => {
-      const handleSaveResult = (event) => {
+      const route = (event) => {
         if (event.detail.promptId !== promptId) return;
-        window.removeEventListener('save-result', handleSaveResult);
+        realRemove('save-result', route);
         resolve(event.detail);
       };
-      window.addEventListener('save-result', handleSaveResult);
+      window.addEventListener('save-result', route);
     });
     return { promptId, promise };
   });
@@ -95,221 +107,214 @@ function setupMocks() {
   expirations.addExpiration.mockReturnValue(undefined);
 }
 
+const latestPromptId = () =>
+  savePrompt.createSaveListener.mock.results.at(-1).value.promptId;
+
 // Dispatches against the promptId issued by the most recent handle() call.
 function dispatchSaveResult(success) {
-  const { promptId } = savePrompt.createSaveListener.mock.results.at(-1).value;
+  lastDispatchedPromptId = latestPromptId();
   window.dispatchEvent(new CustomEvent('save-result', {
-    detail: { promptId, success },
+    detail: { promptId: lastDispatchedPromptId, success },
   }));
 }
 
-// ── Tests: handle - popup return value ─────────────────────────
+const spendCount = () =>
+  runtimeState.setRuntimeValue.mock.calls.length +
+  logService.addEntry.mock.calls.length +
+  expirations.addExpiration.mock.calls.length;
 
-describe('saveOnlyHandler.handle - popup return value', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
+// Which runtime lanes the handler READ, as [creature, key] pairs — arg-count
+// agnostic so the campaignName-dropped-read defect (:96/:188) can be fixed
+// without touching these pins.
+const readTargets = () =>
+  runtimeState.getRuntimeValue.mock.calls.map((c) => [c[0], c[1]]);
+
+// ── Shared harness (single beforeEach/afterEach for the whole file) ──
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  setupMocks();
+  vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+  vi.spyOn(window, 'addEventListener').mockImplementation((type, fn, opts) => {
+    if (type === 'save-result' || type === 'save-dismissed') strayHandlers.add(fn);
+    return realAdd(type, fn, opts);
   });
+  vi.spyOn(window, 'removeEventListener').mockImplementation((type, fn, opts) => {
+    strayHandlers.delete(fn);
+    return realRemove(type, fn, opts);
+  });
+  lastDispatchedPromptId = null;
+});
 
-  it('returns a popup with automation_info type', async () => {
+afterEach(() => {
+  // Double-spend detector: re-firing an ALREADY-resolved promptId must not
+  // spend state again (listener self-detach pin, save-listener hazard).
+  if (lastDispatchedPromptId) {
+    const before = spendCount();
+    window.dispatchEvent(new CustomEvent('save-result', {
+      detail: { promptId: lastDispatchedPromptId, success: true },
+    }));
+    expect(spendCount()).toBe(before);
+  }
+  // Stray-listener drain: every save-event listener still live at test end
+  // (undispatched prompts) is force-removed so it cannot fire in later tests.
+  for (const fn of strayHandlers) {
+    realRemove('save-result', fn);
+    realRemove('save-dismissed', fn);
+  }
+  strayHandlers.clear();
+  vi.restoreAllMocks();
+});
+
+// ── Popup + prompt construction ────────────────────────────────
+
+describe('saveOnlyHandler.handle - popup and prompt construction', () => {
+  it('full-shape popup, DC build, and save-listener config for an explicit saveType', async () => {
     const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
+    const action = makeAction({ saveType: 'WIS' });
 
     const result = await handle(action, ps, campaignName, mapName);
 
+    expect(targetResolver.resolveTarget).toHaveBeenCalledWith(campaignName, 'TestHero');
+    expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
+    // Exact distinct config across branches: explicit saveType is forwarded verbatim.
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+      targetName: 'Goblin',
+      saveType: 'WIS',
+      saveDc: 14,
+    });
     expect(result).toEqual({
       type: 'popup',
       payload: {
         type: 'automation_info',
         name: 'Stunning Strike',
         targetName: 'Goblin',
-        description: 'Target Goblin must make a CON saving throw (DC 14).',
-        automation: { saveType: 'CON' },
+        description: 'Target Goblin must make a WIS saving throw (DC 14).',
+        automation: { type: 'save_only', saveType: 'WIS' },
       },
     });
   });
 
-  it('defaults saveType to CON in popup description when omitted', async () => {
+  it('omitted saveType defaults to CON across popup, listener config, and ability_use row', async () => {
     const ps = makePlayerStats();
     const action = makeAction({});
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(result.payload.description).toContain('CON saving throw');
-    expect(result.payload.description).toContain('DC 14');
-  });
-
-  it('uses custom saveType in popup description and save listener', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'WIS' });
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('WIS saving throw');
+    expect(result.payload.description).toBe(
+      'Target Goblin must make a CON saving throw (DC 14).'
+    );
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
       targetName: 'Goblin',
-      saveType: 'WIS',
+      saveType: 'CON',
       saveDc: 14,
     });
+    // The queued prompt's spend row: full-array census, exact object.
+    expect(logService.addEntry.mock.calls).toEqual([[campaignName, {
+      type: 'ability_use',
+      characterName: 'TestHero',
+      abilityName: 'Stunning Strike',
+      description: 'Stunning Strike triggered — target Goblin must make CON save (DC 14)',
+      promptId: latestPromptId(),
+    }]]);
   });
+});
 
-  it('refuses with a popup and no save prompt when resolveTarget returns null', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    targetResolver.resolveTarget.mockResolvedValue(null);
+// ── Refusal gates ──────────────────────────────────────────────
 
-    const result = await handle(action, ps, campaignName, mapName);
+describe('saveOnlyHandler.handle - refusal gates', () => {
+  // Regression (self-harm fallback family): every save_only consumer
+  // (Stunning Strike, Color Spray, Entangle, Grease, Arms of Hadar, Dominate
+  // Monster) requires another creature — an unarmed or self-armed click must
+  // never queue a saving-throw prompt against the caster.
+  it.each([
+    {
+      label: 'no target armed',
+      resolved: null,
+      reason: 'no_target',
+      message: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
+    },
+    {
+      label: 'armed target is the caster',
+      resolved: { target: { name: 'TestHero' } },
+      reason: 'cannot_target_self',
+      message: "You can't target yourself with Stunning Strike — it requires another creature.",
+    },
+  ])('refuses when $label: exact popup, one refusal row, zero prompt/state spend', async ({ resolved, reason, message }) => {
+    targetResolver.resolveTarget.mockResolvedValue(resolved);
 
-    // Regression (self-harm fallback family, shared with divineSparkHandler):
-    // every save_only consumer (Stunning Strike, Color Spray, Entangle, Grease,
-    // Arms of Hadar, Dominate Monster) requires another creature — an unarmed
-    // click must never queue a saving-throw prompt against the caster.
+    const result = await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
+
     expect(result).toEqual({
       type: 'popup',
       payload: {
         type: 'automation_info',
         name: 'Stunning Strike',
         automationType: 'save_only',
-        description: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
-        automation: { saveType: 'CON' },
+        description: message,
+        automation: { type: 'save_only', saveType: 'CON' },
       },
     });
-    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+    // Full-array refusal-row census: exactly one row, exact shape
+    // (refusal slug, description composition, frozen timestamp).
+    expect(logService.addEntry.mock.calls).toEqual([[campaignName, {
       type: 'automation',
       characterName: 'TestHero',
       abilityName: 'Stunning Strike',
+      automationType: 'save_only',
       automationDetail: 'stunning_strike_refused',
-      reason: 'no_target',
-    }));
-  });
-
-  it('refuses with a popup and no save prompt when the armed target is the caster', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'TestHero' } });
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toBe(
-      "You can't target yourself with Stunning Strike — it requires another creature."
-    );
+      reason,
+      description: `Stunning Strike refused — ${reason}`,
+      timestamp: FROZEN_NOW,
+    }]]);
+    // Zero spend on every later channel.
     expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      automationDetail: 'stunning_strike_refused',
-      reason: 'cannot_target_self',
-    }));
-  });
-});
-
-// ── Tests: handle - dispatch wiring ────────────────────────────
-
-describe('saveOnlyHandler.handle - dispatch wiring', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
-  });
-
-  it('computes save DC and passes it to save listener', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin',
-      saveType: 'CON',
-      saveDc: 14,
-    });
-  });
-
-  it('adds an ability_use log entry with correct details', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'ability_use',
-      characterName: 'TestHero',
-      abilityName: 'Stunning Strike',
-      description: 'Stunning Strike triggered — target Goblin must make CON save (DC 14)',
-      promptId: savePrompt.createSaveListener.mock.results.at(-1).value.promptId,
-    });
-  });
-});
-
-// ── Tests: handle - save result (success path) ─────────────────
-
-describe('saveOnlyHandler.handle - save result success', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
-  });
-
-  it('ignores save-result events with non-matching promptId', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'different-prompt', success: true },
-    }));
-
+    expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     expect(expirations.addExpiration).not.toHaveBeenCalled();
   });
+});
 
-  // CLA-342 regression: the success branch must write the canonical key
-  // consumed by CharSheet.conditionEffects ('stunned_speedHalved'), not a
-  // timestamped dead key.
-  it('writes canonical stunned_speedHalved key (no timestamped dead keys)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
+// ── Save-result success commits ────────────────────────────────
 
-    await handle(action, ps, campaignName, mapName);
+describe('saveOnlyHandler.handle - save result success', () => {
+  it('success: exact ordered commit census (canonical keys, read targets, log rows, expiration)', async () => {
+    // CLA-342: the success branch must write the canonical keys consumed by
+    // CharSheet.conditionEffects ('stunned_speedHalved'), never timestamped
+    // dead keys — the exact-array census below subsumes the old
+    // /_\\d{13}$/ regex pin.
+    await handle(makeAction({ saveType: 'WIS' }), makePlayerStats(), campaignName, mapName);
     dispatchSaveResult(true);
 
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'stunned_speedHalved',
-      true,
-      campaignName,
-    );
-    const deadKeys = runtimeState.setRuntimeValue.mock.calls.filter(
-      (call) => /_\d{13}$/.test(String(call[1])),
-    );
-    expect(deadKeys).toHaveLength(0);
-  });
-
-  it('records advantage_on_target on the attacker', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-    dispatchSaveResult(true);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'TestHero',
-      '_advantageOn_Goblin',
-      ['Goblin'],
-      campaignName,
-    );
-  });
-
-  it('adds expiration for success effects', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-    dispatchSaveResult(true);
-
-    expect(expirations.addExpiration).toHaveBeenCalledWith({
-      attackerName: ps.name,
+    expect(readTargets()).toEqual([
+      ['Goblin', 'activeConditions'],
+      ['TestHero', '_advantageOn_Goblin'],
+    ]);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'stunned_speedHalved', true, campaignName],
+      ['TestHero', '_advantageOn_Goblin', ['Goblin'], campaignName],
+    ]);
+    expect(logService.addEntry.mock.calls).toEqual([
+      [campaignName, {
+        type: 'ability_use',
+        characterName: 'TestHero',
+        abilityName: 'Stunning Strike',
+        description: 'Stunning Strike triggered — target Goblin must make WIS save (DC 14)',
+        promptId: latestPromptId(),
+      }],
+      [campaignName, {
+        type: 'save_result',
+        characterName: 'TestHero',
+        rollType: 'save-save_only',
+        targetName: 'Goblin',
+        saveDc: 14,
+        saveType: 'WIS',
+        success: true,
+        description: 'Goblin succeeded on WIS save. Speed halved until start of next turn.',
+      }],
+    ]);
+    expect(expirations.addExpiration.mock.calls).toEqual([[{
+      attackerName: 'TestHero',
       targetName: 'Goblin',
       effects: [
         { type: 'stunned', condition: 'speed_halved' },
@@ -318,73 +323,91 @@ describe('saveOnlyHandler.handle - save result success', () => {
       campaignName,
       rounds: undefined,
       expireOnCreatureName: 'Goblin',
-    });
+    }]]);
   });
 
-  it('adds a save_result log entry on success', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
+  it('ignores save-result events with a non-matching promptId: zero reads, writes, or log rows', async () => {
+    await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
+    const rowsBefore = logService.addEntry.mock.calls.length;
 
-    await handle(action, ps, campaignName, mapName);
+    window.dispatchEvent(new CustomEvent('save-result', {
+      detail: { promptId: 'different-prompt', success: true },
+    }));
+
+    // The id-gate short-circuits BEFORE the activeConditions read.
+    expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
+    expect(logService.addEntry.mock.calls).toHaveLength(rowsBefore);
+  });
+
+  it('success dedup: already-listed advantage target gets no second write', async () => {
+    // Negative leg of the applySuccessEffects includes() guard
+    // (saveOnlyHandler.js:189) — the positive leg is pinned by the census
+    // above (stored list starts empty/undefined).
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) =>
+      key === '_advantageOn_Goblin' ? ['Goblin'] : undefined);
+
+    await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
     dispatchSaveResult(true);
 
-    const successEntry = logService.addEntry.mock.calls.find(
-      (call) => call[1]?.type === 'save_result' && call[1]?.success === true,
-    );
-    expect(successEntry).toBeDefined();
-    expect(successEntry[1].targetName).toBe('Goblin');
-    expect(successEntry[1].saveDc).toBe(14);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'stunned_speedHalved', true, campaignName],
+    ]);
+  });
+
+  it('non-Stunning-Strike action without effects has an empty default success lane: no writes, row still logged', async () => {
+    // getDefaultEffects() negative leg (saveOnlyHandler.js:17-22):
+    // success: [] means a passed save spends nothing on the runtime lane.
+    // addExpiration NOT censused here — its success payload is hardcoded and
+    // would fire Stunning-Strike stun semantics for this custom action
+    // (flagged source defect, see header).
+    const action = { name: 'Color Spray', automation: { type: 'save_only', saveType: 'CON' } };
+
+    await handle(action, makePlayerStats(), campaignName, mapName);
+    dispatchSaveResult(true);
+
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(logService.addEntry.mock.calls.at(-1)[1]).toMatchObject({
+      type: 'save_result',
+      targetName: 'Goblin',
+      success: true,
+    });
   });
 });
 
-// ── Tests: handle - save result (fail path) ────────────────────
+// ── Save-result fail commits ───────────────────────────────────
 
 describe('saveOnlyHandler.handle - save result fail', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
-  });
-
-  it('adds condition to activeConditions on failure', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
+  it('fail: exact ordered commit census (condition append, read targets, log rows, expiration)', async () => {
+    await handle(makeAction({ saveType: 'WIS' }), makePlayerStats(), campaignName, mapName);
     dispatchSaveResult(false);
 
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
-      campaignName,
-    );
-  });
-
-  it('appends condition to existing activeConditions', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue(['prone', 'blinded']);
-
-    await handle(action, ps, campaignName, mapName);
-    dispatchSaveResult(false);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['prone', 'blinded', 'stunned'],
-      campaignName,
-    );
-  });
-
-  it('adds expiration with fail effects on failure', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-    dispatchSaveResult(false);
-
+    expect(readTargets()).toEqual([['Goblin', 'activeConditions']]);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'activeConditions', ['stunned'], campaignName],
+    ]);
+    expect(logService.addEntry.mock.calls).toEqual([
+      [campaignName, {
+        type: 'ability_use',
+        characterName: 'TestHero',
+        abilityName: 'Stunning Strike',
+        description: 'Stunning Strike triggered — target Goblin must make WIS save (DC 14)',
+        promptId: latestPromptId(),
+      }],
+      [campaignName, {
+        type: 'save_result',
+        characterName: 'TestHero',
+        rollType: 'save-save_only',
+        targetName: 'Goblin',
+        saveDc: 14,
+        saveType: 'WIS',
+        success: false,
+        description: 'Goblin failed WIS save. Stunned until start of next turn.',
+      }],
+    ]);
     expect(expirations.addExpiration).toHaveBeenCalledWith({
-      attackerName: ps.name,
+      attackerName: 'TestHero',
       targetName: 'Goblin',
       effects: [{ type: 'stunned', condition: 'stunned' }],
       campaignName,
@@ -393,32 +416,51 @@ describe('saveOnlyHandler.handle - save result fail', () => {
     });
   });
 
-  it('adds a save_result log entry on failure', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
+  it('fail dedup: existing case-variant condition is replaced, not duplicated', async () => {
+    // Covers both legs of the filter-then-append at
+    // saveOnlyHandler.js:120-121: 'Stunned' is evicted (case-insensitive)
+    // and 'stunned' re-appended at the end; 'prone' untouched.
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) =>
+      key === 'activeConditions' ? ['prone', 'Stunned'] : undefined);
 
-    await handle(action, ps, campaignName, mapName);
+    await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
     dispatchSaveResult(false);
 
-    const failEntry = logService.addEntry.mock.calls.find(
-      (call) => call[1]?.type === 'save_result' && call[1]?.success === false,
-    );
-    expect(failEntry).toBeDefined();
-    expect(failEntry[1].targetName).toBe('Goblin');
-    expect(failEntry[1].success).toBe(false);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'activeConditions', ['prone', 'stunned'], campaignName],
+    ]);
+  });
+
+  it('custom fail condition drives the appended key (Color Spray blinded scenario)', async () => {
+    // conditionKey = effects.fail[0].condition branch. addExpiration is not
+    // censused — hardcoded Stunning-Strike expiration is a flagged source
+    // defect for custom conditions (see header).
+    const action = {
+      name: 'Color Spray',
+      automation: {
+        type: 'save_only',
+        saveType: 'CON',
+        effects: { fail: [{ type: 'blinded', condition: 'blinded' }] },
+      },
+    };
+
+    await handle(action, makePlayerStats(), campaignName, mapName);
+    dispatchSaveResult(false);
+
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'activeConditions', ['blinded'], campaignName],
+    ]);
   });
 });
 
-// ── Tests: handle - custom effects ─────────────────────────────
+// ── Custom success effects ─────────────────────────────────────
 
-describe('saveOnlyHandler.handle - custom effects', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
-  });
-
-  it('uses custom success effect conditions as runtime keys', async () => {
-    const ps = makePlayerStats();
+describe('saveOnlyHandler.handle - custom success effects', () => {
+  it('custom success condition becomes the stunned_<condition> runtime key and no other write fires', async () => {
+    // applySuccessEffects ternary alternate branch (saveOnlyHandler.js:182):
+    // condition !== 'speed_halved' → `stunned_custom_slow`. The custom
+    // success lane has no advantage_on_target entry, so the exact-array
+    // census below proves that is the ONLY write.
     const action = makeAction({
       saveType: 'CON',
       effects: {
@@ -427,38 +469,11 @@ describe('saveOnlyHandler.handle - custom effects', () => {
       },
     });
 
-    await handle(action, ps, campaignName, mapName);
+    await handle(action, makePlayerStats(), campaignName, mapName);
     dispatchSaveResult(true);
 
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'stunned_custom_slow',
-      true,
-      campaignName,
-    );
-  });
-
-  it('applies custom fail condition via effects.fail (Color Spray scenario)', async () => {
-    const ps = makePlayerStats();
-    const action = {
-      name: 'Color Spray',
-      automation: {
-        type: 'save_only',
-        saveType: 'CON',
-        effects: {
-          fail: [{ type: 'blinded', condition: 'blinded' }],
-        },
-      },
-    };
-
-    await handle(action, ps, campaignName, mapName);
-    dispatchSaveResult(false);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['blinded'],
-      campaignName,
-    );
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['Goblin', 'stunned_custom_slow', true, campaignName],
+    ]);
   });
 });

@@ -1,70 +1,118 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
- * questsService — client-side fetch contract for the GM campaign-quests family.
+ * questsService — client-side fetch contract for the campaign-quests family.
  *
- * Lane of the services/campaign/ block (campaignService.test.js map #2002,
- * factionsService precedent #2003, notesService precedent #2005): per-test
+ * Lane of the services/campaign/ block (campaignService opener #1857,
+ * factionsService precedent #1860, notesService precedent #1862): per-test
  * fetch-spied, fail-loud default (unmocked fetch throws — never live, per
- * campaign lockdown), exact request shapes, server-truth response envelopes,
- * error-body extraction vs the client's own generic fallbacks, console.error
- * pins on every rethrow-with-log swallow.
+ * campaign lockdown), full-shape RequestInit censuses via toEqual (no masked
+ * objectContaining bodies), assertion-identical failure faces run as an
+ * errorFaces() it.each table per function, every error path pins exactly ONE
+ * console.error (non-silent doctrine), 409 conflicts route to console.warn as
+ * a distinct no-error pair.
  *
  * THIS file owns `/api/campaigns/:campaign/quests` (GET list, POST full-array
- * overwrite) and `/api/campaigns/:campaign/quests/:id` (GET item, DELETE).
+ * overwrite), `/api/campaigns/:campaign/quests/board` (GET, player-facing) and
+ * `/api/campaigns/:campaign/quests/:id` (DELETE).
  *
  * Response shapes pinned against the server, NOT canned JSON:
- * server/routes/quests.js delegates to server/utils/jsonEntityCrud.js
+ * server/routes/quests.js delegates CRUD to server/utils/jsonEntityCrud.js
  * (createJsonEntityRouter('quests')) — pure CRUD, NO custom legs (no status
  * transition / completion / assign-to-session routes; quest `status` is a
  * client form field persisted through the full-array POST):
  *  - GET list  → { quests: [...] } (responseWrapper envelope). UNLIKE the
- *    notes family, the client UNWRAPS here: loadQuests resolves to the
- *    ARRAY (data.quests || []). Quests.jsx consumes it via useEntityManagement
- *    with NO responseKey (array contract); applyWorldProposal.js appends onto
- *    it. Collection routes loadOrInit() the file, so a missing
- *    campaign/quests.json returns { quests: [] } — this leg never 404s
- *    'Campaign not found'. Server-side localhost transformList/authorizeRead
- *    lives in server/routes/quests.test.js + quests-duplicate-name.test.js.
- *  - GET item  → { quest: entity } (itemWrapper), 404 { error: 'Quest not
- *    found' } (Title-case, jsonEntityCrud singularDisplayName:'Quest') when
- *    the file or id is missing; 403 { error: 'Access denied: GM-only
- *    feature' } via authorizeRead/forbiddenMessage — quests' own flavor.
- *    authorizeRead is NOT wired on the DELETE leg (server-truth).
+ *    notes/factions siblings, the client UNWRAPS here: loadQuests resolves to
+ *    the ARRAY (data.quests || []). Quests.jsx consumes it via
+ *    useEntityManagement with NO responseKey (array contract);
+ *    AiWorldConsole/Sessions pickers, applyWorldProposal.js, draftActions.js
+ *    and seededCampaign.js all rely on the bare-array contract. Collection
+ *    routes loadEntityList() the file (missing file → seeded []), so this leg
+ *    never 404s 'Campaign not found'.
+ *  - GET board (quests.js, mounted BEFORE the GM gate — the ONLY
+ *    visitor-open door on this path) → { quests: whitelisted rows }; the
+ *    field-whitelist (GM `notes` never leave the server) and draft-drop are
+ *    SERVER-side behavior (pinned by server route tests) — this lane pins
+ *    only the client's unwrap-to-array and its `|| []` missing-key fallback,
+ *    pinned SEPARATELY from the GM CRUD unwraps (player quest-board lane:
+ *    QuestBoard.jsx, FirstSessionChecklist.jsx; read-only, never paired
+ *    with a write).
  *  - POST      → { success: true } only; the client returns UNDEFINED
  *    (unlike notesService.saveNotes' envelope passthrough). 400 { error:
- *    'Expected an array for quests' } and 400 { error: 'A quest with that
- *    name already exists' } via validateList → nameUniqueness.js.
+ *    'A quest with that name already exists' } via
+ *    validateList → findDuplicateNameError(quests, 'quest'); 409
+ *    concurrent-edit body carries { conflict: true } — the editor banner
+ *    keys its one-click "Reload list" recovery off this flag.
  *  - DELETE    → { success: true } only (no deleted-id key); client returns
- *    UNDEFINED; DELETE is sent with NO headers (exact-request pin below).
+ *    UNDEFINED; DELETE is sent with NO headers (exact-request census below).
+ *  - GM-only lane gate: refuseUnlessGm wraps the whole factory lane (reads
+ *    AND writes) — non-localhost origins get 403 { error: 'Access denied:
+ *    GM-only feature' } before any CRUD leg runs. Client-side this is just
+ *    another { error } body surfaced verbatim by the serverMessage face.
  *  - 500 body  → { error: <message> } via server/utils/asyncHandler.js
- *    ('Failed to read quests' collection leg, 'Failed to read quest'
- *    singular on the item leg). The client's `error || 'Failed to …'`
- *    generics are defensive, client-only strings (server always sends
- *    { error }) — pinned as such.
+ *    ('Failed to read quests' on the collection GET leg). The client's
+ *    `error || 'Failed to …'` generics are defensive, client-only strings
+ *    (server always sends { error }) — pinned as such.
  *  - Id encoding: the client encodeURIComponent()s raw ids; production
- *    callers pass raw crypto.randomUUID() ids (Quests.jsx), so the raw-id →
- *    single-encoded pin is the real contract (server decodeURIComponent
- *    round-trips it). Pre-encoded inputs double-encode (%252F) — not the
- *    contract; the #2005 anti-pattern was removed here.
+ *    callers pass raw crypto.randomUUID() ids (Quests.jsx deletes by
+ *    raw quest.id), so the raw-id → single-encoded pin is the real contract
+ *    (server decodeURIComponent round-trips it). Encoded faces are pinned
+ *    once per leg-type: collection GET via loadQuests, collection POST via
+ *    saveQuests, board GET via loadQuestBoard, item DELETE via deleteQuest.
  *
- * Consumers (liveness verified): src/components/quests/Quests.jsx (GM quest
- * panel, localhost-only management per AGENTS.md) wires load/save/delete via
- * useEntityManagement and deletes by raw quest.id; src/components/sessions/
- * Sessions.jsx loadResourceOptions lists quests for the session-planner
- * linked-resources picker (quests↔sessions cross-reference — planner lane
- * #2008, cited not absorbed); src/services/ai/applyWorldProposal.js
- * quest_draft → loadQuests → append → saveQuests CRUD lane (own test file).
- * `loadQuest` has no production consumer today — kept as item-route contract
- * coverage, flagged in the lane report.
- * No SSE consumer: routes/quests.js does NOT pass jsonEntityCrud's
- * `broadcast` option (default null), so quest changes are not pushed —
- * panels reload on mount.
+ * Consumers (liveness verified 2026-11-27, export-by-export): Quests.jsx
+ * (GM quest panel) wires loadQuests/saveQuests/deleteQuest via
+ * useEntityManagement; Sessions.jsx picker + AiWorldConsole.jsx consume
+ * loadQuests; draftActions.js/seededCampaign.js use the CRUD trio for the
+ * draft-approval and seeding lanes; applyWorldProposal.js appends onto
+ * loadQuests then saveQuests; QuestBoard.jsx + FirstSessionChecklist.jsx
+ * consume loadQuestBoard read-only. `loadQuest` (singular) is a
+ * ZERO-CALLER export repo-wide — unpinned per dead-export canon (notes'
+ * loadNote precedent); flagged for source removal (no-legacy-compat policy).
+ * SSE: routes/quests.js DOES pass jsonEntityCrud a `broadcast` option
+ * (broadcastQuestsList → `quests-list-<campaign>` events) — that is a
+ * consumer re-fetch concern pinned by Quests.sse-sync.test.jsx, not part of
+ * this fetch-boundary lane.
  *
  * No timers, no localStorage game state — pure fetch boundary; quests live
  * server-side in public/campaigns/:campaign/data/quests.json.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { loadQuests, saveQuests, loadQuest, deleteQuest } from './questsService.js';
+import { loadQuests, saveQuests, loadQuestBoard, deleteQuest } from './questsService.js';
+
+/**
+ * Assertion-identical failure faces shared by every function:
+ *  1. non-2xx WITH a server { error } body — the message surfaces verbatim;
+ *  2. non-2xx WITHOUT an error field — the client's generic fallback string;
+ *  3. network rejection — the original error propagates unchanged.
+ * Each face must land exactly one console.error with the function's prefix.
+ */
+const errorFaces = ({ generic, serverStatus = 500, serverMessage = 'Server-side failure' }) => [
+  {
+    title: 'non-2xx with a server { error } body surfaces the server message',
+    respond: () => ({
+      ok: false,
+      status: serverStatus,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({ error: serverMessage }),
+    }),
+    expected: serverMessage,
+  },
+  {
+    title: 'non-2xx body without an error field falls back to the generic client message',
+    respond: () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({}),
+    }),
+    expected: generic,
+  },
+  {
+    title: 'network rejection propagates the original error',
+    respond: () => Promise.reject(new Error('ENOTFOUND')),
+    expected: 'ENOTFOUND',
+  },
+];
 
 describe('questsService', () => {
   let fetchSpy;
@@ -91,8 +139,9 @@ describe('questsService', () => {
   describe('loadQuests', () => {
     it('unwraps the server list envelope to an array and pins the exact GET request', async () => {
       // server truth: jsonEntityCrud responseWrapper 'quests'; the client
-      // UNWRAPS to the array Quests.jsx/useEntityManagement (no responseKey)
-      // and applyWorldProposal.js consume. GET is fetch(url) — no headers.
+      // UNWRAPS to the array Quests.jsx/useEntityManagement (no responseKey),
+      // AiWorldConsole/Sessions pickers and applyWorldProposal/draftActions/
+      // seededCampaign consume. GET is fetch(url) — no init, no headers.
       const envelope = {
         quests: [
           { id: '3f9a1c2e-0000-4a7b-9d3e-000000000001', name: 'The Lost Artifact', status: 'active', description: 'Recover the artifact', rewards: '100 gp', notes: '' },
@@ -111,66 +160,34 @@ describe('questsService', () => {
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/quests');
     });
 
-    it('URL-encodes the campaign name; empty collection passes through as []', async () => {
-      // server truth: loadOrInit() answer for a missing campaign/quests.json
+    it('URL-encodes the campaign name; defensively returns [] when the success body omits the quests key (server always sends { quests })', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ quests: [] }),
+        json: () => Promise.resolve({}),
       });
 
       const result = await loadQuests('my campaign/1');
 
       expect(result).toEqual([]);
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/quests');
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('defensively returns [] when the envelope has no quests key (server always sends { quests })', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({}),
-      });
+    it.each(errorFaces({ generic: 'Failed to load quests', serverMessage: 'Failed to read quests' }))(
+      '$title',
+      async ({ respond, expected }) => {
+        fetchSpy.mockImplementation(() => respond());
 
-      await expect(loadQuests('test-campaign')).resolves.toEqual([]);
-    });
-
-    it('extracts the server 500 error and logs', async () => {
-      // server truth: read failure surfaces through asyncHandler as
-      // 500 { error: 'Failed to read quests' } (pluralDisplayName)
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({ error: 'Failed to read quests' }),
-      });
-
-      await expect(loadQuests('test-campaign')).rejects.toThrow('Failed to read quests');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quests:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(loadQuests('test-campaign')).rejects.toThrow('Failed to load quests');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quests:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(loadQuests('test-campaign')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quests:', expect.any(Error));
-    });
+        await expect(loadQuests('test-campaign')).rejects.toThrow(expected);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quests:', expect.any(Error));
+      }
+    );
   });
 
   describe('saveQuests', () => {
-    it('POSTs the exact quests body and returns undefined (server answers { success: true } only)', async () => {
+    it('POSTs the exact full-array overwrite body (campaign name URL-encoded) and returns undefined (server answers { success: true } only)', async () => {
       const quests = [
         { id: '3f9a1c2e-0000-4a7b-9d3e-000000000001', name: 'The Lost Artifact', status: 'active', description: 'Recover the artifact', rewards: '100 gp', notes: '' },
       ];
@@ -181,54 +198,21 @@ describe('questsService', () => {
         json: () => Promise.resolve({ success: true }),
       });
 
-      const result = await saveQuests('test-campaign', quests);
+      const result = await saveQuests('my campaign/1', quests);
 
       // full-array overwrite, GUID-keyed — no per-entity PUT (Quests.jsx /
-      // applyWorldProposal.js lane); client resolves undefined, not the envelope
+      // applyWorldProposal.js / draftActions.js lane); client resolves
+      // undefined, not the envelope
       expect(result).toBeUndefined();
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/quests', {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/quests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quests }),
       });
     });
 
-    it('URL-encodes the campaign name; empty-array overwrite sends the exact body', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveQuests('my campaign/1', []);
-
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/quests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quests: [] }),
-      });
-    });
-
-    it('extracts the server 400 duplicate-name error and logs', async () => {
-      // server truth: validateList → findDuplicateNameError(quests, 'quest')
-      // → 400 { error: 'A quest with that name already exists' }
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        json: () => Promise.resolve({ error: 'A quest with that name already exists' }),
-      });
-
-      await expect(saveQuests('test-campaign', [
-        { id: 'id-1', name: 'QA Dup' },
-        { id: 'id-2', name: 'qa dup' },
-      ])).rejects.toThrow('A quest with that name already exists');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-    });
-
     it('routes a handled 409 conflict to console.warn — never a red ERROR (improve 2026-10-27-H)', async () => {
-      // server truth: conflictErrorBody (jsonEntityCrud.js:88) — the banner +
+      // server truth: conflictErrorBody (jsonEntityCrud.js) — the banner +
       // "Reload list" affordance owns user feedback; console stays amber.
       const conflictMessage =
         'Quest "The Lost Artifact" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
@@ -252,112 +236,59 @@ describe('questsService', () => {
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
+    it.each(errorFaces({
+      generic: 'Failed to save quests',
+      serverStatus: 400,
+      serverMessage: 'A quest with that name already exists', // validateList → findDuplicateNameError
+    }))('$title', async ({ respond, expected }) => {
+      fetchSpy.mockImplementation(() => respond());
 
-      await expect(saveQuests('test-campaign', [])).rejects.toThrow('Failed to save quests');
+      await expect(saveQuests('test-campaign', [{ name: 'QA Dup' }])).rejects.toThrow(expected);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(saveQuests('test-campaign', [])).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled(); // only sanctioned 409s reach warn
     });
   });
 
-  describe('loadQuest', () => {
-    // No production consumer today (Quests.jsx lists via loadQuests and edits
-    // in-memory); pinned as the item-route contract against jsonEntityCrud's
-    // itemWrapper. Raw ids are what production callers pass (crypto.randomUUID).
-    it('unwraps the server item envelope and pins the exact GET with raw id single-encoded', async () => {
-      const quest = { id: 'quest/1', name: 'The Lost Artifact', status: 'active' };
+  describe('loadQuestBoard', () => {
+    // Player quest-board lane (QuestBoard.jsx, FirstSessionChecklist.jsx) —
+    // the ONLY visitor-open door on /quests; the field whitelist / draft-drop
+    // is server-side, pinned by server route tests. Pinned separately from
+    // the GM CRUD lanes: this unwrap must survive even if the GM legs move.
+    it('GETs the board lane and unwraps the envelope to a plain array (campaign name URL-encoded)', async () => {
+      const rows = [
+        { id: 'q-1', name: 'The Lost Artifact', status: 'active', description: 'Recover it', rewards: '100 gp' },
+        { id: 'q-2', name: 'Defeat the Giant Eagle', status: 'completed', description: '', rewards: '' },
+      ];
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ quest }),
+        json: () => Promise.resolve({ quests: rows }),
       });
 
-      const result = await loadQuest('my campaign/1', 'quest/1');
+      const result = await loadQuestBoard('my campaign/1');
 
-      // raw id → single-encoded; server decodeURIComponent round-trips it
-      expect(result).toEqual(quest);
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign%2F1/quests/quest%2F1'
-      );
+      expect(result).toEqual(rows); // array, NOT the { quests } envelope
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/quests/board');
     });
 
-    it('defensively passes through a missing or null quest key (server itemWrapper always sends { quest })', async () => {
+    it('returns [] when a success body omits the quests key', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
         json: () => Promise.resolve({}),
       });
-      await expect(loadQuest('test-campaign', 'quest-1')).resolves.toBeUndefined();
 
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ quest: null }),
-      });
-      await expect(loadQuest('test-campaign', 'quest-1')).resolves.toBeNull();
+      await expect(loadQuestBoard('test-campaign')).resolves.toEqual([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('extracts the server 404 error and logs', async () => {
-      // server truth: { error: 'Quest not found' } (Title-case singularDisplayName)
-      // for both file-missing and id-missing (jsonEntityCrud GET :id)
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'Quest not found' }),
-      });
+    it.each(errorFaces({ generic: 'Failed to load quest board' }))('$title', async ({ respond, expected }) => {
+      fetchSpy.mockImplementation(() => respond());
 
-      await expect(loadQuest('test-campaign', 'missing-id')).rejects.toThrow('Quest not found');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest:', expect.any(Error));
-    });
-
-    it('extracts the server 403 GM-only error and logs', async () => {
-      // server truth: quests' own authorizeRead flavor — 403 { error:
-      // 'Access denied: GM-only feature' } for non-localhost item reads
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 403,
-        statusText: 'Forbidden',
-        json: () => Promise.resolve({ error: 'Access denied: GM-only feature' }),
-      });
-
-      await expect(loadQuest('test-campaign', 'quest-1')).rejects.toThrow(
-        'Access denied: GM-only feature'
-      );
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(loadQuest('test-campaign', 'quest-1')).rejects.toThrow('Failed to load quest');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(loadQuest('test-campaign', 'quest-1')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest:', expect.any(Error));
+      await expect(loadQuestBoard('test-campaign')).rejects.toThrow(expected);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest board:', expect.any(Error));
     });
   });
 
@@ -380,35 +311,15 @@ describe('questsService', () => {
       );
     });
 
-    it('extracts the server 404 error and logs', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'Quest not found' }),
-      });
+    it.each(errorFaces({ generic: 'Failed to delete quest', serverStatus: 404, serverMessage: 'Quest not found' }))(
+      '$title',
+      async ({ respond, expected }) => {
+        fetchSpy.mockImplementation(() => respond());
 
-      await expect(deleteQuest('test-campaign', 'missing-id')).rejects.toThrow('Quest not found');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting quest:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(deleteQuest('test-campaign', 'quest-1')).rejects.toThrow('Failed to delete quest');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting quest:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(deleteQuest('test-campaign', 'quest-1')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting quest:', expect.any(Error));
-    });
+        await expect(deleteQuest('test-campaign', 'quest-1')).rejects.toThrow(expected);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting quest:', expect.any(Error));
+      }
+    );
   });
 });

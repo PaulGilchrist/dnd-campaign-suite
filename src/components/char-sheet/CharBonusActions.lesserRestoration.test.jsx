@@ -1,17 +1,22 @@
-// @maintained-by-ai 2026-10-16
-// CharBonusActions host wiring for the Lesser Restoration bonus-action lane:
-// the armed TargetSpellPopups mount, the host-owned two-step target→condition
-// state, and confirm/skip routing. Shared popup internals (condition filtering,
-// no-conditions empty state) are covered in char-spells/CharSpells.Popups.restoration.test.jsx.
+// @maintained-by-ai 2026-11-27
+// CharBonusActions host wiring for the shared TargetSpellPopups mount gate
+// (targetSpellPopupsArmed = pendingLesserRestoration || pendingHex — CLA-066):
+// the Lesser Restoration armed mount, the host-owned two-step target→condition
+// state round-trip, and confirm/skip routing back to the useSpellMetamagicFlow
+// handlers. Shared popup internals (condition filtering/dedup, confirm payload
+// byte shapes, condition-step back-skip, no-conditions empty state) are owned
+// by char-spells/CharSpells.Popups.restoration.test.jsx; the idle "popup-free"
+// leg of this gate is owned by CharBonusActions.spellCasting.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-const mockHandleConfirm = vi.fn();
-const mockHandleSkip = vi.fn();
-
-function flowStub(overrides = {}) {
-  return {
+// Full shape of the mocked useSpellMetamagicFlow return — every key the
+// component destructures at CharBonusActions.jsx:884. Tests override only what
+// they assert; a per-mount flow object is kept so assertions read the very
+// handlers this render received (no stale cross-test spies).
+const { flowShape } = vi.hoisted(() => ({
+  flowShape: () => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
@@ -29,17 +34,16 @@ function flowStub(overrides = {}) {
     handleSanctuaryConfirm: vi.fn(),
     handleSanctuarySkip: vi.fn(),
     pendingLesserRestoration: null,
-    handleLesserRestorationConfirm: mockHandleConfirm,
-    handleLesserRestorationSkip: mockHandleSkip,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
     pendingHex: null,
     handleHexConfirm: vi.fn(),
     handleHexSkip: vi.fn(),
-    ...overrides,
-  };
-}
+  }),
+}));
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => flowStub()),
+  useSpellMetamagicFlow: vi.fn(() => flowShape()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -74,9 +78,8 @@ vi.mock('../../services/combat/buffs/buffService.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  // getStore is imported by assertCanAct (loaded via useSpellCastExecutor).
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
   // Target-scoped so the two-step flow proves it looks up the CHOSEN target.
   getRuntimeValue: vi.fn((name, key) => {
     if (key === 'activeConditions') return name === 'Orc 1' ? ['poisoned'] : [];
@@ -114,36 +117,30 @@ vi.mock('./ArcaneVigorModal.jsx', () => ({
 
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 
-const lesserRestorationSpell = {
-  name: 'Lesser Restoration',
-  level: 2,
-  range: 'Touch',
-  casting_time: 'Bonus Action',
-  prepared: 'Prepared',
-};
-
 const basePlayerStats = {
   name: 'Divine_Cleric',
   rules: '2024',
   level: 17,
   attacks: [],
   bonusActions: [],
-  spellAbilities: { spells: [lesserRestorationSpell], toHit: 9, saveDc: 17 },
+  spellAbilities: {
+    spells: [{ name: 'Lesser Restoration', level: 2, range: 'Touch', casting_time: 'Bonus Action', prepared: 'Prepared' }],
+    toHit: 9,
+    saveDc: 17,
+  },
 };
 
-function makePending() {
-  return {
-    spell: lesserRestorationSpell,
-    spellName: 'Lesser Restoration',
-    spellLevel: 2,
-    castingTime: lesserRestorationSpell.casting_time,
-    range: 'Touch',
-    creatureTargets: ['Divine_Cleric', 'Orc 1'],
-  };
-}
+// Only the fields this lane's renderers read: stage-1 target list + range copy.
+const lesserRestorationPending = {
+  range: 'Touch',
+  creatureTargets: ['Divine_Cleric', 'Orc 1'],
+};
+
+let flow;
 
 function mount(overrides = {}) {
-  vi.mocked(useSpellMetamagicFlow).mockReturnValue(flowStub(overrides));
+  flow = { ...flowShape(), ...overrides };
+  vi.mocked(useSpellMetamagicFlow).mockReturnValue(flow);
   return render(<CharBonusActions playerStats={basePlayerStats} campaignName="test-campaign" />);
 }
 
@@ -154,44 +151,57 @@ function castOnOrc() {
 
 describe('CharBonusActions - Lesser Restoration pickers', () => {
   beforeEach(() => {
+    // resetAllMocks restores each vi.fn's original implementation (Vitest 4)
+    // and clears mockReturnValue, so mount() re-seeds the flow every test.
     vi.resetAllMocks();
   });
 
-  it('does not mount the Lesser Restoration popup when no pending op is staged', () => {
-    mount();
-    expect(screen.queryByText('Lesser Restoration', { selector: '.sp-header' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Cast Lesser Restoration')).not.toBeInTheDocument();
-  });
+  it('mounts the armed target picker, advances to a target-specific condition step, and routes confirm to the hook handler', async () => {
+    mount({ pendingLesserRestoration: lesserRestorationPending });
 
-  it('mounts the target picker listing every candidate target when staged', () => {
-    mount({ pendingLesserRestoration: makePending() });
+    // Armed mount lists every candidate target.
     expect(screen.getByText('Lesser Restoration', { selector: '.sp-header' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cast Lesser Restoration' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Select Divine_Cleric' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Select Orc 1' })).toBeInTheDocument();
-  });
 
-  it('advances target step to a target-specific condition picker and confirms with targetName and condition', async () => {
-    mount({ pendingLesserRestoration: makePending() });
     castOnOrc();
 
+    // Host-owned two-step state: the condition step (fed by the CHOSEN
+    // target's activeConditions) replaces the target step.
     await waitFor(() => {
       expect(screen.getByText('Choose one condition to remove from Orc 1.')).toBeInTheDocument();
     });
     expect(screen.getByRole('radio', { name: 'Select Poisoned condition' })).toBeInTheDocument();
-    // Host-owned two-step state: the condition step replaces the target step.
     expect(screen.queryByRole('button', { name: 'Cast Lesser Restoration' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: 'Select Poisoned condition' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Condition' }));
-    expect(mockHandleConfirm).toHaveBeenCalledTimes(1);
-    expect(mockHandleConfirm).toHaveBeenCalledWith({ targetName: 'Orc 1', condition: 'poisoned' });
+    expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledTimes(1);
+    // Payload bytes are popup-owned (CharSpells.Popups.restoration pins them);
+    // here prove the host routes to the hook with the chosen target back.
+    expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ targetName: 'Orc 1', condition: 'poisoned' })
+    );
   });
 
   it('routes Skip at the target stage to handleLesserRestorationSkip without confirming', () => {
-    mount({ pendingLesserRestoration: makePending() });
+    mount({ pendingLesserRestoration: lesserRestorationPending });
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(mockHandleSkip).toHaveBeenCalledTimes(1);
-    expect(mockHandleConfirm).not.toHaveBeenCalled();
+    expect(flow.handleLesserRestorationSkip).toHaveBeenCalledTimes(1);
+    expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
+  });
+
+  it('arms the shared popup mount for a pendingHex cast alone and routes its skip (CLA-066)', () => {
+    mount({ pendingHex: { creatureTargets: ['Orc 1'] } });
+
+    expect(screen.getByText('Hex', { selector: '.sp-header' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Select Orc 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Target' })).toBeInTheDocument();
+    // Only the Hex leg of the gate armed — no Lesser Restoration popup leaked in.
+    expect(screen.queryByRole('button', { name: 'Cast Lesser Restoration' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(flow.handleHexSkip).toHaveBeenCalledTimes(1);
+    expect(flow.handleHexConfirm).not.toHaveBeenCalled();
   });
 });

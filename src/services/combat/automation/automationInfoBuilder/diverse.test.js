@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 trimmed same-branch missing-key rows + helper over-pin
 // ── diverse builder unit (automationInfoBuilder family #2104) ───────────────
 // Canonical home for diverse.js — the grab-bag lane of remaining handler
 // types: divine_intervention · extra_action · font_of_magic ·
@@ -12,7 +12,9 @@
 // toEqual envelopes pin both the emitted keys and the dropped disk keys
 // (casting_time is on disk for extra_action + the passive trio but never
 // emitted here). Falsy probes use '' / 0 / non-boolean truthies — never
-// null/undefined, which would pass under ?? too and mask the ||/!! arms.
+// null/undefined: `undefined || d` and `'' || d` are the same arm, and only
+// the falsy-but-not-nullish probes discriminate ||/!! from a ?? rewrite, so
+// bare missing-key rows carry no discriminating power and are not duplicated.
 //
 // Cited, not re-pinned here (runtime consumption is a different lane):
 //  • extra_action resource consumption / once-per-turn gate:
@@ -43,21 +45,14 @@ describe('diverseHandlers', () => {
         ])
     })
 
-    // Missing-key (undefined) and falsy ('' / 0 / truthy non-boolean) arms
-    // collapse to the exact default envelope; the trio rows use their verbatim
-    // disk automation (public/data classes.json) so the dropped casting_time
-    // is pinned too.
+    // Falsy ('' / 0 / truthy non-boolean) arms collapse to the exact default
+    // envelope; the trio rows use their verbatim disk automation (public/data
+    // classes.json) so the dropped casting_time is pinned too.
     it.each([
-        { type: 'divine_intervention', auto: { type: 'divine_intervention' },
-            exp: { type: 'divine_intervention', name: 'Test Feature', recharge: 'long_rest',
-                upgradeTo: '', casting_time: '1 action', hasAutomation: true } },
         { type: 'divine_intervention', auto: { type: 'divine_intervention', recharge: '', upgradeTo: '', casting_time: '' },
             exp: { type: 'divine_intervention', name: 'Test Feature', recharge: 'long_rest',
                 upgradeTo: '', casting_time: '1 action', hasAutomation: true } },
-        { type: 'extra_action', auto: { type: 'extra_action' },
-            exp: { type: 'extra_action', name: 'Test Feature', uses: 1, recharge: 'short_rest',
-                oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'testFeatureUses', hasAutomation: true } },
+        // recharge stays absent here, so the undefined || arm rides this row too.
         { type: 'extra_action', auto: { type: 'extra_action', uses: 0, oncePerTurn: '', oncePerCombat: 0, firstRoundOnly: '' },
             exp: { type: 'extra_action', name: 'Test Feature', uses: 1, recharge: 'short_rest',
                 oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
@@ -86,10 +81,11 @@ describe('diverseHandlers', () => {
     // automations (5e + 2024 classes.json) proving every passthrough field
     // AND the dropped casting_time; font/meta customs are synthetic values
     // deliberately distinct from their defaults (disk never carries a custom
-    // casting_time there, so a verbatim disk probe cannot discriminate);
-    // the resourceKey edges are synthetic, pinning the shared helper's
-    // camel-stem casing + whitespace strip (src/services/shared/usesKey.js)
-    // with non-whitespace preserved.
+    // casting_time there, so a verbatim disk probe cannot discriminate).
+    // The resourceKey rows prove extra_action DERIVES the key from
+    // feature.name (camel 'actionSurgeUses' + apostrophe-stripped
+    // "thiefsReflexesUses"); the helper's own casing rules (whitespace
+    // collapse, digits, …) are canonically pinned in shared/usesKey.test.js.
     it.each([
         { type: 'divine_intervention', name: 'Greater Divine Intervention',
             auto: { type: 'divine_intervention', recharge: 'long_rest', upgradeTo: 'wish', casting_time: '1 action' },
@@ -105,11 +101,6 @@ describe('diverseHandlers', () => {
             exp: { type: 'extra_action', name: "Thief's Reflexes", uses: 1, recharge: 'long_rest',
                 oncePerTurn: false, oncePerCombat: true, firstRoundOnly: true,
                 resourceKey: "thiefsReflexesUses", hasAutomation: true } },
-        { type: 'extra_action', name: '  Many   Actions 1st',
-            auto: { type: 'extra_action' },
-            exp: { type: 'extra_action', name: '  Many   Actions 1st', uses: 1, recharge: 'short_rest',
-                oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'manyActions1stUses', hasAutomation: true } },
         { type: 'font_of_magic', name: 'Font of Magic',
             auto: { type: 'font_of_magic', casting_time: '1 reaction' },
             exp: { type: 'font_of_magic', name: 'Font of Magic', casting_time: '1 reaction', hasAutomation: true } },

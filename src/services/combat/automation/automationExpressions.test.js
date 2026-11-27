@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   evaluateAutoExpression,
@@ -58,17 +58,15 @@ describe('resolveUses', () => {
     expect(resolveUses(makePlayerStats({ class: { name: 'Barbarian' } }), 'barbarian_level')).toBe(5)
   })
 
-  it('falls back to class.levels then player level when the class name does not match', () => {
+  it('falls back to class.levels then player level then 0 when the class name does not match', () => {
     expect(resolveUses(makePlayerStats({ class: { name: 'wizard', levels: 10 } }), 'barbarian_level')).toBe(10)
     expect(resolveUses(makePlayerStats({ class: { name: 'wizard' } }), 'barbarian_level')).toBe(5)
     expect(resolveUses(makePlayerStats({ class: undefined }), 'barbarian_level')).toBe(5)
+    expect(resolveUses({ class: { name: 'wizard' }, level: 0 }, 'barbarian_level')).toBe(0)
   })
 
-  it('falls back to player level for unrecognized patterns', () => {
+  it('falls back to player level for unrecognized patterns, 1 when level is falsy', () => {
     expect(resolveUses(makePlayerStats(), 'unknown_pattern')).toBe(5)
-  })
-
-  it('falls back to 1 when level is falsy and the pattern is unrecognized', () => {
     expect(resolveUses(makePlayerStats({ level: 0 }), 'unknown_pattern')).toBe(1)
   })
 })
@@ -76,8 +74,10 @@ describe('resolveUses', () => {
 // ── resolveScaling ───────────────────────────────────────────────
 
 describe('resolveScaling', () => {
-  it('returns null for missing, non-array, or empty scalings', () => {
-    for (const scaling of [null, undefined, '', [], {}]) {
+  it('returns null for missing, primitive, or empty scalings', () => {
+    // '' is the falsy guard; 'abc'/7 exercise the non-object else-branch; [] and
+    // {} run the entry loops empty.
+    for (const scaling of [null, undefined, '', 'abc', 7, [], {}]) {
       expect(resolveScaling(makePlayerStats(), scaling)).toBe(null)
     }
   })
@@ -112,8 +112,8 @@ describe('resolveScaling', () => {
       .toEqual({ level: 10, damage: '3d6' })
   })
 
-  it('sorts unordered object-map keys before resolving and returns null below all thresholds', () => {
-    expect(resolveScaling(makePlayerStats({ level: 20 }), { '14': '4d6', '10': '3d6' }))
+  it('sorts unordered object-map keys, drops non-numeric keys, and returns null below all thresholds', () => {
+    expect(resolveScaling(makePlayerStats({ level: 20 }), { '14': '4d6', foo: 'bad', '10': '3d6' }))
       .toEqual({ level: 14, damage: '4d6' })
     expect(resolveScaling(makePlayerStats({ level: 3 }), { '10': '3d6', '14': '4d6' })).toBe(null)
   })
@@ -153,13 +153,9 @@ describe('resolveHealingPoolExpression', () => {
     expect(resolveHealingPoolExpression('2d6', scaling, makePlayerStats({ level: 10 }))).toBe('4d6')
   })
 
-  it('keeps baseExpression when the level is below all entries', () => {
+  it('keeps baseExpression below all entries and ignores non-numeric scaling keys', () => {
     expect(resolveHealingPoolExpression('2d6', { 3: '3d6', 5: '4d6' }, makePlayerStats({ level: 1 }))).toBe('2d6')
-  })
-
-  it('ignores non-numeric scaling keys', () => {
-    const scaling = { invalid: 'bad', 3: '3d6', 5: '4d6' }
-    expect(resolveHealingPoolExpression('2d6', scaling, makePlayerStats({ level: 5 }))).toBe('4d6')
+    expect(resolveHealingPoolExpression('2d6', { invalid: 'bad', 3: '3d6', 5: '4d6' }, makePlayerStats({ level: 5 }))).toBe('4d6')
   })
 })
 
@@ -168,6 +164,7 @@ describe('resolveHealingPoolExpression', () => {
 describe('getSuperiorityDieSize', () => {
   it('returns d12/d10/d8 by level tier, defaulting to d8 for missing stats', () => {
     expect(getSuperiorityDieSize({ level: 18 })).toBe(12)
+    expect(getSuperiorityDieSize({ level: 17 })).toBe(10)
     expect(getSuperiorityDieSize({ level: 10 })).toBe(10)
     expect(getSuperiorityDieSize({ level: 5 })).toBe(8)
     expect(getSuperiorityDieSize({})).toBe(8)
@@ -340,12 +337,16 @@ describe('evaluateAutoExpression', () => {
 
   it('clamps with _min_ across plain, token, and parenthesised expressions', () => {
     const stats = makePlayerStats()
+    // The malformed 5_min_-3 falls through to the string-fallback console.warn
+    // (logging contract owned by automationService.core.test.js) — silenced here.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(evaluateAutoExpression('-5_min_3', stats)).toBe(3)
     expect(evaluateAutoExpression('10_min_3', stats)).toBe(10)
     expect(evaluateAutoExpression('-proficiency_bonus_min_2', stats)).toBe(2)
     expect(evaluateAutoExpression('(-proficiency_bonus - 2)_min_5', stats)).toBe(5)
     // Regex quirk: the minimum must be digits-only, so this stays verbatim.
     expect(evaluateAutoExpression('5_min_-3', stats)).toBe('5_min_-3')
+    vi.restoreAllMocks()
   })
 
   it('returns Infinity for 1/0 but the original string when the result is NaN', () => {
@@ -363,33 +364,24 @@ describe('evaluateAutoExpression', () => {
 // "class_level_scaling" (2024 classes.json maxKinds/maxRages/uses_expression)
 // is resolved by component-level logic, not the expression engine. It must
 // pass through verbatim WITHOUT the string-fallback console.warn (app-load
-// noise), while genuinely malformed expressions still warn.
+// noise). The malformed-expression warn-once control is owned by
+// automationService.core.test.js (console discipline).
 
 describe('evaluateAutoExpression string sentinels', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it.each(STRING_SENTINEL_EXPRESSIONS)('returns sentinel %s verbatim without warning', (sentinel) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(evaluateAutoExpression(sentinel, makePlayerStats())).toBe(sentinel)
-    expect(warn).not.toHaveBeenCalled()
-  })
-
-  it('does not token-substitute or coerce the sentinel (no numeric conversion, no throw)', () => {
     // Level 5 stats would otherwise let \blevel\b-style tokens corrupt a match;
     // the exact-string guard short-circuits before resolveDiceExpression.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const result = evaluateAutoExpression('class_level_scaling', makePlayerStats({ level: 5 }))
-    expect(result).toBe('class_level_scaling')
+    const result = evaluateAutoExpression(sentinel, makePlayerStats({ level: 5 }))
+    expect(result).toBe(sentinel)
     expect(typeof result).toBe('string')
     expect(warn).not.toHaveBeenCalled()
   })
 
-  it('still warns exactly once for a genuinely unparseable non-sentinel expression', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(evaluateAutoExpression('@@invalid@@', makePlayerStats())).toBe('@@invalid@@')
-    expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0]).toContain('@@invalid@@')
-  })
+  // The malformed-non-sentinel warn-once control is owned by
+  // automationService.core.test.js ("console discipline").
 
   it('reresolveAutomationUsesMax leaves sentinel uses_expression entries untouched and silent', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -431,27 +423,19 @@ describe('reresolveAutomationUsesMax (CLA-229)', () => {
     recharge: 'long_rest',
   })
 
-  it('re-resolves usesMax/uses to the WIS modifier once abilities exist', () => {
-    const stats = {
-      level: 15,
-      proficiency: 5,
-      abilities: [{ name: 'Wisdom', bonus: 3 }],
-      automation: { specialActions: [wisPool()] },
+  it('re-resolves usesMax/uses to the WIS modifier once abilities exist, honouring the min-1 floor', () => {
+    const resolve = (wisdomBonus) => {
+      const stats = {
+        level: 15,
+        proficiency: 5,
+        abilities: [{ name: 'Wisdom', bonus: wisdomBonus }],
+        automation: { specialActions: [wisPool()] },
+      }
+      reresolveAutomationUsesMax(stats)
+      return stats.automation.specialActions[0]
     }
-    reresolveAutomationUsesMax(stats)
-    expect(stats.automation.specialActions[0].usesMax).toBe(3)
-    expect(stats.automation.specialActions[0].uses).toBe(3)
-  })
-
-  it('keeps the min-1 floor when the modifier is negative', () => {
-    const stats = {
-      level: 15,
-      proficiency: 5,
-      abilities: [{ name: 'Wisdom', bonus: -2 }],
-      automation: { specialActions: [wisPool()] },
-    }
-    reresolveAutomationUsesMax(stats)
-    expect(stats.automation.specialActions[0].usesMax).toBe(1)
+    expect(resolve(3)).toMatchObject({ usesMax: 3, uses: 3 })
+    expect(resolve(-2).usesMax).toBe(1)
   })
 
   it('re-resolves every uses_expression category (Steps of the Fey family)', () => {
@@ -478,6 +462,21 @@ describe('reresolveAutomationUsesMax (CLA-229)', () => {
     reresolveAutomationUsesMax(stats)
     expect(stats.automation.specialActions[0].uses).toBe(1)
     expect(stats.automation.specialActions[0].usesMax).toBeUndefined()
+  })
+
+  it('skips non-array automation values and null array entries', () => {
+    const stats = {
+      level: 5,
+      abilities: [{ name: 'Wisdom', bonus: 3 }],
+      automation: {
+        settings: { flag: true },
+        actions: [null, { type: 'free_spell', name: 'Other', uses_expression: 'WIS modifier_min_1' }],
+      },
+    }
+    expect(() => reresolveAutomationUsesMax(stats)).not.toThrow()
+    expect(stats.automation.settings).toEqual({ flag: true })
+    expect(stats.automation.actions[0]).toBe(null)
+    expect(stats.automation.actions[1].usesMax).toBe(3)
   })
 
   it('is null-safe on missing automation', () => {

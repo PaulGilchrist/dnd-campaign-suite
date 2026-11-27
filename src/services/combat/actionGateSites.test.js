@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
  * L5-001 coverage guard — action-gate WIRING registry (source-text lane).
  *
@@ -25,65 +25,59 @@ const ROOT = resolve(__dirname, '../../..');
 
 const read = (relPath) => readFileSync(resolve(ROOT, relPath), 'utf8');
 
+// Canonical action-gate site inventory (one list for both checks below).
+// feedCannotAct (RB-1115): the site must feed cannotAct into assertCanAct and
+// must NOT re-add the silent `if (cannotAct) return;` shape the enforcement
+// gate was designed to replace (assertCanAct.js header). The two spell
+// chokepoints opt out: useSpellCastExecutor gates at the execute seam and
+// useSpellMetamagicGates gates pre-payment (owner ruling 2026-11-10), and
+// neither receives cannotAct in its ctx. CharReactions keeps its cannotAct-ONLY
+// loud economy gate at handleReactionClick by design (pending-OA bypass law),
+// so the feed requirement is per-file, not per-call.
 const GATED_ENTRY_FILES = [
-    'src/components/char-sheet/useCharActionsAutomation.js',      // feature/action/bonus rows
-    'src/components/char-sheet/useCharActionsAttackHandlers.js',  // attack rows
-    'src/components/char-sheet/useCharActionsBaseActions.js',     // Hide / Dodge / Grapple
-    'src/components/char-sheet/CharActions.jsx',                   // action spell damage + attack damage cells
-    'src/components/char-sheet/CharBonusActions.jsx',              // bonus cells, poison, treats, horde breaker, spiritual weapon
-    'src/components/char-sheet/CharReactions.jsx',                 // reaction rows + automation reactions
-    'src/components/char-sheet/CharSpecialActions.jsx',            // meal / treats / brew / shapechange / special automation
-    'src/components/char-sheet/char-spells/CharSpells.jsx',       // spell attack header
-    'src/hooks/combat/useActionSpellMetamagic.js',                 // spell attack + metamagic casts
-    'src/hooks/combat/useSpellCastExecutor.js',                    // confirmed spell-cast chokepoint
+    { path: 'src/components/char-sheet/useCharActionsAutomation.js', feedCannotAct: true },       // feature/action/bonus rows
+    { path: 'src/components/char-sheet/useCharActionsAttackHandlers.js', feedCannotAct: true },   // attack rows
+    { path: 'src/components/char-sheet/useCharActionsBaseActions.js', feedCannotAct: true },      // Hide / Dodge / Grapple
+    { path: 'src/components/char-sheet/CharActions.jsx', feedCannotAct: true },                   // action spell damage + attack damage cells
+    { path: 'src/components/char-sheet/CharBonusActions.jsx', feedCannotAct: true },              // bonus cells, poison, treats, horde breaker, spiritual weapon
+    { path: 'src/components/char-sheet/CharReactions.jsx', feedCannotAct: true },                 // reaction rows + automation reactions
+    { path: 'src/components/char-sheet/CharSpecialActions.jsx', feedCannotAct: true },            // meal / treats / brew / shapechange / special automation
+    { path: 'src/components/char-sheet/char-spells/CharSpells.jsx', feedCannotAct: true },        // spell attack header
+    { path: 'src/hooks/combat/useActionSpellMetamagic.js', feedCannotAct: true },                 // spell attack + metamagic casts
+    { path: 'src/hooks/combat/useSpellCastExecutor.js', feedCannotAct: false },                   // confirmed spell-cast chokepoint
     // The sheet spell lane PAYS (slot/material) inside gateMetamagic's branches
     // before delegating to the executor, so it gates early at its own entry —
     // enforcement denials must cost nothing (owner ruling 2026-11-10).
-    'src/hooks/combat/useSpellMetamagicGates.js',                  // spell-row pre-payment enforcement gate
+    { path: 'src/hooks/combat/useSpellMetamagicGates.js', feedCannotAct: false },                 // spell-row pre-payment enforcement gate
 ];
 
 describe('action gate coverage (L5-001)', () => {
-    it.each(GATED_ENTRY_FILES)('%s routes through assertCanAct', (relPath) => {
-        const src = read(relPath);
+    it.each(GATED_ENTRY_FILES)('$path routes through assertCanAct', ({ path, feedCannotAct }) => {
+        const src = read(path);
         // Import wired from the enforcement module (not just a stray mention)…
         expect(src).toMatch(/import\s*\{[^}]*\bassertCanAct\b[^}]*\}\s*from\s*['"][^'"]*assertCanAct\.js['"]/);
         // …and actually invoked at a call-site.
         expect(src).toMatch(/\bassertCanAct\s*\(/);
-    });
 
-    it('cannotAct-fed gating: no sheet lane re-adds the silent cannotAct gate; every gated file feeds cannotAct (RB-1115)', () => {
-        // Guards against silently swapping a converted call-site back to
-        // `if (cannotAct) return;` (the shape the enforcement gate was designed
-        // to replace — assertCanAct.js header). CharReactions' economy gate at
-        // handleReactionClick keeps its cannotAct-ONLY loud guard by design
-        // (pending-OA bypass law), so the feed requirement is per-file, not
-        // per-call.
-        const CANNOT_ACT_FED_FILES = [
-            'src/components/char-sheet/useCharActionsAutomation.js',
-            'src/components/char-sheet/useCharActionsAttackHandlers.js',
-            'src/components/char-sheet/useCharActionsBaseActions.js',
-            'src/components/char-sheet/CharActions.jsx',
-            'src/components/char-sheet/CharBonusActions.jsx',
-            'src/components/char-sheet/CharReactions.jsx',
-            'src/components/char-sheet/CharSpecialActions.jsx',
-            'src/components/char-sheet/char-spells/CharSpells.jsx',
-            'src/hooks/combat/useActionSpellMetamagic.js',
-        ];
-        for (const relPath of CANNOT_ACT_FED_FILES) {
-            const src = read(relPath);
-            expect(src, `${relPath}: silent cannotAct gate re-added`).not.toMatch(/if\s*\(\s*cannotAct\s*(\|\|[^)]*)?\)\s*return;/);
+        if (feedCannotAct) {
+            expect(src, `${path}: silent cannotAct gate re-added`).not.toMatch(/if\s*\(\s*cannotAct\s*(\|\|[^)]*)?\)\s*return;/);
             const fedCalls = [...src.matchAll(/\bassertCanAct\s*\(\s*\{([\s\S]*?)\}\s*\)/g)]
                 .filter(([, args]) => /[,{\s]cannotAct\s*[,}]/.test(args));
-            expect(fedCalls.length, `${relPath}: assertCanAct must be fed cannotAct (no silent gates)`).toBeGreaterThan(0);
+            expect(fedCalls.length, `${path}: assertCanAct must be fed cannotAct (no silent gates)`).toBeGreaterThan(0);
         }
     });
 
     it('turn-state resets ride the initiative turn seams', () => {
         const src = read('src/components/initiative/navigationHandlers.js');
-        // navigationHandlers must be wired to the turnState reducer…
+        // navigationHandlers must be wired to the turnState reducer AND actually
+        // drive it: importing resetForTurn without invoking it (the parenthesis
+        // distinguishes a call from the bare import specifier) is a gutted seam.
         expect(src).toMatch(/import\s*\{[^}]*\bresetForTurn\b[^}]*\}\s*from\s*['"][^'"]*turnState\.js['"]/);
-        // …and applyTurnStateTransition must be BOTH defined and invoked at the
-        // navigation seam (one occurrence alone — a gutted, uncalled definition — fails).
-        expect((src.match(/applyTurnStateTransition\(/g) || []).length).toBeGreaterThanOrEqual(2);
+        expect(src).toMatch(/\bresetForTurn\s*\(/);
+        // applyTurnStateTransition must be BOTH defined and invoked at the
+        // navigation seam — pin the definition, then require a second
+        // occurrence (the call; a lone gutted definition fails).
+        expect(src).toMatch(/function\s+applyTurnStateTransition\s*\(/);
+        expect((src.match(/\bapplyTurnStateTransition\s*\(/g) || []).length).toBeGreaterThanOrEqual(2);
     });
 });

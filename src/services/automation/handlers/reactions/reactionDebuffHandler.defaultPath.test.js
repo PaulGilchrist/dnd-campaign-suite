@@ -1,42 +1,59 @@
-// @maintained-by-ai 2026-10-16
-// reactionDebuffHandler octet — lane: DEFAULT EFFECT ROUTE CONTENT
-// (handle → DEFAULT_EFFECT_ROUTE → handleBardicRoll → handleAttackRollDebuff /
-// handleDamageDebuff; automation/index.js `reaction_debuff` → handle,
-// auto.effect '' → default route). This file owns the two lane-internal
-// detail pins + the gates that fire BEFORE them:
-//   - 'caps reduced d20 at minimum of 1' (exact reduced-line, d20=1 floor)
-//   - 'returns popup when damage event has no targetName' — the
-//     gateBardicReaction no_defender gate (exact refusal string +
-//     cutting_words_refused reason token; zero heal, zero stamp)
-//   - AC ladder: effectiveAc ?? targetAc precedence + 'AC —' dash
-//     (targetAc-fallback-with-a-value is pinned verbatim by cuttingWords
-//     test 1 — this file pins the two shapes it does NOT cover)
-//   - canonical 'Attack still hits.' prose + the no-recent-roll/mismatch
-//     exits (exact full string, both trigger shapes: name mismatch and
-//     null event) — shed by cuttingWords.main and now canonical repo-wide.
+// @maintained-by-ai 2026-11-27 — DEFAULT-ROUTE detail lane over
+// reactionDebuffHandler.js (handle → DEFAULT_EFFECT_ROUTE → handleBardicRoll →
+// handleAttackRollDebuff; automation/index.js `reaction_debuff` → handle,
+// auto.effect '' → default route). This file owns, in two $-titled families:
+//   APPLIED-CONTENT it.each (full-shape popup toEqual via the REAL infoPopup
+//   builder, seed-pinned 1d8 face 4 through the canonical rollDie lane):
+//   - 'still hits': the canonical 'Attack still hits.' prose + exact HIT
+//     ladder (shed by cuttingWords.main, canonical repo-wide);
+//   - d20 floor-at-1: max(1, d20 − die) exact reduced line;
+//   - effectiveAc shadows a present targetAc (the AC-ladder precedence leg
+//     cuttingWords.main does NOT cover — its event omits effectiveAc, pinning
+//     the targetAc fallback instead);
+//   - both ACs null: 'AC —' dash + N/A reduced outcome, no outcome prose.
+//   REFUSAL it.each (full-shape popup WITHOUT a defenderHp key, ordered
+//   exact-arity getRuntimeValue read censuses, full-array log/commit zero-
+//   spend censuses, zero findLastAttack re-read, zero dice):
+//   - CANONICAL home of the damage-lane no_defender gate refusal (exact
+//     string + cutting_words_refused row full-shape under the frozen clock +
+//     reason token). gateBardicReaction refuses BEFORE dispatch, so the
+//     one-call findLastAttack census also proves handleDamageDebuff's own
+//     :94 no-targetName guard is unreachable;
+//   - the no-recent-roll/mismatch exits (exact full string, both trigger
+//     shapes) — the :638 gate short-circuits before gateBardicReaction, so
+//     the read census pins ZERO latch/marker reads (gate-ORDER pin).
 //
-// Trim pass (octet #5): weak-shape handoffs removed —
-// 'attempts healing when hit turns to miss…' (was mis-named: totalDamage 10
-// made it the DAMAGE lane — folded into the damage routing pin),
-// 'uses primaryDamage as fallback when totalDamage is 0' (attack-roll
-// rollback branch pinned strictly stronger by cuttingWords.main full-string
-// heal pin + latch exact-args pin),
-// 'reduces d20…' 'Reduced'-substring-only (superseded by the cap test's
-// exact reduced line + cuttingWords.flip exact HIT-line pins),
-// hit→miss no-damage rollback + already-missed prose (cuttingWords.test.js
-// tests 1/3 are strict supersets), damage-content 'HP: N'/defenderHp/
-// null-heal pins (cuttingWords.test.js pins 'Goblin HP: 20', defenderHp
-// 20/25/null + exact floor args). Generic ability_use tail stays owned by
-// cuttingWords.test.js; latch/stamp/marker canon lives in
-// reactionDebuffHandler.cuttingWords.latch.test.js.
+// NOT this lane (nine-lane seam map in .attacksVsAlly.test.js header): damage
+// lane prose/full-shape content + targetAc-fallback + already-missed/now-
+// misses prose + the 1d6 die-size pin (.cuttingWords.test.js CONTENT_CASES —
+// this file's former damage-routing pin with its expect.any(Number) heal arg
+// was a strict-subset duplicate and is removed); exact-arg applyHealingToTarget
+// pins, latch/marker/identity, resolveMapPositions 3-arg reference shape and
+// rejecting-log survivor legs (.cuttingWords.latch.test.js, #1880 handoff:
+// both sibling lanes use an ARG-DERIVED clamp + exact-arg censuses there — the
+// old "cuttingWords pins exact floor args" note pointed at a moved pin);
+// ordered stamp bake→flush commit censuses + budget arithmetic (.uses.test.js);
+// front-door guards + no-combat-context (.earlyExits.test.js); second-d20
+// rollD20 lane + reverseHitDamage 4-arg SOURCE BUG #2 (:132, reported) —
+// .attacksVsAlly.test.js owns handleDisadvantageDebuff.
 //
-// Deterministic: runtime/logService/range/rollback/healing/infoPopup fully
-// mocked; the bardic d8 arrives through the mocked canonical diceRoller
-// rollDie lane (fix#169 recipe, seed-pinned face 4) — former regex/floored
-// numerals are now exact seed pins. No churn expected.
+// Deterministic: FROZEN Date.now in beforeEach + vi.resetAllMocks with ALL
+// lane defaults re-installed every test (bare vi.fn factories, no
+// clearAllMocks residue, no factory-set impls); infoPopup is the REAL
+// dependency-free builder (family-wide mirror-mock purge) so the envelope +
+// automation echo stay honest; applyHealingToTarget is an ARG-DERIVED sync
+// clamp even though every kept leg is zero-heal (the clamp makes any future
+// wrong-amount leak surface instead of hiding behind undefined); the 3rd
+// campaignName on gate reads is silently ignored by the 2-param
+// getRuntimeValue (useRuntimeState.js:63, family arity truth) — read censuses
+// pin the EXACT source arity. No *Once chains, no mid-test re-harnesses
+// (per-case fixture installs only), no save-listener strays possible here.
+// No churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
+// ── Mocks BEFORE imports (bare vi.fn factories — every default is re-installed
+//    in beforeEach; infoPopup is NOT mocked: real pure builder) ───────────────
 vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
   resolveMapPositions: vi.fn(),
@@ -44,21 +61,21 @@ vi.mock('../../common/targetResolver.js', () => ({
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-  setRuntimeObject: vi.fn().mockResolvedValue(undefined),
+  setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(),
 }));
 
+// getDistanceFeet dropped: nothing in this handler's import graph consumes it.
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
-  getDistanceFeet: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isWithinRange: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -70,40 +87,14 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
-  findLastAttack: vi.fn().mockResolvedValue({
-    attackEvent: null,
-    attackerName: null,
-    targetName: null,
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  }),
+  findLastAttack: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../common/infoPopup.js', () => ({
-  infoPopup: vi.fn().mockImplementation((name, description, automation, extraProps) => {
-    const result = {
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name,
-        description,
-        automation,
-      },
-    };
-    if (extraProps) {
-      Object.assign(result, extraProps);
-    }
-    return result;
-  }),
-}));
-
-// Canonical dice lane mock (fix#169 recipe): the bardic die rolls through
+// Canonical dice lane mock (fix#169 recipe): the bardic d8 rolls through
 // diceRoller.rollDie, never raw Math.random.
 vi.mock('../../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
@@ -113,14 +104,23 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 
-function makePlayerStats(overrides = {}) {
+const campaignName = 'test-campaign';
+const mapName = 'TestMap';
+const playerName = 'Bard';
+const attackerName = 'Goblin';
+const FROZEN_NOW = 1735689600000;
+const BI_FACE = 4;
+const HEAL_BASE_HP = 157;
+
+function makePlayerStats() {
   return {
-    name: 'Bard',
+    name: playerName,
     proficiency: 2,
     level: 3,
     class: {
@@ -139,224 +139,224 @@ function makePlayerStats(overrides = {}) {
     _trackedResources: {
       bardicInspirationUses: { current: 4, max: 4 },
     },
-    ...overrides,
   };
 }
 
-// MERGES overrides into the base automation — never replaces wholesale.
-function makeAction(automation = {}) {
+const AUTO = {
+  type: 'reaction_debuff',
+  range: '60_ft',
+  effect: '',
+  uses_expression: null,
+  recharge: 'long_rest',
+};
+
+function makeAction() {
+  return { name: 'Cutting Words', automation: AUTO };
+}
+
+// REAL infoPopup envelope (mirror mock purged family-wide): refusal envelopes
+// have NO defenderHp key; handleAttackRollDebuff adds it via extraProps.
+const popupFor = (description, defenderHp) =>
+  defenderHp === undefined
+    ? { type: 'popup', payload: { type: 'automation_info', name: 'Cutting Words', description, automation: AUTO } }
+    : { ...popupFor(description), defenderHp };
+
+// handleAttackRollDebuff header block: Attacker then the die line (no Defender
+// line — that is the damage lane's shape, owned by .cuttingWords.test.js).
+const ATTACK_HEADER =
+  `<b>Cutting Words</b><br/>Attacker: ${attackerName}<br/>` +
+  `Bardic Inspiration die: 1d8 = <b>${BI_FACE}</b><br/>`;
+
+const NO_RECENT_ROLL =
+  `No recent roll found for ${attackerName} (attack, damage, or ability check). ` +
+  'Cutting Words must be used shortly after the roll.';
+const NO_DEFENDER = `Could not determine who ${attackerName} damaged. Cannot apply Cutting Words.`;
+
+// Attack-lane lastAttack result (isDamageLane false ⇒ totalDamage 0 +
+// damageTypes []; MERGES the event/damage overrides).
+function attackLaneResult(attackEvent, damage = {}) {
   return {
-    name: 'Cutting Words',
-    automation: {
-      type: 'reaction_debuff',
-      range: '60_ft',
-      effect: '',
-      uses_expression: null,
-      recharge: 'long_rest',
-      ...automation,
-    },
+    attackEvent: { targetName: attackerName, timestamp: FROZEN_NOW, ...attackEvent },
+    attackerName,
+    targetName: attackerName,
+    primaryDamage: 0,
+    secondaryDamage: 0,
+    totalDamage: 0,
+    damageTypes: [],
+    ...damage,
   };
 }
 
-function makeCombatSummary(creatures = []) {
-  return { round: 1, creatures };
-}
+const EMPTY_RESULT = {
+  attackEvent: null,
+  attackerName: null,
+  targetName: null,
+  primaryDamage: 0,
+  secondaryDamage: 0,
+  totalDamage: 0,
+  damageTypes: [],
+};
 
-// MERGES options into the base attack event (timestamp default present).
-function freshAttackEvent(options = {}) {
-  return {
-    d20: 15,
-    bonus: 5,
-    targetName: 'Goblin',
-    targetAc: 14,
-    effectiveAc: null,
-    hit: true,
-    timestamp: Date.now(),
-    ...options,
-  };
-}
-
-const campaignName = 'test-campaign';
-const mapName = 'TestMap';
-
-describe('reactionDebuffHandler — default path: attack roll & damage debuff', () => {
+describe('reactionDebuffHandler — default path: attack-roll content + gate refusals', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // clearAllMocks does NOT reset return values — neutralise leaks between tests
-    applyHealing.applyHealingToTarget.mockReturnValue(undefined);
-    // Seed pin (fix#169 idiom): bardic d8 lands face 4 on every roll.
-    diceRoller.rollDie.mockReturnValue(4);
+    vi.resetAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+
+    // All lane defaults re-installed EVERY test (no impl residue).
+    useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+    useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
+    useRuntimeState.setRuntimeObject.mockResolvedValue(undefined);
+    logService.addEntry.mockResolvedValue({});
+    rangeCheck.isWithinRange.mockResolvedValue(true);
+    damageUtils.getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
+    targetResolver.resolveTarget.mockResolvedValue({ target: { name: attackerName } });
+    targetResolver.resolveMapPositions.mockResolvedValue(null); // range-skip default
+    damageRollback.findLastAttack.mockResolvedValue(EMPTY_RESULT);
+    // ARG-DERIVED sync clamp (source seam is unawaited). Every kept leg here is
+    // zero-heal; the clamp keeps that honest if a fixture ever drifts.
+    applyHealing.applyHealingToTarget.mockImplementation((cs, name, amount) => ({
+      newHp: HEAL_BASE_HP + amount,
+      actualHeal: amount,
+    }));
+    // Seed pin (fix#169): BI face 4; rollD20 belongs to the disadvantage route.
+    diceRoller.rollDie.mockReturnValue(BI_FACE);
+    diceRoller.rollD20.mockReturnValue(10);
   });
 
-  // Attack-roll lane (isDamageLane false ⇒ totalDamage 0 + damageTypes []).
-  // findLastAttack MERGES damageOverride, never replaces wholesale.
-  function setupAttackPath(attackEvent, damageOverride = {}) {
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-    damageRollback.findLastAttack.mockResolvedValue({
-      attackEvent,
-      attackerName: 'Goblin',
-      targetName: 'Goblin',
-      primaryDamage: 10,
-      secondaryDamage: 0,
-      totalDamage: 0,
-      damageTypes: [],
-      ...damageOverride,
-    });
-    return handle(makeAction(), makePlayerStats(), campaignName, mapName);
-  }
+  const CONTENT_CASES = [
+    {
+      title: 'still hits: canonical HIT ladder + "Attack still hits." prose, zero heal, null defenderHp',
+      event: { d20: 20, bonus: 5, targetAc: 14, hit: true },
+      description:
+        ATTACK_HEADER +
+        'Attack roll: d20(20) + 5 = 25 vs AC 14 → <b>HIT</b><br/>' +
+        'Reduced: d20(16) + 5 = 21 vs AC 14 → <b>HIT</b><br/>' +
+        '<br/><i>Attack still hits.</i>',
+    },
+    {
+      title: 'caps reduced d20 at minimum of 1: max(1, 1−4) exact reduced line on an already-missed attack',
+      event: { d20: 1, bonus: 5, targetAc: 20, hit: false },
+      description:
+        ATTACK_HEADER +
+        'Attack roll: d20(1) + 5 = 6 vs AC 20 → <b>MISS</b><br/>' +
+        'Reduced: d20(1) + 5 = 6 vs AC 20 → <b>MISS</b><br/>' +
+        '<br/><i>The attack already missed — no effect.</i>',
+    },
+    {
+      title: 'effectiveAc shadows a present targetAc: AC 20 ladder, zero-damage reversal-failure prose',
+      // A targetAc fallback would print "vs AC 14" — the exact literal below
+      // subsumes the old not.toContain('vs AC 14') negative.
+      event: { d20: 14, bonus: 3, targetAc: 14, effectiveAc: 20, hit: true },
+      description:
+        ATTACK_HEADER +
+        'Attack roll: d20(14) + 3 = 17 vs AC 20 → <b>HIT</b><br/>' +
+        'Reduced: d20(10) + 3 = 13 vs AC 20 → <b>MISS</b><br/>' +
+        '<br/><i>The attack now misses!</i><br/><i>No damage event found to reverse for Goblin.</i>',
+    },
+    {
+      title: 'both ACs null: "AC —" dash on both lines, N/A reduced outcome, no outcome prose',
+      event: { d20: 14, bonus: 3, targetAc: null, effectiveAc: null, hit: true },
+      description:
+        ATTACK_HEADER +
+        'Attack roll: d20(14) + 3 = 17 vs AC \u2014 → <b>HIT</b><br/>' +
+        'Reduced: d20(10) + 3 = 13 vs AC \u2014 → <b>N/A</b><br/>',
+    },
+  ];
 
-  describe('default path — attack roll debuff', () => {
-    it('still-hits lane: full HIT lines, canonical "Attack still hits." prose, zero heal', async () => {
-      // d20(20)+5=25 vs AC 14; seed-pinned d8 face 4 ⇒ reduced d20(16)+5=21 ≥ 14 ⇒
-      // still hits — exact seed pin (was every-roll regex). No rollback heal, null defenderHp.
-      const result = await setupAttackPath(
-        freshAttackEvent({ d20: 20, bonus: 5, hit: true, targetAc: 14 })
-      );
+  it.each(CONTENT_CASES)('$title', async (c) => {
+    damageRollback.findLastAttack.mockResolvedValue(attackLaneResult(c.event));
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Cutting Words');
-      expect(result.payload.description).toContain('Attack roll: d20(20) + 5 = 25 vs AC 14 → <b>HIT</b>');
-      expect(result.payload.description).toContain('Reduced: d20(16) + 5 = 21 vs AC 14 → <b>HIT</b>');
-      expect(diceRoller.rollDie).toHaveBeenCalledWith(8);
-      expect(result.payload.description).toContain('Attack still hits.');
-      expect(result.payload.description).not.toContain('now misses');
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-      expect(result.defenderHp).toBeNull();
-    });
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-    it('caps reduced d20 at minimum of 1', async () => {
-      // d20(1) − 1d8 ⇒ max(1, ·) == 1 for every roll — exact reduced line pinned.
-      const result = await setupAttackPath(
-        freshAttackEvent({ d20: 1, bonus: 5, hit: false, targetAc: 20 })
-      );
+    // Full-shape popup via the REAL builder: envelope, automation echo, exact
+    // description literal, defenderHp present-and-null on every applied leg.
+    expect(result).toEqual(popupFor(c.description, null));
 
-      expect(result.payload.description).toContain('Reduced: d20(1) + 5 = 6 vs AC 20 → <b>MISS</b>');
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-      expect(result.defenderHp).toBeNull();
-    });
+    // Canonical dice lane: exactly one d8 roll (level-3 class lookup), never
+    // the second-d20 lane.
+    expect(diceRoller.rollDie.mock.calls).toEqual([[8]]);
+    expect(diceRoller.rollD20).not.toHaveBeenCalled();
 
-    it('prefers effectiveAc over targetAc and falls back to a dash when both are null', async () => {
-      // effectiveAc priority (targetAc 14 present but shadowed by effectiveAc 20;
-      // 1d8 reduction ⇒ reduced+3 ≤ 16 < 20 ⇒ reduced MISS, deterministic)
-      let result = await setupAttackPath(
-        freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: 20 })
-      );
-      expect(result.payload.description).toContain('Attack roll: d20(14) + 3 = 17 vs AC 20 → <b>HIT</b>');
-      expect(result.payload.description).toMatch(/Reduced: d20\([0-9]+\) \+ 3 = \d+ vs AC 20 → <b>MISS<\/b>/);
-      expect(result.payload.description).not.toContain('vs AC 14');
-
-      // both null ⇒ AC — and reduced outcome N/A (ac == null ⇒ reducedHit null)
-      result = await setupAttackPath(
-        freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null, targetAc: null })
-      );
-      expect(result.payload.description).toContain('Attack roll: d20(14) + 3 = 17 vs AC \u2014 → <b>HIT</b>');
-      expect(result.payload.description).toContain('vs AC \u2014 → <b>N/A</b>');
-    });
+    // Gate read + handleAttackRollDebuff dispatch read: exactly two, and the
+    // zero-heal clamp seam is never touched on these fixtures.
+    expect(damageRollback.findLastAttack.mock.calls).toEqual([[campaignName], [campaignName]]);
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
   });
 
-  describe('default path — damage debuff', () => {
-    function setupDamagePath() {
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Fire'],
-      });
-      return handle(makeAction(), makePlayerStats(), campaignName, mapName);
-    }
-
-    it('routes to damage handler when attack has damage: exact original amount, heal threaded', async () => {
-      // isDamageLane (damageTypes ['Fire'] + totalDamage 10) ⇒ handleDamageDebuff.
-      // reduced = 10 − 1d8 ⇒ [2,9]; heal > 0 for every roll. Content wording is
-      // owned by cuttingWords.test.js (15/1) — this pin owns routing + numerics.
-      const result = await setupDamagePath();
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Cutting Words');
-      expect(result.payload.description).toContain('Original damage: 10');
-      expect(result.payload.description).toMatch(/Reduced damage: <b>\d+<\/b>/);
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Goblin', expect.any(Number), campaignName
-      );
-    });
-
-    it('refuses via the no_defender gate when damage event has no targetName: exact string, reason token, zero heal, zero stamp', async () => {
-      // gateBardicReaction isDamageLane && !attackEvent.targetName — the lane
-      // never reaches handleDamageDebuff (its own :95 guard is unreachable).
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { rawDamage: 5, timestamp: Date.now() },
-        attackerName: 'Goblin',
+  const BUDGET_READ = [playerName, 'bardicInspirationUses'];
+  const REFUSAL_CASES = [
+    {
+      title: 'no_defender (CANONICAL): damage lane without event targetName refuses at the gate — exact string, reason token, dispatch never ran',
+      result: {
+        ...EMPTY_RESULT,
+        attackEvent: { rawDamage: 5, timestamp: FROZEN_NOW },
+        attackerName,
         targetName: null,
         primaryDamage: 5,
-        secondaryDamage: 0,
         totalDamage: 5,
         damageTypes: ['Fire'],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Cutting Words');
-      expect(result.payload.description).toBe('Could not determine who Goblin damaged. Cannot apply Cutting Words.');
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      },
+      description: NO_DEFENDER,
+      // Latch + marker reads happened (no_defender is gate #3) but the stamp
+      // budget re-read did NOT — dispatch never began. 3rd campaignName is the
+      // source's (ignored) arity at :611/:615.
+      expectedReads: [
+        BUDGET_READ,
+        [playerName, '_Cutting_Words_usedRound', campaignName],
+        [playerName, '_Cutting_Words_appliedAttack', campaignName],
+      ],
+      logRows: [[campaignName, {
         type: 'automation',
+        characterName: playerName,
         automationType: 'cutting_words_refused',
+        name: 'Cutting Words',
+        description: NO_DEFENDER,
         reason: 'no_defender',
-        characterName: 'Bard',
-      }));
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
-    });
-  });
+        timestamp: FROZEN_NOW,
+      }]],
+    },
+    {
+      title: 'attacker-name mismatch: :638 gate exits before the reaction gate — zero latch/marker reads, zero log',
+      result: attackLaneResult(
+        { d20: 15, bonus: 5, targetAc: 14, hit: true },
+        { attackerName: 'Orc', totalDamage: 10, damageTypes: ['Piercing'] }
+      ),
+      description: NO_RECENT_ROLL,
+      expectedReads: [BUDGET_READ],
+      logRows: [],
+    },
+    {
+      title: 'no last attack event at all: same exit, same exact string, zero log',
+      result: EMPTY_RESULT,
+      description: NO_RECENT_ROLL,
+      expectedReads: [BUDGET_READ],
+      logRows: [],
+    },
+  ];
 
-  describe('default path — no fresh events', () => {
-    it('returns the exact no-recent-roll popup when the last attack is missing or belongs to another creature: zero heal, zero stamp', async () => {
-      // handleBardicRoll :646 gate — both trigger shapes emit the same popup.
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+  it.each(REFUSAL_CASES)('$title', async (c) => {
+    damageRollback.findLastAttack.mockResolvedValue(c.result);
 
-      // shape 1: attacker name mismatch
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Orc',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-      const mismatch = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      // shape 2: no attack event at all
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: null,
-        attackerName: null,
-        targetName: null,
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-      const missing = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+    // Refusal envelope via the REAL builder: NO defenderHp key.
+    expect(result).toEqual(popupFor(c.description));
 
-      const expected = 'No recent roll found for Goblin (attack, damage, or ability check). ' +
-        'Cutting Words must be used shortly after the roll.';
-      for (const result of [mismatch, missing]) {
-        expect(result.type).toBe('popup');
-        expect(result.payload.name).toBe('Cutting Words');
-        expect(result.payload.description).toBe(expected);
-      }
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
+    // Ordered EXACT-arity read census proves the gate ORDER: what the refusing
+    // branch short-circuited before never got read.
+    expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual(c.expectedReads);
+
+    // Full-array log census (times(1) detector + zero-log contract for :638).
+    expect(logService.addEntry.mock.calls).toEqual(c.logRows);
+
+    // One findLastAttack read: the route never re-reads lastAttack, so the
+    // executor (handleDamageDebuff/handleAttackRollDebuff) never ran.
+    expect(damageRollback.findLastAttack.mock.calls).toEqual([[campaignName]]);
+
+    // Zero spend, zero stamp, zero heal, zero dice — nothing bought the refusal.
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([]);
+    expect(useRuntimeState.setRuntimeObject.mock.calls).toEqual([]);
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    expect(diceRoller.rollDie).not.toHaveBeenCalled();
   });
 });

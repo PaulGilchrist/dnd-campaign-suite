@@ -1,8 +1,10 @@
-// @maintained-by-ai 2026-10-16 — deterministic mocked-seam lane: runtime store, logService,
+// @maintained-by-ai 2026-11-27 — deterministic mocked-seam lane: runtime store, logService,
 // combat context, and rangeCheck are all mocked at module level. Expression utils
-// (automationExpressions) and rangeToFeet run REAL — they own suites elsewhere
-// (automationExpressions.test.js, rangeValidation.test.js). No timers: turn-based
-// seam, every branch resolves inline.
+// (automationExpressions), liveTargetHp, and rangeToFeet run REAL — they own suites
+// elsewhere (automationExpressions.test.js, liveTargetHp.test.js,
+// rangeValidation.test.js). Determinism: bare vi.fn factories with ALL defaults
+// re-installed in beforeEach after resetAllMocks, FROZEN Date.now, no *Once
+// chains, no mid-test re-harnesses — multi-leg families ride it.each.
 //
 // ── CLA-163 healing_pool lane — healingPoolHandler.js handle() ──────────────
 // handle() dispatches live via automation/index.js registry key `healing_pool`.
@@ -17,18 +19,26 @@
 //   - resourceKey auto-generation ('<lowername>Pool') for dice pools, null for
 //     flat pools without one
 //   - the channel_divinity resourceCost gate AT THIS SEAM: exact-string refusal
-//     popup + ability_use log, non-CD bypass (no runtime read at all),
-//     class_levels default when the runtime key is unset
+//     popup + full-row ability_use log (frozen timestamp), gate-ORDER
+//     zero-read-of-later-channel pin (refusal never reaches combat scan),
+//     non-CD bypass (no runtime read at all), class_levels default when the
+//     runtime key is unset
 //   - resolveChannelDivinityCharges exported contract — this module is its home
 //     (radianceOfDawn + inspiringSmite suites pin their own consumption lanes)
 //   - creatureTargets scan wiring: getCombatContext(campaign), per-creature
-//     isWithinRange filtering, exact 4-key target shape, auto.range → feet
-//     (real rangeToFeet), 60 ft default, null outcomes when nothing resolves
+//     isWithinRange filtering, exact 4-key target shape (bucket-first leg is
+//     integration-only — precedence semantics belong to liveTargetHp.test.js),
+//     auto.range → feet (real rangeToFeet), 60 ft default, null outcomes when
+//     nothing resolves
 //   - restoringTouchConditions extraction from specialActions 'Restoring Touch'
 //
 // NOT owned here:
+//   - pool SPEND / per-target drain: the modal suites (HealingPoolModal.*)
+//     spend what this payload declares, and massHealHandler owns its separate
+//     spell-slot pool arithmetic — neither restates this composition lane
 //   - resolveHealingPoolExpression / evaluateAutoExpression internals
 //     → automationExpressions.test.js
+//   - bucket-vs-row HP precedence → liveTargetHp.test.js
 //   - isWithinRange internals → rangeCheck.test.js; rangeToFeet internals
 //     → rangeValidation.test.js
 //   - healing_pool display info card → automationInfoBuilder/healing.test.js
@@ -36,7 +46,7 @@
 //   - channel_divinity gates of OTHER handlers (conditionHandler,
 //     saveAttackHandler, spellCastHandler…) — each has its own suite
 //   - class channel_divinity data tables → classRules*.test.js
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -76,6 +86,8 @@ import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
 
+const FROZEN_NOW = 1_735_300_000_000;
+
 // MERGE overrides (top level and automation) — never replace wholesale.
 function makeAction(overrides = {}) {
   const { automation: automationOverrides, ...top } = overrides;
@@ -89,6 +101,13 @@ function makeAction(overrides = {}) {
     },
   };
 }
+
+// Level-17 cleric: channel_divinity 3 at the top step, undefined below.
+const clericStats = {
+  name: 'Divine_Cleric',
+  level: 17,
+  class: { class_levels: Array.from({ length: 17 }, (_, i) => ({ level: i + 1, channel_divinity: i === 16 ? 3 : undefined })) },
+};
 
 function mockRuntime({ charges } = {}) {
   useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -106,11 +125,20 @@ function mockCombat({ summary = null, inRange = () => true } = {}) {
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
+  let consoleError;
+
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockRuntime();
     mockCombat();
     logService.addEntry.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    Date.now.mockRestore();
+    consoleError.mockRestore();
   });
 
   describe('modal envelope + pool split', () => {
@@ -164,22 +192,19 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       expect(result.payload.poolExpression).toBe('12');
     });
 
-    it('wires the scaling table through the split (4d12 bumps at 6/12/17)', async () => {
+    it.each([
+      [5, 4, '4d12'],
+      [10, 5, '5d12'],
+      [17, 7, '7d12'],
+    ])('wires the scaling table through the split (level %i → %s)', async (level, pool, expression) => {
       const scaling = { '6': '5d12', '12': '6d12', '17': '7d12' };
 
-      const lvl5 = await handle(makeAction({ automation: { scaling } }), { level: 5 }, campaignName, mapName);
-      expect(lvl5.payload.pool).toBe(4);
-      expect(lvl5.payload.poolExpression).toBe('4d12');
+      const result = await handle(makeAction({ automation: { scaling } }), { level }, campaignName, mapName);
 
-      const lvl10 = await handle(makeAction({ automation: { scaling } }), { level: 10 }, campaignName, mapName);
-      expect(lvl10.payload.isDicePool).toBe(true);
-      expect(lvl10.payload.pool).toBe(5);
-      expect(lvl10.payload.poolExpression).toBe('5d12');
-      expect(lvl10.payload.dieType).toBe(12);
-
-      const lvl17 = await handle(makeAction({ automation: { scaling } }), { level: 17 }, campaignName, mapName);
-      expect(lvl17.payload.pool).toBe(7);
-      expect(lvl17.payload.poolExpression).toBe('7d12');
+      expect(result.payload.isDicePool).toBe(true);
+      expect(result.payload.pool).toBe(pool);
+      expect(result.payload.poolExpression).toBe(expression);
+      expect(result.payload.dieType).toBe(12);
     });
 
     it('flat pool lane: non-dice expression stays isDicePool false, pool comes from auto.pool (Preserve Life shape)', async () => {
@@ -227,11 +252,6 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
         bloodiedOnly: true,
       },
     };
-    const clericStats = {
-      name: 'Divine_Cleric',
-      level: 17,
-      class: { class_levels: Array.from({ length: 17 }, (_, i) => ({ level: i + 1, channel_divinity: i === 16 ? 3 : undefined })) },
-    };
 
     it('returns the healing pool modal when Channel Divinity charges remain', async () => {
       mockRuntime({ charges: 3 });
@@ -244,29 +264,35 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('refuses with popup and logs when no Channel Divinity charges remain', async () => {
+    it('refuses with popup, full-row ability_use log, and never reaches the combat scan when charges are 0', async () => {
       mockRuntime({ charges: 0 });
 
       const result = await handle(preserveLifeAction, clericStats, campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(result.payload.automation).toBe(preserveLifeAction.automation);
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'Divine_Cleric',
-          abilityName: 'Preserve Life',
-        }),
-      );
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Preserve Life',
+        automationType: 'healing_pool',
+        description: 'No Channel Divinity charges remaining.',
+        automation: preserveLifeAction.automation,
+      });
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Divine_Cleric',
+        abilityName: 'Preserve Life',
+        description: 'Divine_Cleric attempted to use Preserve Life but has no Channel Divinity charges remaining.',
+        timestamp: FROZEN_NOW,
+      });
+      // gate ORDER: the refusal short-circuits before the pool split/scan —
+      // combat context and range checks are never consulted
+      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+      expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
     });
 
     it('survives a rejected log write on the refusal path (console.error, still popup)', async () => {
       mockRuntime({ charges: 0 });
-      logService.addEntry.mockRejectedValueOnce(new Error('log down'));
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      logService.addEntry.mockRejectedValue(new Error('log down'));
 
       const result = await handle(preserveLifeAction, clericStats, campaignName, mapName);
 
@@ -274,7 +300,6 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       await vi.waitFor(() => {
         expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('[healingPoolHandler]'), expect.any(Error));
       });
-      consoleError.mockRestore();
     });
 
     it('does not gate non-channel-divinity healing_pool features at 0 charges (no runtime read at all)', async () => {
@@ -308,26 +333,14 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
   });
 
   describe('resolveChannelDivinityCharges (exported contract, consumed by radianceOfDawn + inspiringSmite)', () => {
-    it('stored runtime charges win; string values coerce to numbers; missing class data floors max at 2', () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'channelDivinityCharges') return '0';
-        return null;
-      });
-      const clericStats = {
-        name: 'Divine_Cleric',
-        level: 17,
-        class: { class_levels: Array.from({ length: 17 }, (_, i) => ({ level: i + 1, channel_divinity: i === 16 ? 3 : undefined })) },
-      };
+    it.each([
+      ["stored '0' coerces and is NOT shadowed by the class max of 3", '0', clericStats, { currentCharges: 0, maxCharges: 3 }],
+      ['unset runtime key mirrors the class-derived max', null, clericStats, { currentCharges: 3, maxCharges: 3 }],
+      ['no class data at all floors max at 2', null, { name: 'BareHero', level: 1 }, { currentCharges: 2, maxCharges: 2 }],
+    ])('resolveChannelDivinityCharges: %s', (_label, stored, stats, expected) => {
+      mockRuntime({ charges: stored });
 
-      // stored '0' coerces to 0 — NOT shadowed by the class max of 3
-      expect(resolveChannelDivinityCharges(clericStats)).toEqual({ currentCharges: 0, maxCharges: 3 });
-
-      // unset → currentCharges mirrors class-derived max
-      mockRuntime();
-      expect(resolveChannelDivinityCharges(clericStats)).toEqual({ currentCharges: 3, maxCharges: 3 });
-
-      // no class data at all → hard default max 2
-      expect(resolveChannelDivinityCharges({ name: 'BareHero', level: 1 })).toEqual({ currentCharges: 2, maxCharges: 2 });
+      expect(resolveChannelDivinityCharges(stats)).toEqual(expected);
     });
   });
 
@@ -353,35 +366,25 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       ]);
     });
 
-    it('target rows prefer the live bucket currentHitPoints/hitPoints over the stale cs row (EH 2026-11-13)', async () => {
+    it.each([
+      ['live bucket currentHitPoints/hitPoints win over the stale cs row', 134, 143, { currentHp: 134, maxHp: 143 }],
+      ['empty-string bucket (no-data fingerprint) falls back to the cs row', '', null, { currentHp: 100, maxHp: 100 }],
+    ])('target rows: %s (EH 2026-11-13, integration at this seam)', async (_label, bucketCurrent, bucketMax, expectedHp) => {
       // GET-proved drift face: real heals wrote the bucket to 134/143 while the
       // combatSummary player row stayed at 100/100 — the chooser must show what
-      // the target modal shows one click later.
+      // the target modal shows one click later. Precedence SEMANTICS belong to
+      // liveTargetHp.test.js; these legs pin only that the scan wires them in.
       mockCombat({ summary: { creatures: [{ name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 }] } });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (name === 'Fighting_Rogue' && key === 'currentHitPoints') return 134;
-        if (name === 'Fighting_Rogue' && key === 'hitPoints') return 143;
+        if (name === 'Fighting_Rogue' && key === 'currentHitPoints') return bucketCurrent;
+        if (name === 'Fighting_Rogue' && key === 'hitPoints') return bucketMax;
         return null;
       });
 
       const result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
 
       expect(result.payload.creatureTargets).toEqual([
-        { name: 'Fighting_Rogue', type: 'player', currentHp: 134, maxHp: 143 },
-      ]);
-    });
-
-    it('target rows fall back to the cs row values when the bucket is missing/empty', async () => {
-      mockCombat({ summary: { creatures: [{ name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 }] } });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentHitPoints') return ''; // empty-string = no-data fingerprint
-        return null;
-      });
-
-      const result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
-
-      expect(result.payload.creatureTargets).toEqual([
-        { name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 },
+        { name: 'Fighting_Rogue', type: 'player', ...expectedHp },
       ]);
     });
 
@@ -398,33 +401,26 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Divine_Cleric', 'Goblin', 30);
     });
 
-    it('creatureTargets stays null with no combat context, empty creatures, or nothing in range', async () => {
-      // no summary (fetch-less mocked null) → scan skipped entirely
-      mockCombat({ summary: null });
-      let result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
-      expect(result.payload.creatureTargets).toBe(null);
-      expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+    it.each([
+      ['no combat context', { summary: null }, 0],
+      ['empty creatures array', { summary: { creatures: [] } }, 0],
+      [
+        'creatures present but all out of range',
+        { summary: { creatures: [{ name: 'Troll', type: 'monstrosity', currentHp: 45, maxHp: 84 }] }, inRange: () => false },
+        1,
+      ],
+    ])('creatureTargets stays null with %s (scan consulted %i time(s))', async (_label, combat, rangeCalls) => {
+      mockCombat(combat);
 
-      // empty creatures array
-      mockCombat({ summary: { creatures: [] } });
-      result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
-      expect(result.payload.creatureTargets).toBe(null);
-      expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+      const result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
 
-      // creatures present but all out of range
-      mockCombat({
-        summary: { creatures: [{ name: 'Troll', type: 'monstrosity', currentHp: 45, maxHp: 84 }] },
-        inRange: () => false,
-      });
-      result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
       expect(result.payload.creatureTargets).toBe(null);
-      expect(rangeCheck.isWithinRange).toHaveBeenCalledTimes(1);
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledTimes(rangeCalls);
     });
   });
 
   describe('restoringTouchConditions from specialActions', () => {
-    it('extracts cureConditions when Restoring Touch feature exists, returns empty array otherwise', async () => {
-      // positive case: feature found with cureConditions
+    it('extracts cureConditions from the Restoring Touch feature amid other features', async () => {
       const playerStats = {
         specialActions: [
           {
@@ -435,32 +431,22 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
         ],
       };
 
-      let result = await handle(
-        makeAction(),
-        playerStats,
-        campaignName,
-        mapName,
-      );
+      const result = await handle(makeAction(), playerStats, campaignName, mapName);
 
-      expect(result.payload.restoringTouchConditions).toEqual([
-        'Bloodied',
-        'Unconscious',
-      ]);
+      expect(result.payload.restoringTouchConditions).toEqual(['Bloodied', 'Unconscious']);
+    });
 
-      // negative cases: none of these produce cureConditions
-      const negativeCases = [
-        { specialActions: [{ name: 'Other Feature' }] },
-        { specialActions: [{ name: 'Restoring Touch' }] },
-        { specialActions: [{ name: 'Restoring Touch', automation: {} }] },
-        { specialActions: [{ name: 'Restoring Touch', automation: null }] },
-        {},
-        { specialActions: null },
-      ];
+    it.each([
+      ['other feature only', { specialActions: [{ name: 'Other Feature' }] }],
+      ['Restoring Touch without automation', { specialActions: [{ name: 'Restoring Touch' }] }],
+      ['Restoring Touch with empty automation', { specialActions: [{ name: 'Restoring Touch', automation: {} }] }],
+      ['Restoring Touch with null automation', { specialActions: [{ name: 'Restoring Touch', automation: null }] }],
+      ['no specialActions key', {}],
+      ['null specialActions', { specialActions: null }],
+    ])('restoringTouchConditions falls back to [] when %s', async (_label, stats) => {
+      const result = await handle(makeAction(), stats, campaignName, mapName);
 
-      for (const stats of negativeCases) {
-        result = await handle(makeAction(), stats, campaignName, mapName);
-        expect(result.payload.restoringTouchConditions).toEqual([]);
-      }
+      expect(result.payload.restoringTouchConditions).toEqual([]);
     });
   });
 });

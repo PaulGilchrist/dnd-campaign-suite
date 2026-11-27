@@ -1,11 +1,34 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// Component-seam lane for the weapon damage cell's simple (ungated) damage roll:
+// CharActions -> REAL useSimpleDamageRoll -> mocked rollExpression/addEntry plus a
+// spied DiceRollContext popup host. Owns: the log-row contract (regression pin for
+// the double-.name defect), the popup replacement ORDER (open popup explicitly
+// nulled before the damage face stages; no spurious null write when none is open),
+// and the inert early-return when the roll fails. Attack-name-click roll bytes are
+// owned by CharActions.rendering.test.jsx:276; the disclosure face by
+// DiceRollResult.directDamageDisclosure.test.jsx; dwell/chain-retire presentation
+// by attackDwell/damagePopupChainRetire. No hook-level unit test exists for
+// useSimpleDamageRoll — this seam is its only coverage.
+// Mock hygiene (events-lane recipe, run2 #1853): the phantom useSyncedState export
+// on the useRuntimeState.js mock is DEAD CODE — CharActions.jsx imports
+// useSyncedState from the real useSyncedState.js module (which runs here over the
+// mocked getStore/setRuntimeValue/listeners primitives); the mirrored hand-rolled
+// implementation is removed. getRuntimeValue/setRuntimeValue/useRuntimeValue stay:
+// CharActions.jsx:4 imports them directly.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
+import { DIRECT_DAMAGE_ROLL_NOTE } from '../../hooks/combat/useSimpleDamageRoll.js';
 
+const { DEFAULT_ROLL } = vi.hoisted(() => ({
+  DEFAULT_ROLL: { total: 5, rolls: [3, 2], modifier: 0 },
+}));
+
+// Single backing Map: the REAL useSyncedState.js reads/writes it through the
+// mocked getStore(); the mocked useRuntimeValue/getRuntimeValue share it.
 const _syncedStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -13,23 +36,13 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
   listeners: new Map(),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, newValue);
-    });
-    return [value, setter];
-  }),
-  useRuntimeValue: vi.fn((_, key) => {
-    const hasValue = _syncedStore.has(key);
-    return hasValue ? _syncedStore.get(key) : null;
-  }),
+  useRuntimeValue: vi.fn((_, key) => (_syncedStore.has(key) ? _syncedStore.get(key) : null)),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  // Return shape matches CharActions.jsx:216's own destructuring exactly.
   default: vi.fn(() => ({
-    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
+    rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(),
   })),
 }));
 
@@ -116,7 +129,7 @@ vi.mock('../../services/character/featRangeService.js', () => ({
 }));
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [3, 2], modifier: 0 })),
+  rollExpression: vi.fn(() => DEFAULT_ROLL),
   rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [3, 2, 3, 2], modifier: 0 })),
 }));
 
@@ -189,6 +202,16 @@ const basePlayerStats = {
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
+// ONE producer contract, asserted on both faces it stamps: the log row
+// (type/characterName/rollType added) and the staged popup (type added).
+const ROLL_CONTRACT = {
+  name: 'Dagger',
+  formula: '1d4+3',
+  ...DEFAULT_ROLL,
+  damageType: 'Piercing',
+  note: DIRECT_DAMAGE_ROLL_NOTE,
+};
+
 function renderCharActions(stats, popupHtml, setPopupHtml) {
   globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
   return act(async () => {
@@ -205,51 +228,50 @@ describe('CharActions simple damage roll (weapon damage cell, no target)', () =>
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
+    // Re-seed the roll default after a test may have forced the roll to fail.
+    vi.mocked(rollExpression).mockImplementation(() => DEFAULT_ROLL);
   });
 
-  it('clicking a weapon damage cell logs the roll once and replaces any open popup with the damage result', async () => {
-    const setPopupHtml = vi.fn();
+  it.each([true, false])(
+    'clicking a weapon damage cell logs the roll once and stages the damage popup (prior popup open: %s)',
+    async (hadOpenPopup) => {
+      const setPopupHtml = vi.fn();
 
-    await renderCharActions({ ...basePlayerStats, attacks: [dagger] }, { type: 'some-popup' }, setPopupHtml);
+      await renderCharActions(
+        { ...basePlayerStats, attacks: [dagger] },
+        hadOpenPopup ? { type: 'some-popup' } : null,
+        setPopupHtml
+      );
 
-    await act(async () => { fireEvent.click(screen.getByText('1d4+3')); });
+      await act(async () => { fireEvent.click(screen.getByText('1d4+3')); });
 
-    await waitFor(() => {
-      expect(addEntry).toHaveBeenCalledTimes(1);
-      // Exact entry contract: characterName must be the player's name (regression
-      // pin for the double-.name defect — callers previously passed a string into
-      // useSimpleDamageRoll, which re-reads .name and logged characterName: undefined).
+      await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
+      // Exact log-row contract, incl. campaign threading and characterName as
+      // the player's name (regression pin for the double-.name defect — callers
+      // previously passed a string into useSimpleDamageRoll, which re-read .name
+      // and logged characterName: undefined).
       expect(addEntry).toHaveBeenCalledWith('test-campaign', {
         type: 'roll',
         characterName: 'TestCharacter',
         rollType: 'damage',
-        name: 'Dagger',
-        formula: '1d4+3',
-        rolls: [3, 2],
-        total: 5,
-        modifier: 0,
-        damageType: 'Piercing',
-        note: 'Direct damage roll (no target)',
+        ...ROLL_CONTRACT,
       });
-      // The popup ends on the new damage result (any prior popup is replaced).
-      expect(setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
-        type: 'damage',
-        name: 'Dagger',
-        formula: '1d4+3',
-        rolls: [3, 2],
-        total: 5,
-        modifier: 0,
-        damageType: 'Piercing',
-        note: 'Direct damage roll (no target)',
-      }));
-    });
-  });
+      // An open popup is explicitly closed BEFORE the new face stages; with no
+      // prior popup there is no spurious null write.
+      expect(setPopupHtml).toHaveBeenCalledTimes(hadOpenPopup ? 2 : 1);
+      if (hadOpenPopup) {
+        expect(setPopupHtml).toHaveBeenNthCalledWith(1, null);
+      }
+      expect(setPopupHtml).toHaveBeenLastCalledWith({ type: 'damage', ...ROLL_CONTRACT });
+    }
+  );
 
-  it('clicking a weapon damage cell is inert when the roll fails — nothing logged, popup unchanged', async () => {
+  it('clicking a weapon damage cell is inert when the roll fails — nothing logged, an open popup left untouched', async () => {
     const setPopupHtml = vi.fn();
-    vi.mocked(rollExpression).mockReturnValueOnce(null);
+    vi.mocked(rollExpression).mockReturnValue(null);
 
-    await renderCharActions({ ...basePlayerStats, attacks: [dagger] }, null, setPopupHtml);
+    // Open popup: proves the early-return precedes even the popup-close write.
+    await renderCharActions({ ...basePlayerStats, attacks: [dagger] }, { type: 'some-popup' }, setPopupHtml);
 
     await act(async () => { fireEvent.click(screen.getByText('1d4+3')); });
     await act(async () => { await Promise.resolve(); });

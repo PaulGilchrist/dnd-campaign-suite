@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 trimmed subsumed bare-default assertion + deduped same-envelope disk rows
 // ── initiative_action builder envelope (automationInfoBuilder family) ──────
 // Canonical home for the initiative_action BUILDER envelope. The builder is a
 // fixed 11-key copier: whitelisted auto.* fields ride `||` arms (except
@@ -32,26 +32,13 @@ import classes2024 from '../../../../../public/data/2024/classes.json'
 // ── synthetic fixtures (distinct from defaults, per #2099 blindness lesson) ─
 
 describe('initiativeHandlers.initiative_action – envelope contract', () => {
-    it('bare automation emits the exact default envelope; hardcoded/unknown fields cannot be overridden', () => {
-        expect(initiativeHandlers.initiative_action(
-            makeFeature({ type: 'initiative_action' }), BASE_STATS
-        )).toEqual({
-            type: 'initiative_action',
-            name: 'Test Feature',
-            effect: '',
-            healExpression: '',
-            trigger: 'roll_initiative',
-            uses: 1,
-            usesMax: 1,
-            recharge: 'long_rest',
-            resourceCost: '',
-            resourceKey: 'testFeatureUses',
-            hasAutomation: true,
-        })
-
-        // Decoy feature: type/hasAutomation stay hardcoded, usesMax is never
-        // read from auto (derived from uses only), unknown keys dropped,
-        // auto.resourceKey ignored, and playerStats is unused entirely.
+    it('emits the exact default envelope; hardcoded/unknown fields cannot be overridden', () => {
+        // Decoy feature: every auto value falls to its default arm while the
+        // feature carries tampering. type/hasAutomation stay hardcoded,
+        // usesMax is never read from auto (derived from uses only), unknown
+        // keys dropped, auto.resourceKey ignored, and playerStats is unused
+        // entirely — pinned with undefined stats, which strictly dominates a
+        // BASE_STATS call that would emit the identical envelope.
         expect(initiativeHandlers.initiative_action(
             makeFeature({
                 type: 'hijacked_type',
@@ -194,6 +181,14 @@ const EXPECTED_DISK_ENVELOPES = {
     },
 }
 
+// The two 'Superior Inspiration' rows (5e lv19 vs 2024 lv18) differ ONLY in
+// the DISCARDED key minTarget (1 vs 2), so they build byte-identical
+// envelopes — a same-branch duplicate asserted once. The count guard below
+// still pins both rows' presence on disk.
+const UNIQUE_DISK_ROWS = DISK_ROWS.filter(
+    (f, i, rows) => rows.findIndex(g => g.name === f.name) === i
+)
+
 describe('initiativeHandlers.initiative_action – verbatim disk drill', () => {
     it('disk still carries exactly these five initiative_action rows (anti-drift guard)', () => {
         expect(DISK_ROWS.map(f => f.name).sort()).toEqual([
@@ -205,7 +200,7 @@ describe('initiativeHandlers.initiative_action – verbatim disk drill', () => {
         ])
     })
 
-    it.each(DISK_ROWS.map(f => [f.name, f]))(
+    it.each(UNIQUE_DISK_ROWS.map(f => [f.name, f]))(
         'disk row %s builds its exact envelope',
         (_name, feature) => {
             expect(initiativeHandlers.initiative_action(feature, BASE_STATS))

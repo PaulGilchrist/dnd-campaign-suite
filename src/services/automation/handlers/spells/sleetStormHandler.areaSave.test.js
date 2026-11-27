@@ -1,22 +1,21 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — IMPROVE-AND-TRIM pass: 21→20 cases (7 failure-leg assertion tests merged into one ordered commit/log/read census per outcome; reject family → keyed-impl it.each, no *Once chains; gate-order exact read censuses incl. sleet's prone-before-immunity order; honest-bytes pin: lane consumes only tracking.saveDc/radius, saveType hardcoded DEX unlike grease twin; resetAllMocks-safe factories; whitespace key-normalisation + promptId-paired reject-leg log census added; header line refs re-verified vs current bytes)
 // ── sleetStorm QUARTET seam map (shared subject: sleetStormHandler.js) ──
 // lane (this) — .areaSave: processSleetStormAreaSave ONLY — the recurring
 //   per-creature DEX-save lane, fired at the caster-turn initiative seam by
-//   expireStaleEffects.js:45 (Phase 3). LIVE-wired — SP-111 precedent,
-//   grease's tracking-store lane joined it 2026-11-19 (Phase 6,
-//   expireStaleEffects.grease.test.js). In-area enumeration
-//   itself lives in expireStaleEffects (targetEffects filter
-//   effect==='sleet_storm' && source===caster → per-target re-force);
-//   pinned over there in expirations_expireStaleEffects.test.js.
-// RAW check (2024 Essentials, verified at sleetStormHandler.js:361-403):
-//   weather area spell, 20-ft-radius / 40-ft-tall cylinder, heavily obscured,
-//   difficult terrain, Concentration ≤ 1 minute. Save is DEX (NOT CON) and
-//   there is NO damage — appliedDamage: 0 on every addTargetResult, no
-//   damage dice in the module ("2d8 cold + 1d4 bludgeoning" is ice storm,
-//   not sleet storm). Fail = Prone + concentration loss. Turn-based: the
-//   area persists via runtime-store tracking + concentration, expired only
-//   at round seams — no clocks here (grep-verified: zero timers in module).
-// Siblings (split verified by CONTENT at arrival 2026-10-16, honest):
+//   expireStaleEffects.js:57 (Phase 3, re-verified 2026-11-27). LIVE-wired —
+//   SP-111 precedent, grease's tracking-store lane joined it 2026-11-19.
+//   In-area enumeration itself lives in expireStaleEffects (targetEffects
+//   filter effect==='sleet_storm' && source===caster → per-target re-force,
+//   :46-48); pinned over there in expirations_expireStaleEffects.test.js.
+// RAW check (2024 Essentials, sleetStormHandler.js:369-411): weather area
+//   spell, 20-ft-radius / 40-ft-tall cylinder, heavily obscured, difficult
+//   terrain, Concentration ≤ 1 minute. Save is DEX (NOT CON) and there is NO
+//   damage — appliedDamage: 0 on every addTargetResult, no damage dice in the
+//   module ("2d8 cold + 1d4 bludgeoning" is ice storm, not sleet storm).
+//   Fail = Prone + concentration loss. Turn-based: the area persists via
+//   runtime-store tracking + concentration, expired only at round seams —
+//   no clocks here (grep-verified: zero timers in module).
+// Siblings (split verified by CONTENT, honest):
 //   #1961 .handle         — handle() cast-time application: per-target
 //     applySleetStormProneTarget (activeConditionMeta, breakConcentration,
 //     targetEffects, condition/concentration_lost logs), tracking-key write,
@@ -28,47 +27,67 @@
 //     weaknessesAndResistivities (isProneImmune, cast-time lane)
 // Split is honest by content: this is the ONLY quartet file that imports
 // processSleetStormAreaSave; siblings all import handle().
-// Lane-delta guards (pinned here as NO-side-effects; their positive pins
-// live in #1961 — applySleetAreaSaveFailure intentionally omits them):
-//   no activeConditionMeta write, no targetEffects write, no addExpiration,
-//   no breakConcentration/getCombatSummary, no 'condition'/'concentration_lost'
+// Gate ORDER (sleet-DISTINCT bytes; do not family-merge blindly): sleet's
+//   shouldSkipSleetAreaSave runs map/in-area (:272-280) → already-prone
+//   (:282-284) → player immunity (:289-307). The grease twin (#1921) runs
+//   immunity BEFORE the prone read — the exact-array read censuses below
+//   fail if either lane re-orders. Where an assertion is identical except
+//   the handler name, a family-wide it.each consolidation is a REPORT-ONLY
+//   recommendation (owner sign-off pending on the shared guard table).
+// Field consumption (prose verdict, #1891 audit): the lane reads ONLY
+//   tracking.saveDc and tracking.radius. createSaveListener's saveType and
+//   every log/popup string HARDCODE 'DEX'/'Prone' — unlike grease (which
+//   reads tracking.saveType into the request), a contradicted tracking.saveType
+//   changes nothing here. Latent-only: the sole producer (handle :52-61)
+//   always writes saveType:'DEX', so prod bytes agree. Pinned honestly below
+//   ('consumes ONLY ...' case); re-pin if the lane ever parameterises.
+//   tracking.duration/timestamp/mapName are stored by handle but never read
+//   by this lane (persistence lives in expiration + concentration instead).
+// Duration policy: this lane stores NO durations/expirations (handle-lane
+//   owns those). Divergence noted cross-file only: handle's '1_minute'→10
+//   rounds minutes×10 encoding (sleetStormHandler.js:64-70) predates the
+//   ≥1min-combat-scoped canon — #1961 handle.test.js should pin the honest
+//   bytes and cite the #1822 owner-pending precedent.
+// Arity (per #1878): every getRuntimeValue CALL this lane makes is 3-arg in
+//   source bytes (:371 tracking, :282+:313 activeConditions, :329
+//   concentration) while the real getRuntimeValue is 2-param (read-side
+//   campaignName is inert) — censuses below match the source calls, not the
+//   signature. setRuntimeValue writes ARE 4-arg with campaignName threaded.
+// Lane-delta guards (their positive pins live in #1961 —
+//   applySleetAreaSaveFailure intentionally omits them): no
+//   activeConditionMeta/targetEffects write, no addExpiration, no
+//   breakConcentration/getCombatSummary, no 'condition'/'concentration_lost'
 //   log entries, no storeSpellLastAttack.
 // Flags (reported, not silently kept):
 //   • PRODUCTION DEFECT FIXED 2026-11-23 (await census finale):
-//     shouldSkipSleetAreaSave sleetStormHandler.js:286 called async
-//     getCombatContext WITHOUT await, so ?.creatures was undefined in prod and
-//     the playerIsImmuneToCondition branch was UNREACHABLE — immune PCs took
-//     Prone from the recurring area save (live-witnessed pre-fix: seeded
-//     prone/restrained-immunity EvasiveFighter landed Restrained+Prone via the
-//     web/sleet area lanes). Now awaited (grease twin :140) AND, per the
-//     Option A landing (bug-zone-save-computedstats-bucket-has-no-producer,
-//     2026-11-23), the roster-resolved targetStats PARAMETER (sweep-side
-//     `characters.find(...) → computedStats || character`) is passed to
+//     shouldSkipSleetAreaSave :289 called async getCombatContext WITHOUT
+//     await, so ?.creatures was undefined in prod and the playerIsImmuneToCondition
+//     branch was UNREACHABLE — immune PCs took Prone from the recurring area
+//     save. Now awaited (grease twin) AND, per the Option A landing
+//     (bug-zone-save-computedstats-bucket-has-no-producer, 2026-11-23), the
+//     roster-resolved targetStats PARAMETER is passed to
 //     playerIsImmuneToCondition AS the stats object — the runtime
-//     `computedStats` BUCKET those buckets era's pins seeded had NO producer
-//     (data-starved gate) and its read is DELETED (one canonical shape).
-//     Pins below exercise the async contract: immunity-skips /
-//     non-immune-resolves / NPC-unaffected.
+//     'computedStats' BUCKET had NO producer (data-starved gate) and its read
+//     is DELETED (one canonical shape). Pins below exercise the async
+//     contract: immunity-skips / non-immune-resolves / NPC-unaffected.
 //   • WIRED 2026-11-19 (owner "WIRE IT"): remove_sleet_storm_area expiration
-//     effect (rounds:10) is PRODUCED at sleetStormHandler.js:73-76 (handle
-//     lane) and consumed by clearExpirationEffects.js EXPIRATION_HANDLERS —
-//     the clock nulls the tracking key (pin:
-//     clearExpirationEffects.grease-sleet-zone-expiry.test.js).
-//     The recurring-save consumption itself IS live (expireStaleEffects:45).
-//   • registry note: automation/index.js dispatches BOTH 'sleet_storm' and
-//     'sleet_storm_area_save' to handle() (558/585) — not to this export.
-// Related refs (distinct modules, no exact-name dupes): greaseAreaSave pair
-//   (closed — area-save sibling pattern), freezingSphere #20 (modal-builder),
-//   calmEmotions trio (sphere-math REAL-unmocked precedent), antimagicField
-//   #18 (Q1 name-split pattern — verified: no name-split issue here, this
-//   filename matches its content exactly).
+//     (rounds:10 from the '1_minute' encoding) is PRODUCED at
+//     sleetStormHandler.js:72-76 (handle lane) and consumed by
+//     clearExpirationEffects.js EXPIRATION_HANDLERS — the clock nulls the
+//     tracking key (pin: clearExpirationEffects.grease-sleet-zone-expiry.test.js).
+//   • registry note (re-verified 2026-11-27): automation/index.js dispatches
+//     BOTH 'sleet_storm_area_save' (558) and 'sleet_storm' (585) to handle()
+//     — not to this export; trio dispatch is owned by index.webDispatch.test.js.
+// Mock factories carry BASE implementations inline (vi.fn(async…)) so they
+//   survive vi.resetAllMocks() — no *Once chains, no mid-test re-harness
+//   beyond the exact-key runtime router.
 // ──────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn(),
+  buildSaveDc: vi.fn(), // import-graph only — the process lane never calls it
   createSaveListener: vi.fn(),
 }));
 
@@ -77,7 +96,7 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -85,12 +104,13 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+// Import-side-effect isolation only — the process lane never writes expirations.
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn(),
+  addExpiration: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isWithinRange: vi.fn(async () => true),
 }));
 
 vi.mock('../../../combat/automation/automationImmunities.js', () => ({
@@ -115,7 +135,7 @@ vi.mock('../../../ui/storage.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
   storeSpellLastAttack: vi.fn(),
-  addTargetResult: vi.fn().mockResolvedValue({}),
+  addTargetResult: vi.fn(async () => ({})),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -137,8 +157,14 @@ import * as damageRollback from '../../common/damageRollback.js';
 const campaignName = 'TestCampaign';
 const mapName = 'test-map';
 const casterName = 'TestWizard';
-const TRACKING_KEY = '_sleetStorm_TestWizard';
-const CONCENTRATION_KEY = '_sleetStorm_concentration_TestWizard';
+const targetName = 'Goblin';
+
+// Reader mirrors the writer's key normalisation (handle stores
+// `_sleetStorm_${caster.replace(/\s+/g,'_')}`): 'Test Wizard' → _sleetStorm_Test_Wizard
+const trackingKeyFor = (caster) => `_sleetStorm_${caster.replace(/\s+/g, '_')}`;
+const concentrationKeyFor = (caster) => `_sleetStorm_concentration_${caster.replace(/\s+/g, '_')}`;
+const TRACKING_KEY = trackingKeyFor(casterName);
+const CONCENTRATION_KEY = concentrationKeyFor(casterName);
 
 function makeTracking(overrides = {}) {
   return {
@@ -150,284 +176,234 @@ function makeTracking(overrides = {}) {
   };
 }
 
-// getRuntimeValue router: tracking key vs concentration key vs conditions.
-// Concentration key is checked FIRST — it also startsWith('_sleetStorm_').
-// NOTE (Option A landing): there is NO `computedStats` bucket key any more —
-// the immunity gate receives the roster-resolved stats as the processXxxAreaSave
-// targetStats PARAMETER (bug-zone-save-computedstats-bucket-has-no-producer).
-function routeRuntime({ activeConditions = [], concentration = [], tracking = makeTracking() } = {}) {
+// Exact-key runtime router. NOTE (Option A landing): there is NO
+// `computedStats` bucket key any more — the immunity gate receives the
+// roster-resolved stats as the targetStats PARAMETER
+// (bug-zone-save-computedstats-bucket-has-no-producer).
+function routeRuntime({
+  caster = casterName,
+  activeConditions = [],
+  concentration = [],
+  tracking = makeTracking(),
+} = {}) {
+  const trackingKey = trackingKeyFor(caster);
+  const concentrationKey = concentrationKeyFor(caster);
   useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-    if (key === CONCENTRATION_KEY) return concentration;
-    if (key === TRACKING_KEY) return tracking;
+    if (key === concentrationKey) return concentration;
+    if (key === trackingKey) return tracking;
     if (key === 'activeConditions') return activeConditions;
     return null;
   });
 }
 
-// Monster combat-context in the ASYNC contract (production shape, per the
-// 2b8a16573 await-fix): the source awaits getCombatContext before reading
-// .creatures. Pins that need the player-immunity branch resolve a PLAYER row,
-// so a dropped await drops the row to undefined and fails them (the old
-// sync-mock shape passed even un-awaited — that mock lie hid the defect).
-function monsterContext(targetName = 'Goblin') {
+// getCombatContext in the ASYNC contract (production shape, per the 2026-11-23
+// await-fix): the source awaits it before reading .creatures. Pins that need
+// the player-immunity branch resolve a PLAYER row, so a dropped await drops
+// the row to undefined and fails them (the old sync-mock shape passed even
+// un-awaited — that mock lie hid the defect).
+function monsterContext(name = targetName) {
   damageUtils.getCombatContext.mockResolvedValue({
-    creatures: [{ name: targetName, type: 'monster' }],
+    creatures: [{ name, type: 'monster' }],
   });
 }
 
-function playerContext(targetName = 'Goblin') {
+function playerContext(name = targetName) {
   damageUtils.getCombatContext.mockResolvedValue({
-    creatures: [{ name: targetName, type: 'player' }],
+    creatures: [{ name, type: 'player' }],
   });
 }
 
-function setupAreaSave(saveOutcome = { success: false, roll: 5, total: 5 }) {
+function mockSave(success, { roll, total, promptId = `sleet-area-${success ? 'ok' : 'fail'}` } = {}) {
+  const outcome = success
+    ? { success: true, roll: roll ?? 14, total: total ?? 14 }
+    : { success: false, roll: roll ?? 5, total: total ?? 5 };
+  savePrompt.createSaveListener.mockReturnValue({ promptId, promise: Promise.resolve(outcome) });
+}
+
+// Happy-path base: in-area monster, valid tracking, save resolves `success`.
+function setupAreaSave(success = false) {
   routeRuntime();
   monsterContext();
-  rangeCheck.isWithinRange.mockResolvedValue(true);
-  savePrompt.createSaveListener.mockReturnValue({
-    promptId: 'sleet-area-prompt',
-    promise: Promise.resolve(saveOutcome),
-  });
+  mockSave(success);
 }
 
 // ── Tests: processSleetStormAreaSave ───────────────────────────
 
 describe('sleetStormHandler.processSleetStormAreaSave', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Deterministic baseline: clear any leaked Once-queues from prior tests,
-    // restore resolved defaults for the two awaited/floating promises.
-    logService.addEntry.mockReset().mockResolvedValue({});
-    damageRollback.addTargetResult.mockReset().mockResolvedValue({});
-    rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
-    damageUtils.getCombatContext.mockReset();
-    savePrompt.createSaveListener.mockReset();
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    vi.resetAllMocks(); // factories carry inline base impls — nothing to reinstall
   });
 
-  describe('tracking early returns', () => {
-    it('returns null and touches nothing when no tracking data', async () => {
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+  describe('tracking guards', () => {
+    it('returns null for missing or saveDc-less tracking, reading ONLY the tracking key', async () => {
+      routeRuntime({ tracking: null });
+      expect(await processSleetStormAreaSave(casterName, targetName, campaignName, mapName)).toBeNull();
 
-      expect(result).toBeNull();
+      routeRuntime({ tracking: { caster: casterName } }); // no saveDc
+      expect(await processSleetStormAreaSave(casterName, targetName, campaignName, mapName)).toBeNull();
+
+      // both guard legs: read census is the tracking read ONLY (:371, 3-arg) —
+      // no later channel (range, conditions, context, prompt, log, write) touched
+      expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual([
+        [casterName, TRACKING_KEY, campaignName],
+        [casterName, TRACKING_KEY, campaignName],
+      ]);
+      expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('skip gates (gate-order read censuses)', () => {
+    // Sleet order is map → already-prone → immunity (grease twin is the
+    // reverse for the last two): each exact read census FAILS on re-ordering.
+    it.each([
+      {
+        title: 'already prone (case-insensitive activeConditions read)',
+        setup: () => {
+          routeRuntime({ activeConditions: ['PrOnE'] });
+          monsterContext();
+        },
+        expectReads: [
+          [casterName, TRACKING_KEY, campaignName],
+          [targetName, 'activeConditions', campaignName],
+        ],
+      },
+      {
+        title: 'outside the tracked radius',
+        setup: () => {
+          routeRuntime({ tracking: makeTracking({ radius: 20 }) });
+          monsterContext();
+          rangeCheck.isWithinRange.mockResolvedValue(false);
+        },
+        expectReads: [[casterName, TRACKING_KEY, campaignName]], // prone read never reached — range gate is FIRST
+      },
+      {
+        title: 'immune player — gate receives the PASSED roster stats verbatim',
+        setup: () => {
+          routeRuntime();
+          playerContext();
+          automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
+        },
+        // prone read precedes the immunity gate; no concentration read
+        expectReads: [
+          [casterName, TRACKING_KEY, campaignName],
+          [targetName, 'activeConditions', campaignName],
+        ],
+        expectImmunityCall: {
+          conditionKey: 'prone',
+          playerStats: { name: targetName, immunities: ['prone'] },
+          getRuntimeValue: expect.any(Function),
+          campaignName,
+        },
+      },
+    ])('skips the save entirely when the target is $title — zero spends', async (c) => {
+      const rosterStats = { name: targetName, immunities: ['prone'] };
+      c.setup();
+
+      expect(await processSleetStormAreaSave(casterName, targetName, campaignName, mapName, rosterStats)).toBeNull();
+
+      // exact-array read census: nothing after the firing gate is read
+      expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual(c.expectReads);
+      // the computedStats bucket (deleted with Option A) is never read
+      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
+      // gate ORDER: the range check is FIRST on all three skip legs (the
+      // out-of-radius case fires the gate by answering false — call #1)
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledTimes(1);
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(casterName, targetName, 20);
+      if (c.expectImmunityCall) {
+        expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(c.expectImmunityCall);
+      } else {
+        // out-of-range never fetches the immunity context; already-prone
+        // returns BEFORE the context fetch (prone gate sits ahead of it)
+        expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+        expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
+      }
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns null when tracking has no saveDc', async () => {
-      routeRuntime({ tracking: { caster: casterName } });
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result).toBeNull();
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('skip checks (shouldSkipSleetAreaSave)', () => {
-    it('returns null when target is already prone (case-insensitive)', async () => {
-      routeRuntime({ activeConditions: ['prone'] });
-      monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result).toBeNull();
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('returns null when target is already Prone (mixed case)', async () => {
-      routeRuntime({ activeConditions: ['PrOnE'] });
-      monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result).toBeNull();
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('returns null when target is outside the area radius', async () => {
-      routeRuntime({ tracking: makeTracking({ radius: 20 }) });
-      monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(false);
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result).toBeNull();
-      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(casterName, 'Goblin', 20);
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('skips the range check when mapName is null (proceeds with save)', async () => {
+    it('skips the range check when mapName is null and proceeds with the save', async () => {
       routeRuntime();
       monsterContext();
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-no-map',
-        promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
-      });
+      mockSave(true);
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, null);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
     });
 
-    it('proceeds with save when isWithinRange throws (map data unavailable)', async () => {
+    it('proceeds with the save when isWithinRange throws (map data unavailable)', async () => {
       routeRuntime();
       monsterContext();
       rangeCheck.isWithinRange.mockRejectedValue(new Error('map not found'));
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-fallback',
-        promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
-      });
+      mockSave(true);
       const consoleWarn = vi.spyOn(console, 'warn').mockReturnValue();
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
       expect(result.type).toBe('popup');
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
       expect(consoleWarn).toHaveBeenCalledWith(
         '[sleetStormHandler] Map data unavailable, proceeding with save:',
         expect.any(Error),
       );
       consoleWarn.mockRestore();
     });
+  });
 
-    it('immune player is SKIPPED: no save prompt, no condition writes, gate receives the PASSED roster stats verbatim', async () => {
-      // LIVE PIN (Option A landing, bug-zone-save-computedstats-bucket-has-no-producer):
-      // the awaited ASYNC combat context resolves the PLAYER row, so the immunity
-      // branch is reachable exactly as in production, and the stats object is the
-      // targetStats PARAMETER the expireStaleEffects sweep threads from the caller's
-      // roster (`characters.find(...) → computedStats || character`) — never a
-      // runtime `computedStats` bucket (which has NO producer).
-      const rosterStats = { name: 'Goblin', immunities: ['prone'] };
+  describe('immunity contract (awaited async context)', () => {
+    it.each([
+      ['roster-resolved stats', { name: targetName, immunities: [] }],
+      ['absent roster target (undefined stats → the rule guard answers false)', undefined],
+    ])('non-immune player with %s proceeds to the save — gate receives the param verbatim', async (_case, stats) => {
       routeRuntime();
       playerContext();
-      automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
-      rangeCheck.isWithinRange.mockResolvedValue(true);
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
+      mockSave(true);
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName, stats);
 
-      expect(result).toBeNull();
+      expect(result.type).toBe('popup');
       // The param IS the stats object playerIsImmuneToCondition reads — passed
       // directly, never re-wrapped under a computedStats key.
       expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
         conditionKey: 'prone',
-        playerStats: rosterStats,
+        playerStats: stats,
         getRuntimeValue: expect.any(Function),
         campaignName,
       });
-      expect(useRuntimeState.getRuntimeValue.mock.calls.every(([, key]) => key !== 'computedStats')).toBe(true);
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
     });
 
-    it('non-immune player resolves normally (immunity false → save proceeds, prone applies on fail)', async () => {
-      const rosterStats = { name: 'Goblin', immunities: [] };
-      routeRuntime();
-      playerContext();
-      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-not-immune',
-        promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
-      });
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, rosterStats);
-
-      expect(result.type).toBe('popup');
-      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
-        conditionKey: 'prone',
-        playerStats: rosterStats,
-        getRuntimeValue: expect.any(Function),
-        campaignName,
-      });
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['prone'],
-        campaignName,
-      );
-    });
-
-    it('target absent from the roster (no targetStats threaded) still resolves normally', async () => {
-      routeRuntime();
-      playerContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-no-stats',
-        promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
-      });
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      // undefined stats → playerIsImmuneToCondition's own guard answers false; the
-      // handler still hands it the (undefined) param so the call contract stays uniform.
-      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith({
-        conditionKey: 'prone',
-        playerStats: undefined,
-        getRuntimeValue: expect.any(Function),
-        campaignName,
-      });
-      expect(savePrompt.createSaveListener).toHaveBeenCalled();
-    });
-
-    it('immunity leg is player-only: NPC row with an immunity-carrying targetStats arg still saves (awaited context gates on type)', async () => {
+    it('immunity leg is player-only: monster row with an immunity-carrying stats arg still saves', async () => {
       // Awaited contract + defect-incompatible: the resolved MONSTER row keeps
       // the immunity check out even when an immunity-carrying roster arg is
       // threaded (roster lookup by cs-row TYPE, not by the passed stats).
       routeRuntime();
       monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-npc',
-        promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
-      });
+      automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
+      mockSave(true);
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName, { name: 'Goblin', immunities: ['prone'] });
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName, { name: targetName, immunities: ['prone'] });
 
       expect(result.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
     });
   });
 
-  describe('save prompt and ability_use log', () => {
-    it('creates save listener with exact params (tracking extras not forwarded)', async () => {
-      setupAreaSave();
+  describe('save outcome sequences', () => {
+    it('failed save — exact request, ordered log census (promptId-paired), popup, and ordered write census condition→concentration', async () => {
+      routeRuntime();
+      monsterContext();
+      mockSave(false, { promptId: 'p-fail' });
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'DEX',
-        saveDc: 15,
-      });
-    });
-
-    it('posts ability_use entry with full composed description and promptId', async () => {
-      setupAreaSave();
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: casterName,
-        abilityName: 'Sleet Storm',
-        description: 'Goblin must make a DEX save (DC 15) or become Prone and lose Concentration (Sleet Storm area).',
-        promptId: 'sleet-area-prompt',
-      });
-    });
-  });
-
-  describe('outcome — failed save', () => {
-    it('returns popup with own full-string description', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
       expect(result).toEqual({
         type: 'popup',
@@ -437,47 +413,60 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
           description: 'Goblin failed the DEX save (DC 15). Becomes Prone and loses Concentration.',
         },
       });
-    });
 
-    it('applies prone with exact write (fresh conditions)', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['prone'],
-        campaignName,
-      );
-    });
-
-    it('deduplicates existing conditions before appending prone', async () => {
-      routeRuntime({ activeConditions: ['blinded', 'restrained'] });
-      monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-dedup',
-        promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
+      // re-forced at the turn-start seam: DEX save at the tracked DC, ONE
+      // listener, tracking extras (radius/duration/timestamp) never forwarded
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveType: 'DEX',
+        saveDc: 15,
       });
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      // ordered full-array log census: ability_use carries the SAME promptId
+      // the listener returned (pairing — stray-prompt detector), then the
+      // save_result outcome entry. Exactly 2 — no 'condition'/
+      // 'concentration_lost' entries leak in from the handle lane.
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Sleet Storm',
+          description: 'Goblin must make a DEX save (DC 15) or become Prone and lose Concentration (Sleet Storm area).',
+          promptId: 'p-fail',
+        }],
+        [campaignName, {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-sleet-storm',
+          targetName,
+          saveDc: 15,
+          saveType: 'DEX',
+          success: false,
+          description: 'Goblin failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.',
+        }],
+      ]);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['blinded', 'restrained', 'prone'],
-        campaignName,
-      );
-    });
+      // ordered full-array write census (4-arg, campaignName threaded):
+      // condition append, then the caster-side concentration-loss tracker.
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        [targetName, 'activeConditions', ['prone'], campaignName],
+        [casterName, CONCENTRATION_KEY, [targetName], campaignName],
+      ]);
 
-    it('calls addTargetResult with exact failure shape (zero damage)', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
+      // exact read census: tracking, skip-gate conditions, re-read on apply,
+      // concentration list — nothing else (:371, :282, :313, :329)
+      expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual([
+        [casterName, TRACKING_KEY, campaignName],
+        [targetName, 'activeConditions', campaignName],
+        [targetName, 'activeConditions', campaignName],
+        [casterName, CONCENTRATION_KEY, campaignName],
+      ]);
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
+      // rollback ledger: ONE entry, failure shape, zero damage (no dice here)
+      expect(damageRollback.addTargetResult).toHaveBeenCalledTimes(1);
       expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
+        targetName,
         saveResult: 'failure',
         roll: 5,
         total: 5,
@@ -486,95 +475,12 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
       });
     });
 
-    it('tracks concentration loss on failed save', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        casterName,
-        CONCENTRATION_KEY,
-        ['Goblin'],
-        campaignName,
-      );
-    });
-
-    it('appends to existing concentration-loss list without duplicating', async () => {
-      routeRuntime({ concentration: ['Orc'] });
+    it('successful save — popup + logs only; write census is EMPTY and the concentration list is never read', async () => {
+      routeRuntime();
       monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-conc-append',
-        promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
-      });
+      mockSave(true, { promptId: 'p-ok' });
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        casterName,
-        CONCENTRATION_KEY,
-        ['Orc', 'Goblin'],
-        campaignName,
-      );
-    });
-
-    it('does not rewrite concentration-loss list when target already tracked', async () => {
-      routeRuntime({ concentration: ['Goblin'] });
-      monsterContext();
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'sleet-area-conc-dedup',
-        promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
-      });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      const concWrites = useRuntimeState.setRuntimeValue.mock.calls.filter((c) => c[1] === CONCENTRATION_KEY);
-      expect(concWrites.length).toBe(0);
-    });
-
-    it('posts save_result failure entry with full-string description', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-sleet-storm',
-        targetName: 'Goblin',
-        saveDc: 15,
-        saveType: 'DEX',
-        success: false,
-        description: 'Goblin failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.',
-      });
-    });
-
-    it('lane-delta guard: area failure does NOT run handle-lane side effects', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      // Positive pins for all of these live in #1961 (applySleetStormProneTarget);
-      // applySleetAreaSaveFailure must stay free of them.
-      const keys = useRuntimeState.setRuntimeValue.mock.calls.map((c) => c[1]);
-      expect(keys).not.toContain('activeConditionMeta');
-      expect(keys).not.toContain('targetEffects');
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-      expect(concentrationService.breakConcentration).not.toHaveBeenCalled();
-      expect(combatData.getCombatSummary).not.toHaveBeenCalled();
-      expect(damageRollback.storeSpellLastAttack).not.toHaveBeenCalled();
-      const logTypes = logService.addEntry.mock.calls.map((c) => c[1].type);
-      expect(logTypes).not.toContain('condition');
-      expect(logTypes).not.toContain('concentration_lost');
-    });
-  });
-
-  describe('outcome — successful save', () => {
-    it('returns popup with own full-string description', async () => {
-      setupAreaSave({ success: true, roll: 14, total: 14 });
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
       expect(result).toEqual({
         type: 'popup',
@@ -584,26 +490,39 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
           description: 'Goblin succeeded the DEX save (DC 15). Unaffected.',
         },
       });
-    });
 
-    it('writes no prone and no concentration loss on successful save', async () => {
-      setupAreaSave({ success: true, roll: 14, total: 14 });
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Sleet Storm',
+          description: 'Goblin must make a DEX save (DC 15) or become Prone and lose Concentration (Sleet Storm area).',
+          promptId: 'p-ok',
+        }],
+        [campaignName, {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-sleet-storm',
+          targetName,
+          saveDc: 15,
+          saveType: 'DEX',
+          success: true,
+          description: 'Goblin succeeded on DEX save against Sleet Storm.',
+        }],
+      ]);
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      // success leg: NO condition or concentration write at all
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      // …and the concentration key is never even read (recordSleetAreaSaveSuccess
+      // skips applySleetAreaSaveFailure's list read)
+      expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual([
+        [casterName, TRACKING_KEY, campaignName],
+        [targetName, 'activeConditions', campaignName],
+      ]);
 
-      const conditionWrites = useRuntimeState.setRuntimeValue.mock.calls.filter(
-        (c) => c[1] === 'activeConditions' || c[1] === CONCENTRATION_KEY,
-      );
-      expect(conditionWrites.length).toBe(0);
-    });
-
-    it('calls addTargetResult with exact success shape', async () => {
-      setupAreaSave({ success: true, roll: 14, total: 14 });
-
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
+      expect(damageRollback.addTargetResult).toHaveBeenCalledTimes(1);
       expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
+        targetName,
         saveResult: 'success',
         roll: 14,
         total: 14,
@@ -612,89 +531,138 @@ describe('sleetStormHandler.processSleetStormAreaSave', () => {
       });
     });
 
-    it('posts save_result success entry with full-string description', async () => {
-      setupAreaSave({ success: true, roll: 14, total: 14 });
+    it('consumes ONLY tracking.saveDc and tracking.radius — saveType/prone stay hardcoded DEX/Prone (honest bytes, latent-only vs grease twin)', async () => {
+      // HONEST BYTE: unlike the grease twin (which forwards tracking.saveType
+      // into the request), this lane hardcodes 'DEX' in the listener args and
+      // every prose string; a contradicted tracking.saveType changes nothing.
+      // The sole producer (handle :57) always writes 'DEX', so this is a
+      // latent-only quirk — re-pin if the lane ever parameterises.
+      routeRuntime({ tracking: makeTracking({ saveType: 'CON', radius: 30 }) });
+      monsterContext();
+      mockSave(false);
 
-      await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-sleet-storm',
-        targetName: 'Goblin',
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(casterName, targetName, 30); // radius IS tracked
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveType: 'DEX', // hardcoded, NOT the contradicted tracked 'CON'
         saveDc: 15,
-        saveType: 'DEX',
-        success: true,
-        description: 'Goblin succeeded on DEX save against Sleet Storm.',
       });
+      expect(result.payload.description).toBe('Goblin failed the DEX save (DC 15). Becomes Prone and loses Concentration.');
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        [targetName, 'activeConditions', ['prone'], campaignName],
+        [casterName, CONCENTRATION_KEY, [targetName], campaignName],
+      ]);
+    });
+
+    it('preserves existing conditions and appends concentration-tracker entries without duplicating', async () => {
+      routeRuntime({ activeConditions: ['blinded', 'restrained'], concentration: ['Orc'] });
+      monsterContext();
+      mockSave(false);
+
+      await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
+
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        [targetName, 'activeConditions', ['blinded', 'restrained', 'prone'], campaignName],
+        [casterName, CONCENTRATION_KEY, ['Orc', targetName], campaignName],
+      ]);
+    });
+
+    it('target already in the concentration-loss list: list NOT rewritten, condition write still lands', async () => {
+      routeRuntime({ concentration: [targetName] });
+      monsterContext();
+      mockSave(false);
+
+      await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
+
+      // exact write census: ONLY the activeConditions write survives
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        [targetName, 'activeConditions', ['prone'], campaignName],
+      ]);
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(casterName, CONCENTRATION_KEY, campaignName);
+    });
+
+    it('caster whitespace normalises into BOTH keys (reader mirrors the writer)', async () => {
+      routeRuntime({ caster: 'Test Wizard' });
+      monsterContext('Goblin');
+      mockSave(false);
+
+      await processSleetStormAreaSave('Test Wizard', targetName, campaignName, mapName);
+
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Test Wizard', '_sleetStorm_Test_Wizard', campaignName);
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        [targetName, 'activeConditions', ['prone'], campaignName],
+        ['Test Wizard', '_sleetStorm_concentration_Test_Wizard', [targetName], campaignName],
+      ]);
     });
   });
 
-  describe('error handling (.catch on floating addEntry, save promise)', () => {
-    it('addEntry rejection on ability_use (call #1) does not derail the save', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-      logService.addEntry.mockRejectedValueOnce(new Error('log error'));
-      const consoleError = vi.spyOn(console, 'error').mockReturnValue();
+  describe('lane-delta guards vs the handle lane (#1961)', () => {
+    it('area failure runs NO handle-lane side effects', async () => {
+      setupAreaSave(false);
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(logService.addEntry).toHaveBeenCalledTimes(2); // ability_use + save_result
-      expect(damageRollback.addTargetResult).toHaveBeenCalled(); // save still processed
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith('[sleetStormAreaSave] Error:', expect.any(Error));
-      consoleError.mockRestore();
-    });
-
-    it('addEntry rejection on save_result failure path (call #2) is caught', async () => {
-      setupAreaSave({ success: false, roll: 5, total: 5 });
-      // Once-queue fires in call order: #1 ability_use resolves, #2 save_result rejects.
-      logService.addEntry
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Error('save_result log error'));
-      const consoleError = vi.spyOn(console, 'error').mockReturnValue();
-
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith('[sleetStormAreaSave] Error:', expect.any(Error));
-      // Failure application completed before/independent of the log rejection
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
+      // Positive pins for all of these live in #1961 (applySleetStormProneTarget);
+      // applySleetAreaSaveFailure must stay free of them.
+      expect(useRuntimeState.setRuntimeValue.mock.calls.map((c) => c[1])).toEqual([
         'activeConditions',
-        ['prone'],
-        campaignName,
-      );
-      consoleError.mockRestore();
+        CONCENTRATION_KEY,
+      ]);
+      expect(logService.addEntry.mock.calls.map((c) => c[1].type)).toEqual(['ability_use', 'save_result']);
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(concentrationService.breakConcentration).not.toHaveBeenCalled();
+      expect(combatData.getCombatSummary).not.toHaveBeenCalled();
+      expect(damageRollback.storeSpellLastAttack).not.toHaveBeenCalled();
     });
+  });
 
-    it('addEntry rejection on save_result success path (call #2) is caught', async () => {
-      setupAreaSave({ success: true, roll: 14, total: 14 });
-      logService.addEntry
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Error('save_result log error'));
+  describe('error handling (floating addEntry catches, save promise)', () => {
+    // No *Once chains: keyed impl targets the rejected call by entry.type,
+    // immune to call-order drift.
+    it.each([
+      { outcome: 'failed', success: false, rejectType: 'ability_use', condWrites: 1 },
+      { outcome: 'failed', success: false, rejectType: 'save_result', condWrites: 1 },
+      { outcome: 'successful', success: true, rejectType: 'save_result', condWrites: 0 },
+    ])('addEntry rejection on $rejectType during a $outcome save is caught — exactly-1 console.error, commits complete independently', async (c) => {
+      setupAreaSave(c.success);
+      logService.addEntry.mockImplementation((campaign, entry) =>
+        entry.type === c.rejectType ? Promise.reject(new Error(`${c.rejectType} log error`)) : Promise.resolve({}),
+      );
       const consoleError = vi.spyOn(console, 'error').mockReturnValue();
 
-      const result = await processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName);
+      const result = await processSleetStormAreaSave(casterName, targetName, campaignName, mapName);
 
       expect(result.type).toBe('popup');
+      // both log attempts still happen (full-array spend census)
+      expect(logService.addEntry.mock.calls.map((e) => e[1].type)).toEqual(['ability_use', 'save_result']);
       expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalledWith('[sleetStormAreaSave] Error:', expect.any(Error));
+      // failure application completed before/independent of the log rejection;
+      // success leg commits nothing
+      const condWrites = useRuntimeState.setRuntimeValue.mock.calls.filter((w) => w[1] === 'activeConditions');
+      expect(condWrites.length).toBe(c.condWrites);
+      expect(damageRollback.addTargetResult).toHaveBeenCalledTimes(1);
       consoleError.mockRestore();
     });
 
-    it('rejects without side effects when the save prompt promise rejects', async () => {
-      setupAreaSave();
+    it('save promise rejects → throws with ONLY the paired ability_use logged and zero writes', async () => {
+      routeRuntime();
+      monsterContext();
       savePrompt.createSaveListener.mockReturnValue({
         promptId: 'sleet-area-reject',
         promise: Promise.reject(new Error('save cancelled')),
       });
 
       await expect(
-        processSleetStormAreaSave(casterName, 'Goblin', campaignName, mapName),
+        processSleetStormAreaSave(casterName, targetName, campaignName, mapName),
       ).rejects.toThrow('save cancelled');
 
+      // exactly-1-log census: only the promptId-paired ability_use was posted
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, expect.objectContaining({ type: 'ability_use', promptId: 'sleet-area-reject' })],
+      ]);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(damageRollback.addTargetResult).not.toHaveBeenCalled();
     });

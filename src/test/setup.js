@@ -90,8 +90,21 @@ global.ResizeObserver ??= class {
   disconnect() {}
 };
 
-// Cleanup after each test
-afterEach(() => {
+// Captured at module load (before any test can install fake timers) so the
+// drain below always uses the real macrotask queue.
+const realSetTimeout = globalThis.setTimeout;
+
+// Cleanup after each test. The final await drains one real macrotask tick:
+// effect cleanups that RTL's cleanup() triggers can schedule 0ms fallbacks
+// (e.g. useOverlayEntranceFocus's close-restore re-check) whose ids are never
+// captured. Without the drain those callbacks may fire after this file's jsdom
+// environment tears down, surfacing as an unhandled `ReferenceError: document
+// is not defined`. Draining here runs them while jsdom still exists; the
+// stranded-only, idempotent, never-fighting restore is safe against an emptied
+// DOM (its anchor.isConnected guard fails and it becomes a no-op). Same-task
+// timers queued before the drain fire first (FIFO), so one tick is enough.
+afterEach(async () => {
   cleanup();
   clearActiveInstances();
+  await new Promise(resolve => realSetTimeout(resolve, 0));
 });

@@ -2988,3 +2988,126 @@ run2#1819: inventoryService -> maintained (15->9 blocks/15r) all-lane 4-leg erro
 - Headline: 1 file DELETED as pure duplicate; 🔴 new: radianceOfDawn DC-display-vs-actual-save mismatch + dcSuccess 'none' vs RAW half + serial-comma regex failure (Elf Keen Senses); 4 unlogged-failure / campaignName-dropped-arg source notes.
 - Marker canon date = LOCAL date +%F = 2026-11-27 for all lanes from run2#1820 on.
 - Next head: animateDeadHandler.confirm.details.test.js.
+
+## Batch18 (RUN4 batch #239, run2#1820-#1834, 2026-11-27)
+run2#1820: animateDeadHandler.confirm.details -> maintained (5->4) sentinel getMonsterSaveBonuses mock replaces re-implementation; mirror-mock theme kicked off family-wide.
+run2#1821: createUndeadHandler.confirm -> maintained (14->12) REAL getNextUniqueMonsterName exposed stale 'Ghoul' mirror vs prod 'Ghoul 1'-series law; storage-lane wrong-names pin filed (OPEN: storage + #1899 lanes).
+run2#1822: truePolymorphService.summon-revert -> maintained (27->21 blocks/27r) refusal it.each + DC formula family + recast-clobber twin deleted (cause owned #1983); random-initiative-fallback gap CLOSED (shed-ledger pointer satisfied); rejecting-addEntry survivors both lanes; 🔴×2+⚠×2 filed (CON-bonus-on-array, polymorphOriginal clobber, no-name-uniquification, phantom-INT-probe).
+run2#1823: CharActions.baseActionsHide -> maintained (6->4) 2 hook-lane-owned refusals deleted; times(2) press census added; buildFeatureDetailHtml mirror -> sentinel.
+run2#1824: CharActions.grapple -> maintained (4->3) failure-leg twin deleted (hook lanes byte-own); popup copy demoted to routing shape, component-owned target/campaign kept exact.
+run2#1825: CharActions.spellRendering -> maintained (13->12) BIG MIRROR PURGE (getActionSpellNames + whole formatUtils mock + dead useSyncedState export); mock-leak fix via vi.hoisted defaults() re-seed (clearAllMocks keeps mockReturnValue).
+run2#1826: CharBonusActions.spellCasting -> maintained (9->8) host arg-shape routing contract NEWLY pinned per spell (3 genuinely different mappings); dead useMetamagic mock + 3 dead flowShape keys dropped; mutation-checked. REC OPEN: rendering flowShape stale-partial + 6 sibling lanes same smell.
+run2#1827: saveAttackHandler.exhausted -> maintained (13->8 decls/18r) real resolveUses (delegation proven behaviorally via proficiency 0); exact-census everywhere; resource-lane short-circuit 2-row table NEW; 🔴 channelDivinity campaignName-drop + :36-vs-:43 positional/find + :37 ||-chain filed.
+run2#1828: healingHandler.secondWind -> maintained (9->9) FIRST attempt aborted by host memory guard (disk untouched), re-dispatched fresh; mirror-FIXTURE purge: applyHealingDirectly fixture hardcoded 89/94 clamps, hit-die description mispainted 5 vs real 12; bucket-outranks-snapshot refusal NEW; Fortified-HEALED marking pinned.
+run2#1829: healingHandler.targeted -> maintained (10->8 blocks/13r) mirrored fixed-return fixture purged (mispainted maximize+reroll); recharge-invariance it.each; 0-heal-SPENDS-Fortified divergence pinned; double-resolveTarget quirk; evaluated-number expression branch NEW coverage; 🔴 ally-vs-healer max-HP clamp + ⚠ Healer-feat string-amount filed.
+run2#1830: healingHandler.test main -> maintained (14->7 blocks/14r) 3rd consecutive mirror-fixture purge (odd-max 15 mispainted as 20); gateHitDiceCost '?? playerStats.level' default NEW pin; zero-spend full-array censuses; both carried healing 🔴 honestly flagged, not laundered.
+run2#1831: revivificationHandler -> maintained (18->13 cases/9 blocks) 6 same-branch player-success tests -> one ordered-read/batch-write census lane (kills HP-rides-second-write face); opposing-trap living/corpse it.each; clearAllMocks-residue harness fix; 🔴 NaN rage-gate PASS + 🗑 :101-103 dead code filed; level-0 defensive-fallback test removed.
+run2#1832: reactionDamageHandler -> maintained (32->25 blocks/44r) biggest rewrite of batch: all multi-harness loops -> single-call it.each; FROZEN clock + full-shape log toEqual; STRAY SAVE-LISTENER double-fire bomb fixed (afterEach sweep); gate-order short-circuit pins; Spear leg removed (stronger-owned reactiveStrike); ⚠ :827 hardcoded-2d12 modal + ⚠ :360 unconditional-disadvantage-log filed; colon-void marker replaced.
+run2#1833: reactionDebuffHandler.attacksVsAlly -> maintained (9->7) infoPopup mirror purged; te-before-spend order + gate-ORDER zero-read pins; applyHealingToTarget SYNCHRONOUS-call requirement documented; 🔴 :132 campaignName-drop + 🔴 :440-461 missing self-exclusion + ⚠ :455 arity carried; recs: reactiveStrike void-marker+stale-name, handOfHarm pre-merge cites, branchesOfTheTree :463 drift.
+run2#1834: reactionDebuffHandler.uses -> maintained (7->6) keyed-budget router, exact bake/flush two-write census FROZEN, real infoPopup, key-absence negatives; 2 cross-file redundancy removals vs earlyExits:274 CANONICAL; no new source bugs (3 carried re-verified).
+
+## Batch #239 GREEN — RUN4 run2#1820-#1834 (2026-11-27)
+## Batch #239 — PROGRESS: completed 2425 / remaining 1005 (total 3430)
+- Suite: lint clean; 3620 files, 37,783 passed, ZERO failures EXIT:0 (166s). Evidence /tmp/batch239.log.
+- Tests 37,784 -> 37,783 (net -1 across 15 lanes: consolidations offset by strengthened it.each expansions). Queue 1020 -> 1005 = exact -15, strict drop holds.
+- First attempt went RED on lint only: orchestrator's own queue script carried dead TODAY const from the #238 mtime fix (no-unused-vars). Removed dead const (script tooling, not test/source); script re-verified correct (3430/3430 marked, QUEUE 1005).
+- Headline: mirror-fixture purge hit THREE consecutive healing lanes (hardcoded helper-return fixtures mispainting amounts — one description wrong for months); latent save-listener double-fire bomb defused (reactionDamage); ~10 source defects filed incl. ally max-HP clamp, NaN rage-gate pass, missing Protection self-exclusion gate, concentration DC read off array.
+- Next head: reactionDebuffHandler.wardingFlare.test.js (batch #240 from run2#1835; carry-forward recs for wardingFlare/cuttingWords/cuttingWords.latch/earlyExits in bugs ledger).
+
+## Batch19 (RUN4 batch #240, run2#1835-#1849, 2026-11-27)
+run2#1835: reactionDebuffHandler.wardingFlare -> maintained (5->3 blocks/5r) real infoPopup, diceRoller seam mocked (stray-real-roll fixed); ⚠ :505 third resolveMapPositions arity instance filed; disadvantage's stale duplicate-flag retired (already purged).
+run2#1836: reactionSaveHealHandler -> maintained (43->34 cases/9 blocks) 2nd stray window-level save-listener bomb defused; uses-spend-on-FAILURE + re-fire double-spend detectors NEW; 'barbarian_level + 4' fixture mispainter -> live '2 * barbarian_level'; 3 ⚠ filed (monk_level silent-0 regex, dcScaling dead knob, name-match stance gate).
+run2#1837: actionGateSites -> maintained (13->12) static conformance kept cheap; import+feed registry merged w/ honest feedCannotAct:false opt-outs; resetForTurn-invocation + applyTurnStateTransition-definition pins (mutation-checked).
+run2#1838: automationInfoBuilder.diverse -> maintained (19->16) already-strong pure builder; falsy-vs-undefined discrimination rationale established; usesKey digit over-pin trimmed (REC: restore in shared/usesKey.test.js).
+run2#1839: automationInfoBuilder.initiative -> maintained (8->7) bare-default assertion subsumed by tampering decoy; same-envelope disk row deduped, count guard keeps both.
+run2#1840: CharHitPoints -> maintained (18->15 cases/8 blocks) run2#1636 chip-vs-lane note CLOSED LEGITIMATE SPLIT; isPlayer/maxHp/currentHp log stamps first-in-family; recs: death-save-chip:174 self-dup, merged-revive-write symmetry.
+run2#1841: massHealHandler -> maintained (15->12 its/26 cases) 🔴 condition-removal log OVERCOUNT filed (old length===3 assertion laundered it, now pinned honestly); 🗑 :85 void computation; sequential pool-spend law + Fortified marking NEW; healer-max clamp NOT shared.
+run2#1842: CharActions.monkKi -> maintained (5->5) spendsFP branch was DEAD (all fixtures false) — positive FP-write pin ADDED; phantom useSyncedState export + saveAttackHandler mock w/ NONEXISTENT path purged.
+run2#1843: CharBonusActions.lesserRestoration -> maintained (4->3) flowShape verdict COMPLETE -> hoisted canon; CLA-066 pendingHex-only arming gap CLOSED (grep-proven unproven family-wide); idle-negative consolidated to spellCasting.
+run2#1844: healingHandler.handOfHealing.cla159 -> maintained (7->3) 4 cross-file dupes deleted stronger-owned (touchTargetLiveHp/full-hp-refusal); mispainted mirrored actualHeal:5 vs real clamp 10 caught; ally-clamp 🔴 confirmed NOT shared monk route.
+run2#1845: healingHandler.monk -> maintained (7->5) both carried recs implemented (header lane-map fix + arg-derived clamp fixture); self-path Focus-commit census was owned NOWHERE — added; ⚠ :347 undefined-not-false filed.
+run2#1846: healingPoolHandler -> maintained (28 scenarios preserved) massHeal-pool BOUNDARY CLOSED in header; loops/mid-test re-harnesses -> it.each families; gate-order + frozen-clock refusal pins.
+run2#1847: animateDeadHandler.confirm.storage -> maintained (11->9) MIRROR-AUDIT HIT: stale saveBonuses + VERBATIM name-copy (honest-by-coincidence) -> importOriginal pass-throughs; real-helper saveBonuses full-row + logEntries byte-identity pinned. Recs: animateDead confirm:56-78 + multicast + confirm.initiative carry same dual mirrors.
+run2#1848: createUndeadHandler.confirm.storage -> maintained (13->10 defs/15 cases) run2#1821 WRONG-NAMES PRE-CONFIRMATION CONFIRMED+FIXED (impossible ['Ghoul','Ghoul 2'] -> honest 'Ghoul 1'-series); two-Date.now skim seam byte-identity pinned; non-clamp legs added (over-request-by-1).
+run2#1849: combat/auras/lionAuraUtils -> maintained (37->34) mirror-audit CLEAN; self-exclusion + second-holder exemption MERGED with shared-code-path proof (:80); 🗑 :97 dead branch filed.
+
+## Batch #240 GREEN — RUN4 run2#1835-#1849 (2026-11-27)
+## Batch #240 — PROGRESS: completed 2440 / remaining 990 (total 3430)
+- Suite: lint clean; 3620 files, 37,777 passed, ZERO failures EXIT:0 (165s). Evidence /tmp/batch240.log.
+- Tests 37,783 -> 37,777 (net -6). Queue 1005 -> 990 = exact -15, strict drop holds.
+- Headline: TWO latent save-listener double-fire bombs defused (reactionSaveHeal second instance); massHeal condition-removal log OVERCOUNT caught (a stale length-only assertion had been laundering it for months); run2#1821 createUndead WRONG-NAMES pre-confirmation CONFIRMED+FIXED at run2#1848; verbatim-source-copy mirror found in animateDead storage ('honest by coincidence'); monkKi spendsFP branch was fully dead (no test ever proved the FP write); CLA-066 pendingHex arming gap closed grep-proven. ~15 new source findings (2 🔴, several 🗑/⚠).
+- Next head: auraOfProtection.test.js (batch #241 from run2#1850).
+
+## Batch20 (RUN4 batch #241, run2#1850-#1864, 2026-11-27)
+run2#1850: auraOfProtection -> maintained (58->56) mirror CLEAN; placedItems merge-leg gap CLOSED both probes; 🗑 :107 dead guard; findMapToken-duplication rec (-> discharged #1852).
+run2#1851: saveOnlyHandler -> maintained (13->12) 3rd save-listener drain + re-fire detector; 🔴 campaignName-dropped x2 NOVEL-in-handler, 🔴 hardcoded expiration vs custom effects, 🗑 dead getDefaultEffects arm, ⚠ hardcoded copy.
+run2#1852: coronaAuraUtils -> maintained (41->38) partial importOriginal (real comparator); findMapToken CANONICAL HOME pinned (merge-order + finite-coord + edge); ⚠ :76 campaignName-divergence deliberately UNPINNED; 🗑 zero-caller mapData param.
+run2#1853: CharActions.events -> maintained (21->17) #1842 rec CONFIRMED+FIXED (phantom export + store mirror -> real hook); last uncovered bus event pinned; FAMILY CLEANUP LIST (10 files) established.
+run2#1854: CharActions.recklessAttack -> maintained (3->4) cleanup 1/10 discharged; chooser negative control + pre-side-effect refusal order + real-prop args NEW.
+run2#1855: CharActions.rendering -> maintained (10->10) cleanup 2/10: phantom + STALE-CLOSURE setter both CONFIRMED+DELETED (no dependents); undefined-arg anti-pattern -> real prop; list updated (baseActionsHide/grapple/automationHandler phantoms survived earlier sweeps).
+run2#1856: wolfAuraUtils -> maintained (27->16) biggest aura trim; misplaced-doc rec resolved-by-rewrite (disk-proven); guard arms made LIVE; ally-gate 3-way duplication rec.
+run2#1857: campaignService -> maintained (28->23) masked bodies purged, *Once -> URL-keyed router, console.error exactly-one; ⚠ updateCharacter no-{error}-branch + ⚠ swallow-to-[] asymmetry; live-mutation safety verified.
+run2#1858: CampaignAdmin.theme-toggle -> maintained (1->1) already-lean; re-render delegation leg added; persistence split clean.
+run2#1859: automationExpressions -> maintained (64->60) core-lane dup deleted per declared ownership; 3 dead arms LIVE; ⚠ psionic null-throw divergence, ⚠ resolveUses silent-level, 🗑 dead >=5 arm.
+run2#1860: factionsService -> maintained (16->22) DEAD-SPOT CLOSED: loadFactionStandings live-consumer zero-pins -> full coverage; errorFaces factory idiom established.
+run2#1861: notesService -> maintained (20->13) errorFaces adopted (exactly-one = strengthening); 🗑 loadNote DEAD EXPORT (zero callers) unpinned + source-removal rec.
+run2#1862: questsService -> maintained (22->19 coverage UP) both directions: loadQuestBoard live-zero-pin -> 5 tests; 🗑 loadQuest dead -> 6 tests deleted; header server-truth corrected.
+run2#1863: settlementsService -> maintained (24->18) STALE-PIN vs retired server 404 caught+replaced; 2 false header claims fixed; 🗑 saveSettlements dead export; campaign sweep 5/5 complete.
+run2#1864: regenerateHandler.active -> maintained (1->1 by-design guard lane) ALL seam citations refreshed (drift x6); stale 600-rounds flag RETIRED vs current bytes; duration-policy PASS; 🗑 isRegenerateActive dead-export deletion rec; #1947 sole-flag-write do-not-trim note carried.
+
+## Batch #241 GREEN — RUN4 run2#1850-#1864 (2026-11-27)
+## Batch #241 — PROGRESS: completed 2455 / remaining 975 (total 3430)
+- Suite: lint clean; 3620 files, 37,732 passed, ZERO failures EXIT:0 (158s). Evidence /tmp/batch241.log.
+- Tests 37,777 -> 37,732 (net -45: campaign-service canon conversions + aura-family consolidations). Queue 990 -> 975 = exact -15, strict drop holds.
+- Headline: 3 DEAD EXPORTS found & unpinned (loadNote, loadQuest, saveSettlements — source-removal recs filed) + 2 live-zero-pin coverage holes CLOSED (loadFactionStandings, loadQuestBoard); CharActions mock-cleanup list opened (10 files, 2 discharged); STALE-PIN vs retired server behavior caught (settlements DELETE 404); a fully-dead tested branch (monkKi spendsFP) given a real positive pin; ~14 new source findings.
+- Next head: regenerateHandler.test.js (batch #242 from run2#1865).
+
+## Batch21 (RUN4 batch #242, run2#1865-#1879, 2026-11-27)
+run2#1865: regenerateHandler main -> maintained (4->6) registration-wiring REAL executeHandler + 606-row dormant-route absence census; hardcode-mutant killed; header drift fixed (cites by NAME).
+run2#1866: automationCollector.types -> maintained (147->162 COVERAGE UP) 15 previously-UNROUTED router branches pinned; CLA-061 full-envelope w/ bucket exclusivity.
+run2#1867: CharActions.handlers -> maintained (1->1) cleanup 3/10: phantom #3 = UNREACHABLE dead mock code; reject->recover arc w/ build census + real-prop; rendering-owned bytes demoted.
+run2#1868: CharActions.sacredWeapon2024 -> maintained (10->12 cases) cleanup 4/10 (phantom #4 dead); unarmed gate + no-mastery guard + raw-tooltip legs NEW.
+run2#1869: CharActions.simpleDamageRoll -> maintained (2->3) cleanup 5/10 (phantom #5 empirically-dead); popup-ORDER + null-guard NEW; fail-inert proves early-return precedence.
+run2#1870: CharActions.spellDisplay -> maintained (5->4 blocks) cleanup 6/10 (phantom #6); #1825 :230 overlap FOLDED (Potent-non-leak kept + negative leg); hoisted defaults leak-proofing.
+run2#1871: CharBonusActions.edgeCases -> maintained (17->16) flowShape DEFECT CAUGHT (7/22 keys, 15 undefined) -> hoisted canon; phantom #7... (see 1872 tally fix); dead useMetamagic + 2 completed mocks; cannotAct arm deleted stronger-owned.
+run2#1872: CharBonusActions.rendering -> maintained (23->22) PRE-CONFIRMED flowShape CONFIRMED (10 keys incl 3 dead); NON-RESOLVING MOCK PATH (real HexAbilityModal loaded unmocked!) fixed; phantom + dead useMetamagic + missing export; 7-sibling bundle rec.
+run2#1873: CharCharacterAdvancement.options -> maintained (18->12) tables merged via census + falsy-collapse; mismatch/double-space/race-fix legs NEW; phantom GUILTY+fixed.
+run2#1874: CharInventory.equipmentData -> maintained (3->2) ALL-5-point hygiene CLEAN (first in run); purse VOID-marker note filed.
+run2#1875: boonOfRecoveryHandler -> maintained (4->9 single-branch) masked deathSaves READ-fixtures purged; campaignName VERIFIED; ⚠ uncought awaited-writes partial-commit filed.
+run2#1876: interceptionHandler main -> maintained (14->20) campaignName gate-channel pins FIRST-IN-FAMILY; 🗑 dead rangeFt-guard + ⚠ name-fallback divergence; false header claim fixed; dead-mock recs (damage/description siblings mock rangeValidation unimported).
+run2#1877: reactionBonusHandler -> maintained (42->20 decls/63 legs) 🔴 onSpent-spend-without-effect + 🔴 bonus-announces-miss + ⚠ 2-arg reads + 🗑 double-period + ⚠ 'AC null'; half-dead Once-chain test caught.
+run2#1878: cuttingWords.latch -> maintained (6->3/7 legs) 3 carried recs discharged; SYNTHESIS: getRuntimeValue IS 2-PARAM (3rd arg ignored) -> campaignName-dropped READ 🔴s downgraded to intent-only (correction logged); 🔴 range-refusal log-invisibility + 🗑 unreachable guard.
+run2#1879: cuttingWords main -> maintained (6->7) full-shape literals replace ~30 toContains; rollD20-never + tail-row census; reject-survivor NEW; arity-twist applied (exact 2-arg pins, no false 🔴); :132 campaignName-drop re-verified on disadvantage lane.
+
+## Batch #242 GREEN — RUN4 run2#1865-#1879 (+ arbitration fix-lane) (2026-11-27)
+## Batch #242 — PROGRESS: completed 2470 / remaining 960 (total 3430)
+- First boundary attempt EXIT:1 with ALL tests passing: single unhandled 'ReferenceError: document is not defined' — useOverlayEntranceFocus.js:94 cleanup schedules setTimeout(restoreFocusIfStranded,0) w/o capturing/clearing id; fires post-jsdom-teardown on unlucky per-file ordering (flagged origin SaveAttackAoeModal.ma2059, green in isolation).
+- ARBITRATION: test-infra-only fix lane -> src/test/setup.js afterEach extended w/ one-tick real-timer drain (realSetTimeout captured pre-fake-timers; FIFO same-deadline => stranded-restore callbacks run pre-resolve while jsdom alive; idempotent+never-fighting => no-ops post-cleanup). Source note stays filed for owner (clearTimeout at :94).
+- Suite re-verified: lint clean; 3620 files, 37,774 passed, ZERO failures, ZERO unhandled errors, EXIT:0 (164s). Evidence /tmp/batch242b.log (first /tmp/batch242.log kept as incident evidence).
+- Tests 37,732 -> 37,774 (net +42: coverage-building lanes #1866 +15 router branches, #1877 collapse w/ leg expansion, #1875 masked-fixture rewrite). Queue 975 -> 960 = exact -15, strict drop holds.
+- Headline: getRuntimeValue 2-PARAM synthesis DOWNgraded 4 earlier campaignName-dropped-read 🔴s to intent-only (correction in bugs ledger); 🔴 onSpent-spend-without-effect + range-refusal-log-invisibility + partial-commit write chain filed; 6/10 CharActions cleanup files discharged; non-resolving mock path (real modal unmocked) caught.
+- Next head: reactionDebuffHandler.defaultPath.test.js (batch #243 from run2#1880; carries #1879 floor-args re-point rec + #1880-latch notes).
+
+## Batch21b (RUN4 batch #243, run2#1880-#1894, 2026-11-27)
+run2#1880: reactionDebuff.defaultPath -> maintained (6->2 families/7 cases) no_defender CANONICAL hardened (exact-arity read censuses prove 2-vs-3-arg asymmetry + single-findLastAttack executor-never-ran); damage-routing subset deleted; 4/4 carried notes incl getDistanceFeet dead-key drop.
+run2#1881: reactionDebuff.disadvantage -> maintained (5->4/5 runs) subset test deleted stronger-owned; *Once dice chain killed via arg-derived rolls; ordered 4-write census tempHp-LAST-on-defender; :132 route-verified unreachable here.
+run2#1882: reactionDebuff.earlyExits -> maintained (9 cases/6 bodies) 4 canonical pins retained-strong + route-seams-untouched census everywhere; infoPopup replica purged; family hygiene 6/8 converted.
+run2#1883: toolValidation.limits -> maintained (11->11 strictly stronger) whole-Map toEqual; EXACT pool-drain inclusive boundary; family-zero-covered :168 lowercase-index branch pinned via disk 'chef'.
+run2#1884: toolValidation.major-feature -> maintained (3->5) filter(Boolean) :210 unknown-drop POSITIVE leg (mutation previously un-failable); full-shape defensive join.
+run2#1885: toolValidation.parsing -> maintained (47->38) 12 zero-signal twins deleted ('one'==fallback indistinguishability); 3 distinct-branch legs added; ⚠ digit-fallback + no-word-boundary regex notes.
+run2#1886: toolValidation.services -> maintained (6->5) one-way every() coverage hole -> exact 10-row census; rejecting-mock survivor; 2 stale header claims incl missed live consumer.
+run2#1887: toolValidation.test main -> maintained (6->7) family 5/5 COMPLETE: padded-trim leg + FULL EXPORT-FACE CENSUS pinning computeSkilledToolUsage retirement both directions; normalizeCategory test-only-export note.
+run2#1888: CreatureSelectionModal -> maintained (29->21 blocks/23 cases) 7 consolidations; confirmDisabled latch was untested-at-seam -> added; badge copy demoted to service-owned; AOEConditionModal.expiry VOID-marker note.
+run2#1889: stinkingCloudHandler main -> maintained (24->15) refusal families real spellNoticePopup; 10 scattered -> 2 exact-array censuses w/ promptId-pairing stray-detector; duration-policy both-sides; 7 deleted stronger-owned; 3 sibling recs.
+run2#1890: index.webDispatch -> maintained (5->4) source-text caller-liveness pin shed to behavioral webStamp cover; reference-identity toBe upgrades; mid-test re-harness removed; ALL cites byte-verified.
+run2#1891: greaseAreaSave.areaSave -> maintained (17->13) full-sequence promptId-paired censuses; activeConditionMeta + success zero-write + key-whitespace NEW; ⚠ hardcoded-'Prone' prose latent; shared-table rec opened.
+run2#1892: sleetStorm.areaSave -> maintained (21->20/12 bodies) ⚠ HARDCODES DEX vs grease forwards (family bytes-divergence); gate-order NOT family-uniform discovery; #1961 minutes×10 carry.
+run2#1893: stinkingCloud.areaSave -> maintained (16->26) reject-propagation + withinRange-throw warn + saveType/radius + whitespace BOTH-direction legs added; 5 header claims fixed (1 false popup-composition); no-poisoned-skip distinctness pinned.
+run2#1894: webAreaSave.areaSave -> maintained (21->19/12 bodies) FAMILY MAP CLOSED: web hardcoded-STR w/ PROD-NORMAL ⚠ contradicting stored 'DEX' byte (:177-vs-:342) pinned; split reject contract (addEntry swallow / save propagate) pinned; header drift x4 fixed incl false no-minutes claim.
+
+## Batch #243 GREEN — RUN4 run2#1880-#1894 (2026-11-27)
+## Batch #243 — PROGRESS: completed 2485 / remaining 945 (total 3430)
+- Suite: lint clean; 3620 files, 37,734 passed, ZERO failures, ZERO unhandled errors EXIT:0 (172s). Evidence /tmp/batch243.log. (First run since the setup.js teardown-drain fix with zero unhandled errors — fix holding.)
+- Tests 37,774 -> 37,734 (net -40). Queue 960 -> 945 = exact -15, strict drop holds.
+- Headline: AREA-SAVE FAMILY MAP CLOSED (4 lanes, 3 divergent saveType shapes, split reject contracts, per-family gate orders — shared-table consolidation held pending owner sign-off since uniformity would LAUNDER real divergence); toolValidation family 5/5 complete (export-face census pins a retirement both directions); reactionDebuff hygiene conversion 8/8 minus branchesOfTheTree; 4 dead/latent source traps filed.
+- PAUSED at owner request 2026-11-27 after this boundary. RESUME = BATCH #244 from run2#1895, head webAreaSaveHandler.edgeCases.test.js (carries: #1990 note — ??0 recurring legs owned by .areaSave now, cast-only face remains; minutes×10 handle-lane carries for grease/sleet/stinking/web handle lanes all pending at their turns). MARKER DATE: read date +%F fresh on resume.

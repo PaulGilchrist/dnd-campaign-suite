@@ -1,25 +1,51 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// CharActions spell-DISPLAY lane: the resolved damage/heal formula cells in the
+// action bar (heal-modifier threading, Potent Spellcasting cantrip boost and its
+// cantrip-only guard, utility-spell omission) plus feature-row DC/damage badges.
+// Deliberately NOT covered here (pinned by siblings):
+// - row columns, cell clickability, hit/damage-cell dispatch → CharActions.spellRendering.test.jsx
+// - metamagic/popup event-bus behaviour → CharActions.events.test.jsx
+// Mock hygiene (events-lane recipe, run2 #1853/#1855): the REAL useSyncedState.js
+// runs against the mocked useRuntimeState.js primitives (getStore/
+// setRuntimeValue/listeners) — the phantom `useSyncedState` export previously
+// mocked ON useRuntimeState.js is deleted (that module does not export it, and
+// CharActions imports the hook from useSyncedState.js; #1869 empirically
+// confirmed the phantom was unreachable dead mock code), and with it the
+// hand-rolled store mirror. Real spellSectionUtils/formatUtils render the row
+// set and labels (no mirrors).
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 
+// Default hook returns, re-seeded every beforeEach (clearAllMocks does not drop
+// mockReturnValue overrides, so per-test seams must not leak). Hoisted so the
+// vi.mock factories can share them with the test body.
+const { metamagicDefaults, flowDefaults } = vi.hoisted(() => ({
+  metamagicDefaults: () => ({
+    pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
+    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
+  }),
+  flowDefaults: () => ({
+    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
+    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
+  }),
+}));
+
+// Shared backing Map for the real useSyncedState (CharActions imports it from
+// useSyncedState.js, which reads getStore/setRuntimeValue/listeners from here).
+// No test seeds it — the store fixture just keeps the real hook inert.
 const _syncedStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => { _syncedStore.set(key, newValue); });
-    return [value, setter];
-  }),
-  useRuntimeValue: vi.fn((_, key, _campaignName) => {
-    const hasValue = _syncedStore.has(key);
-    return hasValue ? _syncedStore.get(key) : null;
-  }),
+  useRuntimeValue: vi.fn(() => null),
   listeners: new Map(),
 }));
 
@@ -41,10 +67,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
-  useActionSpellMetamagic: vi.fn(() => ({
-    pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
-    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
-  })),
+  useActionSpellMetamagic: vi.fn(metamagicDefaults),
 }));
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
@@ -60,12 +83,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
-    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
-    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
-    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
-  })),
+  useSpellMetamagicFlow: vi.fn(flowDefaults),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -187,6 +205,8 @@ vi.mock('../../services/rules/core/spellDamageUtils.js', () => ({
   resolveHealExpression: vi.fn((_spell, _level, mod) => `1d4+${mod ?? 0}`),
 }));
 
+// --- Helpers ---
+
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
   spellAbilities: { spells: [], toHit: 5, saveDc: 13, prepared: [], modifier: 2 },
@@ -197,99 +217,86 @@ function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-function renderWithFetch(component, options = {}) {
+function statsWithSpells(spells, overrides = {}) {
+  return createStats({
+    ...overrides,
+    spellAbilities: { ...basePlayerStats.spellAbilities, ...overrides.spellAbilities, spells },
+  });
+}
+
+async function renderActions(stats, campaignName = undefined) {
   globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-  return act(async () => { render(component, options); });
+  await act(async () => { render(<CharActions playerStats={stats} campaignName={campaignName} />); });
 }
 
 // Potent Spellcasting feature as authored on real character data (2024 Cleric cantrip bonus).
 const potentSpellcastingFeature = { type: 'damage_bonus', name: 'Potent Spellcasting', options: ['Spellcasting Ability', 'Wisdom'], upgrades: false };
 
+// --- Tests ---
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+  _syncedStore.clear();
+  getRuntimeValue.mockReturnValue(null);
+  useActionSpellMetamagic.mockReturnValue(metamagicDefaults());
+  useSpellMetamagicFlow.mockReturnValue(flowDefaults());
+});
+
 describe('CharActions action spell bar', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    _syncedStore.clear();
-    getRuntimeValue.mockImplementation(() => null);
-  });
-
   it('shows the resolved heal formula with the caster spellcasting modifier for healing action spells', async () => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{ name: 'Healing Word', level: 1, heal_at_slot_level: true, casting_time: '1 action', prepared: 'Prepared' }],
-        toHit: 5, saveDc: 13, modifier: 2,
-      },
-    });
-
-    await renderWithFetch(<CharActions playerStats={stats} />);
+    await renderActions(statsWithSpells(
+      [{ name: 'Healing Word', level: 1, heal_at_slot_level: true, casting_time: '1 action', prepared: 'Prepared' }],
+      { spellAbilities: { toHit: 5, saveDc: 13, modifier: 2 } },
+    ));
 
     expect(screen.getByText('Healing Word')).toBeInTheDocument();
     expect(screen.getByText('1d4+2')).toBeInTheDocument();
   });
 
-  it('shows leveled spell damage as a clickable cell, never boosted by Potent Spellcasting', async () => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{ name: 'Fireball', level: 3, range: '150 ft', damage: '8d6', casting_time: '1 action', prepared: 'Prepared' }],
-        toHit: 5, saveDc: 13,
-      },
-      automation: { actions: [potentSpellcastingFeature] },
-    });
-    // Potent bonus is fully opted-in (Wis 2) — if it leaked past the cantrip-only
-    // guard the cell would read 8d6+2.
-    getRuntimeValue.mockImplementation((_name, key) => (key === '_Potent_Spellcasting_option' ? 'Spellcasting Ability' : null));
-
-    await renderWithFetch(<CharActions playerStats={stats} />);
-
-    expect(screen.getByText('Fireball')).toHaveClass('clickable');
-    expect(screen.getByText('8d6')).toHaveClass('clickable');
-    expect(screen.queryByText('8d6+2')).not.toBeInTheDocument();
-  });
-
   it('omits action spells that deal neither damage nor healing', async () => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{ name: 'Minor Illusion', level: 0, casting_time: '1 action', prepared: 'Always' }],
-        toHit: 5, saveDc: 13,
-      },
-    });
-
-    await renderWithFetch(<CharActions playerStats={stats} />);
+    await renderActions(statsWithSpells(
+      [{ name: 'Minor Illusion', level: 0, casting_time: '1 action', prepared: 'Always' }],
+    ));
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(screen.queryByText('Minor Illusion')).not.toBeInTheDocument();
   });
 
+  // Potent Spellcasting at the display seam: boost applies to cantrips only, and
+  // only once a Spellcasting-Ability option is chosen. Cell clickability is
+  // pinned by spellRendering's row-column/dispatch tests, not restated here.
   it.each([
-    { label: 'adds the Wis bonus to cantrip damage when Spellcasting Ability is chosen', chosenOption: 'Spellcasting Ability', expectedText: '1d6+2' },
-    { label: 'leaves cantrip damage unmodified until an option is chosen', chosenOption: null, expectedText: '1d6' },
-  ])('Potent Spellcasting: $label', async ({ chosenOption, expectedText }) => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{ name: 'Burning Hands', level: 0, damage: '1d6', casting_time: '1 action', prepared: 'Prepared' }],
-        toHit: 5, saveDc: 13,
-      },
-      automation: { actions: [potentSpellcastingFeature] },
-    });
-    getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === '_Potent_Spellcasting_option') return chosenOption;
-      return null;
-    });
+    {
+      label: 'adds the Wis bonus to cantrip damage when Spellcasting Ability is chosen',
+      spell: { name: 'Burning Hands', level: 0, damage: '1d6', casting_time: '1 action', prepared: 'Prepared' },
+      chosenOption: 'Spellcasting Ability', expectedText: '1d6+2', absentText: null,
+    },
+    {
+      label: 'leaves cantrip damage unmodified until an option is chosen',
+      spell: { name: 'Burning Hands', level: 0, damage: '1d6', casting_time: '1 action', prepared: 'Prepared' },
+      chosenOption: null, expectedText: '1d6', absentText: '1d6+2',
+    },
+    {
+      label: 'never boosts leveled spell damage (cantrip-only guard)',
+      spell: { name: 'Fireball', level: 3, range: '150 ft', damage: '8d6', casting_time: '1 action', prepared: 'Prepared' },
+      // Bonus is fully opted-in (Wis 2) — if it leaked past the cantrip-only
+      // guard the cell would read 8d6+2.
+      chosenOption: 'Spellcasting Ability', expectedText: '8d6', absentText: '8d6+2',
+    },
+  ])('Potent Spellcasting: $label', async ({ spell, chosenOption, expectedText, absentText }) => {
+    getRuntimeValue.mockImplementation((_name, key) => (key === '_Potent_Spellcasting_option' ? chosenOption : null));
 
-    await renderWithFetch(<CharActions playerStats={stats} />);
+    await renderActions(statsWithSpells([spell], { automation: { actions: [potentSpellcastingFeature] } }));
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
+    if (absentText) {
+      expect(screen.queryByText(absentText)).not.toBeInTheDocument();
+    }
   });
 });
 
 describe('CharActions automation feature-row badges', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    _syncedStore.clear();
-    getRuntimeValue.mockImplementation(() => null);
-  });
-
   it.each([
     {
       label: 'shows numeric save DC and damage badges',
@@ -311,7 +318,7 @@ describe('CharActions automation feature-row badges', () => {
       actions: [{ name: 'Feature Action', description: 'Do the thing.', automation }],
     });
 
-    await renderWithFetch(<CharActions playerStats={stats} campaignName="test-campaign" />);
+    await renderActions(stats, 'test-campaign');
 
     expect(screen.getByText(/Feature Action:/)).toBeInTheDocument();
     for (const badge of expectedBadges) {

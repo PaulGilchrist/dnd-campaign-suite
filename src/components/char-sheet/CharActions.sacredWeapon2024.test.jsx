@@ -1,4 +1,20 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
+// CharActions attack-row hit-cell lane: sacred weapon bonus display (buff-gated
+// Charisma boost on melee/unarmed rows with its breakdown tooltip, +1 floor,
+// exhaustion folded after the boost), the 2024 mastery column cell contents +
+// popup dispatch, the save-DC substitution for save-based attacks, and hit-cell
+// penalty classes. Pinned here per the CharActions.rendering.test.jsx delegation
+// header; the mastery column's enable gating (rules + passive) is pinned
+// stronger there, and the exact happy-path roll bytes live in that rendering
+// lane — this file never restates them. The Sacred Weapon picker modal UI is
+// owned by modals/divine/SacredWeaponModal.test.jsx.
+// Mock hygiene (events-lane recipe, run2 #1853/#1855): the phantom
+// `useSyncedState` export and its hand-rolled store mirror are deleted from the
+// useRuntimeState.js mock — the real module exports no such symbol, and the
+// phantom was UNREACHABLE dead mock code (CharActions.jsx imports the real hook
+// from useSyncedState.js, which is not mocked). The real useSyncedState.js runs
+// over the complete mocked primitive set (getRuntimeValue/setRuntimeValue/
+// getStore/useRuntimeValue/listeners).
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -6,22 +22,19 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { showWeaponMasteryPopup } from '../../hooks/combat/useActionPopup.js';
 
+const CAMPAIGN = 'test-campaign';
+
+// Shared backing Map: the real useSyncedState.js reads/writes it through the
+// mocked getStore/setRuntimeValue primitives; the mocked useRuntimeValue reads
+// the same keys. No test seeds it — the store fixture just keeps the real hook
+// inert; buffs are seeded through the getRuntimeValue mock below.
 const _syncedStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => { _syncedStore.set(key, newValue); });
-    return [value, setter];
-  }),
-  useRuntimeValue: vi.fn((_, key, _campaignName) => {
-    const hasValue = _syncedStore.has(key);
-    return hasValue ? _syncedStore.get(key) : null;
-  }),
+  useRuntimeValue: vi.fn((_, key) => (_syncedStore.has(key) ? _syncedStore.get(key) : null)),
   listeners: new Map(),
 }));
 
@@ -186,26 +199,28 @@ const basePlayerStats = {
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
-}
-
-function mockRuntimeValues(buffs = [], conditions = []) {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    if (key === 'hasteExtraActionUsed') return false;
-    if (key === 'activeConditions') return conditions;
-    return null;
-  });
-}
-
 const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' };
+const unarmedStrike = { name: 'Unarmed Strike', range: 5, hitBonus: 5, damage: '1d6+3', damageType: 'Bludgeoning', type: 'Action', weaponType: 'unarmed' };
 
-function charismaStats(bonus) {
-  return createStats({
-    attacks: [longsword],
+// Melee/unarmed fixture with an explicit Charisma entry on the given weapon(s).
+function charismaStats(bonus, attacks = [longsword]) {
+  return {
+    ...basePlayerStats,
+    attacks,
     abilities: [{ name: 'STR', bonus: 3 }, { name: 'Charisma', bonus }],
+  };
+}
+
+function setBuffs(buffs) {
+  getRuntimeValue.mockImplementation((_name, key) => (key === 'activeBuffs' ? buffs : null));
+}
+
+async function renderCharActions(stats, props = {}) {
+  let result;
+  await act(async () => {
+    result = render(<CharActions playerStats={stats} campaignName={CAMPAIGN} {...props} />);
   });
+  return result;
 }
 
 describe('CharActions attack row display (sacred weapon, mastery, save DC, penalties)', () => {
@@ -219,13 +234,18 @@ describe('CharActions attack row display (sacred weapon, mastery, save DC, penal
   });
 
   describe('sacred weapon hit bonus', () => {
-    it('boosts melee hit bonus by Charisma and shows the breakdown tooltip when buff is active', async () => {
-      mockRuntimeValues([{ effect: 'sacred_weapon' }]);
+    it.each([
+      { weapon: longsword },
+      { weapon: unarmedStrike },
+    ])('boosts $weapon.name hit bonus by Charisma and shows the breakdown tooltip when the buff is active', async ({ weapon }) => {
+      setBuffs([{ effect: 'sacred_weapon' }]);
 
-      await act(async () => { render(<CharActions playerStats={charismaStats(4)} />); });
+      await renderCharActions(charismaStats(4, [weapon]));
 
       const hit = screen.getByText('+9');
       expect(hit).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +4');
+      // campaign threading uses the real prop value, not an undefined-arg pin
+      expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeBuffs', CAMPAIGN);
     });
 
     it.each([
@@ -233,64 +253,72 @@ describe('CharActions attack row display (sacred weapon, mastery, save DC, penal
         attack: { name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action', weaponType: 'ranged' } },
       { name: 'melee attack without the buff', buffs: [], attack: longsword },
     ])('leaves hit bonus untouched for $name', async ({ buffs, attack }) => {
-      mockRuntimeValues(buffs);
+      setBuffs(buffs);
 
-      const stats = createStats({
-        attacks: [attack],
-        abilities: [{ name: 'STR', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      await renderCharActions(charismaStats(4, [attack]));
 
       const hit = screen.getByText('+5');
       expect(hit).not.toHaveAttribute('title');
     });
 
     it('applies a minimum +1 bonus when the Charisma modifier is negative', async () => {
-      mockRuntimeValues([{ effect: 'sacred_weapon' }]);
+      setBuffs([{ effect: 'sacred_weapon' }]);
 
-      await act(async () => { render(<CharActions playerStats={charismaStats(-2)} />); });
+      await renderCharActions(charismaStats(-2));
 
       const hit = screen.getByText('+6');
       expect(hit).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +1');
     });
 
-    it('folds the exhaustion penalty into the sacred-weapon-boosted total', async () => {
-      mockRuntimeValues([{ effect: 'sacred_weapon' }]);
+    it('folds the exhaustion penalty into the boosted total without touching the breakdown tooltip', async () => {
+      setBuffs([{ effect: 'sacred_weapon' }]);
 
       // Base 5 + sacred weapon 4 = 9, minus exhaustion 2 = 7
-      await act(async () => { render(<CharActions playerStats={charismaStats(4)} exhaustionPenalty={2} />); });
+      await renderCharActions(charismaStats(4), { exhaustionPenalty: 2 });
 
-      expect(screen.getByText('+7')).toBeInTheDocument();
+      const hit = screen.getByText('+7');
+      expect(hit).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +4');
     });
   });
 
-  describe('2024 mastery column', () => {
-    it('renders the Mastery header and the attack mastery name as a clickable cell that opens the popup', async () => {
-      mockRuntimeValues();
-
-      const stats = createStats({
+  describe('2024 mastery column cells', () => {
+    it.each([
+      { mastery: 'Vex', clickable: true },
+      { mastery: undefined, clickable: false },
+    ])('renders the mastery cell clickable=$clickable (mastery=$mastery)', async ({ mastery, clickable }) => {
+      const stats = {
+        ...basePlayerStats,
         rules: '2024',
-        attacks: [{ ...longsword, mastery: 'Vex' }],
+        attacks: [{ ...longsword, mastery }],
         automation: { passives: [{ type: 'weapon_kind_mastery' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      };
+      const { container } = await renderCharActions(stats);
 
       expect(screen.getByText('Mastery')).toBeInTheDocument();
-      const cell = screen.getByText('Vex');
-      expect(cell).toHaveClass('clickable');
-
-      fireEvent.click(cell);
-      expect(showWeaponMasteryPopup).toHaveBeenCalledWith('Vex', expect.anything());
+      // The attacks grid is flat (fragments, no row wrapper): 7 header cells,
+      // then the attack row's 7 cells — the mastery cell is index 13.
+      const cell = container.querySelectorAll('.attacks > div')[13];
+      if (clickable) {
+        expect(cell).toHaveClass('clickable');
+        expect(cell).toHaveTextContent('Vex');
+        fireEvent.click(cell);
+        expect(showWeaponMasteryPopup).toHaveBeenCalledTimes(1);
+        expect(showWeaponMasteryPopup).toHaveBeenCalledWith('Vex', expect.any(Function));
+      } else {
+        expect(cell).not.toHaveClass('clickable');
+        expect(cell).toBeEmptyDOMElement();
+        fireEvent.click(cell);
+        expect(showWeaponMasteryPopup).not.toHaveBeenCalled();
+      }
     });
   });
 
   it('shows the save DC instead of a hit bonus for save-based attacks', async () => {
-    mockRuntimeValues();
-
-    const stats = createStats({
+    const stats = {
+      ...basePlayerStats,
       attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
-    });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
+    };
+    await renderCharActions(stats);
 
     expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
     expect(screen.queryByText('+5')).not.toBeInTheDocument();
@@ -302,7 +330,7 @@ describe('CharActions attack row display (sacred weapon, mastery, save DC, penal
       { name: 'disadvantage', props: { conditionAttackMode: 'disadvantage' }, text: '+5', classes: ['stat--penalized'] },
       { name: 'cannotAct', props: { cannotAct: true }, text: '+5', classes: ['stat--penalized', 'disabled-attack'] },
     ])('marks the hit cell penalized for $name', async ({ props, text, classes }) => {
-      await act(async () => { render(<CharActions playerStats={createStats({ attacks: [longsword] })} {...props} />); });
+      await renderCharActions({ ...basePlayerStats, attacks: [longsword] }, props);
 
       const cell = screen.getByText(text);
       classes.forEach(cls => expect(cell).toHaveClass(cls));

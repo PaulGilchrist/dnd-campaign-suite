@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 improve-and-trim: defensive major join converted to 2-row it.each (mixed-category error leg + filter(Boolean) unknown-drop positive leg, previously unpinned), defensive lane result now full-shape toEqual per limits #1883 bar.
 // toolValidation MAJOR-feature lane (#2062): Fighter majors "Tool: " row extraction in
 // applyMajorFeatureGrants — the join where getMajorFeatureProficiencyChoices rows become
 // category limits (via equipment.json tool→category lookup) and flow into validateTools.
@@ -15,9 +15,12 @@
 // Disk honesty: Fighter (Battle Master + Champion decoy), background Artisan, and equipment rows
 // are verbatim public/data/{2024/classes,2024/backgrounds,equipment}.json. Disk sweep: Battle
 // Master's Student of War (lv3, choose 1 from 17 Artisan's Tools + choose 1 skill) is the only
-// tool-bearing major choice on disk — so the mixed-category console.error branch has ZERO disk
-// source and gets one clearly-fabricated defensive feat-major below (family precedent:
-// limits.test.js isAny lane). "Guild Artisan" is NOT a disk name (its real name is Artisan).
+// tool-bearing major choice on disk — so the join's error branch and the filter(Boolean)
+// unknown-name drop have ZERO disk source and share one clearly-fabricated defensive major
+// with two it.each rows (family precedent: limits.test.js isAny lane). Results are asserted
+// FULL-SHAPE per the limits #1883 bar. "Guild Artisan" is NOT a disk name (its real name is
+// Artisan). The lowercase-index feat lookup (toolValidation.js:168) is never reached here:
+// every form omits feats, so applyFeatGrants early-returns on the empty list (pinned in limits).
 // The skill-row filter is pinned by the console.error spy on the real-data positive run: an
 // unfiltered "Skill: " row would miss the tool→category map and trip the mixed-pool error.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -92,10 +95,28 @@ describe('toolValidation - major feature (Student of War) tool grants', () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('DEFENSIVE (no disk source): refuses to express a mixed-category major pool, logging console.error and granting no limit', async () => {
-    // Fabricated feature + mixed pool — disk sweep confirms no 2024 major choice spans two tool
-    // categories (only Battle Master's Student of War carries choices, all 17 Artisan's Tools).
-    // Container name stays 'Battle Master' so the selected-major resolution still lands.
+  it.each([
+    {
+      label: 'mixed two-category pool',
+      fabricatedFrom: ["Tool: Alchemist's Supplies", 'Tool: Dice Set'],
+      // Dice Set (Gaming Sets) + Alchemist's Supplies (Artisan's) — the model cannot express
+      // the split pool: error logged, NOTHING granted (no partial limit).
+      expectedLimits: new Map(),
+      expectedError: "Major feature \"Fabricated Mixed Grant\" grants tools across multiple categories (Artisan's Tools, Gaming Sets); category-limit model cannot express a mixed pool.",
+    },
+    {
+      label: 'unresolvable tool row dropped',
+      fabricatedFrom: ["Tool: Alchemist's Supplies", 'Tool: Nonexistent Kit'],
+      // Positive leg of the `filter(Boolean)` drop: an unknown name must NOT widen the pool
+      // to length>1 — the remaining known tool grants its limit silently.
+      expectedLimits: new Map([["Artisan's Tools", 1]]),
+      expectedError: null,
+    },
+  ])('DEFENSIVE (no disk source): $label — join result $expectedLimits', async ({ fabricatedFrom, expectedLimits, expectedError }) => {
+    // Fabricated feature — disk sweep confirms no 2024 major choice spans two tool categories
+    // or names a tool missing from equipment.json (only Battle Master's Student of War carries
+    // choices, all 17 Artisan's Tools). Container name stays 'Battle Master' so the
+    // selected-major resolution still lands.
     vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
       name: 'Fighter',
       majors: [{
@@ -103,19 +124,23 @@ describe('toolValidation - major feature (Student of War) tool grants', () => {
         features: [{
           name: 'Fabricated Mixed Grant',
           level: 3,
-          proficiency_choices: [
-            { choose: 1, from: ["Tool: Alchemist's Supplies", 'Tool: Dice Set'] },
-          ],
+          proficiency_choices: [{ choose: 1, from: fabricatedFrom }],
         }],
       }],
     });
 
     const result = await getToolLimitsByCategory(formData({ background: undefined }));
 
-    expect(result.categoryLimits).toEqual(new Map());
-    expect(consoleError).toHaveBeenCalledWith(
-      "Major feature \"Fabricated Mixed Grant\" grants tools across multiple categories (Artisan's Tools, Gaming Sets); category-limit model cannot express a mixed pool."
-    );
+    expect(result).toEqual({
+      categoryLimits: expectedLimits,
+      preSelected: [],
+      skilledUsesAvailable: 0,
+    });
+    if (expectedError === null) {
+      expect(consoleError).not.toHaveBeenCalled();
+    } else {
+      expect(consoleError).toHaveBeenCalledWith(expectedError);
+    }
   });
 
   it('validateTools accepts exactly the major-granted allowance and warns with exact counts one over', async () => {

@@ -34,9 +34,9 @@ const STAMP_COMMIT_SUBJECTS = [
   // "changes since maintained" — exclude by subject like the stamp commit.
   'Test maintenance',
 ];
-// LOCAL date (was toISOString() = UTC, which runs 5h ahead of EST and poisoned
-// the dirty-file comparison — see fix note at step 3).
-const TODAY = new Date().toLocaleDateString('en-CA');
+// NOTE: no blanket "today" constant — the dirty-file comparison uses each file's
+// LOCAL mtime (was a blanket TODAY from toISOString() = UTC, 5h ahead of EST,
+// which poisoned the comparison — see fix note at step 3).
 
 const testFiles = [];
 (function walk(dir) {

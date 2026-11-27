@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 improve-and-trim: full-shape toEqual on limit/preSelected results, Skilled pool drained EXACTLY (inclusive boundary + cross-loop consumption order), lowercase-index feat lookup pinned via disk-verbatim 'chef', redundant missing-key-vs-empty-array leg dropped.
 // toolValidation LIMITS lane (pair opener #2061): getToolLimitsByCategory aggregation of
 // background/class/feat tool grants + validateTools category-overflow & Skilled-pool warnings.
 // PAIR SEAM MAP (siblings cited, never re-pinned here):
@@ -13,8 +13,9 @@
 // public/data/equipment.json rows (Thieves' Tools, Navigator's Tools, Dice Set, Flute, …;
 // there is no tools.json — tool rows live in equipment.json). One documented exception: the
 // non-Skilled isAny feat branch has ZERO disk source (only Skilled matches on disk), pinned as a
-// defensive lane with a clearly-fabricated feat. rules-validation.json: no tool entries in either
-// ruleset (verified) — limits derive solely from bg/class/feat/major-feature grants.
+// defensive lane with a clearly-fabricated feat. The Chef lane requests its verbatim disk index
+// 'chef' (lowercase) to pin the index-lookup branch; disk index verified. rules-validation.json:
+// no tool entries in either ruleset (verified) — limits derive solely from bg/class/feat/major-feature grants.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import * as dataLoader from '../ui/dataLoader.js';
@@ -71,10 +72,12 @@ describe('toolValidation - getToolLimitsByCategory', () => {
       class: { name: 'Bard' },
     });
 
-    expect(result.categoryLimits.get('Gaming Sets')).toBe(1);
-    expect(result.categoryLimits.get('Musical Instrument')).toBe(3);
+    expect(result.categoryLimits).toEqual(new Map([
+      ['Gaming Sets', 1],
+      ['Musical Instrument', 3],
+    ]));
     expect(result.preSelected).toEqual([]);
-    expect(result.categoryLimits.has("Artisan's Tools")).toBe(false);
+    expect(result.skilledUsesAvailable).toBe(0);
   });
 
   it('routes fixed (non-choice) background and class tools to preSelected, not to limits', async () => {
@@ -85,9 +88,10 @@ describe('toolValidation - getToolLimitsByCategory', () => {
       class: { name: 'Druid' },
     });
 
-    expect(result.preSelected).toContain("Thieves' Tools");
-    expect(result.preSelected).toContain('Herbalism Kit');
-    expect(result.categoryLimits.size).toBe(0);
+    // Array.from(Set) order: background row precedes class row.
+    expect(result.preSelected).toEqual(["Thieves' Tools", 'Herbalism Kit']);
+    expect(result.categoryLimits).toEqual(new Map());
+    expect(result.skilledUsesAvailable).toBe(0);
   });
 
   it('aggregates background + class + feat grants across categories with the Skilled pool tracked separately', async () => {
@@ -100,19 +104,22 @@ describe('toolValidation - getToolLimitsByCategory', () => {
       feats: ['Musician', 'Skilled'],
     });
 
-    expect(result.categoryLimits.get("Artisan's Tools")).toBe(2);
-    expect(result.categoryLimits.get('Musical Instrument')).toBe(4);
-    expect(result.categoryLimits.has('Gaming Sets')).toBe(false);
+    expect(result.categoryLimits).toEqual(new Map([
+      ["Artisan's Tools", 2],
+      ['Musical Instrument', 4],
+    ]));
     expect(result.skilledUsesAvailable).toBe(3);
     expect(result.preSelected).toEqual([]);
   });
 
-  it('auto-selects Cook\'s Utensils for Chef without inventing a category limit', async () => {
+  it('auto-selects Cook\'s Utensils for a lowercase-index feat name without inventing a category limit', async () => {
     // Disk Chef benefit is a fixed tool ("...with Cook's Utensils if you don't already have it") —
     // guards that the Chef short-circuit runs before the generic feat parser could misread it.
+    // The lowercase 'chef' pins the `f.index === featName.toLowerCase()` lookup branch (name-match
+    // is pinned by Skilled/Musician/Tough above); disk index of Chef is verbatim "chef".
     const result = await getToolLimitsByCategory({
       rules: '2024',
-      feats: ['Chef'],
+      feats: ['chef'],
     });
 
     expect(result.preSelected).toEqual(["Cook's Utensils"]);
@@ -162,8 +169,8 @@ describe('toolValidation - validateTools', () => {
   it('returns no warnings for non-2024 rulesets and when nothing is selected', async () => {
     expect(await validateTools({ rules: '5e', toolProficiencies: ['Flute', "Thieves' Tools"] })).toEqual([]);
     expect(await validateTools({})).toEqual([]);
+    // Missing key and [] flow through the same `|| []` into the same silent loops — one leg.
     expect(await validateTools({ rules: '2024' })).toEqual([]);
-    expect(await validateTools({ rules: '2024', toolProficiencies: [] })).toEqual([]);
   });
 
   it('warns once with exact counts when Gaming Sets selections exceed the Guard allowance, and stays silent at the boundary', async () => {
@@ -204,12 +211,15 @@ describe('toolValidation - validateTools', () => {
   });
 
   it('lets the Skilled pool absorb overflow across limited and unlimited categories, then warns when the pool runs dry', async () => {
-    // Bard grants 3 Musical; Skilled pool of 3 covers +4 more Musical but not the extra tool on top.
+    // Bard grants 3 Musical; pool of 3 covers +4 more Musical but not the extra tool on top.
+    // Within-pool leg drains the pool EXACTLY (overflow-2 Musical + 1 zero-allowance Other Tools
+    // = 3 Skilled uses): pins `skilledCanCover >= excess` / `>= length` as inclusive and pins
+    // that the category-limit loop consumes the pool before the zero-allowance loop.
     const withinPool = await validateTools({
       rules: '2024',
       class: { name: 'Bard' },
       feats: ['Skilled'],
-      toolProficiencies: ['Flute', 'Lute', 'Lyre', "Navigator's Tools"],
+      toolProficiencies: ['Flute', 'Lute', 'Lyre', 'Drum', 'Dulcimer', "Navigator's Tools"],
     });
     expect(withinPool).toEqual([]);
 

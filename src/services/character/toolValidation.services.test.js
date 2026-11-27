@@ -1,23 +1,25 @@
-// @maintained-by-ai 2026-10-16
-// toolValidation SERVICES lane (#2064, trimmed pass #398+): getToolsByCategory units —
-// the Skilled-usage computation deferred here by the limits opener (#2061).
-// SEAM MAP (siblings cited, never re-pinned here):
-// - .limits.test.js (#2061) — getToolLimitsByCategory aggregation, "Skilled pool tracked
-//   separately" (pool-vs-usage comparison in validateTools), bg/class/feat fetch lanes.
-// - .parsing.test.js (#2063) — regex branches; there normalization flows only through parse
-//   outputs. Here normalizeCategory is pinned ONLY through the getToolsByCategory filter —
+// @maintained-by-ai 2026-11-27 improve-and-trim: short-circuit null leg deleted (indistinguishable undefined twin); fabricated-grid + disk legs raised to full-shape whole-row toEqual; disk leg gains exact 10-row Musical Instrument census (old one-way every() check could not fail on omissions); added rejecting-mock propagates-not-swallowed pin; stale header claims corrected (quickBuildService consumer, removed same-name-row fiction, sibling seam re-verified).
+// toolValidation SERVICES lane (#2064): getToolsByCategory units — the dataLoader-backed
+// category filter (short-circuit guard, compound predicate, verbatim pass-through, error face).
+// SEAM MAP (siblings cited, never re-pinned here; all three re-swept 2026-11-27):
+// - .limits.test.js (#2061) — getToolLimitsByCategory aggregation, Skilled pool vs usage in
+//   validateTools, bg/class/feat fetch lanes, lowercase-index feat lookup (:168 sole pin).
+// - .parsing.test.js (#2063) — regex branches + full normalization table through parse outputs
+//   (unknown 'Gaming Tool' verbatim pass-through owned THERE — not restated here). Here
+//   normalizeCategory is pinned ONLY through the getToolsByCategory filter (plural→singular):
 //   the sole integration pin allowed in this file.
 // - .test.js (#2065) — normalizeCategory direct-unit lane.
-// - .major-feature.test.js (#2062) — 'Tool: ' row join into limits.
+// - .major-feature.test.js (#2062) — Fighter majors 'Tool: ' row join into limits.
 // RETIRED (#dead-export resolution): the computeSkilledToolUsage describe died with its
-// export per #2064 REC ("pin dies with the export") — it had ZERO production importers;
-// the live Skilled-tool math is skillValidation/skilled-pool.js computeSkilledToolUsageOnly
-// (async, formData-driven, limits from bg+class only; pinned in the skillValidation lanes).
-// Consumer check (#1916 lane): getToolsByCategory is LIVE (WizardStepTools.jsx + validateTools).
-// Disk honesty: equipment.json is the tool-row home (#2061 fact) — the drills fs-read verbatim
-// rows ('Flute', 'Dice Set', singular 'Musical Instrument'). The fabricated compact grid and the
-// same-name-in-two-categories row are clearly-labeled defensive fixtures for branches disk data
-// cannot discriminate (family precedent: parsing.test.js fabricated digit rows).
+// export per #2064 REC ("pin dies with the export") — re-verified against current bytes:
+// toolValidation.js exports no computeSkilledToolUsage; the live Skilled-tool math is
+// skillValidation/skilled-pool.js computeSkilledToolUsageOnly (pinned in the skillValidation lanes).
+// Consumer check (re-verified vs disk): getToolsByCategory is LIVE — WizardStepTools.jsx:61,
+// quickBuildService.js:186, and validateTools (toolValidation.js:266).
+// Disk honesty: equipment.json is the tool-row home — disk legs fs-read verbatim rows. The only
+// fabricated fixture is the compact compound-predicate grid (an Armor row wearing tool_category):
+// disk has ZERO non-Tools rows carrying tool_category, so disk data cannot discriminate that
+// branch (family precedent: parsing.test.js fabricated digit rows).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 
@@ -45,41 +47,56 @@ describe('toolValidation - getToolsByCategory', () => {
     vi.mocked(dataLoader.loadEquipment).mockResolvedValue([]);
   });
 
-  it.each([null, undefined, ''])('short-circuits %j to [] without touching the equipment store', async (input) => {
+  // null dropped: same `!category` guard, outcome indistinguishable from undefined (cosmetic twin).
+  it.each([[undefined], ['']])('short-circuits %j to [] without touching the equipment store', async (input) => {
     expect(await getToolsByCategory(input)).toEqual([]);
     expect(dataLoader.loadEquipment).not.toHaveBeenCalled();
   });
 
-  it('returns exactly the Tools rows of the normalized category — other categories and non-tool rows excluded', async () => {
+  it('conjoins equipment_category AND tool_category — whole rows pass, every other row excluded', async () => {
     // Fabricated compact grid: an Armor row wearing a matching tool_category proves the
-    // compound predicate (equipment_category AND tool_category) actually conjoins.
+    // compound predicate (equipment_category AND tool_category) actually conjoins — disk
+    // has zero non-Tools rows carrying tool_category, so disk cannot discriminate this.
+    const flute = { name: 'Flute', equipment_category: 'Tools', tool_category: 'Musical Instrument' };
+    const drum = { name: 'Drum', equipment_category: 'Tools', tool_category: 'Musical Instrument' };
+    const diceSet = { name: 'Dice Set', equipment_category: 'Tools', tool_category: 'Gaming Sets' };
     vi.mocked(dataLoader.loadEquipment).mockResolvedValue([
-      { name: 'Flute', equipment_category: 'Tools', tool_category: 'Musical Instrument' },
-      { name: 'Drum', equipment_category: 'Tools', tool_category: 'Musical Instrument' },
-      { name: 'Dice Set', equipment_category: 'Tools', tool_category: 'Gaming Sets' },
+      flute,
+      drum,
+      diceSet,
       { name: 'Longsword', equipment_category: 'Weapons', tool_category: null },
       { name: 'Shield', equipment_category: 'Armor', tool_category: 'Musical Instrument' },
     ]);
 
     // Plural input → 'Musical Instrument' via normalizeCategory-through-filter
     // (the sole integration pin allowed here; .test.js #2065 owns the direct unit).
-    const result = await getToolsByCategory('Musical Instruments');
-    expect(result.map(t => t.name)).toEqual(['Flute', 'Drum']);
+    // Full-shape: exact set, order, and whole unmutated rows.
+    expect(await getToolsByCategory('Musical Instruments')).toEqual([flute, drum]);
 
-    // Normalization is not a wildcard: an exact-name category still filters precisely.
-    expect((await getToolsByCategory('Gaming Sets')).map(t => t.name)).toEqual(['Dice Set']);
+    // Normalization is not a wildcard: an exact-name category still filters precisely
+    // (requesting Gaming Sets must not leak the Musical Instrument rows).
+    expect(await getToolsByCategory('Gaming Sets')).toEqual([diceSet]);
   });
 
-  it('passes verbatim equipment.json rows through and plural==singular inputs on real data', async () => {
+  it('returns exactly the disk Musical Instrument rows, verbatim, plural==singular', async () => {
     vi.mocked(dataLoader.loadEquipment).mockResolvedValue(diskEquipment);
 
     const plural = await getToolsByCategory('Musical Instruments');
+    // Disk census (equipment.json order): exact set + order, so both omission AND
+    // cross-category leakage fail (replaces the one-way every() check that passed on omissions).
+    expect(plural.map(t => t.name)).toEqual([
+      'Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Horn', 'Lute', 'Lyre', 'Pan flute', 'Shawm', 'Viol',
+    ]);
     // Disk anchor: the untouched, whole Flute row survives the filter (disk-vs-fake drill).
     expect(plural).toContainEqual(diskTools.find(t => t.name === 'Flute'));
-    // Same set through both spellings — normalization integrated at the filter, not just the map.
+    // Same result through both spellings — normalization integrated at the filter, not just the map.
     expect(await getToolsByCategory('Musical Instrument')).toEqual(plural);
-    // No leakage of other categories/rows into the result.
-    expect(plural.every(t => t.equipment_category === 'Tools' && t.tool_category === 'Musical Instrument')).toBe(true);
+  });
+
+  it('does not swallow a failing equipment load', async () => {
+    // throw-vs-return exact: the service has no try/catch here — rejection propagates.
+    vi.mocked(dataLoader.loadEquipment).mockRejectedValue(new Error('equipment fetch failed'));
+    await expect(getToolsByCategory('Musical Instrument')).rejects.toThrow('equipment fetch failed');
   });
 });
 

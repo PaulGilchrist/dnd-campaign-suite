@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
  * Interaction contract for CampaignAdmin's theme toggle.
  *
@@ -6,8 +6,9 @@
  * `toggleTheme` prop and owns no theme state. One test pins that whole
  * contract via observable behavior:
  * - the single toggle presents the correct accessible name + icon per theme,
- *   delegates exactly once per click, keeps callbacks independent, and only
- *   changes presentation when the parent flips the `theme` prop.
+ *   delegates exactly once per click in both themes (including after the
+ *   parent re-renders), and only changes presentation when the parent flips
+ *   the `theme` prop.
  *
  * Deliberately NOT covered here (already covered elsewhere):
  * - static rendering of the header/Appearance-section chrome
@@ -66,5 +67,10 @@ describe('CampaignAdmin - Theme Toggle', () => {
         expect(lightBtn.querySelector('i.fa-moon')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Switch to Light Mode' })).not.toBeInTheDocument();
         expect(props.toggleTheme).toHaveBeenCalledTimes(1);
+
+        // After the parent-driven re-render, the refreshed light-mode toggle
+        // still delegates exactly once (no stale/duplicate wiring).
+        fireEvent.click(lightBtn);
+        expect(props.toggleTheme).toHaveBeenCalledTimes(2);
     });
 });

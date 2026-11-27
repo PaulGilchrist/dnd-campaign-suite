@@ -1,15 +1,17 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 sweep: same-branch rows trimmed (null/undefined mapData, empty-vs-missing enemiesDisadvantageSaves, parse-vs-fallback distance, sync restatement of shared type gate); real isDistanceInRange via importOriginal (mirror-reimpl purged); canonical findMapToken merge order + non-array enemies leg pinned.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
 }));
 
-// isWithinRange stays the mocked universal checker; the pure comparator runs
-// as the real one-liner implementation so the sync lane measures honestly.
-vi.mock('../../rules/combat/rangeCheck.js', () => ({
+// isWithinRange (async lane's universal checker, edge behavior pinned in
+// rangeCheck.test.js) is mocked; isDistanceInRange and getDistanceFeet run as
+// the REAL implementations so the sync lane measures honestly with no
+// mirror-reimplementation drift.
+vi.mock('../../rules/combat/rangeCheck.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   isWithinRange: vi.fn(async () => false),
-  isDistanceInRange: (dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt,
 }));
 
 vi.mock('../../maps/mapsService.js', () => ({
@@ -34,6 +36,19 @@ import { getCombatSummary, getCombatContext } from '../../encounters/combatData.
 // lenient fork — bearer↔victim distance is measured when the active map tracks positioned
 // tokens for both creatures, and unmeasurable pairs (no active map, gridless tokens,
 // tokenless creatures) stay consulted-and-passes lenient (house law §44).
+// CANONICAL findMapToken OWNER (auraOfProtection.js:59 comment ADMITS its token
+// probe MIRRORS this private helper): players[]-then-placedItems[] merge, exact
+// name match, FIRST-WINS so a duplicate name resolves to its players[] token —
+// pinned in the sync 'duplicate name' row below; both scan legs, all four
+// missing-token faces (bearer/victim × either leg), and both coordinate-shape
+// faces (absent and non-finite) are pinned here so a future shared-helper
+// consolidation has a strong canonical home.
+// Async lane note: production callers (handlePlayerSaveDamage/handleNpcSaveDamage)
+// NEVER pass mapData — the internal activeMapName→loadMapData lane is the prod
+// face (regression block); the mapData-parameter grid rows pin the exported API.
+// Distance EDGE math lives with the real comparator: the sync lane pins exactly-
+// 60 ft both sides; the async lane's edge is isWithinRange's own lane
+// (rangeCheck.test.js), so no edge row is restated here.
 const CAMPAIGN = 'test-campaign';
 
 const grid = (...names) => ({ players: names.map(name => ({ name, gridX: 0, gridY: 0 })) });
@@ -67,8 +82,7 @@ describe('getCoronaSaveDisadvantage — grid lane', () => {
   }
 
   it.each([
-    ['undefined', undefined],
-    ['null', null],
+    ['undefined mapData', undefined],
     ['players list empty', { players: [] }],
   ])('returns false with no grid (%s) and no combat summary to pool bearers from', async (_label, mapData) => {
     seed({ buffs: { Paladin: [corona()] }, inRange: true });
@@ -84,6 +98,7 @@ describe('getCoronaSaveDisadvantage — grid lane', () => {
     ['damageType omitted passes the type gate', { buffs: { Paladin: [corona()] } }, undefined, { disadvantage: true, source: 'Paladin' }],
     ['lowercase incoming damageType matches', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: ['Fire'] })] } }, 'fire', { disadvantage: true, source: 'Paladin' }],
     ['non-string first enemies-list entry stays lenient', { buffs: { Paladin: [corona()] }, enemies: { Paladin: [42] } }, 'Fire', { disadvantage: true, source: 'Paladin' }],
+    ['non-array enemies payload stays lenient', { buffs: { Paladin: [corona()] }, enemies: { Paladin: 'not-an-array' } }, 'Fire', { disadvantage: true, source: 'Paladin' }],
     ['target holding the buff is skipped', { buffs: { Target: [corona()] } }, 'Fire', { disadvantage: false }],
     ['no player holds the buff', {}, 'Fire', { disadvantage: false }],
     ['only source out of range', { inRange: false }, 'Fire', { disadvantage: false }],
@@ -91,7 +106,6 @@ describe('getCoronaSaveDisadvantage — grid lane', () => {
     ['garbage buff payloads skipped, loop reaches valid source', { buffs: { P1: null, P2: 'not-an-array', P3: [corona()] }, players: ['Target', 'P1', 'P2', 'P3'], inRange: (s) => s === 'P3' }, 'Fire', { disadvantage: true, source: 'P3' }],
     ['damageType not in enemiesDisadvantageSaves', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: ['Radiant'] })] } }, 'Fire', { disadvantage: false }],
     ['empty enemiesDisadvantageSaves blocks everything', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: [] })] } }, 'Fire', { disadvantage: false }],
-    ['buff without enemiesDisadvantageSaves matches nothing', { buffs: { Paladin: [{ effect: 'sunlight_aura' }] } }, 'Fire', { disadvantage: false }],
     ['target absent from coronaOfLightEnemies', { enemies: { Paladin: ['Other'] } }, 'Fire', { disadvantage: false }],
   ])('%s', async (_label, setup, damageType, expected) => {
     const mapData = seed(setup);
@@ -102,9 +116,10 @@ describe('getCoronaSaveDisadvantage — grid lane', () => {
 
   it.each([
     ['missing distance defaults to 60 ft', undefined, 60],
-    ['"60 ft" parses to 60', '60 ft', 60],
+    // '30 ft' is the only suffix-parse face that discriminates parse from
+    // fallback (an authored '60 ft' parses and defaults to the same number;
+    // an unparseable string hits the identical NaN-||-60 branch as missing).
     ['"30 ft" parses to 30', '30 ft', 30],
-    ['unparseable distance falls back to 60', 'far away', 60],
   ])('range passed to isWithinRange: %s', async (_label, distance, expectedFeet) => {
     const mapData = seed({ buffs: { Paladin: [corona({ distance })] } });
 
@@ -250,12 +265,25 @@ describe('getCoronaSaveDisadvantageSync', () => {
   }
 
   it.each([
-    ['Fire save on a marked enemy', {}, { disadvantage: true, source: 'War_Cleric' }],
-    ['damageType case normalized ("radiant")', { damageType: 'radiant' }, { disadvantage: true, source: 'War_Cleric' }],
+    ['Fire save on a marked enemy (no mapData: tokenless pair stays lenient)', {}, { disadvantage: true, source: 'War_Cleric' }],
+    // The shared gates (type gate, enemies gate, self-skip, buff scan) are
+    // pinned exhaustively via the async lane; sync keeps one negative leg per
+    // gate to pin that the SYNC export still WIRING-calls them.
     ['non-Fire/Radiant damage type', { damageType: 'Cold' }, { disadvantage: false }],
     ['target absent from coronaOfLightEnemies', { enemies: ['Other'] }, { disadvantage: false }],
     ['mapData players used without any combat summary', { mapData: grid('War_Cleric', 'Bandit 1'), summary: null }, { disadvantage: true, source: 'War_Cleric' }],
     ['no summary and no mapData', { summary: null }, { disadvantage: false }],
+    // findMapToken canonical merge order: players[] BEFORE placedItems[],
+    // first-match-wins — a duplicate name resolves to its players[] token.
+    // Players leg is adjacent (5 ft), placedItems leg is 65 ft: disadvantage
+    // proves the players token won the lookup.
+    ['duplicate name resolves players[] token over placedItems[] token', {
+      mapData: {
+        players: [{ name: 'War_Cleric', gridX: 5, gridY: 5 }, { name: 'Bandit 1', gridX: 6, gridY: 5 }],
+        placedItems: [{ name: 'Bandit 1', type: 'npc', gridX: 18, gridY: 5 }],
+      },
+      summary: null,
+    }, { disadvantage: true, source: 'War_Cleric' }],
   ])('%s', async (_label, { enemies, mapData, summary, damageType = 'Fire' }, expected) => {
     seed({ enemies, mapData, summary });
 

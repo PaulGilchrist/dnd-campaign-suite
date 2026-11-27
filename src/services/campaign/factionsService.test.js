@@ -1,44 +1,85 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
  * factionsService — client-side fetch contract for the factions collection.
  *
- * Lane of the services/campaign/ block (queue #2012, second lane of this
- * block); canonical idiom from campaignService.test.js (#2002): per-test
- * fetch-spied, fail-loud default (unmocked fetch throws — never live, per
- * campaign lockdown), console.error pins on the service's rethrow-with-log
- * swallows, exact request/response shapes.
+ * Lane of the services/campaign/ block; canonical idiom from
+ * campaignService.test.js (block opener): per-suite fetch-spied with a
+ * fail-loud default (unmocked fetch throws — never live, per campaign
+ * lockdown), full-shape RequestInit censuses via toEqual (no masked
+ * objectContaining bodies), assertion-identical failure faces run as
+ * it.each tables, every error path pins exactly ONE console.error
+ * (non-silent doctrine).
  *
- * THIS file owns `/api/campaigns/:campaign/factions` and
- * `/api/campaigns/:campaign/factions/:id` (GET/POST list, GET/DELETE item).
+ * THIS file owns `/api/campaigns/:campaign/factions`,
+ * `/api/campaigns/:campaign/factions/standings` and
+ * `/api/campaigns/:campaign/factions/:id` (GET/POST list, GET/DELETE item,
+ * GET standings).
  *
  * Response shapes pinned against the server, NOT canned JSON:
- * server/routes/factions.js delegates to server/utils/jsonEntityCrud.js
- * (createJsonEntityRouter('factions')):
- *  - GET list  → { factions: [...] }  (responseWrapper envelope — the client
- *    passes it through; Factions.jsx unwraps via useEntityManagement
- *    responseKey:'factions'). Collection routes loadOrInit() the file, so a
- *    missing campaign/factions.json returns { factions: [] } — this endpoint
- *    family never 404s 'Campaign not found' on the collection leg.
- *  - GET item  → { faction: entity }  (itemWrapper), 404 { error:
- *    'Faction not found' } when the file or the id is missing.
- *  - POST      → { success: true } only (no extra keys), 400 { error:
- *    'Expected an array for factions' } or the findDuplicateNameError
- *    message from server/utils/nameUniqueness.js.
- *  - DELETE    → { success: true } only; DELETE is sent with no headers.
- *  - 500 body  → { error: <message> } via server/utils/asyncHandler.js;
- *    the client's `error || 'Failed to …'` generic fallback is defensive
- *    (server always sends { error }) — pinned as the client's own string.
+ * server/routes/factions.js delegates CRUD to server/utils/jsonEntityCrud.js:
+ *  - GET list  → { factions: [...] } envelope, passed through untouched
+ *    (Factions.jsx unwraps via useEntityManagement responseKey:'factions').
+ *  - GET item  → { faction: entity }, 404 { error: 'Faction not found' }.
+ *  - POST      → { success: true } only; 400 duplicate-name / 409
+ *    concurrent-edit bodies.
+ *  - DELETE    → { success: true } only; DELETE is sent with NO headers.
+ *  - GET standings (factions.js:65) → { factions: whitelisted rows }; the
+ *    field-whitelist and draft-filtering are SERVER-side behavior (pinned by
+ *    server route tests) — this lane pins only the client's unwrap-to-array
+ *    and its `|| []` missing-key fallback.
+ *  - Error bodies arrive as { error } via asyncHandler; the client's
+ *    `error || 'Failed to …'` generic fallback is defensive — pinned as the
+ *    client's own string.
  *
- * Consumers: src/components/factions/Factions.jsx (GM factions panel,
- * localhost-only management per AGENTS.md) wires load/save/delete into
- * useEntityManagement. `loadFaction` has no production consumer today —
- * kept as endpoint-contract coverage, flagged in the lane report.
+ * Consumers: Factions.jsx (GM panel) wires load/save/delete; QuestBoard.jsx
+ * wires the read-only loadFactionStandings. Favor/influence math is
+ * server-owned — no client-side arithmetic to pin here.
  *
- * No timers, no localStorage game state — pure fetch boundary (server-first
- * state lives in factions.json via these routes).
+ * No timers, no localStorage — pure fetch boundary.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { loadFactions, saveFactions, loadFaction, deleteFaction } from './factionsService.js';
+import {
+  loadFactions,
+  saveFactions,
+  loadFactionStandings,
+  loadFaction,
+  deleteFaction,
+} from './factionsService.js';
+
+/**
+ * Assertion-identical failure faces shared by every function:
+ *  1. non-2xx WITH a server { error } body — the message surfaces verbatim;
+ *  2. non-2xx WITHOUT an error field — the client's generic fallback string;
+ *  3. network rejection — the original error propagates unchanged.
+ * Each face must land exactly one console.error with the function's prefix.
+ */
+const errorFaces = ({ generic, serverStatus = 500, serverMessage = 'Server-side failure' }) => [
+  {
+    title: 'non-2xx with a server { error } body surfaces the server message',
+    respond: () => ({
+      ok: false,
+      status: serverStatus,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({ error: serverMessage }),
+    }),
+    expected: serverMessage,
+  },
+  {
+    title: 'non-2xx body without an error field falls back to the generic client message',
+    respond: () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({}),
+    }),
+    expected: generic,
+  },
+  {
+    title: 'network rejection propagates the original error',
+    respond: () => Promise.reject(new Error('ENOTFOUND')),
+    expected: 'ENOTFOUND',
+  },
+];
 
 describe('factionsService', () => {
   let fetchSpy;
@@ -63,7 +104,7 @@ describe('factionsService', () => {
   });
 
   describe('loadFactions', () => {
-    it('returns the server list envelope and pins the exact GET request', async () => {
+    it('GETs the collection and passes the server envelope through (campaign name URL-encoded)', async () => {
       const envelope = {
         factions: [
           { id: 'f-1', name: 'Harpers', description: 'Secret society', influence: 5 },
@@ -76,69 +117,30 @@ describe('factionsService', () => {
         json: () => Promise.resolve(envelope),
       });
 
-      const result = await loadFactions('test-campaign');
-
-      // passthrough of { factions } envelope — Factions.jsx unwraps via responseKey
-      expect(result).toEqual({ factions: envelope.factions });
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/factions', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-    });
-
-    it('URL-encodes the campaign name; empty collection passes through as { factions: [] }', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ factions: [] }),
-      });
-
       const result = await loadFactions('my campaign/1');
 
-      expect(result).toEqual({ factions: [] });
+      // passthrough of { factions } envelope — Factions.jsx unwraps via responseKey
+      expect(result).toEqual(envelope);
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/factions', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    it('extracts the server error message and logs on a failed response', async () => {
-      // server truth: jsonEntityCrud read failure surfaces through
-      // asyncHandler as 500 { error: 'Failed to read Factions' }
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({ error: 'Failed to read Factions' }),
-      });
+    it.each(errorFaces({ generic: 'Failed to load Factions', serverMessage: 'Failed to read Factions' }))(
+      '$title',
+      async ({ respond, expected }) => {
+        fetchSpy.mockImplementation(() => respond());
 
-      await expect(loadFactions('test-campaign')).rejects.toThrow('Failed to read Factions');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      // defensive client branch — the server always sends { error }
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(loadFactions('test-campaign')).rejects.toThrow('Failed to load Factions');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(loadFactions('test-campaign')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
-    });
+        await expect(loadFactions('test-campaign')).rejects.toThrow(expected);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
+      }
+    );
   });
 
   describe('saveFactions', () => {
-    it('POSTs the exact factions body and returns the server { success: true } envelope', async () => {
+    it('POSTs the exact full-array overwrite body and returns the server { success: true } envelope', async () => {
       const factions = [{ id: 'f-1', name: 'Harpers', influence: 5 }];
 
       fetchSpy.mockResolvedValue({
@@ -156,38 +158,6 @@ describe('factionsService', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ factions }),
       });
-    });
-
-    it('URL-encodes the campaign name; empty-array overwrite sends exact body', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveFactions('my campaign/1', []);
-
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign%2F1/factions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ factions: [] }),
-      });
-    });
-
-    it('extracts the server 400 duplicate-name error and logs', async () => {
-      // server truth: validateList → findDuplicateNameError(factions, 'faction')
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        json: () => Promise.resolve({ error: 'A faction with that name already exists' }),
-      });
-
-      await expect(
-        saveFactions('test-campaign', [{ name: 'Harpers' }, { name: 'harpers' }])
-      ).rejects.toThrow('A faction with that name already exists');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('routes a handled 409 conflict to console.warn — never a red ERROR (improve 2026-10-27-H)', async () => {
@@ -215,32 +185,67 @@ describe('factionsService', () => {
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('falls back to its own generic message when the error body has no error field', async () => {
+    it.each(errorFaces({
+      generic: 'Failed to save Factions',
+      serverStatus: 400,
+      serverMessage: 'A faction with that name already exists', // validateList → findDuplicateNameError
+    }))('$title', async ({ respond, expected }) => {
+      fetchSpy.mockImplementation(() => respond());
+
+      await expect(saveFactions('test-campaign', [{ name: 'Harpers' }])).rejects.toThrow(expected);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled(); // only sanctioned 409s reach warn
+    });
+  });
+
+  describe('loadFactionStandings', () => {
+    // Player quest-board lane (QuestBoard.jsx) — read-only; the field
+    // whitelist / draft-drop is server-side, pinned by server route tests.
+    it('GETs the standings lane and unwraps the envelope to a plain array', async () => {
+      const rows = [
+        { id: 'f-1', name: 'Harpers', influence: 5 },
+        { id: 'f-2', name: 'Zhentarim', influence: 3 },
+      ];
       fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ factions: rows }),
+      });
+
+      const result = await loadFactionStandings('test-campaign');
+
+      expect(result).toEqual(rows); // array, NOT the { factions } envelope
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/factions/standings', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    it('returns [] when a success body omits the factions key', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
         json: () => Promise.resolve({}),
       });
 
-      await expect(saveFactions('test-campaign', [])).rejects.toThrow('Failed to save Factions');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      await expect(loadFactionStandings('test-campaign')).resolves.toEqual([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
+    it.each(errorFaces({ generic: 'Failed to load faction standings' }))('$title', async ({ respond, expected }) => {
+      fetchSpy.mockImplementation(() => respond());
 
-      await expect(saveFactions('test-campaign', [])).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      await expect(loadFactionStandings('test-campaign')).rejects.toThrow(expected);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading faction standings:', expect.any(Error));
     });
   });
 
   describe('loadFaction', () => {
     // No production consumer today (Factions.jsx lists via loadFactions);
     // pinned as the item-route contract against jsonEntityCrud's itemWrapper.
-    it('returns the server item envelope and URL-encodes campaign and faction id', async () => {
+    it('GETs the item route and passes the { faction } envelope through (campaign and id both URL-encoded)', async () => {
       const faction = { id: 'faction/1', name: 'Harpers', description: 'Secret society' };
       fetchSpy.mockResolvedValue({
         ok: true,
@@ -260,38 +265,16 @@ describe('factionsService', () => {
       );
     });
 
-    it('extracts the server 404 error and logs', async () => {
-      // server truth: { error: 'Faction not found' } for file-missing and
-      // id-missing (jsonEntityCrud GET :id)
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'Faction not found' }),
-      });
+    it.each(errorFaces({ generic: 'Failed to load Faction', serverStatus: 404, serverMessage: 'Faction not found' }))(
+      '$title',
+      async ({ respond, expected }) => {
+        fetchSpy.mockImplementation(() => respond());
 
-      await expect(loadFaction('test-campaign', 'missing-id')).rejects.toThrow('Faction not found');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(loadFaction('test-campaign', 'f-1')).rejects.toThrow('Failed to load Faction');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(loadFaction('test-campaign', 'f-1')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
-    });
+        await expect(loadFaction('test-campaign', 'f-1')).rejects.toThrow(expected);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
+      }
+    );
   });
 
   describe('deleteFaction', () => {
@@ -311,35 +294,15 @@ describe('factionsService', () => {
       );
     });
 
-    it('extracts the server 404 error and logs', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'Faction not found' }),
-      });
+    it.each(errorFaces({ generic: 'Failed to delete Faction', serverStatus: 404, serverMessage: 'Faction not found' }))(
+      '$title',
+      async ({ respond, expected }) => {
+        fetchSpy.mockImplementation(() => respond());
 
-      await expect(deleteFaction('test-campaign', 'missing-id')).rejects.toThrow('Faction not found');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
-    });
-
-    it('falls back to its own generic message when the error body has no error field', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(deleteFaction('test-campaign', 'f-1')).rejects.toThrow('Failed to delete Faction');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
-    });
-
-    it('rejects and logs on network failure', async () => {
-      fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
-
-      await expect(deleteFaction('test-campaign', 'f-1')).rejects.toThrow('ENOTFOUND');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
-    });
+        await expect(deleteFaction('test-campaign', 'f-1')).rejects.toThrow(expected);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
+      }
+    );
   });
 });

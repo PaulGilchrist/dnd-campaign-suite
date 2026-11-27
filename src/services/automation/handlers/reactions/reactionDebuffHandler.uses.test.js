@@ -1,44 +1,61 @@
-// @maintained-by-ai 2026-10-16
-// reactionDebuffHandler octet #8 (uses) — lane: USES/BUDGET ACCOUNTING on the
-// DEFAULT (bardic) route: resolveUsesBudget → currentUsesFor → buildBardicStampPatch
-// spend keys (automation/index.js:338 `reaction_debuff` → handle →
+// @maintained-by-ai 2026-11-27 — uses/budget-accounting lane over reactionDebuffHandler.js
+// (default/bardic route: resolveUsesBudget → currentUsesFor → buildBardicStampPatch
+// spend keys; automation/index.js:338 `reaction_debuff` → handle →
 // DEFAULT_EFFECT_ROUTE; live from classes.json Cutting Words, feats.json,
-// rules-fightingStyles.js). Full octet seam map in .attacksVsAlly.test.js header.
+// rules-fightingStyles.js). Family nine-lane seam map in .attacksVsAlly.test.js header.
 //
 // THIS lane owns:
 //  - the uses_expression → usesMax channels: numeric pass-through vs
-//    evaluateAutoExpression(expr, playerStats) string eval — complementary to
-//    .earlyExits.test.js (uses-exhausted refusal copy + rechargeLabel for the
-//    same budget) and .cuttingWords.test.js:290 (bardicUsesMax budget early exit);
-//  - effectiveUsesKey selection: 'bardicInspirationUses' when no uses_expression
-//    but tracked bardic max > 0, else lowercase feature-name '<feature>Uses'
-//    ('cuttingWordsUses' here; blessedDefenderUses / wardingFlareUses are
-//    pinned by the attacksVsAlly / wardingFlare lanes);
-//  - currentUsesFor ?? fallback: undefined AND null stored values fall back to
-//    the budget max (0 never does — that refuses at the front door, earlyExits);
-//  - SINGLE-CHANNEL spend on this route. NOTE (correcting the .earlyExits lane's
-//    cosmetic header note): what this lane pins is NOT the spendUse channel.
-//    handleBardicRoll bakes latch + marker + uses into one stampPatch via
-//    setRuntimeObject and returns { preSpent: true }, so handle()'s post-route
-//    spendUse (setRuntimeValue) NEVER runs on the default route — true post-route
-//    spendUse is owned on the attacksVsAlly and wardingFlare lanes. Every kept
-//    test below therefore pins setRuntimeValue NOT called (zero double-spend).
+//    evaluateAutoExpression(string, playerStats) (the arg pin and the numeric
+//    no-eval pin are CANONICAL in .earlyExits.test.js:271-275 — not restated);
+//  - the currentUsesFor `?? max` fallback legs: stored undefined AND stored
+//    null current both revert to the budget max (0 never does — that refuses
+//    at the front door, earlyExits);
+//  - effectiveUsesKey selection: 'bardicInspirationUses' when no
+//    uses_expression but tracked bardic max > 0, else the feature-derived
+//    '<feature>Uses' key. The exact-array bake toEqual below doubles as the
+//    ABSENCE negative (no stray cuttingWordsUses on the bardic leg; no
+//    bardicInspirationUses when uses_expression shadows the tracked budget) —
+//    .cuttingWords.latch.test.js's superset stamp uses objectContaining and
+//    cannot prove absence;
+//  - the last-use boundary: stored 1 passes the >0 front-door gate and
+//    stamps exactly 0;
 //  - zero-budget contract: no uses_expression and no tracked max ⇒ the route
-//    still stamps latch + marker but writes NO uses key at all (free reaction).
+//    stamps latch + marker only, NO uses key at all (free reaction);
+//  - SINGLE-channel spend on this route: handleBardicRoll bakes latch +
+//    marker + uses into one stampPatch via setRuntimeObject and returns
+//    { preSpent: true }, so handle()'s post-route spendUse NEVER runs here.
+//    Every test pins the ordered exact-array two-write commit census
+//    (skipSync=true store-only bake BEFORE dispatch, then awaited flush with
+//    byte-identical economy keys + flushTs under the frozen clock) plus
+//    setRuntimeValue.mock.calls === [] (zero double-spend). True post-route
+//    spendUse (setRuntimeValue '<feature>Uses') is owned on the attacksVsAlly
+//    and wardingFlare lanes.
 //
-// NOT this lane: latch/marker key semantics + skipSync bake wording
-// (.cuttingWords.latch.test.js), default-route ability_use tail
-// (.cuttingWords.test.js:310), exhaustion refusal + rechargeLabel
-// (.earlyExits.test.js), route-internal gates (attacksVsAlly / wardingFlare /
-// defaultPath / branchesOfTheTree).
+// NOT this lane: exhaustion refusal copy + rechargeLabel + numeric no-eval
+// gate (.earlyExits.test.js), no-combat-context refusal (CANONICAL there),
+// latch/marker semantics + attack-identity fallback (.cuttingWords.latch),
+// BI die-size + popup prose composition + null-heal defenderHp prose +
+// generic ability_use tail row (.cuttingWords.test.js), route-internal gates
+// (attacksVsAlly / wardingFlare / defaultPath / branchesOfTheTree).
 //
-// Deterministic: runtime store, logs, ranges, rollback, healing, expression
-// eval and infoPopup are fully mocked; the bardic/second d20 now roll through
-// the mocked canonical diceRoller lane (fix#169 recipe) with a seeded default
-// face, so popup numerals are exact by construction. Pure budget arithmetic —
-// no churn expected when the app changes.
+// Deterministic: FROZEN Date.now in beforeEach + ALL lane defaults
+// re-installed after resetAllMocks (bare vi.fn factories, no clearAllMocks
+// residue); infoPopup is the REAL dependency-free builder (family-wide mirror-
+// mock purge) so the popup envelope + automation echo stay honest — the
+// description is pinned only as expect.any(String) because prose belongs to
+// .cuttingWords.test.js. Runtime store reads route through a (charKey, key)
+// router (never positional chains), the store-only heal seam gets a SYNC
+// mockReturnValue (source calls it unawaited), and the BI/second d20 faces are
+// seed-pinned through the mocked canonical diceRoller lane (fix#169). The rig
+// is always an in-range still-hits attack-roll lane (resolveMapPositions
+// resolves null ⇒ range skip; no heal tail), so budget arithmetic is the sole
+// assertion focus. No churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
+
+// ── Mocks BEFORE imports (bare vi.fn factories — every default is re-installed
+//    in beforeEach, nothing here survives on factory-set impls) ──────────────
 
 vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
@@ -47,12 +64,12 @@ vi.mock('../../common/targetResolver.js', () => ({
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-  setRuntimeObject: vi.fn().mockResolvedValue(undefined),
+  setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
@@ -61,7 +78,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isWithinRange: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -73,37 +90,11 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
-  findLastAttack: vi.fn().mockResolvedValue({
-    attackEvent: null,
-    attackerName: null,
-    targetName: null,
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  }),
+  findLastAttack: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
-}));
-
-vi.mock('../../common/infoPopup.js', () => ({
-  infoPopup: vi.fn().mockImplementation((name, description, automation, extraProps) => {
-    const result = {
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name,
-        description,
-        automation,
-      },
-    };
-    if (extraProps) {
-      Object.assign(result, extraProps);
-    }
-    return result;
-  }),
 }));
 
 // Canonical dice lane mock (fix#169 recipe): BI/second-d20 dice arrive via
@@ -113,19 +104,38 @@ vi.mock('../../../dice/diceRoller.js', () => ({
   rollDie: vi.fn(),
 }));
 
+// infoPopup deliberately NOT mocked: it is a dependency-free pure builder, so
+// the REAL one keeps every popup-envelope toEqual below honest about the
+// actual production shape (mirror mock purged family-wide).
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'TestCampaign';
 const mapName = 'DungeonMap';
+const playerName = 'Bard';
+
+// FROZEN clock: bake round-stamp, attack identity and flushTs are exact.
+const FROZEN_NOW = 1735689600000;
+
+// Latch + attack-instance identity stamped on every successful default-route
+// pass (key semantics owned by .cuttingWords.latch — reused here only as the
+// census envelope around the uses key this lane owns).
+const STAMP_BASE = {
+  _Cutting_Words_usedRound: 1,
+  _Cutting_Words_appliedAttack: String(FROZEN_NOW),
+};
 
 function makePlayerStats(overrides = {}) {
   return {
-    name: 'Bard',
+    name: playerName,
     proficiency: 2,
     level: 3,
     class: {
@@ -136,10 +146,7 @@ function makePlayerStats(overrides = {}) {
         { level: 3, bardic_die: 8 },
       ],
     },
-    abilities: [
-      { name: 'Wisdom', bonus: 2 },
-      { name: 'Charisma', bonus: 4 },
-    ],
+    abilities: [{ name: 'Charisma', bonus: 4 }],
     characterAdvancement: [],
     _trackedResources: {
       bardicInspirationUses: { current: 4, max: 4 },
@@ -148,193 +155,155 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function freshAttackEvent(options = {}) {
-  return {
-    d20: 15,
-    bonus: 5,
-    targetName: 'Goblin',
-    targetAc: 14,
-    effectiveAc: null,
-    hit: true,
-    timestamp: Date.now(),
-    ...options,
-  };
+// (charKey, key)-keyed router: 'Uses'-suffixed budget keys (cuttingWordsUses /
+// bardicInspirationUses) return the stored current; latch + marker reads fall
+// through to undefined so they never gate. NOT a positional chain — adding
+// internal getRuntimeValue reads elsewhere cannot shift these values.
+function routeRuntimeValue(storedUses) {
+  useRuntimeState.getRuntimeValue.mockImplementation((charKey, key) =>
+    key.endsWith('Uses') ? storedUses : undefined
+  );
 }
 
-// Reaches the DEFAULT_EFFECT_ROUTE with an in-range, fresh Goblin attack.
-// MERGE-style overrides (never replace the automation object wholesale).
-function setupDefaultPath({
-  usesExpression,
-  evaluateAutoExpressionReturn,
-  getRuntimeValueReturn,
-} = {}) {
-  const action = {
+// Default ROUTE action (merge, never replace wholesale).
+function setupDefaultPath({ usesExpression, evaluatedMax, storedUses } = {}) {
+  automationService.evaluateAutoExpression.mockReturnValue(evaluatedMax);
+  routeRuntimeValue(storedUses);
+  return {
     name: 'Cutting Words',
     automation: {
       type: 'reaction_debuff',
       range: '60_ft',
       effect: '',
-      uses_expression: null,
+      uses_expression: usesExpression ?? null,
       recharge: 'long_rest',
     },
   };
-  if (usesExpression !== undefined) {
-    action.automation.uses_expression = usesExpression;
-  }
-
-  automationService.evaluateAutoExpression.mockReturnValue(
-    evaluateAutoExpressionReturn !== undefined ? evaluateAutoExpressionReturn : 1
-  );
-  useRuntimeState.getRuntimeValue.mockImplementation(
-    typeof getRuntimeValueReturn === 'function'
-      ? getRuntimeValueReturn
-      : () => (getRuntimeValueReturn !== undefined ? getRuntimeValueReturn : undefined)
-  );
-
-  targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-  targetResolver.resolveMapPositions.mockResolvedValue(null);
-  damageUtils.getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
-  damageRollback.findLastAttack.mockResolvedValue({
-    attackEvent: freshAttackEvent(),
-    attackerName: 'Goblin',
-    targetName: 'Goblin',
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  });
-
-  return action;
 }
 
-// The store-only bake write (skipSync=true), ahead of the awaited flush.
-function bakedPatch() {
-  const call = useRuntimeState.setRuntimeObject.mock.calls.find(c => c[3] === true);
-  expect(call, 'bake (skipSync=true) setRuntimeObject write').toBeTruthy();
-  return call[1];
+// Ordered two-write commit census: store-only bake ahead of dispatch,
+// awaited flush after it with byte-identical economy keys + flushTs.
+function expectStampCensus(usesPatch) {
+  const stamp = { ...STAMP_BASE, ...usesPatch };
+  expect(useRuntimeState.setRuntimeObject.mock.calls).toEqual([
+    [playerName, stamp, campaignName, true],
+    [playerName, { ...stamp, _Cutting_Words_flushTs: FROZEN_NOW }, campaignName],
+  ]);
+  // preSpent route: the post-route spendUse channel never fires.
+  expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([]);
 }
 
 describe('reactionDebuffHandler — uses/budget accounting (default route)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Seed pin (fix#169 idiom): seeded faces for the now-mocked dice seams —
-    // budget arithmetic stays the assertion focus, popup numerals are exact.
+    vi.resetAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+
+    // Lane defaults re-installed EVERY test (no impl residue between tests).
+    routeRuntimeValue(undefined);
+    useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
+    useRuntimeState.setRuntimeObject.mockResolvedValue(undefined);
+    logService.addEntry.mockResolvedValue({});
+    damageUtils.getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
+    // SYNCHRONOUS source seam (reactionDebuffHandler.js:27 — no await): a
+    // mockResolvedValue here would hand the code a Promise; this rig stays a
+    // still-hits lane so the heal never fires, but the sync shape is honest.
+    applyHealing.applyHealingToTarget.mockReturnValue({ newHp: null, actualHeal: 0 });
+    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    targetResolver.resolveMapPositions.mockResolvedValue(null);
+    rangeCheck.isWithinRange.mockResolvedValue(true);
+    damageRollback.findLastAttack.mockResolvedValue({
+      attackEvent: {
+        d20: 15,
+        bonus: 5,
+        targetName: 'Goblin',
+        targetAc: 14,
+        effectiveAc: null,
+        hit: true,
+        timestamp: FROZEN_NOW,
+      },
+      attackerName: 'Goblin',
+      targetName: 'Goblin',
+      primaryDamage: 0,
+      secondaryDamage: 0,
+      totalDamage: 0,
+      damageTypes: [],
+    });
+    // Seed pin (fix#169 idiom): BI d8 face 4 ⇒ reduced 15−4=11, 11+5=16 ≥ 14
+    // ⇒ still-hits attack-roll lane — numeral-free for this lane's census.
     diceRoller.rollDie.mockReturnValue(4);
     diceRoller.rollD20.mockReturnValue(10);
   });
 
-  describe('uses decrement via the preSpent stampPatch', () => {
-    const DECREMENT_CASES = [
+  describe('uses budget channels + currentUsesFor ?? fallback (stampPatch spend)', () => {
+    const BUDGET_CASES = [
       {
-        title: 'string uses_expression evaluates the max; unset current falls back to it (2→1)',
+        title: 'string uses_expression: evaluated max IS the budget, unset current falls back to it (2→1)',
         usesExpression: 'proficiency_bonus',
-        evaluateAutoExpressionReturn: 2,
-        getRuntimeValueReturn: undefined,
-        expected: 1,
+        evaluatedMax: 2,
+        storedUses: undefined,
+        expectedUses: 1,
       },
       {
-        title: 'numeric uses_expression with a stored current decrements from current (2→1)',
+        title: 'numeric uses_expression shadows the tracked bardic max 4, decrementing stored current under the feature key (2→1)',
         usesExpression: 3,
-        getRuntimeValueReturn: 2,
-        expected: 1,
+        storedUses: 2,
+        expectedUses: 1,
       },
       {
         title: 'stored null current falls back to the max, not to zero (3→2)',
         usesExpression: 3,
-        getRuntimeValueReturn: null,
-        expected: 2,
+        storedUses: null,
+        expectedUses: 2,
+      },
+      {
+        title: 'the last use spends exactly to zero and the route still resolves',
+        usesExpression: 2,
+        storedUses: 1,
+        expectedUses: 0,
       },
     ];
 
-    it.each(DECREMENT_CASES)('%title', async ({ usesExpression, evaluateAutoExpressionReturn, getRuntimeValueReturn, expected }) => {
-      const playerStats = makePlayerStats();
-      const action = setupDefaultPath({ usesExpression, evaluateAutoExpressionReturn, getRuntimeValueReturn });
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      // spend baked into the stampPatch under the feature-derived key...
-      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingWordsUses: expected }));
-      // ...and re-flashed byte-identical after dispatch (single economy value across both writes)
-      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(2);
-      const flush = useRuntimeState.setRuntimeObject.mock.calls.find(c => c[3] === undefined);
-      expect(flush[1]).toEqual(expect.objectContaining({ cuttingWordsUses: expected }));
-      // preSpent route: the post-route spendUse channel never fires (no double-spend)
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('evaluates string uses_expression against the live playerStats', async () => {
-      const playerStats = makePlayerStats();
-      const action = setupDefaultPath({
-        usesExpression: 'proficiency_bonus',
-        evaluateAutoExpressionReturn: 2,
-      });
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(automationService.evaluateAutoExpression).toHaveBeenCalledWith('proficiency_bonus', playerStats);
-    });
-
-    it('spends the last use exactly to zero and still resolves the debuff', async () => {
-      // current 1 passes the front-door exhaustion gate (>0) and stamps 0.
-      const action = setupDefaultPath({
-        usesExpression: 2,
-        getRuntimeValueReturn: (charKey, key) => (key === 'cuttingWordsUses' ? 1 : undefined),
-      });
+    it.each(BUDGET_CASES)('%title', async ({ usesExpression, evaluatedMax, storedUses, expectedUses }) => {
+      const action = setupDefaultPath({ usesExpression, evaluatedMax, storedUses });
 
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Bardic Inspiration die');
-      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingWordsUses: 0 }));
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      // Full popup envelope via the REAL builder: automation echoes the live
+      // object; description prose is .cuttingWords.test.js's ownership.
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Cutting Words',
+          description: expect.any(String),
+          automation: action.automation,
+        },
+        defenderHp: null,
+      });
+      // Exact-array bake census: the uses key + value, and the ABSENCE of any
+      // other budget key, in one toEqual.
+      expectStampCensus({ cuttingWordsUses: expectedUses });
     });
   });
 
   describe('effectiveUsesKey selection (resolveUsesBudget)', () => {
-    it('spends bardicInspirationUses, not the feature-derived key, when no uses_expression is set', async () => {
-      const action = setupDefaultPath({});
+    it('no uses_expression + tracked bardic max > 0: spend lands on bardicInspirationUses (unset current → 4−1=3), never the feature key', async () => {
+      const action = setupDefaultPath();
 
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      // tracked max 4, unset runtime current → 4−1=3, under the BARDIC key
-      const patch = bakedPatch();
-      expect(patch).toEqual(expect.objectContaining({ bardicInspirationUses: 3 }));
-      expect(patch).not.toHaveProperty('cuttingWordsUses');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expectStampCensus({ bardicInspirationUses: 3 });
     });
 
-    it('prefers the uses_expression budget over the tracked bardic fallback', async () => {
-      // tracked bardic max 4 is present but must be shadowed by uses_expression 2.
-      const action = setupDefaultPath({ usesExpression: 2 });
+    it('zero budget (no expression, no tracked max): only latch + marker stamp, NO uses key — the reaction is free', async () => {
+      const action = setupDefaultPath();
 
-      const result = await handle(action, makePlayerStats(), campaignName, mapName);
+      const result = await handle(action, makePlayerStats({ _trackedResources: {} }), campaignName, mapName);
 
+      // Reaction still runs — it just costs nothing.
       expect(result.type).toBe('popup');
-      // exact bake shape: latch + marker + the uses key, no bardic spend
-      expect(bakedPatch()).toEqual({
-        _Cutting_Words_usedRound: expect.any(Number),
-        _Cutting_Words_appliedAttack: expect.any(String),
-        cuttingWordsUses: 1,
-      });
-      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(2);
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('writes no uses key at all when there is no budget (no expression, no tracked max)', async () => {
-      const action = setupDefaultPath({});
-      const playerStats = makePlayerStats({ _trackedResources: {} });
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      // reaction still runs — it is just free
-      expect(result.type).toBe('popup');
-      expect(bakedPatch()).toEqual({
-        _Cutting_Words_usedRound: expect.any(Number),
-        _Cutting_Words_appliedAttack: expect.any(String),
-      });
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expectStampCensus({});
     });
   });
 });

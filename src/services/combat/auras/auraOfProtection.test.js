@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27 sweep: same-branch ally-refusal row + redundant phantom zero-face dropped; placedItems[] token leg pinned on both display probes.
 // auraOfProtection primitives lane — canonical home (folder lane map in
 // auraComboEffects.test.js) for the saving-throw aura primitives and constants.
 // auraComboEffects re-runs hasAuraOfProtection/hasCannotActCondition/getAuraRangeFromStats
@@ -174,7 +174,8 @@ describe('computeAuraBonus', () => {
     ['computedStats is null or undefined', () => [{ name: 'Paladin', computedStats: null }, { name: 'Bard', computedStats: undefined }]],
     ['the source lacks Aura of Protection', () => [bearer('Wizard', ['Spell Sniper'])]],
     ['the bearer has a cannot-act condition', () => [bearer('Paladin', ['Aura of Protection'])], () => getRuntimeValue.mockReturnValue(['stunned'])],
-    ['the EDITED bearer\'s ally list excludes the target', () => [bearer('Paladin', ['Aura of Protection'])], () => getAllyList.mockReturnValue(['OtherPlayer'])],
+    // Ally-gate refusal is pinned stronger in the ally-gate describe below
+    // (edited defector vs legacy party set) — same source branch, not restated.
     ['the bearer is out of range', () => [bearer('Paladin', ['Aura of Protection'])], () => isWithinRange.mockResolvedValue(false)],
   ])('returns { bonus: 0, sourceName: null } when %s', async (_case, characters, setup) => {
     setup?.();
@@ -307,8 +308,11 @@ describe('computeAuraBonus — assumed-co-present caveat (phantom bearer)', () =
     expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'Map');
   });
 
-  it('does NOT flag a bearer with a token on the active map', async () => {
-    loadMapData.mockResolvedValue({ players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] });
+  it.each([
+    ['token in players[]', { players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] }],
+    ['token in placedItems[]', { placedItems: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] }],
+  ])('does NOT flag a bearer with a positioned token on the active map (%s)', async (_case, mapData) => {
+    loadMapData.mockResolvedValue(mapData);
     const result = await compute(paladin(), 'Cleric', board('Cleric'));
     expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
     expect(result.assumedCoPresent).toBeUndefined();
@@ -358,11 +362,9 @@ describe('computeAuraBonus — assumed-co-present caveat (phantom bearer)', () =
     expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
   });
 
-  it('zero-envelope result never carries the flag', async () => {
-    isWithinRange.mockResolvedValue(false);
-    expect(await compute(paladin(), 'Cleric', board('Cleric')))
-      .toEqual({ bonus: 0, sourceName: null });
-  });
+  // (No zero-envelope face here: a dropped bearer never reaches the winner-side
+  // probe — the note lane below owns the drop path, and the main zero tables
+  // already pin the flag-free { bonus: 0, sourceName: null } shape.)
 });
 
 // Backlog 2026-11-06 (DB): tokened-bearer vs UNPOSITIONED-target display lane.
@@ -382,7 +384,11 @@ describe('computeAuraBonus — target-unpositioned drop note (tokened bearer)', 
     loadMapData.mockResolvedValue(bearerTokenMap);
   });
 
-  it('names the bearer when a positioned map, placed bearer, and unplaced target drop the aura', async () => {
+  it.each([
+    ['bearer token in players[]', bearerTokenMap],
+    ['bearer token in placedItems[]', { placedItems: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] }],
+  ])('names the bearer when a positioned map, placed bearer (%s), and unplaced target drop the aura', async (_case, mapData) => {
+    loadMapData.mockResolvedValue(mapData);
     const result = await compute(paladin(), 'Cleric');
     expect(result).toEqual({ bonus: 0, sourceName: null, targetUnpositionedBearer: 'ElderPaladin' });
     expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'Map');

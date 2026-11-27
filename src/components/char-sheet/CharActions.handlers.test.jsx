@@ -1,16 +1,29 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // CharActions attack-row error resilience (component level).
 // Happy-path click→rollAttack is pinned in CharActions.rendering.test.jsx;
 // hook-level ctx resolution/rejection is pinned in useCharActionsAttackHandlers.test.js.
 // This file pins the component-level consequence: a rejected attack-context build
 // logs, skips the roll, and leaves the attack row fully usable on the next click.
+// The exact happy-path roll payload is pinned in CharActions.rendering.test.jsx —
+// this lane only shape-matches the recovery roll to avoid restating it.
+// Mock hygiene (events-lane recipe, run2 #1853/#1855): the REAL useSyncedState.js
+// runs against the mocked useRuntimeState.js primitives (getStore/setRuntimeValue/
+// listeners) — the phantom `useSyncedState` export previously mocked ON
+// useRuntimeState.js is deleted (that module does not export it, and the component
+// imports the real hook from useSyncedState.js, so the mirror was both wrong and
+// unreachable) along with its hand-rolled setter that failed to resolve
+// updater-function values against the live store.
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { buildAttackContext } from '../../services/automation/contextBuilder.js';
 
+const CAMPAIGN = 'test-campaign';
 
+// Shared backing Map: the real useSyncedState.js reads/writes it through the
+// mocked getStore/setRuntimeValue primitives; the mocked useRuntimeValue reads
+// the same keys. No test seeds it — the store fixture just keeps the real hook inert.
 const _syncedStore = new Map();
 const mockRollAttack = vi.fn();
 
@@ -18,12 +31,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => { _syncedStore.set(key, newValue); });
-    return [value, setter];
-  }),
   useRuntimeValue: vi.fn((_, key, _campaignName) => {
     const hasValue = _syncedStore.has(key);
     return hasValue ? _syncedStore.get(key) : null;
@@ -197,24 +204,35 @@ describe('CharActions attack-row resilience', () => {
     vi.mocked(buildAttackContext).mockResolvedValue({ hitBonus: 5 });
   });
 
-  it('a rejected attack-context build logs the error, rolls nothing, and leaves the row usable for the next click', async () => {
+  it('a rejected attack-context build logs the error and rolls nothing; the next click on the same row builds with the component props and rolls', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const buildError = new Error('context error');
-    vi.mocked(buildAttackContext).mockRejectedValueOnce(buildError);
+    vi.mocked(buildAttackContext).mockRejectedValue(buildError);
 
-    render(<CharActions playerStats={{ name: 'TestCharacter', rules: '5e', level: 5, attacks: [longsword], actions: [], spellAbilities: { spells: [], toHit: 5, saveDc: 13 }, abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3 }} />);
+    render(<CharActions playerStats={{ name: 'TestCharacter', rules: '5e', level: 5, attacks: [longsword], actions: [], spellAbilities: { spells: [], toHit: 5, saveDc: 13 }, abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3 }} campaignName={CAMPAIGN} />);
 
-    // Failed build: error surfaced, no roll, row still present and interactive.
+    // Failed build: attempted once, surfaced through the error log, no roll.
     await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.any(String), buildError);
+    expect(buildAttackContext).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[CharActions]'), buildError);
     expect(mockRollAttack).not.toHaveBeenCalled();
+    // The row is still mounted and interactive for the retry.
+    expect(screen.getByText('Longsword')).toBeInTheDocument();
 
-    // Recovery: with build succeeding again, the same row rolls normally.
+    // Recovery: with the build succeeding again, the same row rolls normally.
+    vi.mocked(buildAttackContext).mockResolvedValue({ hitBonus: 5 });
     await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
 
+    // The component's own props thread through the hook into the build.
+    expect(buildAttackContext).toHaveBeenLastCalledWith(expect.objectContaining({
+      attack: expect.objectContaining({ name: 'Longsword' }),
+      playerStats: expect.objectContaining({ name: 'TestCharacter' }),
+      campaignName: CAMPAIGN,
+    }));
+    // Shape pin only — the exact happy-path bytes live in CharActions.rendering.test.jsx.
     expect(mockRollAttack).toHaveBeenCalledTimes(1);
-    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { hitBonus: 5 });
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', expect.any(Number), expect.objectContaining({ hitBonus: 5 }));
 
     errorSpy.mockRestore();
   });

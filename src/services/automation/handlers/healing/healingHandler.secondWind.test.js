@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 //
 // ── #1812 secondWind lane — healingHandler.js handleSelfHealing ───────────
 // SUBJECT: the generic self_healing branch of handleSelfHealing in
@@ -10,15 +10,25 @@
 // LIVE, verified 2026-10-15.
 //
 // This lane owns (amount pins are UNIQUE here — sibling suites mock
-// applyHealingDirectly to fixed returns and never pin the amount argument):
-//   - heal amount = roll total (+ passive bonus, no double-count)
-//   - Second Wind use consumption: exactly one spent iff actualHeal > 0,
-//     skipSync=true write, remainingUses/rollInfo echoed to SSE
-//   - refusal branches: full-HP gate (before any roll), zero-delta race
-//     (no use spent), 0-HP unconscious RAW refusal, 0-use gate ordering
-//     before HP gates
+// applyHealingDirectly to fixed returns; here the fixture clamps against the
+// playerStats it is handed so actualHeal, description and the SSE row are
+// honest per fixture — the old hardcoded-89/94 mirror fixture mispainted the
+// hit-die description as 'Regained 5 HP' for a 40/94 target, purged 11-27):
+//   - success commit census: roll args → apply amount (roll total + passive
+//     bonus, no double-count) → exactly one skipSync use write → full SSE row
+//     → full popup shape (ordered mock.calls censuses)
+//   - Fortified Health marked when the heal lands; NOT marked on the
+//     zero-delta race (self-path markFortifiedIfHealed both conditions)
+//   - refusal family with zero-spend censuses (setRuntimeValue.mock.calls
+//     === []): full-HP gate before any roll, 0-HP unconscious RAW refusal,
+//     full-HP runtime bucket outranking a stale damaged snapshot, and the
+//     0-use gate ordering before the HP gates
+//   - zero-delta race (gate passes → rolls → actualHeal 0): no use spent,
+//     '. No use spent' tail, row logs unchanged uses
 //   - hit_die_roll branch: healAmount = computeHitDieRecovery total with
-//     resolveHealingBonusesWithDetails NEVER called (CLA-305 no-double-add)
+//     resolveHealingBonusesWithDetails NEVER called (CLA-305 no-double-add);
+//     the dice-cost gate, decrement twin and CON-variant 6,3 stay in
+//     healingHandler.test.js — this keeps the 23,5 variant per lane map
 //   - evaluated-number expressions (3 * monk_level) route through the same
 //     amount fix with their own resourceKey consumption
 //
@@ -27,7 +37,8 @@
 //   - handleMonkHealing / cla159 picker → monk.test.js, cla159.test.js
 //   - triggerTacticalShift riders (hasTacticalShift mocked false below)
 //     → healingHandler.tacticalShift.test.js
-//   - generic self-path dispatch/gate/uses bookkeeping → healingHandler.test.js (#1815)
+//   - generic self-path dispatch/gate/uses bookkeeping, hit-dice cost gate,
+//     bloodiedOnly, maximize/reroll branch selection → healingHandler.test.js (#1815)
 //   - handleUsesHealing / handleFlatHeal → healingHandler.targeted.test.js (#1814)
 //
 // Deterministic: all seams mocked, no timers, inert fetch from setup.
@@ -120,108 +131,172 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
     automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
     automationService.hasHealingMaximizationForTarget.mockReturnValue(false);
     automationService.hasRerollHealingOnes.mockReturnValue(false);
+    // Clamp against the stats actually handed in — no hidden 89/94 constant.
     healingRoll.applyHealingDirectly.mockImplementation((ps, targetName, amount) => {
-      const current = 89;
-      const max = 94;
+      const current = ps.currentHitPoints;
+      const max = ps.maxHitPoints ?? ps.hitPoints;
       const newHp = Math.min(max, current + amount);
       return { newHp, maxHp: max, actualHeal: newHp - current };
     });
     runtimeMap({ secondWindUses: 4, currentHitPoints: 89 });
   });
 
-  it('heals roll total plus healing bonus, not just the bonus', async () => {
-    const result = await handle(makeSecondWind(), makeFighterStats(), campaignName, null);
+  it('success commit census: rolls the substituted expression, heals the roll total, spends exactly one use with skipSync, logs the full row and popup', async () => {
+    const ps = makeFighterStats();
 
-    expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10 + 18');
-    expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'EvasiveFighter' }),
-      'EvasiveFighter',
-      23,
-      campaignName,
-    );
-    expect(result.payload.description).toBe('Second Wind: 1d10 + 18=23 (5) — Regained 5 HP (3 uses remaining).');
+    const result = await handle(makeSecondWind(), ps, campaignName, null);
+
+    expect(diceRoller.rollExpression.mock.calls).toEqual([['1d10 + 18']]);
+    expect(healingRoll.applyHealingDirectly.mock.calls).toEqual([
+      [ps, 'EvasiveFighter', 23, campaignName],
+    ]);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['EvasiveFighter', 'secondWindUses', 3, campaignName, true],
+    ]);
+    expect(healingRoll.logHealingToSSE.mock.calls).toEqual([[campaignName, {
+      targetName: 'EvasiveFighter',
+      sourceName: 'Second Wind',
+      actualHeal: 5,
+      newHp: 94,
+      maxHp: 94,
+      rollInfo: '1d10 + 18=23 (5)',
+      maximize: false,
+      healingName: 'Second Wind',
+      remainingUses: 3,
+      maxUses: 4,
+      bonusDetails: [],
+    }]]);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Second Wind',
+        automationType: 'self_healing',
+        description: 'Second Wind: 1d10 + 18=23 (5) — Regained 5 HP (3 uses remaining).',
+      },
+    });
   });
 
-  it('adds passive healing bonuses on top of the roll total without double-counting', async () => {
+  it('weaves passive healing bonuses on top of the roll total without double-counting and marks Fortified Health when the heal lands', async () => {
+    const ps = makeFighterStats();
     automationService.resolveHealingBonusesWithDetails.mockReturnValue({
       totalBonus: 2,
       details: [{ name: 'Fortified Health', amount: 2 }],
     });
 
-    await handle(makeSecondWind(), makeFighterStats(), campaignName, null);
+    await handle(makeSecondWind(), ps, campaignName, null);
 
-    expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(
-      expect.anything(),
-      'EvasiveFighter',
-      25,
-      campaignName,
-    );
+    expect(healingRoll.applyHealingDirectly.mock.calls).toEqual([
+      [ps, 'EvasiveFighter', 25, campaignName],
+    ]);
+    expect(automationService.markFortifiedHealthUsed.mock.calls).toEqual([
+      [ps, campaignName],
+    ]);
   });
 
-  it('consumes exactly one use when healing succeeds', async () => {
-    await handle(makeSecondWind(), makeFighterStats(), campaignName, null);
+  it('zero-delta race: gate passes, roll lands, nothing heals — no use spent, no Fortified mark, row logs unchanged uses', async () => {
+    // Dispatch snapshot already at max while the HP bucket still reads 89
+    // (healed elsewhere between click and apply): the race the CLA-305
+    // no-consumption law exists for.
+    const ps = makeFighterStats({ currentHitPoints: 94 });
+    automationService.resolveHealingBonusesWithDetails.mockReturnValue({
+      totalBonus: 2,
+      details: [{ name: 'Fortified Health', amount: 2 }],
+    });
 
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'EvasiveFighter',
-      'secondWindUses',
-      3,
-      campaignName,
-      true,
-    );
-    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      actualHeal: 5,
-      remainingUses: 3,
+    const result = await handle(makeSecondWind(), ps, campaignName, null);
+
+    expect(healingRoll.applyHealingDirectly.mock.calls).toEqual([
+      [ps, 'EvasiveFighter', 25, campaignName],
+    ]);
+    expect(automationService.markFortifiedHealthUsed).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([]);
+    expect(healingRoll.logHealingToSSE.mock.calls).toEqual([[campaignName, {
+      targetName: 'EvasiveFighter',
+      sourceName: 'Second Wind',
+      actualHeal: 0,
+      newHp: 94,
+      maxHp: 94,
       rollInfo: '1d10 + 18=23 (5)',
-    }));
+      maximize: false,
+      healingName: 'Second Wind',
+      remainingUses: 4,
+      maxUses: 4,
+      bonusDetails: [{ name: 'Fortified Health', amount: 2 }],
+    }]]);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Second Wind',
+        automationType: 'self_healing',
+        description: 'Second Wind: 1d10 + 18=23 (5) — Already at full HP (4 uses remaining). No use spent.',
+      },
+    });
   });
 
-  it('refuses at full HP with no roll, no log, and no use spent', async () => {
+  it.each([
+    {
+      case: 'full HP',
+      currentHitPoints: 94,
+      description: 'Second Wind: Already at full HP (4 uses remaining). No use spent.',
+    },
+    {
+      case: '0 HP (unconscious RAW refusal)',
+      currentHitPoints: 0,
+      description: "Second Wind can't be used while unconscious at 0 Hit Points.",
+    },
+  ])('refuses at $case before any roll with zero side effects', async ({ currentHitPoints, description }) => {
+    runtimeMap({ secondWindUses: 4, currentHitPoints });
+
+    const result = await handle(
+      makeSecondWind(),
+      makeFighterStats({ currentHitPoints }),
+      campaignName,
+      null,
+    );
+
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Second Wind',
+        automationType: 'self_healing',
+        description,
+      },
+    });
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
+    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([]);
+  });
+
+  it('refuses on the full-HP runtime bucket even when the dispatch snapshot still reads damaged (bucket outranks snapshot)', async () => {
     runtimeMap({ secondWindUses: 4, currentHitPoints: 94 });
 
-    const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 94 }), campaignName, null);
+    const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 89 }), campaignName, null);
 
     expect(result.payload.description).toBe('Second Wind: Already at full HP (4 uses remaining). No use spent.');
     expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
-    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
-    const usesCalls = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'secondWindUses');
-    expect(usesCalls).toHaveLength(0);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([]);
   });
 
-  it('does not consume a use when applied heal yields zero (race at full HP)', async () => {
-    healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 94, maxHp: 94, actualHeal: 0 });
-
-    const result = await handle(makeSecondWind(), makeFighterStats(), campaignName, null);
-
-    expect(result.payload.description).toBe('Second Wind: 1d10 + 18=23 (5) — Already at full HP (4 uses remaining). No use spent.');
-    const usesCalls = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'secondWindUses');
-    expect(usesCalls).toHaveLength(0);
-    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      remainingUses: 4,
-    }));
-  });
-
-  it('refuses at 0 HP with no roll and no use spent (RAW unconscious)', async () => {
-    runtimeMap({ secondWindUses: 4, currentHitPoints: 0 });
-
-    const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 0 }), campaignName, null);
-
-    expect(result.payload.description).toBe("Second Wind can't be used while unconscious at 0 Hit Points.");
-    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-    expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
-    const usesCalls = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'secondWindUses');
-    expect(usesCalls).toHaveLength(0);
-  });
-
-  it('still blocks first on the 0-use gate before HP gates', async () => {
+  it('blocks first on the 0-use gate before the HP gates', async () => {
     runtimeMap({ secondWindUses: 0, currentHitPoints: 0 });
 
     const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 0 }), campaignName, null);
 
     expect(result.payload.description).toBe('Second Wind has no uses remaining. Recharges on a Short Rest.');
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([]);
   });
 
   it('hit_die_roll branch keeps computeHitDieRecovery total with no double-add of bonus', async () => {
+    // Lane map: healingHandler.test.js owns the dice-cost gate, the
+    // shortRestHitDice decrement twin and the CON-variant (6,3); this pins
+    // the no-double-add law with the CON-variant (23,5).
     runtimeMap({ shortRestHitDice: 3, currentHitPoints: 40 });
     restRules.getHitDieSize.mockReturnValue(10);
     restRules.computeHitDieRecovery.mockReturnValue(12);
@@ -233,7 +308,10 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
     expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(23, 5);
     expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(expect.anything(), 'EvasiveFighter', 12, campaignName);
     expect(automationService.resolveHealingBonusesWithDetails).not.toHaveBeenCalled();
-    expect(result.payload.description).toBe('Second Wind: 1d10=23 (5) — Regained 5 HP (2 hit dice remaining).');
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['EvasiveFighter', 'shortRestHitDice', 2, campaignName, true],
+    ]);
+    expect(result.payload.description).toBe('Second Wind: 1d10=23 (5) — Regained 12 HP (2 hit dice remaining).');
   });
 
   it('flat-expression self heals (3 * monk_level) route roll total through the same fix', async () => {
@@ -251,7 +329,11 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
 
     await handle(action, makeFighterStats(), campaignName, null);
 
-    expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(expect.anything(), 'EvasiveFighter', 54, campaignName);
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'wholenessOfBodyUses', 0, campaignName, true);
+    expect(healingRoll.applyHealingDirectly.mock.calls).toEqual([
+      [expect.anything(), 'EvasiveFighter', 54, campaignName],
+    ]);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      ['EvasiveFighter', 'wholenessOfBodyUses', 0, campaignName, true],
+    ]);
   });
 });

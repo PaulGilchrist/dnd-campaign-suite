@@ -1,12 +1,13 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // regression: bug-lion-aura-penalizes-allies-not-just-enemies — the ATTACKER
 // hostility gate (Power of the Wilds "any of your enemies within 5 feet of
 // you") is pinned in the 'attacker hostility gate' block below; regression:
-// bug-lion-aura-self-target-exclusion-inert — the targetName axis ("attacks
-// against targets other than you") is pinned in the 'self-target exclusion'
-// block below; regression: bug-lion-aura-second-barbarian-exemption-missing —
-// the clause's second axis ("or another Barbarian who has this option active")
-// is pinned in the 'second-holder target exemption' block below.
+// bug-lion-aura-self-target-exclusion-inert ("attacks against targets other
+// than you") + bug-lion-aura-second-barbarian-exemption-missing ("or another
+// Barbarian who has this option active") are BOTH pinned in the 'Lion-holder
+// target exemption' block below — a bearer necessarily carries the Lion stamp,
+// so the pre-loop targetIsExemptFromLionAuras read covers the bearer-self case
+// too and the two axes share one code path.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -260,129 +261,81 @@ describe('getLionDisadvantageAgainst — betrayal ally-list flip (off-list = ene
   });
 });
 
-// Power of the Wilds (Lion) RAW: "enemies within 5 feet of you have Disadvantage
-// on attack rolls against targets other than you" — an attack aimed AT the
-// bearer itself must roll normal (bug-lion-aura-self-target-exclusion-inert:
-// the util never received targetName, so the exclusion was inert). Attackers
-// below are off-list enemies (bug-lion-aura-penalizes-allies hostile gate) so
-// only the target axis can lift the penalty.
-describe('getLionDisadvantageAgainst — self-target exclusion (targets other than you)', () => {
+// Clause axes 1 + 2 (bug-lion-aura-self-target-exclusion-inert, bug-lion-aura-
+// second-barbarian-exemption-missing): RAW "against targets other than you OR
+// ANOTHER BARBARIAN WHO HAS THIS OPTION ACTIVE" (2024 classes.json, Path of the
+// Beast). Both axes ride the same pre-loop targetIsExemptFromLionAuras read —
+// a bearer always carries the Lion stamp, so "target IS the bearer" is just
+// the self case of "target holds a stamp". A near-miss stamp grants no
+// exemption; a null/omitted targetName stays lenient. Both production lanes
+// (contextBuilder-sync resolveLionAura / contextBuilder-map
+// accumulateAuraCounts and monster-card resolveMonsterLionAura) ride this one
+// util, so grid / skipRangeCheck / gridless faces pin both-lane parity.
+describe('getLionDisadvantageAgainst — Lion-holder target exemption (you, or another Barbarian with the option)', () => {
   beforeEach(resetMocks);
 
-  it('exempts a measured grid attack whose target IS the bearer', async () => {
-    seed({ buffs: { Barbarian: [lion()] } });
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Barbarian', campaignName: CAMPAIGN, mapData: grid('Barbarian') }))
-      .toEqual({ disadvantage: false });
-    expect(isWithinRange).not.toHaveBeenCalled();
-  });
-
-  it('exempts the bearer on the unmeasured skipRangeCheck lane too', async () => {
-    seed({ buffs: { Barbarian: [lion()] } });
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Barbarian', campaignName: CAMPAIGN, mapData: grid('Barbarian'), skipRangeCheck: true }))
-      .toEqual({ disadvantage: false });
-  });
-
-  it('keeps disadvantage when the target is a creature other than the bearer', async () => {
-    seed({ buffs: { Barbarian: [lion()] } });
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Wizard', campaignName: CAMPAIGN, mapData: grid('Barbarian', 'Wizard') }))
-      .toEqual({ disadvantage: true, source: 'Barbarian' });
-  });
-
-  it('a second in-range bearer still forces disadvantage when the target is a NON-holder', async () => {
-    // Self-exclusion never masks a bearer: the target-less Barbarian can't fire
-    // (out of range), so Second wins. (When the target IS a Lion holder the
-    // clause's second axis exempts it from every bearer — see the
-    // 'second-holder target exemption' block.)
-    seed({ buffs: { Barbarian: [lion()], Second: [lion()] }, inRange: source => source !== 'Barbarian' });
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Wizard', campaignName: CAMPAIGN, mapData: grid('Barbarian', 'Second', 'Wizard') }))
-      .toEqual({ disadvantage: true, source: 'Second' });
-  });
+  const bearers = () => ({ buffs: { ElderPaladin: [lion()], DraconicDragon: [lion()] } });
+  const twoBearerGrid = () => grid('ElderPaladin', 'DraconicDragon');
 
   it.each([
-    ['null', null],
-    ['undefined', undefined],
-  ])('lenient when the caller passes no target (%s) — legacy behavior unchanged', async (_label, targetName) => {
-    seed({ buffs: { Barbarian: [lion()] } });
+    ['the bearer itself', 'ElderPaladin'],
+    ['another Lion holder', 'DraconicDragon'],
+  ])('exempts a measured grid attack whose target is %s', async (_label, targetName) => {
+    seed(bearers());
 
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName, campaignName: CAMPAIGN, mapData: grid('Barbarian') }))
-      .toEqual({ disadvantage: true, source: 'Barbarian' });
-  });
-
-  it('exempts the bearer on the gridless combat-context lane', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [
-      { name: 'Thug 1', type: 'npc' },
-      { name: 'DraconicDragon', type: 'player' },
-      { name: 'HexWarlock', type: 'player' },
-    ] });
-    seed({ buffs: { DraconicDragon: [lion()] } });
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Thug 1', targetName: 'DraconicDragon', campaignName: CAMPAIGN, skipRangeCheck: true }))
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName, campaignName: CAMPAIGN, mapData: twoBearerGrid() }))
       .toEqual({ disadvantage: false });
-  });
-});
-
-// Clause axis 2 (bug-lion-aura-second-barbarian-exemption-missing): RAW
-// "against targets other than you OR ANOTHER BARBARIAN WHO HAS THIS OPTION
-// ACTIVE" (2024 classes.json, Path of the Beast) — a target carrying its own
-// Lion stamp is exempt from EVERY bearer's aura, not just the bearer-self
-// skip. The activeBuffs optionName==='Lion' entry is the engine's only
-// runtime proxy for the option (produced solely by the stance lane, so stamp
-// presence is sufficient). Both production lanes (contextBuilder-sync
-// resolveLionAura / contextBuilder-map accumulateAuraCounts and the
-// monster-card resolveMonsterLionAura) ride this one util, so the
-// grid/skipRangeCheck/gridless faces below cover both-lanes parity.
-describe('getLionDisadvantageAgainst — second-holder target exemption (another Barbarian with the option)', () => {
-  beforeEach(resetMocks);
-
-  const twoBearers = () => ({ buffs: { ElderPaladin: [lion()], DraconicDragon: [lion()] } });
-  const partyWithVictim = () => [
-    { name: 'Goblin', type: 'npc' },
-    { name: 'ElderPaladin', type: 'player' },
-    { name: 'DraconicDragon', type: 'player' },
-    { name: 'Wild_Sage_Druid', type: 'player' },
-  ];
-
-  it('exempts a measured grid attack whose target holds the Lion option (the OTHER holder)', async () => {
-    seed(twoBearers());
-
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'DraconicDragon', campaignName: CAMPAIGN, mapData: grid('ElderPaladin', 'DraconicDragon') }))
-      .toEqual({ disadvantage: false });
-    expect(getRuntimeValue).toHaveBeenCalledWith('DraconicDragon', 'activeBuffs', CAMPAIGN);
+    expect(getRuntimeValue).toHaveBeenCalledWith(targetName, 'activeBuffs', CAMPAIGN);
     expect(isWithinRange).not.toHaveBeenCalled(); // exemption precedes measurement
   });
 
-  it('exempts the holder target on the unmeasured skipRangeCheck face too', async () => {
-    seed(twoBearers());
+  it.each([
+    ['the bearer itself', 'ElderPaladin'],
+    ['another Lion holder', 'DraconicDragon'],
+  ])('exempts %s on the unmeasured skipRangeCheck face too', async (_label, targetName) => {
+    seed(bearers());
 
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'ElderPaladin', campaignName: CAMPAIGN, mapData: grid('ElderPaladin', 'DraconicDragon'), skipRangeCheck: true }))
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName, campaignName: CAMPAIGN, mapData: twoBearerGrid(), skipRangeCheck: true }))
       .toEqual({ disadvantage: false });
   });
 
-  it('exempts the holder target on the gridless combat-context lane (monster-lane face)', async () => {
-    getCombatContext.mockResolvedValue({ creatures: partyWithVictim() });
-    seed(twoBearers());
+  it('exempts a holder target on the gridless combat-context lane (monster-card face)', async () => {
+    getCombatContext.mockResolvedValue({ creatures: [
+      { name: 'Goblin', type: 'npc' },
+      { name: 'ElderPaladin', type: 'player' },
+      { name: 'DraconicDragon', type: 'player' },
+      { name: 'Wild_Sage_Druid', type: 'player' },
+    ] });
+    seed(bearers());
 
     expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'DraconicDragon', campaignName: CAMPAIGN, skipRangeCheck: true }))
       .toEqual({ disadvantage: false });
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('control: the same enemy attacking a NON-holder still pays the first bearer’s aura', async () => {
-    getCombatContext.mockResolvedValue({ creatures: partyWithVictim() });
-    seed(twoBearers());
+  it('positive: an enemy attacking a NON-holder target pays the first bearer’s aura', async () => {
+    // Self/holder exemption never masks a bearer: the out-of-range
+    // ElderPaladin can't fire, so the in-range DraconicDragon wins.
+    seed({ ...bearers(), inRange: source => source !== 'ElderPaladin' });
 
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'Wild_Sage_Druid', campaignName: CAMPAIGN, skipRangeCheck: true }))
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'Wild_Sage_Druid', campaignName: CAMPAIGN, mapData: grid('ElderPaladin', 'DraconicDragon', 'Wild_Sage_Druid') }))
+      .toEqual({ disadvantage: true, source: 'DraconicDragon' });
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+  ])('lenient when the caller passes no target (%s) — legacy behavior unchanged', async (_label, targetName) => {
+    seed(bearers());
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName, campaignName: CAMPAIGN, mapData: grid('ElderPaladin') }))
       .toEqual({ disadvantage: true, source: 'ElderPaladin' });
   });
 
   it('a near-miss target stamp (optionName Bear) grants no exemption', async () => {
     seed({ buffs: { ElderPaladin: [lion()], DraconicDragon: [{ optionName: 'Bear' }] } });
 
-    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'DraconicDragon', campaignName: CAMPAIGN, mapData: grid('ElderPaladin', 'DraconicDragon') }))
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Goblin', targetName: 'DraconicDragon', campaignName: CAMPAIGN, mapData: twoBearerGrid() }))
       .toEqual({ disadvantage: true, source: 'ElderPaladin' });
   });
 });

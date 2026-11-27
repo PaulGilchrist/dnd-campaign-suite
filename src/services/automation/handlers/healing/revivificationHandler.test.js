@@ -1,10 +1,32 @@
-// @maintained-by-ai 2026-10-16
-// Deterministic unit contract for the revivification handler (dead/0-HP target restore
-// via rage spend). Module boundaries fully mocked; exact-key + full-string own-composition
-// pins. Registry internals belong to targetEffectDefinitions.test.js; reaction rendering
-// belongs to CharReactions.edgeCases.test.jsx.
+// @maintained-by-ai 2026-11-27
+//
+// ── revivificationHandler.js — rage-spended revival reaction lane ────────
+// SUBJECT: handle() (dispatch key `revivification`, automation/index.js:358):
+// pre-payment refusals with zero-spend censuses, the death→life commit per
+// target kind (player merged death-state batch / monster summary-row lane),
+// the crossing unconscious-strip fold, the hp_change log-family row and the
+// addEntry-rejection survivor.
+//
+// Lane map (NOT duplicated here): the HP-truth verdict table and strip
+// filter/case-fold internals belong to src/services/shared/reviveTargetHp
+// .test.js; HP chokepoint batch-write laws belong to the applyHealing owner;
+// rest-recharge of rage defers to the rage owner. What reviveTargetHp.js
+// explicitly LEAVES to each lane — "Refusal COPY, payload shape ... and the
+// surrounding read ORDER" — is exactly what the exact getRuntimeValue
+// .mock.calls censuses below pin.
+//
+// Fixture honesty (run2#1828/1829/1830 lesson): resolveReviveTargetHp,
+// reviveTargetIsLiving and stripUnconsciousOnRevive run REAL — the runtime
+// router only feeds buckets, so batch content, deltas and maxHp compute per
+// fixture. Player maxHp pins the runtime-bucket half of the source's `??`
+// (seeded 55 outranks the row-less target); monster maxHp pins the row half
+// (9). No mirrored helper returns anywhere.
+//
+// Deterministic: module seams mocked, Date.now frozen and window.dispatchEvent
+// spied in a beforeEach that RE-SEEDS every default (no clearAllMocks impl
+// residue), rejecting mocks re-installed by that seed, no *Once chains.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -20,7 +42,7 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
+  addEntry: vi.fn(),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -41,470 +63,304 @@ import storage from '../../../ui/storage.js';
 
 const campaignName = 'test-campaign';
 const playerName = 'TestHero';
+const FROZEN_NOW = 1731500000000;
+
+// Realistic reaction automation (CharReactions.jsx shape): every refusal and
+// success payload must echo it untouched — pinned by full-shape toEqual.
+const AUTOMATION = { type: 'revivification', reactionSave: { dc: 15, type: 'CON' } };
+
+function makeAction() {
+  return { name: 'Revivification', automation: AUTOMATION };
+}
 
 function makePlayerStats(overrides = {}) {
+  return { name: playerName, level: 5, ...overrides };
+}
+
+// The handler's one popup envelope, full shape.
+function infoPopup(description) {
   return {
-    name: playerName,
-    level: 5,
-    ...overrides,
+    type: 'popup',
+    payload: {
+      type: 'automation_info',
+      name: 'Revivification',
+      description,
+      automation: AUTOMATION,
+    },
   };
 }
 
-// MERGES automation overrides onto a realistic default (CharReactions.jsx shape).
-function makeAction(automationOverrides = {}) {
-  return {
-    name: 'Revivification',
-    automation: { type: 'revivification', ...automationOverrides },
-  };
-}
-
-function makePlayerTarget(name) {
-  return { name, type: 'player' };
-}
-
-function makeNPCTarget(name, currentHp = 0) {
-  return { name, type: 'npc', currentHp };
-}
-
-function stubRage(value) {
+// Feeds the runtime buckets the REAL shared helpers read: rage gate,
+// player-HP truth, condition strip source and player maxHp.
+function seedRuntime({ rage, targetHp = 0, conditions = null, hitPoints = null }) {
   useRuntimeState.getRuntimeValue.mockImplementation((_target, key) => {
-    if (key === 'ragePoints') return value;
+    if (key === 'ragePoints') return rage;
+    if (key === 'currentHitPoints') return targetHp;
+    if (key === 'activeConditions') return conditions;
+    if (key === 'hitPoints') return hitPoints;
     return null;
   });
 }
 
-function stubCombatReady(rage = 1) {
-  useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
-    if (key === 'ragePoints') return rage;
-    if (key === 'currentHitPoints') return 0;
-    return null;
-  });
-  damageUtils.getCombatContext.mockResolvedValue({});
+// Refusal census: NOTHING moved — no victim write, no rage spend, no summary
+// persist, no log row, no SSE broadcast. Full-array, never key-filtered.
+function expectZeroSpend() {
+  expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([]);
+  expect(useRuntimeState.setRuntimeBatch.mock.calls).toEqual([]);
+  expect(storage.set.mock.calls).toEqual([]);
+  expect(logPoster.addEntry.mock.calls).toEqual([]);
+  expect(dispatchSpy.mock.calls).toEqual([]);
 }
 
 // ── Tests ──────────────────────────────────────────────────────
 
+let dispatchSpy;
+
 describe('revivificationHandler', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+    dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    useRuntimeState.getRuntimeValue.mockReset().mockReturnValue(null);
+    useRuntimeState.setRuntimeValue.mockReset().mockResolvedValue(undefined);
+    useRuntimeState.setRuntimeBatch.mockReset();
+    damageUtils.getCombatContext.mockReset().mockResolvedValue({});
+    damageUtils.getTargetFromAttacker.mockReset().mockReturnValue(null);
+    logPoster.addEntry.mockReset().mockResolvedValue(undefined);
+    storage.set.mockReset();
   });
 
-  // ── Guard clauses ──────────────────────────────────────────
-
-  describe('guard clauses', () => {
-    it('returns info popup when rage is missing, and echoes action automation untouched', async () => {
-      stubRage(null);
-
-      const automation = { type: 'revivification', reactionSave: { dc: 15, type: 'CON' } };
-      const result = await handle(
-        makeAction(automation),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe(
-        'No Rage remaining to power Revivification.',
-      );
-      expect(result.payload.automation).toEqual(automation);
-      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when stored rage is negative', async () => {
-      stubRage(-1);
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'No Rage remaining to power Revivification.',
-      );
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when no combat is active', async () => {
-      stubRage(1);
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No combat active.');
-    });
-
-    it('returns popup when no target selected', async () => {
-      stubRage(1);
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'Select a target in the combat tracker first.',
-      );
-    });
-
-    it('returns popup when player target is not at 0 HP', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'currentHitPoints') return 5;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'Ally is not at 0 Hit Points.',
-      );
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when NPC target is not at 0 HP', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin', 7));
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'Goblin is not at 0 Hit Points.',
-      );
-      expect(storage.set).not.toHaveBeenCalled();
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  // ── Player target lane ─────────────────────────────────────
+  // ── Pre-payment refusals ───────────────────────────────────
 
-  describe('player target healing', () => {
-    it('sets player currentHitPoints to level in the merged death-state batch and spends 1 rage via setRuntimeValue', async () => {
-      stubCombatReady(3);
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+  it.each([
+    ['absent (null)', null],
+    ['unset (undefined)', undefined],
+    ['zero', 0],
+    ['negative (corrupt store)', -1],
+  ])('refuses before combat is even consulted when rage is %s, paying nothing', async (_label, rage) => {
+    seedRuntime({ rage });
 
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-        'Ally',
-        {
-          currentHitPoints: 5,
-          deathSaves: [false, false, false],
-          deathFailures: [false, false, false],
-          isDead: 0,
-        },
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'ragePoints',
-        2,
-        campaignName,
-      );
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('defaults heal amount to 1 when level is 0', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      await handle(
-        makeAction(),
-        makePlayerStats({ level: 0 }),
-        campaignName,
-        null,
-      );
-
-      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-        'Ally',
-        expect.objectContaining({ currentHitPoints: 1 }),
-        campaignName,
-      );
-    });
-
-    it('clears the death-state keys on resurrect (isDead-stuck regression)', async () => {
-      // bug-revivification-handler-leaves-isdead-stuck: the old lane wrote only
-      // currentHitPoints, leaving isDead:1 on a living 18-HP ally so every
-      // downstream death gate (isCreatureDead, the Revivify corpse census)
-      // still read it as a corpse. The resurrect commit must carry the full
-      // CLA-092 death-state reset — the same write set as the HoUoM twin
-      // (7d64885e3) and the sheet-revive lane (db0ad4cf8).
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      await handle(
-        makeAction(),
-        makePlayerStats({ level: 18 }),
-        campaignName,
-        null,
-      );
-
-      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
-      const [target, writes, campaign] = useRuntimeState.setRuntimeBatch.mock.calls[0];
-      expect(target).toBe('Ally');
-      expect(campaign).toBe(campaignName);
-      expect(writes.currentHitPoints).toBe(18);
-      expect(writes.isDead).toBe(0);
-      expect(writes.deathSaves).toEqual([false, false, false]);
-      expect(writes.deathFailures).toEqual([false, false, false]);
-      // HP must NOT ride a separate single-key write — that was the leak face.
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Ally', 'currentHitPoints', expect.anything(), campaignName);
-    });
-
-    it('returns success popup with full description', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Revivification');
-      expect(result.payload.description).toBe(
-        'TestHero uses Revivification to save Ally, setting their Hit Points to 5 and expending 1 Rage.',
-      );
-    });
-
-    it('dispatches combat-summary-updated event', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(dispatchEventSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'combat-summary-updated' }),
-      );
-      dispatchEventSpy.mockRestore();
-    });
+    expect(result).toEqual(infoPopup('No Rage remaining to power Revivification.'));
+    expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    expectZeroSpend();
   });
 
-  // ── NPC target lane ────────────────────────────────────────
+  it('refuses with "No combat active." before target resolution, paying nothing', async () => {
+    seedRuntime({ rage: 1 });
+    damageUtils.getCombatContext.mockResolvedValue(null);
 
-  describe('NPC target healing', () => {
-    it('mutates target.currentHp and persists combat summary via storage.set', async () => {
-      stubCombatReady();
-      const combatCtx = { creatures: [] };
-      damageUtils.getCombatContext.mockResolvedValue(combatCtx);
-      const goblin = makeNPCTarget('Goblin');
-      damageUtils.getTargetFromAttacker.mockReturnValue(goblin);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(goblin.currentHp).toBe(5);
-      expect(storage.set).toHaveBeenCalledWith(
-        'combatSummary',
-        combatCtx,
-        campaignName,
-      );
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'TestHero uses Revivification to save Goblin, setting their Hit Points to 5 and expending 1 Rage.',
-      );
-    });
+    expect(result).toEqual(infoPopup('No combat active.'));
+    expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
+    expectZeroSpend();
   });
 
-  // ── Death→life crossing `unconscious` strip (improve 2026-11-15, QY backlog) ──
-  // The pre-payment gate refuses any living target, so reaching the commit IS
-  // the crossing: the interceptor-parity strip (stripUnconsciousOnRevive sheds
-  // exactly `unconscious`, case-folded; prone rides through) must fold into the
-  // ONE merged batch, never a second victim write. A living target refuses
-  // pre-spend with zero reads of the condition bucket.
+  it('refuses with the tracker-select message when no target is picked, paying nothing', async () => {
+    seedRuntime({ rage: 1 });
+    damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
-  describe('revive-crossing condition strip', () => {
-    function stubCombatWithConditions(rage, conditions) {
-      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'ragePoints') return rage;
-        if (key === 'currentHitPoints') return 0;
-        if (key === 'activeConditions') return conditions;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-    }
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-    it('player corpse carrying unconscious+prone: the merged batch sheds unconscious and keeps prone', async () => {
-      stubCombatWithConditions(1, ['unconscious', 'prone']);
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      await handle(makeAction(), makePlayerStats({ level: 18 }), campaignName, null);
-
-      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
-      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-        'Ally',
-        {
-          currentHitPoints: 18,
-          deathSaves: [false, false, false],
-          deathFailures: [false, false, false],
-          isDead: 0,
-          activeConditions: ['prone'],
-        },
-        campaignName,
-      );
-      // No second victim POST: only the rage spend rides setRuntimeValue.
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName, 'ragePoints', 0, campaignName);
-    });
-
-    it('player corpse with an unconscious-free bucket keeps the exact four-key batch (nothing materialised)', async () => {
-      for (const raw of [null, [], ['prone']]) {
-        useRuntimeState.setRuntimeBatch.mockClear();
-        stubCombatWithConditions(1, raw);
-        damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        const writes = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
-        expect(Object.keys(writes)).toEqual([
-          'currentHitPoints', 'deathSaves', 'deathFailures', 'isDead',
-        ]);
-      }
-    });
-
-    it('monster corpse crossing sheds unconscious from its condition bucket', async () => {
-      stubCombatWithConditions(1, ['unconscious']);
-      const combatCtx = { creatures: [] };
-      damageUtils.getCombatContext.mockResolvedValue(combatCtx);
-      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin', 'activeConditions', [], campaignName);
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', combatCtx, campaignName);
-    });
-
-    it('living-target refusal pays nothing and NEVER reads the condition bucket (no strip off-crossing)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'currentHitPoints') return 5; // alive despite the seed trap
-        if (key === 'activeConditions') return ['unconscious'];
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toBe('Ally is not at 0 Hit Points.');
-      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      const condReads = useRuntimeState.getRuntimeValue.mock.calls
-        .filter(([, key]) => key === 'activeConditions');
-      expect(condReads).toEqual([]);
-    });
+    expect(result).toEqual(infoPopup('Select a target in the combat tracker first.'));
+    expectZeroSpend();
   });
 
-  // ── Logging ──────────────────────────────────────────────────
+  it.each([
+    {
+      label: 'player whose living runtime bucket outranks a corpse-row trap',
+      target: { name: 'Ally', type: 'player', currentHp: 0 },
+      seed: { rage: 1, targetHp: 5, conditions: ['unconscious'], hitPoints: 55 },
+      expectedReads: [
+        [playerName, 'ragePoints', campaignName],
+        ['Ally', 'currentHitPoints'],
+      ],
+    },
+    {
+      label: 'monster whose living summary row outranks a corpse-bucket trap',
+      target: { name: 'Goblin', type: 'npc', currentHp: 7, maxHp: 9 },
+      seed: { rage: 1, targetHp: 0, conditions: ['unconscious'] },
+      expectedReads: [[playerName, 'ragePoints', campaignName]],
+    },
+  ])('refuses a living $label before payment: HP truth read once, condition bucket NEVER read', async ({ target, seed, expectedReads }) => {
+    seedRuntime(seed);
+    damageUtils.getTargetFromAttacker.mockReturnValue(target);
 
-  describe('logging', () => {
-    it('posts heal log entry with exact payload', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const now = Date.now();
-      const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    expect(result).toEqual(infoPopup(`${target.name} is not at 0 Hit Points.`));
+    // Exact reads census: rage gate → resolveReviveTargetHp (player bucket /
+    // monster row, once). No activeConditions read off-crossing — the strip
+    // must never run on a refusal — and no maxHp read after an unpaid gate.
+    expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual(expectedReads);
+    expectZeroSpend();
+  });
 
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
+  // ── Death→life commit census ───────────────────────────────
 
-      // Log-family parity (2026-11-14 resurrection log-family split): the old
-      // unregistered type:'heal' row escaped every hp_change-keyed audit and
-      // rendered via GenericEntry; revive writers ride the hp_change family.
-      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'hp_change',
-        characterName: playerName,
-        targetName: 'Ally',
-        delta: 5,
-        currentHp: 5,
-        maxHp: undefined,
-        isHealing: true,
-        sourceName: playerName,
-        note: 'Revivification',
-        timestamp: now,
-      });
-      dateSpy.mockRestore();
-    });
+  it('player corpse commit: one merged death-state batch, sole single-key write is the rage spend, full popup + hp_change row + broadcast', async () => {
+    seedRuntime({ rage: 3, targetHp: 0, conditions: ['prone'], hitPoints: 55 });
+    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Ally', type: 'player' });
 
-    it('catches addEntry rejection, logs it, and still returns success popup', async () => {
-      stubCombatReady();
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-      logPoster.addEntry.mockRejectedValueOnce(new Error('Log service unavailable'));
+    const result = await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Regression bug-revivification-handler-leaves-isdead-stuck: the old
+    // currentHitPoints-only write left isDead:1 on a living ally so every
+    // downstream death gate (isCreatureDead, the Revivify corpse census)
+    // still read them as a corpse. The CLA-092 death-state reset now rides
+    // ONE merged POST, the same idiom as the HoUoM twin and sheet-revive.
+    // Exact strict-shape batch: the prone-carrying bucket sheds nothing, so
+    // the key set stays the four death-state keys — an absent/prone-only
+    // bucket is never materialised as activeConditions.
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Ally',
+      {
+        currentHitPoints: 5,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+      },
+      campaignName,
+    );
+    // Write census: the ONLY single-key write is the rage spend (3→2) on the
+    // ACTOR — HP never rides a second victim write (the leak face).
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [playerName, 'ragePoints', 2, campaignName],
+    ]);
+    // Exact reads census (lane-owned read order): rage → HP truth → strip
+    // bucket → maxHp bucket. The row-less target's maxHp comes from the
+    // runtime hitPoints bucket (55), outranking any row fallback.
+    expect(useRuntimeState.getRuntimeValue.mock.calls).toEqual([
+      [playerName, 'ragePoints', campaignName],
+      ['Ally', 'currentHitPoints'],
+      ['Ally', 'activeConditions', campaignName],
+      ['Ally', 'hitPoints', campaignName],
+    ]);
+    expect(storage.set.mock.calls).toEqual([]); // players never ride the summary-persist lane
+    expect(result).toEqual(infoPopup(
+      'TestHero uses Revivification to save Ally, setting their Hit Points to 5 and expending 1 Rage.',
+    ));
+    expect(dispatchSpy.mock.calls.map(([ev]) => ev.type)).toEqual(['combat-summary-updated']);
+    // hp_change family parity (2026-11-14 resurrection log-family split): the
+    // old unregistered type:'heal' row escaped every hp_change-keyed audit.
+    expect(logPoster.addEntry.mock.calls).toEqual([[campaignName, {
+      type: 'hp_change',
+      characterName: playerName,
+      targetName: 'Ally',
+      delta: 5,
+      currentHp: 5,
+      maxHp: 55,
+      isHealing: true,
+      sourceName: playerName,
+      note: 'Revivification',
+      timestamp: FROZEN_NOW,
+    }]]);
+  });
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
+  it('player crossing sheds unconscious into the merged batch (prone rides through), still one batch + one rage spend', async () => {
+    seedRuntime({ rage: 1, conditions: ['unconscious', 'prone'] });
+    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Ally', type: 'player' });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[revivification] Error:',
-        expect.any(Error),
-      );
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe(
-        'TestHero uses Revivification to save Ally, setting their Hit Points to 5 and expending 1 Rage.',
-      );
-      consoleErrorSpy.mockRestore();
-    });
+    await handle(makeAction(), makePlayerStats({ level: 18 }), campaignName, null);
+
+    // The strip FILTER law (case-folded, exact-member) belongs to
+    // reviveTargetHp.test.js; this lane owns the fold: the shed array rides
+    // the ONE victim POST, never a second write.
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Ally',
+      {
+        currentHitPoints: 18,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+        activeConditions: ['prone'],
+      },
+      campaignName,
+    );
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [playerName, 'ragePoints', 0, campaignName],
+    ]);
+  });
+
+  it('monster commit: row mutated + summary persisted, no batch or bucket write, hp_change row takes maxHp from the row', async () => {
+    const combatCtx = { creatures: [] };
+    damageUtils.getCombatContext.mockResolvedValue(combatCtx);
+    seedRuntime({ rage: 3, conditions: null });
+    const goblin = { name: 'Goblin', type: 'npc', currentHp: 0, maxHp: 9 };
+    damageUtils.getTargetFromAttacker.mockReturnValue(goblin);
+
+    const result = await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
+
+    expect(goblin.currentHp).toBe(5);
+    expect(storage.set).toHaveBeenCalledTimes(1);
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', combatCtx, campaignName);
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    // Nothing shed → NO bucket write: the rage spend is the only single-key
+    // write on the plain monster crossing.
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [playerName, 'ragePoints', 2, campaignName],
+    ]);
+    expect(result).toEqual(infoPopup(
+      'TestHero uses Revivification to save Goblin, setting their Hit Points to 5 and expending 1 Rage.',
+    ));
+    expect(dispatchSpy.mock.calls.map(([ev]) => ev.type)).toEqual(['combat-summary-updated']);
+    expect(logPoster.addEntry.mock.calls).toEqual([[campaignName, {
+      type: 'hp_change',
+      characterName: playerName,
+      targetName: 'Goblin',
+      delta: 5,
+      currentHp: 5,
+      maxHp: 9,
+      isHealing: true,
+      sourceName: playerName,
+      note: 'Revivification',
+      timestamp: FROZEN_NOW,
+    }]]);
+  });
+
+  it('monster crossing sheds unconscious through its own bucket write, ordered after the rage spend', async () => {
+    const combatCtx = { creatures: [] };
+    damageUtils.getCombatContext.mockResolvedValue(combatCtx);
+    seedRuntime({ rage: 1, conditions: ['unconscious'] });
+    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc', currentHp: 0 });
+
+    await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
+
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    // Exact ORDERED write census: rage spend precedes the shed bucket — the
+    // bucket is a separate channel from the summary row (monster leg only
+    // writes it when something shed).
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [playerName, 'ragePoints', 0, campaignName],
+      ['Goblin', 'activeConditions', [], campaignName],
+    ]);
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', combatCtx, campaignName);
+  });
+
+  // ── Logging resilience ─────────────────────────────────────
+
+  it('survives addEntry rejection: logs the failure and still returns the success popup', async () => {
+    seedRuntime({ rage: 1 });
+    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Ally', type: 'player' });
+    const logError = new Error('Log service unavailable');
+    logPoster.addEntry.mockRejectedValue(logError);
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    // The commit is not held hostage by the log write.
+    expect(result).toEqual(infoPopup(
+      'TestHero uses Revivification to save Ally, setting their Hit Points to 5 and expending 1 Rage.',
+    ));
+    await expect.poll(() => consoleErrorSpy.mock.calls).toEqual([
+      ['[revivification] Error:', logError],
+    ]);
   });
 });

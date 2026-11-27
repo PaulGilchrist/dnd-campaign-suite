@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // interceptionHandler sextet — lane: MAIN / EARLY-RETURN GATES (gate behavior only;
 // envelope shape, description text, damage math, logging, consumption latch owned elsewhere).
 //
@@ -21,8 +21,11 @@
 //                                      skip paths (no map, unavailable positions).
 //
 // Range seam is isWithinRange (rangeValidation.js is NOT imported by the handler).
-// Deterministic: every handler import mocked (incl. expirations barrel), exact-string
-// gate-message pins, call-seam range pins — no churn expected.
+// parseMagicItemName is intentionally NOT mocked — the magic-name arms exercise the
+// real shared parser (fix#201). All other handler imports mocked (incl. expirations
+// barrel). Refusal legs carry a zero-spend census (no later channel read/written) and
+// the gate channels pin campaignName threading (findLastAttack, resolveMapPositions).
+// Deterministic: exact-string gate-message pins, call-seam range pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/targetResolver.js', () => ({
@@ -79,6 +82,19 @@ import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as targetResolver from '../../common/targetResolver.js';
+import * as logService from '../../../ui/logService.js';
+import * as expirations from '../../../rules/effects/expirations.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
+
+// Zero-spend census for every early-return refusal: no gate may read the spent-mark,
+// write the runtime store, log, schedule an expiration, or heal.
+function expectNoCommitWrites() {
+    expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+}
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -148,6 +164,7 @@ describe('interceptionHandler', () => {
         vi.clearAllMocks();
         useRuntimeState.getRuntimeValue.mockReturnValue(null);
         useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
+        logService.addEntry.mockResolvedValue({});
         targetResolver.resolveMapPositions.mockResolvedValue({
             attackerPos: { x: 0, y: 0 },
             targetPos: { x: 1, y: 0 },
@@ -180,53 +197,55 @@ describe('interceptionHandler', () => {
 
             const result = await handle(makeAction(overrides), makePlayerStats(), campaignName, mapName);
 
+            expect(damageRollback.findLastAttack).toHaveBeenCalledWith(campaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe(expected);
+            expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
             expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+            expectNoCommitWrites();
         });
     });
 
     describe('shield or weapon gate', () => {
-        it('returns error popup when no shield or weapon equipped', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+        it.each([
+            { label: 'nothing equipped', stats: {} },
+            {
+                label: 'equipped slot misses the equipment lookup',
+                stats: {
+                    inventory: { equipped: ['Longsword', null] },
+                    equipment: [{ name: 'Something Else', equipment_category: 'Weapon' }],
+                },
+            },
+        ])('refuses with exact message when $label', async ({ stats }) => {
+            const result = await handle(makeAction(), makePlayerStats(stats), campaignName, mapName);
 
+            expect(damageRollback.findLastAttack).toHaveBeenCalledWith(campaignName);
             expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe(
                 'Interception: You must be holding a Shield or a Simple or Martial weapon to use this Reaction.'
             );
+            expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
             expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
+            expectNoCommitWrites();
         });
 
-        it('returns error popup when equipped slot misses the equipment lookup', async () => {
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Longsword', null] },
-                equipment: [{ name: 'Something Else', equipment_category: 'Weapon' }],
-            });
+        it.each([
+            { label: 'shield', inventory: { equipped: ['Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
+            { label: 'weapon', inventory: { equipped: ['Longsword'] }, equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }] },
+            { label: 'shield and weapon', inventory: { equipped: ['Shield', 'Shortsword'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }, { name: 'Shortsword', equipment_category: 'Weapon' }] },
+            { label: 'magic shield name', inventory: { equipped: ['+1 Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
+            { label: 'magic weapon name', inventory: { equipped: ['+1 Mace'] }, equipment: [{ name: 'Mace', equipment_category: 'Weapon' }] },
+            // fix#201 shared-parser arm: digit-less '+' keeps the full name
+            // (old local substring(3) copy produced 'hield'/'ace' — refusal).
+            { label: 'digit-less + prefix keeps full name (fix#201)', inventory: { equipped: ['+ Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
+            { label: 'null/undefined slots skipped', inventory: { equipped: [null, 'Shield', undefined] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
+        ])('proceeds past the gate when $label is equipped', async ({ inventory, equipment }) => {
+            const result = await handle(makeAction(), makePlayerStats({ inventory, equipment }), campaignName, mapName);
 
-            const result = await handle(makeAction(), ps, campaignName, mapName);
-
-            expect(result.payload.description).toContain('You must be holding a Shield');
-        });
-
-        it('proceeds when shield, weapon, or both are equipped (incl. magic-name parsing)', async () => {
-            const testCases = [
-                { inventory: { equipped: ['Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
-                { inventory: { equipped: ['Longsword'] }, equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }] },
-                { inventory: { equipped: ['Shield', 'Shortsword'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }, { name: 'Shortsword', equipment_category: 'Weapon' }] },
-                { inventory: { equipped: ['+1 Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
-                { inventory: { equipped: ['+1 Mace'] }, equipment: [{ name: 'Mace', equipment_category: 'Weapon' }] },
-                // fix#201 shared-parser arm: digit-less '+' keeps the full name
-                // (old local substring(3) copy produced 'hield'/'ace' — refusal).
-                { inventory: { equipped: ['+ Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
-                { inventory: { equipped: [null, 'Shield', undefined] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
-            ];
-
-            for (const tc of testCases) {
-                const result = await handle(makeAction(), makePlayerStats(tc), campaignName, mapName);
-                expect(result.payload.description).not.toContain('You must be holding a Shield');
-                expect(result.payload.description).toContain('interpose yourself');
-            }
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
         });
     });
 
@@ -241,9 +260,12 @@ describe('interceptionHandler', () => {
 
             const result = await handle(makeAction({ automation: { range } }), makePlayerStats(shieldStats), campaignName, mapName);
 
+            expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(campaignName, playerName);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toBe(`${attackerName} is out of range.`);
             expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(playerName, attackerName, expectedFt);
+            expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+            expectNoCommitWrites();
         });
 
         it('skips range check when no map (no position lookup, no range call)', async () => {
