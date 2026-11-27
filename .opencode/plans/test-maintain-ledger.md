@@ -2959,3 +2959,32 @@ run2#1804: shadowyDodge -> maintained (18->8 blocks/21r) 6 refusals -> 9-row it.
 - Headline: 🔴 vowOfEnmity permanent-listener leak + 🔴 tempTeleport moved:false no-log found; VACUOUS CLA-230 replace-test caught; ~10 dead-branch/dup source notes filed; recipe now includes isWithinRange short-circuit + rejection-survivor re-seed standards.
 - DATE NOTE: local clock approaching 2026-11-27 midnight; lanes/gates use `date +%F` (local) — canon date rolls over naturally; keep reading `date +%F` fresh each dispatch.
 - Next head: wildMagicSurgeHandler.cla389-gate.test.js.
+
+## RUN4 Batch17 (2026-11-26/27) — wild-magic/damage/ranger/cleric lanes + assertCanAct pair + inventory (lanes 1805-1819, crosses midnight)
+run2#1805: wildMagicSurge.cla389-gate -> maintained (3->3) gate-miss describe.each w/ differentiated stamp-disarm-vs-zero-spend censuses; full modal toEqual w/ rollDie×2 detector; dead table fixture + stale cross-refs fixed.
+run2#1806: wildMagicSurge main -> maintained (28->20) full-shape modals + ordered censuses + dice censuses throughout; 8 same-branch garbage variants deleted; NEW near-miss rider pin; 3 🗑 dead-branch source notes (:166 identical-ternary, :207 unreachable, :249/:290 misleading ellipsis); titles verbatim kept for gate cross-refs.
+run2#1807: damageReductionHandler -> maintained (10->3 blocks/12r) refusal+passthrough families w/ all-6-collaborator zero censuses; 2 NEW catalog-miss refusal rows; real parseMagicItemName kept; normal-lane dup probe queued for deletion.
+run2#1808: buildAttackContext-noMap -> maintained (8->4) seam distinct from services map lane confirmed; merged censuses + sanctuary keyed pins; map-sibling *Once chain note queued.
+run2#1809: contextBuilder-cover -> **FULL-FILE DELETED** after 3/3 verbatim-dup verification vs map bait-and-switch table (harness equivalence checked; map+sync 63 green); queued #1724 rec RESOLVED; damageRoll dead-branch stays in ledger.
+run2#1810: radianceOfDawn -> maintained (24->16) full-shape activations w/ honest automationType divergence pin, frozen-clock NPC commit + player-prompt registries, mirror computeDamageAfterSave mock -> REAL helper; 🔴×3 filed: confirm-vs-handle saveDc coercion split (DC13 shown vs DC10 live), dcSuccess:'none' vs RAW half, hardcoded '(CON)'.
+run2#1811: cla-081-defensive-tactics -> maintained (4->3) exact-key pin folded, executeHandler merge w/ identity passthrough; NEW rejected-log-writer survivor; order-independent re-seed; getRuntimeValue 2-vs-3-arg call-convention divergence filed.
+run2#1812: resistancesValidationLimits -> maintained (23->19) ordered fetch censuses; 4 masked/legacy/same-branch rows retired w/ rationale comments; :25/:53 array-join + :71-77 masked-branch #1916 candidates filed.
+run2#1813: saveAttackHandler.handle-2 -> maintained (30->18 decls/30r) it.each families throughout; real resolveScaling unmocked; attackerPos gridX/Y + CLA-208 distinct-scalings + rangeToFeet bypass censuses; ⚠ consumeTrackedUses derived-key churn + _mapName naming filed.
+run2#1814: saveAttackHandler.handle main -> maintained (15->12 decls/19r) both queued notes implemented (times(1) census + seedRuntime re-seed); NEW legendary-shape + explicit-rounds expiration cases; overlayTargetId real via importOriginal; 🔴 :176 campaignName-dropped read + :124-vs-:139 positional/find inconsistency filed.
+run2#1815: assertCanAct.charge -> maintained (6->6/11r) bonusAction bucket + FREE_BUCKETS family + real-spend equality pins; race-backstop full envelope; ⚠ classifyBucket FREE_BUCKETS missing 'legendary' zero-diff-SSE-write finding filed.
+run2#1816: assertCanAct main -> maintained (6->8r) NEW reportDenial degradation test (2 dead branches revived + dead spy purpose); fast-path it.each census w/ getStore zero-read; blockers wrong-target filter newly pinned.
+run2#1817: raceBuffService -> maintained (18->16) dead-export describe deleted (buffApplier canon verified); 'or'-delimiter + ASI-ruleset-gate legs added; 🔴 :212 serial-comma regex failure vs Elf Keen Senses live row filed.
+run2#1818: bardicInspirationState -> maintained (18->12 blocks/26r) dead exports unpinned (grantedBy zero callers), 3 it.each tables w/ read-order censuses, offense _trackedResources fallback branch newly pinned.
+run2#1819: inventoryService -> maintained (15->9 blocks/15r) all-lane 4-leg error family (unparseable-json branch NEW), partial-conflict normalized-adoption + ternary-false leg; server-copy pin gap filed.
+
+## Batch #238 GREEN — RUN4 run2#1805-#1819 (lanes 1805-1819, crosses 26->27 local midnight)
+## Batch #238 — PROGRESS: completed 2410 / remaining 1020 (total 3430)
+- Suite: lint clean; 3620 files, 37,784 passed, ZERO failures EXIT:0 (160s). Evidence /tmp/batch238.log.
+- Queue 1035 -> 1020. NOTE: total dropped 3431 -> 3430 (contextBuilder-cover.test.js deleted by run2#1809 after duplicate verification).
+- BOOKKEEPING INCIDENT (false stall, caught before stop): first recount read QUEUE 1263 — two causes fixed in test-maintain-delta-queue.mjs:
+  (1) TODAY used toISOString() = UTC, which is already 2026-11-27 while local is still the 26th → dirty files stamped with a phantom future date. Now uses local date (en-CA) and per-file LOCAL mtime instead of blanket TODAY.
+  (2) The owner's 00:03 local commit 'Test maintenance' carried 257 already-maintained test files, so their commit-date (27) post-dated their markers (26) → 242 files falsely re-queued. Maintenance commits are excluded by subject (now a list: date-stamp commit + 'Test maintenance').
+  Verified after fix: 0 files with a 2026-11-26 marker remain queued.
+- Headline: 1 file DELETED as pure duplicate; 🔴 new: radianceOfDawn DC-display-vs-actual-save mismatch + dcSuccess 'none' vs RAW half + serial-comma regex failure (Elf Keen Senses); 4 unlogged-failure / campaignName-dropped-arg source notes.
+- Marker canon date = LOCAL date +%F = 2026-11-27 for all lanes from run2#1820 on.
+- Next head: animateDeadHandler.confirm.details.test.js.

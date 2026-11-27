@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // QUARTET lane (see resistancesValidation.test.js header seam map): race-side resistance extraction
 // (5e + 2024) via getResistanceLimits — the CANONICAL home for race extraction (Info lane cites
 // this file per #2049) — plus the race-switch subrace seam ({ name: '' } must never reach the
@@ -11,7 +11,12 @@
 // Disk anchors verified verbatim against public/data/races.json + public/data/2024/races.json:
 //   5e trait descriptions are STRINGS on disk ("You have resistance to fire damage." /
 //   "…resistance against poison damage."); the 5e 'Damage Resistance' base-trait branch in the
-//   source is an empty no-op — pinned to extract nothing.
+//   source is an empty no-op — pinned to extract nothing via the verbatim disk-anchor row below
+//   (a standalone no-subrace row is masked by it: the anchor carries the same base prose).
+//   Array-`description` tolerance in extract5eRaceResistances is NOT re-proven here: disk never
+//   stores arrays (no-legacy policy) and the wrapper pin in resistancesValidation.test.js
+//   (array-form Tiefling fixture → preSelected ['Fire']) already exercises the branch — the
+//   tolerance itself is a #1916 legacy-shape candidate for the source owner.
 //   FLAG: disk stores subrace ancestry types ONLY in a structured damage_resistance field
 //   ('Fire'/'Poison') — the prose extractors never read it, so verbatim Dragonborn/Tiefling
 //   subrace data yields NO resistance today (pinned below). Any 'resistance to …' prose in a
@@ -76,10 +81,14 @@ describe('getResistanceLimits — API contract', () => {
     const result = await getResistanceLimits(baseArgs({ rules }));
 
     expect(result).toEqual({ resistances: [], immunities: [], details });
-    expect(dataLoader.fetchRaceData).toHaveBeenCalledWith('Human', rules);
+    // Ordered census: exactly one fetch per side, ruleset-routed, nothing extra.
+    expect(dataLoader.fetchRaceData.mock.calls).toEqual([['Human', rules]]);
+    expect(dataLoader.fetchClassData.mock.calls).toEqual([['Wizard', rules]]);
   });
 
   it('defaults missing level to 1 (level-1 immunity included, level-5 excluded)', async () => {
+    // The ONLY pin for getResistanceLimits' `formData.level || 1` input normalization —
+    // the Immunities lane gates with an explicit level only.
     // SYNTHETIC class prose (disk sweep: zero real class damage immunities — Immunities lane).
     mockRace({ name: 'Human', traits: [] });
     vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -127,15 +136,6 @@ describe('getResistanceLimits — 5e race extraction (canonical)', () => {
       raceData: {
         name: 'Tiefling',
         traits: [{ name: 'Hellish Resistance', description: 'You have resistance to fire damage.' }],
-      },
-      expected: ['Fire'],
-    },
-    {
-      name: 'Hellish Resistance — array description joined before matching (SYNTHETIC shape; disk uses string)',
-      race: { name: 'Tiefling' },
-      raceData: {
-        name: 'Tiefling',
-        traits: [{ name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }],
       },
       expected: ['Fire'],
     },
@@ -189,7 +189,7 @@ describe('getResistanceLimits — 5e race extraction (canonical)', () => {
       expected: ['Fire'],
     },
     {
-      name: 'disk anchor: Gold Dragonborn verbatim subrace data extracts nothing (structured damage_resistance is never read)',
+      name: 'disk anchor: Gold Dragonborn verbatim subrace data extracts nothing (structured damage_resistance is never read; same row re-proves the base-trait "Damage Resistance" no-op — its prose would match a generic-regex regression)',
       race: { name: 'Dragonborn', subrace: { name: 'Gold Dragonborn' } },
       raceData: {
         name: 'Dragonborn',
@@ -199,16 +199,6 @@ describe('getResistanceLimits — 5e race extraction (canonical)', () => {
           description: 'Gold Dragonborn embody nobility and inner fire, inheriting a powerful flame breath and the disciplined, honorable nature of gold dragons.',
           damage_resistance: 'Fire',
         }],
-      },
-      expected: [],
-    },
-    {
-      name: '5e base-trait "Damage Resistance" branch is a no-op — base prose alone grants nothing',
-      race: { name: 'Dragonborn' },
-      raceData: {
-        name: 'Dragonborn',
-        traits: [{ name: 'Damage Resistance', description: 'You have resistance to the damage type associated with your draconic ancestry.' }],
-        subraces: [],
       },
       expected: [],
     },
@@ -249,18 +239,14 @@ describe('getResistanceLimits — race-switch seam (subrace never resolves as a 
     const result = await getResistanceLimits(baseArgs({ race: { name: 'Dwarf', subrace: { name: '' } } }));
 
     expectRaceResistances(result, ['Poison']);
-  });
-
-  it('5e: once the subrace settles, the collector completes on the exact grant set (no throw, no bleed)', async () => {
-    mockRace(dwarfRaceData());
-
-    const result = await getResistanceLimits(baseArgs({ race: { name: 'Dwarf', subrace: { name: 'Hill Dwarf' } } }));
-
-    expectRaceResistances(result, ['Poison']);
+    // A settled subrace name ({ name: 'Hill Dwarf' }, racial_traits grant nothing) is the
+    // Stout-Halfling-resolved-subrace shape minus the grant — same completed path, no re-proof.
   });
 
   // Disk anchor public/data/2024/races.json: 2024 Dwarf trait prose is capital-R
   // 'You have Resistance to Poison damage.' — the 2024 extractor matches that form.
+  // This twin is ALSO the canonical 2024 Dwarven Resilience extraction pin (the weaker
+  // subrace-less table row was consolidated into it).
   const dwarfRaceData2024 = () => ({
     name: 'Dwarf',
     traits: [{ name: 'Dwarven Resilience', description: 'You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.' }],
@@ -298,15 +284,7 @@ describe('getResistanceLimits — 2024 race extraction (canonical, #2049)', () =
       expected: ['Necrotic', 'Radiant'],
     },
     {
-      name: 'Dwarven Resilience — disk verbatim (capital-R "Resistance to Poison" wording)',
-      race: { name: 'Dwarf' },
-      raceData: {
-        name: 'Dwarf',
-        traits: [{ name: 'Dwarven Resilience', description: 'You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.' }],
-      },
-      expected: ['Poison'],
-    },
-    {
+      // Canonical 2024 Dwarven Resilience prose lives in the seam lane's 2024 twin row.
       name: 'subrace traits prose (SYNTHETIC — disk Abyssal Tiefling carries only unread damage_resistance)',
       race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } },
       raceData: {

@@ -21,13 +21,22 @@
 // Design + origin: .opencode/plans/test-maintain-date-stamp.md
 
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import { writeFileSync, readdirSync, statSync, readFileSync, existsSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
 const IGNORE_DIRTY = process.argv.includes('--ignore-dirty');
 const MARKER = '@maintained-by-ai';
-const STAMP_COMMIT_SUBJECT = 'chore: date-stamp maintenance markers';
-const TODAY = new Date().toISOString().slice(0, 10);
+const STAMP_COMMIT_SUBJECTS = [
+  'chore: date-stamp maintenance markers',
+  // 2026-11-27: owner committed RUN4 lane work at 00:03 local under this subject;
+  // its commit-date (27) post-dates the markers (26) of the very lanes it carries,
+  // which re-queued 242 already-maintained files. Maintenance commits are not
+  // "changes since maintained" — exclude by subject like the stamp commit.
+  'Test maintenance',
+];
+// LOCAL date (was toISOString() = UTC, which runs 5h ahead of EST and poisoned
+// the dirty-file comparison — see fix note at step 3).
+const TODAY = new Date().toLocaleDateString('en-CA');
 
 const testFiles = [];
 (function walk(dir) {
@@ -61,7 +70,7 @@ const raw = execFileSync(
   [
     'log', `--since=${since}`, '--name-only',
     '--format=C%x09%ad', '--date=short',
-    '--invert-grep', `--grep=${STAMP_COMMIT_SUBJECT}`,
+    ...STAMP_COMMIT_SUBJECTS.flatMap((s) => ['--invert-grep', `--grep=${s}`]),
     '--', 'src',
   ],
   { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }
@@ -76,13 +85,22 @@ for (const line of raw.split('\n')) {
   }
 }
 
-// 3. Dirty working-tree files count as changed today (unless --ignore-dirty).
+// 3. Dirty working-tree files count as changed at their LOCAL file mtime date
+// (unless --ignore-dirty). FIX 2026-11-27 (test-maintain orchestration): was a
+// blanket TODAY stamp computed from the script's UTC date, which flips ahead of
+// local at 19:00 EST and re-queued our own maintained-but-uncommitted lanes
+// under a phantom future date (UTC-skew incident, batch #232; recurrence at the
+// 26→27 local midnight rollover). mtime keeps the heuristic honest across day
+// boundaries: a file edited and marker-stamped the same day stays out of queue.
 if (!IGNORE_DIRTY) {
   const status = execFileSync('git', ['status', '--short', '--', 'src'], { encoding: 'utf8' });
   for (const line of status.split('\n')) {
     if (!line.trim()) continue;
     const path = line.slice(3).split(' -> ').pop().trim();
-    if (/\.test\.jsx?$/.test(path)) lastChange.set(posix.normalize(path), TODAY);
+    if (/\.test\.jsx?$/.test(path) && existsSync(path)) {
+      const mtimeLocal = new Date(statSync(path).mtimeMs).toLocaleDateString('en-CA');
+      lastChange.set(posix.normalize(path), mtimeLocal);
+    }
   }
 }
 

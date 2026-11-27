@@ -1,9 +1,12 @@
+// @maintained-by-ai 2026-11-27
 // No-map branch (mapName falsy) of buildAttackContextForDamage.
 // The map-present branch is covered by buildAttackContext-map.test.js.
 // Note: the buildSyncCtx fallback inside damageRoll.js shares the same
 // `saveDc || 0` contract as the no-map early return; it is only reachable
 // from the map lane, so its coverage lives in the map file, not here.
-// @maintained-by-ai 2026-10-15
+// The Nature's Sanctuary branch table (resolveSanctuaryNotice is pre-branch
+// shared code) is owned by the map file's "Nature's Sanctuary resistance"
+// describe; only the positive integration into the no-map output is pinned here.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -84,61 +87,45 @@ describe('buildAttackContextForDamage (no map)', () => {
         runtimeState.getRuntimeValue.mockReturnValue(null);
     });
 
-    it('returns base context with all expected fields and skips map services', async () => {
+    it('early-returns the full base context, applies saveDc||0, and touches no map/NPC/sanctuary services', async () => {
         // Non-default saveSuccess proves dcSuccess is passed through, not defaulted.
         const result = await buildAttackContextForDamage(
             makeAttackContext({ saveSuccess: 0.5 }),
             playerName, campaignName, null,
         );
 
-        expect(result.damageType).toBe('fire');
-        expect(result.resistanceNotice).toBeNull();
-        expect(result.targetName).toBeUndefined();
-        expect(result.saveDc).toBe(15);
-        expect(result.saveType).toBe('DEX');
-        expect(result.dcSuccess).toBe(0.5);
-        expect(result.attackerName).toBe(playerName);
-        expect(mapsService.loadMapData).not.toHaveBeenCalled();
-        expect(npcsService.loadNPCs).not.toHaveBeenCalled();
-    });
+        expect(result).toEqual({
+            damageType: 'fire',
+            resistanceNotice: null,
+            targetName: undefined,
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 0.5,
+            attackerName: playerName,
+        });
 
-    it('defaults saveDc to 0 when not provided', async () => {
-        const result = await buildAttackContextForDamage(
+        // Degraded path: `saveDc || 0` fallback branch.
+        const defaulted = await buildAttackContextForDamage(
             makeAttackContext({ saveDc: undefined }),
             playerName, campaignName, null,
         );
+        expect(defaulted.saveDc).toBe(0);
 
-        expect(result.saveDc).toBe(0);
+        // Exactly one combat-context fetch per call, no second fetch from the
+        // map lane's resolveTargetPosition; nothing else consulted. With no
+        // target name resolved, the sanctuary guard must not read the store.
+        expect(damageUtils.getCombatContext.mock.calls).toEqual([[campaignName], [campaignName]]);
+        expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
+        expect(damageUtils.getResistanceNotice).not.toHaveBeenCalled();
+        expect(damageUtils.getAttackerTargetName).not.toHaveBeenCalled();
+        expect(mapsService.loadMapData).not.toHaveBeenCalled();
+        expect(npcsService.loadNPCs).not.toHaveBeenCalled();
+        expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('resolves target from combat context', async () => {
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-        damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-        const result = await buildAttackContextForDamage(
-            makeAttackContext(),
-            playerName, campaignName, null,
-        );
-
-        expect(result.targetName).toBe('Goblin');
-        expect(damageUtils.getTargetFromAttacker).toHaveBeenCalledWith({ creatures: [] }, playerName);
-    });
-
-    it('falls back to getAttackerTargetName when getTargetFromAttacker returns null', async () => {
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-        damageUtils.getTargetFromAttacker.mockReturnValue(null);
-        damageUtils.getAttackerTargetName.mockReturnValue('Falling Victim');
-
-        const result = await buildAttackContextForDamage(
-            makeAttackContext(),
-            playerName, campaignName, null,
-        );
-
-        expect(result.targetName).toBe('Falling Victim');
-    });
-
-    it('includes resistanceNotice when target is resistant', async () => {
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+    it('resolves the creature target and passes its resistance notice through, skipping the sanctuary check', async () => {
+        const cs = { creatures: [] };
+        damageUtils.getCombatContext.mockResolvedValue(cs);
         damageUtils.getTargetFromAttacker.mockReturnValue({
             name: 'Goblin',
             resistances: ['fire'],
@@ -151,72 +138,64 @@ describe('buildAttackContextForDamage (no map)', () => {
             playerName, campaignName, null,
         );
 
-        expect(result.resistanceNotice).toBe('Target is resistant to fire');
-        expect(damageUtils.getResistanceNotice).toHaveBeenCalledWith(
-            ['fire'],
-            ['fire'],
-            [],
-            'Goblin',
-        );
+        expect(result).toEqual({
+            damageType: 'fire',
+            resistanceNotice: 'Target is resistant to fire',
+            targetName: 'Goblin',
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 0,
+            attackerName: playerName,
+        });
+        expect(damageUtils.getTargetFromAttacker.mock.calls).toEqual([[cs, playerName]]);
+        expect(damageUtils.getResistanceNotice.mock.calls).toEqual([
+            [['fire'], ['fire'], [], 'Goblin'],
+        ]);
+        // Truthful notice short-circuits the sanctuary store read.
+        expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
     });
 
-    describe("Nature's Sanctuary (no map)", () => {
-        function mockSanctuary(creatures, resistance) {
-            // Keyed lookup keeps this independent of getRuntimeValue call order.
-            runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'naturesSanctuaryCreatures') return creatures;
-                if (key === 'naturesSanctuaryResistance') return resistance;
-                return null;
-            });
-        }
+    it('falls back to getAttackerTargetName when no creature target resolves', async () => {
+        const cs = { creatures: [] };
+        damageUtils.getCombatContext.mockResolvedValue(cs);
+        damageUtils.getTargetFromAttacker.mockReturnValue(null);
+        damageUtils.getAttackerTargetName.mockReturnValue('Falling Victim');
 
-        beforeEach(() => {
-            damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        const result = await buildAttackContextForDamage(
+            makeAttackContext(),
+            playerName, campaignName, null,
+        );
+
+        expect(result.targetName).toBe('Falling Victim');
+        expect(result.resistanceNotice).toBeNull();
+        expect(damageUtils.getAttackerTargetName.mock.calls).toEqual([[cs, playerName]]);
+        // A name-only fallback has no creature data, so no resistance probe runs.
+        expect(damageUtils.getResistanceNotice).not.toHaveBeenCalled();
+    });
+
+    it("surfaces a matching Nature's Sanctuary notice in the no-map output", async () => {
+        // Branch-table negatives (absent from list, unset/mismatched
+        // resistance, case handling) are owned by the map file — same
+        // shared pre-branch code path.
+        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+        damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        // Keyed lookup keeps this independent of getRuntimeValue call order.
+        runtimeState.getRuntimeValue.mockImplementation((player, key) => {
+            if (key === 'naturesSanctuaryCreatures') return ['Goblin'];
+            if (key === 'naturesSanctuaryResistance') return 'Fire';
+            return null;
         });
 
-        it('adds sanctuary notice when target is in the list and damage type matches', async () => {
-            mockSanctuary(['Goblin'], 'Fire');
+        const result = await buildAttackContextForDamage(
+            makeAttackContext({ damageType: 'fire' }),
+            playerName, campaignName, null,
+        );
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, null,
-            );
-
-            expect(result.resistanceNotice).toBe("Goblin resists fire (Nature's Sanctuary)");
-        });
-
-        it('returns null notice when sanctuary does not apply', async () => {
-            // Target absent from the sanctuary creature list.
-            mockSanctuary(['Ogre'], 'fire');
-
-            let result = await buildAttackContextForDamage(
-                makeAttackContext(),
-                playerName, campaignName, null,
-            );
-            expect(result.resistanceNotice).toBeNull();
-
-            // Damage type does not match the sanctuary resistance.
-            runtimeState.getRuntimeValue.mockReset();
-            mockSanctuary(['Goblin'], 'cold');
-
-            result = await buildAttackContextForDamage(
-                makeAttackContext(),
-                playerName, campaignName, null,
-            );
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not consult the runtime store when no target is resolved', async () => {
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext(),
-                playerName, campaignName, null,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-            expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
-        });
+        expect(result.resistanceNotice).toBe("Goblin resists fire (Nature's Sanctuary)");
+        // Runtime-store key names are a cross-module contract with the writer.
+        expect(runtimeState.getRuntimeValue.mock.calls).toEqual([
+            [playerName, 'naturesSanctuaryCreatures', campaignName],
+            [playerName, 'naturesSanctuaryResistance', campaignName],
+        ]);
     });
 });

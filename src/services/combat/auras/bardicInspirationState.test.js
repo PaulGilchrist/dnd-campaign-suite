@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // bardicInspirationState lane — unit home for the granted-inspiration runtime
 // readers (consumers: the popup-inline BI offer/commit lanes — handlePlainDamage.js
 // and useLoggedDiceRollAttack.js gate the offense button through
@@ -14,13 +14,21 @@
 //   handler nulls the die/options/grantedBy trio). Purity test below proves
 //   readers never mutate state.
 // - Runtime keys are the envelope: bardicInspirationDie / GrantedBy /
-//   CombatOptions / Uses. Per-key mockImplementation pins them by name, so
-//   tests survive call-order refactors that positional Once-chains would not.
+//   CombatOptions / Uses. Ordered full mock.calls censuses pin every read by
+//   (name, key, campaign) exactly once per call — tests survive call-order
+//   refactors that positional Once-chains would not, and the granted-defense
+//   census doubles as proof the arm never touches the uses key.
 // - Die-size ladder verified against disk, not fabricated: 5e Bard stores the
 //   die in class_specific.bardic_inspiration_die, 2024 Bard in bardic_die —
 //   one dataset exercises each branch (d6 → d8@5 → d10@10 → d12@15).
-// - Uses envelope is dual-shape: plain number or { current }; _trackedResources
-//   is the last-resort fallback when the runtime uses key is null.
+// - Uses envelope is dual-shape: plain number or { current };
+//   _trackedResources is the last-resort fallback when the runtime uses key is
+//   null — pinned once per function (defense and offense carry their own copy
+//   of that branch).
+// - DEAD EXPORTS UNPINNED (grep-verified 2026-11-27: hasBardicInspiration and
+//   getBardicInspirationGrantedBy have zero callers outside this module).
+//   hasBardicInspiration's truthiness gate is covered through the defense
+//   census; grantedBy is pinned nowhere. Do not re-pin — retire the exports.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -29,12 +37,10 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import {
-  hasBardicInspiration,
   hasBardicInspirationDefense,
   hasBardicInspirationOffense,
   getBardicInspirationDieSize,
   getBardicInspirationDieSizeFromClass,
-  getBardicInspirationGrantedBy,
 } from './bardicInspirationState.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -64,33 +70,23 @@ const bard = (extra = {}) => ({
   ...extra,
 });
 
-describe('hasBardicInspiration', () => {
-  it('is true iff the bardicInspirationDie key holds a truthy value', () => {
-    for (const [die, expected] of [['d6', true], [6, true], [null, false], [undefined, false], ['', false]]) {
-      runtime.bardicInspirationDie = die;
-      expect(hasBardicInspiration('BardPlayer', 'Campaign')).toBe(expected);
-    }
-    expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', 'bardicInspirationDie', 'Campaign');
-  });
-});
-
 describe('hasBardicInspirationDefense', () => {
-  it('grants defense when a granted die carries the defense_add_to_ac option', () => {
+  it.each([
+    [JSON.stringify(['defense_add_to_ac']), true],
+    [JSON.stringify(['offense_add_to_damage']), false],
+    [JSON.stringify([]), false],
+  ])('granted die with options %s gates defense solely on defense_add_to_ac', (options, expected) => {
     Object.assign(runtime, {
       bardicInspirationDie: 'd6',
-      bardicInspirationCombatOptions: JSON.stringify(['defense_add_to_ac']),
+      bardicInspirationCombatOptions: options,
     });
-    expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', null)).toBe(true);
-    // options key + campaign pinned on the granted path
-    expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', 'bardicInspirationCombatOptions', 'Campaign');
-  });
-
-  it('denies defense when the granted die options lack defense_add_to_ac', () => {
-    runtime.bardicInspirationDie = 'd6';
-    for (const options of [JSON.stringify(['offense_add_to_damage']), JSON.stringify([])]) {
-      runtime.bardicInspirationCombatOptions = options;
-      expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', null)).toBe(false);
-    }
+    // null stats proves the granted arm adjudicates from runtime keys alone.
+    expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', null)).toBe(expected);
+    // Census: the granted arm reads die + options and NEVER the uses key.
+    expect(getRuntimeValue.mock.calls).toEqual([
+      ['BardPlayer', 'bardicInspirationDie', 'Campaign'],
+      ['BardPlayer', 'bardicInspirationCombatOptions', 'Campaign'],
+    ]);
   });
 
   it('unparseable combatOptions fail closed (no defense) with a warning, never a throw', () => {
@@ -102,57 +98,98 @@ describe('hasBardicInspirationDefense', () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  it('without a granted die, a Bard with uses left qualifies — number or { current } envelope, zero never', () => {
-    const cases = [[3, true], [0, false], [{ current: 2 }, true], [{ current: 0 }, false]];
-    for (const [uses, expected] of cases) {
-      runtime.bardicInspirationUses = uses;
-      expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', bard())).toBe(expected);
-    }
-    expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', 'bardicInspirationUses', 'Campaign');
-  });
-
-  it('falls back to _trackedResources only when the runtime uses key is null', () => {
-    runtime.bardicInspirationUses = null;
-    for (const [current, expected] of [[1, true], [0, false]]) {
-      const stats = bard({ _trackedResources: { bardicInspirationUses: { current } } });
-      expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', stats)).toBe(expected);
-    }
-  });
-
-  it('without a granted die, non-Bards and missing stats never qualify — even with uses on the key', () => {
-    runtime.bardicInspirationUses = 5;
-    expect(hasBardicInspirationDefense('BardPlayer', 'Campaign', null)).toBe(false);
-    expect(hasBardicInspirationDefense('Fighter', 'Campaign', { name: 'Fighter', class: { name: 'Fighter' } })).toBe(false);
+  it.each([
+    { label: 'number uses above zero', rawUses: 3, stats: bard(), expected: true },
+    { label: 'number uses at zero', rawUses: 0, stats: bard(), expected: false },
+    { label: '{ current } uses above zero', rawUses: { current: 2 }, stats: bard(), expected: true },
+    { label: '{ current } uses at zero', rawUses: { current: 0 }, stats: bard(), expected: false },
+    {
+      label: 'null key falls back to _trackedResources current 1',
+      rawUses: null,
+      stats: bard({ _trackedResources: { bardicInspirationUses: { current: 1 } } }),
+      expected: true,
+    },
+    {
+      label: 'null key falls back to _trackedResources current 0',
+      rawUses: null,
+      stats: bard({ _trackedResources: { bardicInspirationUses: { current: 0 } } }),
+      expected: false,
+    },
+    {
+      label: 'non-Bard class never qualifies even with uses on the key',
+      rawUses: 5,
+      stats: { name: 'Fighter', class: { name: 'Fighter' } },
+      expected: false,
+    },
+    {
+      label: 'missing stats short-circuit before the uses read',
+      rawUses: 5,
+      stats: null,
+      expected: false,
+      reads: ['bardicInspirationDie'],
+    },
+  ])('without a granted die: $label → $expected', ({ rawUses, stats, expected, reads }) => {
+    runtime.bardicInspirationUses = rawUses;
+    const name = stats?.name ?? 'BardPlayer';
+    expect(hasBardicInspirationDefense(name, 'Campaign', stats)).toBe(expected);
+    expect(getRuntimeValue.mock.calls).toEqual(
+      (reads ?? ['bardicInspirationDie', 'bardicInspirationUses']).map((key) => [name, key, 'Campaign'])
+    );
   });
 });
 
 describe('hasBardicInspirationOffense', () => {
-  it('grants offense from runtime die + offense_add_to_damage, reading all three keys exactly', () => {
+  it.each([
+    {
+      label: 'granted die + offense option arms even at zero uses',
+      die: 'd6',
+      options: ['offense_add_to_damage'],
+      rawUses: 0,
+      stats: bard(),
+      expected: true,
+    },
+    {
+      label: 'granted die without the offense option still qualifies on number uses',
+      die: 'd6',
+      options: [],
+      rawUses: 3,
+      stats: bard(),
+      expected: true,
+    },
+    { label: '{ current } uses envelope above zero qualifies', rawUses: { current: 2 }, stats: bard(), expected: true },
+    { label: '{ current } uses envelope at zero denies', rawUses: { current: 0 }, stats: bard(), expected: false },
+    {
+      label: 'null key falls back to _trackedResources current 1',
+      rawUses: null,
+      stats: bard({ _trackedResources: { bardicInspirationUses: { current: 1 } } }),
+      expected: true,
+    },
+    {
+      label: 'null key falls back to _trackedResources current 0',
+      rawUses: null,
+      stats: bard({ _trackedResources: { bardicInspirationUses: { current: 0 } } }),
+      expected: false,
+    },
+    {
+      label: 'non-Bard class never qualifies even with uses (class gate, not just the count)',
+      rawUses: 5,
+      stats: bard({ class: { name: 'Fighter' } }),
+      expected: false,
+    },
+  ])('runtime reads: $label → $expected', ({ die, options = [], rawUses, stats, expected }) => {
     Object.assign(runtime, {
-      bardicInspirationDie: 'd6',
-      bardicInspirationCombatOptions: JSON.stringify(['offense_add_to_damage']),
-      bardicInspirationUses: 2,
+      bardicInspirationDie: die,
+      bardicInspirationCombatOptions: JSON.stringify(options),
+      bardicInspirationUses: rawUses,
     });
-    expect(hasBardicInspirationOffense(bard(), 'Campaign')).toBe(true);
-    for (const key of ['bardicInspirationDie', 'bardicInspirationCombatOptions', 'bardicInspirationUses']) {
-      expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', key, 'Campaign');
-    }
-  });
-
-  it('without runtime offense, Bard uses qualify above zero and not at zero', () => {
-    runtime.bardicInspirationCombatOptions = JSON.stringify([]);
-    for (const [uses, expected] of [[{ current: 2 }, true], [3, true], [0, false]]) {
-      runtime.bardicInspirationUses = uses;
-      expect(hasBardicInspirationOffense(bard(), 'Campaign')).toBe(expected);
-    }
-  });
-
-  it('non-Bard uses never grant offense (class gate, not just the uses count)', () => {
-    Object.assign(runtime, {
-      bardicInspirationCombatOptions: JSON.stringify([]),
-      bardicInspirationUses: 5,
-    });
-    expect(hasBardicInspirationOffense({ name: 'Fighter', class: { name: 'Fighter' } }, 'Campaign')).toBe(false);
+    expect(hasBardicInspirationOffense(stats, 'Campaign')).toBe(expected);
+    // Census: the offense gate reads all three keys exactly once, in order,
+    // scoped to (stats.name, key, campaign) — even when the runtime arm hits.
+    expect(getRuntimeValue.mock.calls).toEqual([
+      ['BardPlayer', 'bardicInspirationDie', 'Campaign'],
+      ['BardPlayer', 'bardicInspirationCombatOptions', 'Campaign'],
+      ['BardPlayer', 'bardicInspirationUses', 'Campaign'],
+    ]);
   });
 
   it('unparseable combatOptions fail closed when there are no Bard uses', () => {
@@ -243,24 +280,14 @@ describe('getBardicInspirationDieSizeFromClass', () => {
   });
 });
 
-describe('getBardicInspirationGrantedBy', () => {
-  it('reports the granting bard from the grantedBy key, "unknown" when nothing is recorded', () => {
-    for (const [grantedBy, expected] of [['AllyBard', 'AllyBard'], [null, 'unknown'], [undefined, 'unknown'], ['', 'unknown']]) {
-      runtime.bardicInspirationGrantedBy = grantedBy;
-      expect(getBardicInspirationGrantedBy('BardPlayer', 'Campaign')).toBe(expected);
-    }
-    expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', 'bardicInspirationGrantedBy', 'Campaign');
-  });
-});
-
 describe('purity of inspiration queries', () => {
-  it('status readers never write to the runtime store — offers wait indefinitely, consumption is the modal\'s explicit clear', () => {
-    Object.assign(runtime, { bardicInspirationDie: 'd8', bardicInspirationUses: 2 });
-    hasBardicInspiration('BardPlayer', 'Campaign');
+  it('status readers never write to the runtime store — offers wait indefinitely, consumption is the popup commit handler\'s explicit clear', () => {
+    Object.assign(runtime, { bardicInspirationDie: 'd8', bardicInspirationCombatOptions: JSON.stringify([]), bardicInspirationUses: 2 });
     hasBardicInspirationDefense('BardPlayer', 'Campaign', bard());
+    hasBardicInspirationDefense('BardPlayer', 'Campaign', null);
     hasBardicInspirationOffense(bard(), 'Campaign');
     getBardicInspirationDieSize('BardPlayer', 'Campaign');
-    getBardicInspirationGrantedBy('BardPlayer', 'Campaign');
+    getBardicInspirationDieSizeFromClass(bard());
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });

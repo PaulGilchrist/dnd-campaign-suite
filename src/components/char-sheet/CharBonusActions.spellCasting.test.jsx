@@ -1,17 +1,22 @@
-// @maintained-by-ai 2026-10-16
-// CharBonusActions host: pending-popup DISPLAY contract.
+// @maintained-by-ai 2026-11-27
+// CharBonusActions host: pending-popup DISPLAY + routing contract.
 // When useSpellMetamagicFlow arms a pending state, this host must surface the
 // right popup/modal with the right display data (spell identity, sorcery
-// points, chooser title + targets) — and stay popup-free when idle.
-// Click lanes live in CharBonusActions.interactive.test.jsx; the Hex/upcast
-// detail-popup host is covered in CharBonusActions.spellCastFlow.test.jsx;
-// Lesser Restoration/Hex target popups in CharBonusActions.lesserRestoration.test.jsx.
-import { render, screen } from '@testing-library/react';
+// points, chooser title + targets) and route the chooser's target/skip presses
+// back to the matching handler with the per-spell arg shape — staying
+// popup-free when idle.
+// Action/spell-row click lanes live in CharBonusActions.interactive.test.jsx;
+// the Hex/upcast detail-popup host is covered in
+// CharBonusActions.spellCastFlow.test.jsx; Lesser Restoration/Hex target
+// popups in CharBonusActions.lesserRestoration.test.jsx.
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
 // Full shape of the mocked useSpellMetamagicFlow return — every key the
 // component destructures from the hook. Tests override only what they assert.
+// resetAllMocks in beforeEach restores this default implementation, so
+// per-test mockReturnValue overrides never leak.
 const { flowShape } = vi.hoisted(() => ({
   flowShape: () => ({
     pendingMetamagic: null,
@@ -21,9 +26,6 @@ const { flowShape } = vi.hoisted(() => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null,
-    handleGreaterRestorationConfirm: vi.fn(),
-    handleGreaterRestorationSkip: vi.fn(),
     pendingBarkskin: null,
     handleBarkskinConfirm: vi.fn(),
     handleBarkskinSkip: vi.fn(),
@@ -80,12 +82,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../hooks/combat/useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 10),
-  getMaxSorceryPoints: vi.fn(() => 10),
-  spendSorceryPoints: vi.fn(),
 }));
 
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
@@ -146,11 +142,18 @@ vi.mock('./modals/HexAbilityModal.jsx', () => ({
   default: vi.fn(() => <div data-testid="hex-ability-modal" />),
 }));
 
+// Echo modal mock: renders title + each mapped target as a pressable option
+// and a skip button so the host's target/skip routing is observable at the DOM.
 vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
   default: vi.fn((props) => (
     <div data-testid="secondary-target-modal">
       {props.title}
-      {(props.targets || []).map((t) => <span key={t.name}>{t.name}</span>)}
+      {(props.targets || []).map((t) => (
+        <button key={t.name} data-testid={`target-${t.name}`} onClick={() => props.onTargetSelected(t.name)}>
+          {t.name}
+        </button>
+      ))}
+      <button data-testid="modal-skip" onClick={() => props.onSkip()}>Skip</button>
     </div>
   )),
 }));
@@ -215,27 +218,70 @@ describe('CharBonusActions - pending popup display', () => {
     const popup = screen.queryByTestId('metamagic-popup');
     expect(!!popup).toBe(shown);
     if (shown) {
-      // Pins the host→popup data mapping, not just the popup's presence.
+      // Pins the host→popup data mapping, not just the popup's presence:
+      // spellName/spellLevel → spell.{name,level}, _currentSP → _metamagicCurrentSP.
       expect(popup).toHaveTextContent('Fireball L3 SP 5');
     } else {
       expect(screen.queryByTestId('secondary-target-modal')).not.toBeInTheDocument();
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
+      // Idle row still renders and carries the cross-component castable-row
+      // testid contract ('Shocking Grasp' → 'shocking-grasp' slug).
+      expect(screen.getByTestId('castable-row-shocking-grasp')).toHaveTextContent('Shocking Grasp');
     }
   });
 
   it.each([
-    { pending: 'pendingBarkskin', title: 'Barkskin' },
-    { pending: 'pendingHealingWord', title: 'Healing Word' },
-    { pending: 'pendingSanctuary', title: 'Sanctuary' },
-  ])('arms the $title target chooser when $pending is armed', ({ pending, title }) => {
-    mockFlow({ [pending]: { creatureTargets: ['Ally 1', 'Ally 2'] } });
+    {
+      pending: 'pendingBarkskin',
+      title: 'Barkskin',
+      confirm: 'handleBarkskinConfirm',
+      skip: 'handleBarkskinSkip',
+      // Host wraps the chosen name in an array for Barkskin.
+      confirmArg: ['Ally 2'],
+    },
+    {
+      pending: 'pendingHealingWord',
+      title: 'Healing Word',
+      confirm: 'handleHealingWordConfirm',
+      skip: 'handleHealingWordSkip',
+      // Host wraps it in a { targetName } object for Healing Word.
+      confirmArg: { targetName: 'Ally 2' },
+    },
+    {
+      pending: 'pendingSanctuary',
+      title: 'Sanctuary',
+      confirm: 'handleSanctuaryConfirm',
+      skip: 'handleSanctuarySkip',
+      // Host passes the raw name for Sanctuary.
+      confirmArg: 'Ally 2',
+    },
+  ])('arms the $title chooser and routes its presses to the $title handlers', ({ pending, title, confirm, skip, confirmArg }) => {
+    const handlers = {
+      handleBarkskinConfirm: vi.fn(), handleBarkskinSkip: vi.fn(),
+      handleHealingWordConfirm: vi.fn(), handleHealingWordSkip: vi.fn(),
+      handleSanctuaryConfirm: vi.fn(), handleSanctuarySkip: vi.fn(),
+    };
+    mockFlow({ [pending]: { creatureTargets: ['Ally 1', 'Ally 2'] }, ...handlers });
     renderWithSpells([bonusSpell({ name: title, level: 1, range: '60 ft.' })]);
 
+    // Display: the host maps raw string creatureTargets onto { name, type }
+    // rows (the mock renders t.name) under the right title.
     const modal = screen.getByTestId('secondary-target-modal');
     expect(modal).toHaveTextContent(title);
-    expect(modal).toHaveTextContent('Ally 1');
-    expect(modal).toHaveTextContent('Ally 2');
+    expect(screen.getByTestId('target-Ally 1')).toBeInTheDocument();
+    expect(screen.getByTestId('target-Ally 2')).toBeInTheDocument();
+
+    // Routing: a target press reaches only this chooser's confirm handler,
+    // with the per-spell arg shape.
+    fireEvent.click(screen.getByTestId('target-Ally 2'));
+    expect(handlers[confirm]).toHaveBeenCalledTimes(1);
+    expect(handlers[confirm]).toHaveBeenCalledWith(confirmArg);
+    expect(handlers[skip]).not.toHaveBeenCalled();
+
+    // Skip press reaches only this chooser's skip handler (confirm stays at 1).
+    fireEvent.click(screen.getByTestId('modal-skip'));
+    expect(handlers[skip]).toHaveBeenCalledTimes(1);
+    expect(handlers[confirm]).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -252,12 +298,5 @@ describe('CharBonusActions - pending popup display', () => {
     // spell must not fall through to the default 'Utility' label.
     expect(screen.getByText(spell.name)).toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
-  });
-
-  it('stamps data-testid="castable-row-<slug>" on the bonus spell-name cell', () => {
-    renderWithSpells([bonusSpell({ name: 'Misty Step', level: 2, range: 'Self' })]);
-    const nameCell = screen.getByText('Misty Step');
-    expect(nameCell).toHaveClass('left', 'clickable');
-    expect(nameCell).toHaveAttribute('data-testid', 'castable-row-misty-step');
   });
 });

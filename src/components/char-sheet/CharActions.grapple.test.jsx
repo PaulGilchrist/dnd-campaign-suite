@@ -1,9 +1,10 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // CharActions grapple CLICK integration — owns only the component wiring lane:
 // span click → useCharActionsBaseActions invoked with the component's props/mocks →
 // observable popup + runtime-store write. All handleGrappleAction internals
-// (already-grappled guard, contest resolution, monk-Dex, JoAT/advantage stacking,
-// STR-mod fallbacks, log text) are owned by useCharActionsGrappleAction.test.js and
+// (already-grappled guard, win/loss contest boundary incl. the failure leg and its
+// byte-exact popup copy, monk-Dex, JoAT/advantage stacking, STR-mod fallbacks,
+// log text) are owned by useCharActionsGrappleAction.test.js and
 // useCharActionsBaseActions.grapple-contest-math.test.js; the Grapple-clickable-span
 // contract is owned by CharActions.baseActions.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
@@ -245,37 +246,26 @@ describe('CharActions grapple click integration', () => {
     getRuntimeValue.mockImplementation(() => null);
   });
 
-  it('clicking Grapple rolls Strength (Athletics) against the target contest and stamps grappled on success', async () => {
+  it('clicking Grapple fires the contest check exactly once and stamps the grappled write with the target and campaign props', async () => {
     const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ lastAttack: { d20: 12, total: 18 } });
 
+    expect(rollAbilityCheck).toHaveBeenCalledTimes(1);
     expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 6, {});
+    // Popup bytes (contest copy, win/loss wording) are hook-lane owned — only the
+    // routing of a Grapple popup back through the DiceRollContext sink is pinned here.
     await waitFor(() => {
-      expect(setPopupHtml).toHaveBeenCalledWith({
+      expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
         type: 'automation_info',
         name: 'Grapple',
-        description: 'Grapple successful! (d20: 12 + 6 = 18) vs Goblin Athletics (+1). Target is now grappled.',
-      });
+      }));
     });
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['grappled'], 'test-campaign');
-  });
-
-  it('clicking Grapple reports failure and leaves the target ungrappled when the check loses the contest', async () => {
-    const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ target: npcTarget('Ogre', 8), lastAttack: { d20: 1, total: 7 } });
-
-    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 6, {});
-    await waitFor(() => {
-      expect(setPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Grapple',
-        description: 'Grapple failed! (d20: 1 + 6 = 7) vs Ogre Athletics (+8). Target is not grappled.',
-      });
-    });
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Ogre', 'activeConditions', expect.arrayContaining(['grappled']), 'test-campaign');
+    // Component lane owns target resolution + campaign-propagation on the store write.
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['grappled']), 'test-campaign');
   });
 
   it.each([
-    { label: 'cannotAct prop blocks the click and pops the shared reason (RB-1115)', cannotAct: true, target: npcTarget('Goblin', 1), expectedPopup: CANNOT_ACT_REASON },
-    { label: 'no selected target prompts to select one', cannotAct: false, target: null, expectedPopup: { type: 'automation_info', name: 'Grapple', description: 'No target selected. Select a target in combat first.' } },
+    { label: 'cannotAct prop gates the handler and pops the shared reason (RB-1115)', cannotAct: true, target: npcTarget('Goblin', 1), expectedPopup: CANNOT_ACT_REASON },
+    { label: 'unresolvable target routes to the select-a-target prompt', cannotAct: false, target: null, expectedPopup: expect.objectContaining({ type: 'automation_info', name: 'Grapple' }) },
   ])('guard: $label', async ({ cannotAct, target, expectedPopup }) => {
     const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ cannotAct, target });
 

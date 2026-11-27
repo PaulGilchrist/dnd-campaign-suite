@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 /**
  * PAIR CORE — general enforcement lane of the assertCanAct pair (closer #2069):
  *  - THIS file: turn-lock, enforcement fast path (off/missing both shapes),
@@ -67,6 +67,7 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Bob', bucket: 'action', setPopupHtml: popup }))
             .toEqual({ allowed: false, rule: 'turnLock', reason: "It is Alice's turn — Bob cannot act now." });
         expect(popup).toHaveBeenCalledTimes(1);
+        expect(popup).toHaveBeenCalledWith("It is Alice's turn — Bob cannot act now.");
         expect(addEntry).toHaveBeenCalledTimes(1);
         // General enforcement never mutates the economy — charging is charge:true's lane (#2068).
         expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -105,19 +106,17 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         });
     });
 
-    it('enforcement off OR missing ⇒ allowed fast path, exactly one store read per shape', () => {
+    it.each([
+        ['missing enforcement flag', {}],
+        ['enforcement mode off', { 'campaign.enforcement': { mode: 'off' } }],
+    ])('%s ⇒ allowed fast path on exactly one store read', (_label, map) => {
+        mockStore(map);
         const popup = vi.fn();
-        mockStore({});
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', cannotAct: false, setPopupHtml: popup }))
             .toEqual({ allowed: true, reason: null });
         expect(getRuntimeValue).toHaveBeenCalledTimes(1); // flag only — no turnState/active reads
-
-        getRuntimeValue.mockClear();
-        mockStore({ 'campaign.enforcement': { mode: 'off' } });
-        expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', cannotAct: false }))
-            .toEqual({ allowed: true, reason: null });
-        expect(getRuntimeValue).toHaveBeenCalledTimes(1);
-
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'enforcement');
+        expect(getStore).not.toHaveBeenCalled(); // combatSummary mirror never touched off-mode
         expect(popup).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -157,16 +156,17 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         });
     });
 
-    it('economy exhaustion denial — exact string, survives missing popup sink, still audits (sink fold from #2068 open rec)', () => {
+    it('economy exhaustion denial — exact string, survives missing popup sink, audits exactly once (sink fold from #2068 open rec)', () => {
         mockStore({
             'campaign.enforcement': ON,
             'campaign.activeCreatureName': 'Rakan',
             'campaign.turnState': spend({}, 'Rakan', 'action').turnState,
         });
         // No setPopupHtml (some call sites have none) — reportDenial must degrade, not throw.
-        expect(() => assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'action' })).not.toThrow();
-        expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'action' }))
+        // bucket/source omitted ⇒ the ctx defaults ('action') ride the audit row, pinned by the envelope.
+        expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan' }))
             .toEqual({ allowed: false, rule: 'actionEconomy', reason: 'No action left this turn.' });
+        expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',
             creature: 'Rakan',
@@ -177,14 +177,38 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         });
     });
 
-    it('blocker targetEffects: action-lane vs reaction-lane scoping, te.reason passthrough, fallback strings', () => {
+    it('reportDenial degradation: no campaignName ⇒ popup only, zero audit rows; rejected log ⇒ console.error, denial stands', async () => {
+        mockStore({
+            'campaign.enforcement': ON,
+            'campaign.activeCreatureName': 'Rakan',
+            'campaign.turnState': spend({}, 'Rakan', 'bonusAction').turnState,
+        });
+        const DENY = { allowed: false, rule: 'actionEconomy', reason: 'No bonus action left this turn.' };
+        // Call sites with no campaign: UI feedback only, the audit lane is skipped.
+        const popup = vi.fn();
+        expect(assertCanAct({ creatureName: 'Rakan', bucket: 'bonusAction', setPopupHtml: popup })).toEqual(DENY);
+        expect(popup).toHaveBeenCalledTimes(1);
+        expect(addEntry).not.toHaveBeenCalled();
+
+        // A failing campaign-log never bubbles — the denial still returns.
+        addEntry.mockImplementation(() => Promise.reject(new Error('log offline')));
+        expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket: 'bonusAction' })).toEqual(DENY);
+        await Promise.resolve(); // flush the .catch microtask
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[assertCanAct] denial log failed:', expect.any(Error));
+    });
+
+    it('blocker targetEffects: action-lane vs reaction-lane scoping, target scoping, te.reason passthrough, fallback strings', () => {
+        const blockMol = { target: 'Mol', effect: 'no_action_and_bonus_action', reason: "Mol's block (must not deny Rakan)" };
         const blockAB = { target: 'Rakan', effect: 'no_action_and_bonus_action', reason: "Poisoned by Stinking Cloud (can't take an Action or Bonus Action)" };
         const blockR = { target: 'Rakan', effect: 'no_reactions', reason: "Petrifying Ray: can't take reactions" };
         mockStore({
             'campaign.enforcement': ON,
             'campaign.activeCreatureName': 'Rakan',
             'campaign.turnState': {},
-            'campaign.targetEffects': [blockAB, blockR],
+            // blockMol leads the list: `find` matching it for Rakan would surface the wrong reason.
+            'campaign.targetEffects': [blockMol, blockAB, blockR],
         });
         const ctx = (bucket) => assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', bucket });
         expect(ctx('action')).toEqual({ allowed: false, rule: 'condition', reason: blockAB.reason });

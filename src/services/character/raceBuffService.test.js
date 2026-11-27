@@ -1,19 +1,27 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 import { describe, it, expect } from 'vitest';
-import { computeRaceBuffs, applyRaceBuffsToPlayerData } from './raceBuffService.js';
+import { computeRaceBuffs } from './raceBuffService.js';
 import races5e from '../../../public/data/races.json';
 
-// Coverage notes (audited 2026-10-16):
+// Coverage notes (audited 2026-11-27):
 // - This file is the sole behavioral home for computeRaceBuffs: consumers
 //   (src/config/utils.js, src/hooks/wizard/useWizardAbilities.js,
 //   src/components/character-creation/WizardStepAbilities.jsx) all vi.mock it in
 //   their own tests, so nothing here is duplicated elsewhere.
-// - mergeDeduplicated dedup/append/create semantics live canonically in
-//   src/services/shared/buffApplier.test.js — not re-pinned here.
+// - Dead export unpinned (#1916, re-verified 2026-11-27): applyRaceBuffsToPlayerData
+//   has zero production callers (grep across src/ finds none) — its tests were
+//   removed. If the export is ever wired back up, mergeDeduplicated dedup/append/
+//   create semantics are canonically tested in src/services/shared/buffApplier.test.js.
 // - Source dead-branch flag (#1916): raceBuffService.js L111-113 re-pushes a
 //   'Trance' trait, but L94 already pushed every trait unconditionally, so the
 //   some() guard can never fire. The traits test pins the observable outcome
 //   (exactly one Trance entry).
+// - Latent source-bug flag (reported, NOT pinned): the addSkillProficiencies2024
+//   regex cannot parse serial-comma lists ("Insight, Perception, or Survival
+//   skill") — the delimiter class cannot cross the second comma. The only 2024
+//   disk row in that shape (Elf "Keen Senses") carries proficiency_choices, so
+//   the choices lane ships its options regardless and no live data is lost. Do
+//   not pin the broken comma-list outcome; fix the regex instead.
 
 const DEFAULT_BUFFS = {
   abilityScoreIncreases: [],
@@ -54,7 +62,7 @@ describe('raceBuffService', () => {
       ]);
     });
 
-    it('merges subrace ability bonuses with the race: appends new, sums shared, ignores unmatched', () => {
+    it('merges subrace ability bonuses with the race: appends new abilities, sums shared ones', () => {
       const race = {
         ability_bonuses: [{ name: 'str', bonus: 2 }],
         subraces: [
@@ -73,10 +81,8 @@ describe('raceBuffService', () => {
       expect(
         computeRaceBuffs(race, { race: { subrace: { name: 'Hill Dwarf' } } }, '5e').abilityScoreIncreases
       ).toEqual([{ name: 'Strength', amount: 3 }]);
-      // Unmatched subrace name: race-only
-      expect(
-        computeRaceBuffs(race, { race: { subrace: { name: 'Drow' } } }, '5e').abilityScoreIncreases
-      ).toEqual([{ name: 'Strength', amount: 2 }]);
+      // Unmatched-subrace resolution failures live in the dedicated
+      // "subrace cannot be resolved" boundary test below.
     });
 
     it('applies starting_proficiencies from race and subrace, ruleset-agnostic', () => {
@@ -207,19 +213,26 @@ describe('raceBuffService', () => {
       expect(resolve('cold')).toEqual(['fire', 'cold']);
     });
 
-    it('parses 2024 skill proficiencies from trait descriptions', () => {
+    it('parses 2024 skill proficiencies from trait descriptions ("and" and "or" separators)', () => {
       const race = {
-        traits: [{ name: 'Skill Proficiency', description: 'Proficiency in the Perception and Stealth skills' }],
+        traits: [
+          { name: 'Skill Proficiency', description: 'Proficiency in the Perception and Stealth skills' },
+          { name: 'Tool Proficiency', description: 'Proficiency in the Perception or Investigation skill' },
+        ],
       };
       const result = computeRaceBuffs(race, {}, '2024');
       expect(result.proficiencies).toEqual([
         { name: 'Skill: Perception' },
         { name: 'Skill: Stealth' },
+        { name: 'Skill: Perception' },
+        { name: 'Skill: Investigation' },
       ]);
     });
 
     it('expands 2024 proficiency_choices per option and duplicates Versatile options into feats', () => {
       const race = {
+        // 2024 never reads ability_bonuses (the ASI lane is ruleset === '5e' only)
+        ability_bonuses: [{ name: 'str', bonus: 2 }],
         traits: [
           { name: 'Skillful', proficiency_choices: { choose: '2', from: ['Perception', 'Stealth'] } },
           { name: 'Versatile', proficiency_choices: { choose: '1', from: ['Lucky'] } },
@@ -227,6 +240,7 @@ describe('raceBuffService', () => {
         ],
       };
       const result = computeRaceBuffs(race, {}, '2024');
+      expect(result.abilityScoreIncreases).toEqual([]);
       expect(result.proficiencies).toEqual([
         { name: 'Perception', isChoice: true, choose: '2' },
         { name: 'Stealth', isChoice: true, choose: '2' },
@@ -254,29 +268,6 @@ describe('raceBuffService', () => {
       expect(
         computeRaceBuffs(noSubraces, { race: { subrace: { name: 'High Elf' } } }, '5e').abilityScoreIncreases
       ).toEqual(raceOnly);
-    });
-  });
-
-  // DEAD EXPORT flag (#1916, verified 2026-10-16): no production module imports
-  // applyRaceBuffsToPlayerData — the three consumers of raceBuffService.js import
-  // only computeRaceBuffs. Pinned minimally until the export is removed; if it is
-  // ever wired back up, its merge semantics are canonically tested in
-  // src/services/shared/buffApplier.test.js and should not be re-pinned here.
-  describe('applyRaceBuffsToPlayerData', () => {
-    it('merges buff languages into playerData, creating the array when absent', () => {
-      const existing = { abilities: [], languages: ['Common'] };
-      applyRaceBuffsToPlayerData(existing, { abilityScoreIncreases: [], languages: ['Common', 'Elvish'] });
-      expect(existing.languages).toEqual(['Common', 'Elvish']);
-
-      const fresh = { abilities: [] };
-      applyRaceBuffsToPlayerData(fresh, { abilityScoreIncreases: [], languages: ['Elvish'] });
-      expect(fresh.languages).toEqual(['Elvish']);
-    });
-
-    it('throws TypeError when buffs is null or undefined', () => {
-      const playerData = { abilities: [], languages: ['Common'] };
-      expect(() => applyRaceBuffsToPlayerData(playerData, null)).toThrow(TypeError);
-      expect(() => applyRaceBuffsToPlayerData(playerData, undefined)).toThrow(TypeError);
     });
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -6,24 +6,32 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 
+// Default hook returns, re-seeded every beforeEach (clearAllMocks does not drop
+// mockReturnValue overrides, so per-test seams must not leak). Hoisted so the
+// vi.mock factories can share them with the test body.
+const { metamagicDefaults, flowDefaults } = vi.hoisted(() => ({
+  metamagicDefaults: () => ({
+    pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
+    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
+  }),
+  flowDefaults: () => ({
+    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
+    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
+  }),
+}));
+
+// Shared backing Map for the real useSyncedState (CharActions imports it from
+// useSyncedState.js, which reads getStore/setRuntimeValue/listeners from here).
+// No test seeds it — the store fixture just keeps the real hook inert.
 const _syncedStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => _syncedStore),
-  useSyncedState: vi.fn((_, key, defaultValue) => {
-    const hasValue = _syncedStore.has(key);
-    const value = hasValue ? _syncedStore.get(key) : defaultValue;
-    const setter = vi.fn((newValue) => {
-      _syncedStore.set(key, newValue);
-    });
-    return [value, setter];
-  }),
-  useRuntimeValue: vi.fn((_, key, _campaignName) => {
-    const hasValue = _syncedStore.has(key);
-    return hasValue ? _syncedStore.get(key) : null;
-  }),
+  useRuntimeValue: vi.fn(() => null),
   listeners: new Map(),
 }));
 
@@ -44,18 +52,12 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
-  useActionSpellMetamagic: vi.fn(() => ({
-    pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
-    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
-  })),
+  useActionSpellMetamagic: vi.fn(metamagicDefaults),
 }));
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
-  buildFeatureDetailHtml: vi.fn((entity) => {
-    if (entity.details) return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    return null;
-  }),
+  buildFeatureDetailHtml: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -63,12 +65,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
-    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
-    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
-    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
-  })),
+  useSpellMetamagicFlow: vi.fn(flowDefaults),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -193,31 +190,8 @@ vi.mock('../../services/rules/core/spellDamageUtils.js', async (importOriginal) 
   resolveHealExpression: vi.fn((_spell, _level, mod) => `1d4+${mod ?? 0}`),
 }));
 
-vi.mock('../../services/ui/formatUtils.js', () => ({
-  formatRange: vi.fn((range) => range || ''),
-  formatWeaponRange: vi.fn((a) => (a?.range ? String(a.range) : '')),
-  signFormatter: new Intl.NumberFormat('en-US', { signDisplay: 'always' }),
-  getAttackSpellLevel: vi.fn((spellAbilities, attackName) => {
-    if (!spellAbilities?.spells) return null;
-    const spell = spellAbilities.spells.find(s => s.name === attackName);
-    return spell ? spell.level : null;
-  }),
-}));
-
-vi.mock('../../services/ui/spellSectionUtils.js', async (importOriginal) => ({
-  ...(await importOriginal()),
-  getActionSpellNames: vi.fn((playerStats) => {
-    const names = new Set();
-    for (const spell of playerStats.spellAbilities?.spells || []) {
-      if (spell.casting_time === '1 action' && (spell.prepared === 'Always' || spell.prepared === 'Prepared')) {
-        if (spell.damage || spell.heal_at_slot_level) {
-          names.add(spell.name);
-        }
-      }
-    }
-    return names;
-  }),
-}));
+// Real spellSectionUtils.getActionSpellNames and real formatUtils render the
+// row set / labels; only hook-owned services are stubbed above.
 
 // --- Helpers ---
 
@@ -230,6 +204,8 @@ const basePlayerStats = {
 function spell(name, overrides = {}) {
   return { name, range: '60 ft', casting_time: '1 action', prepared: 'Prepared', ...overrides };
 }
+
+const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' };
 
 function statsWithSpells(spells, overrides = {}) {
   return { ...basePlayerStats, ...overrides, spellAbilities: { ...basePlayerStats.spellAbilities, spells, ...overrides.spellAbilities } };
@@ -247,7 +223,9 @@ describe('CharActions spell rendering', () => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
-    getRuntimeValue.mockImplementation(() => null);
+    getRuntimeValue.mockReturnValue(null);
+    useActionSpellMetamagic.mockReturnValue(metamagicDefaults());
+    useSpellMetamagicFlow.mockReturnValue(flowDefaults());
   });
 
   it('renders spell rows with name, level, range, and damage columns (Cantrip label for level 0)', async () => {
@@ -258,11 +236,11 @@ describe('CharActions spell rendering', () => {
 
     expect(screen.getByText('Fireball')).toHaveClass('clickable');
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('150 ft')).toBeInTheDocument();
+    expect(screen.getByText('150 ft.')).toBeInTheDocument();
     expect(screen.getByText('8d6')).toBeInTheDocument();
     expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
     expect(screen.getByText('Cantrip')).toBeInTheDocument();
-    expect(screen.getByText('120 ft')).toBeInTheDocument();
+    expect(screen.getByText('120 ft.')).toBeInTheDocument();
     expect(screen.getByText('1d10')).toBeInTheDocument();
   });
 
@@ -320,14 +298,7 @@ describe('CharActions spell rendering', () => {
     },
   ])('Hit column: $label', async ({ s, expectedHit, clickable }) => {
     const handleSpellAttackClick = vi.fn();
-    useActionSpellMetamagic.mockReturnValue({
-      pendingActionMetamagic: null,
-      handleActionMetamagicConfirm: vi.fn(),
-      handleActionMetamagicSkip: vi.fn(),
-      handleActionSpellDamageClick: vi.fn(),
-      handleSpellAttackClick,
-      handleSpellDamageClick: vi.fn(),
-    });
+    useActionSpellMetamagic.mockReturnValue({ ...metamagicDefaults(), handleSpellAttackClick });
 
     await renderActions(statsWithSpells([s]));
 
@@ -336,6 +307,7 @@ describe('CharActions spell rendering', () => {
       if (clickable) {
         expect(hitCell).toHaveClass('clickable');
         await act(async () => { fireEvent.click(hitCell); });
+        expect(handleSpellAttackClick).toHaveBeenCalledTimes(1);
         expect(handleSpellAttackClick).toHaveBeenCalledWith(expect.objectContaining({
           name: s.name, type: 'Action', hitBonus: 5, damage: '1d10',
         }));
@@ -352,79 +324,62 @@ describe('CharActions spell rendering', () => {
     {
       label: 'save-DC spell routes the damage click to resolveSpellDamage with the composed attack item',
       s: spell('Fireball', { level: 3, damage: '8d6', dc: { dc_type: 'CON', dc_success: 'half' } }),
-      expectedResolve: expect.objectContaining({ name: 'Fireball', damage: '8d6', saveDc: 13, saveType: 'CON', type: 'Action' }),
+      expectResolve: true,
     },
     {
-      label: 'attack spell routes the damage click to the metamagic gate, bypassing resolveSpellDamage',
+      label: 'attack spell routes the damage click to the metamagic gate with the authored spell, bypassing resolveSpellDamage',
       s: spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' }),
-      expectedResolve: null,
+      expectResolve: false,
     },
-  ])('Damage cell dispatch: $label', async ({ s, expectedResolve }) => {
+  ])('Damage cell dispatch: $label', async ({ s, expectResolve }) => {
     const resolveSpellDamage = vi.fn();
     const gateMetamagic = vi.fn();
-    useActionSpellMetamagic.mockReturnValue({
-      pendingActionMetamagic: null,
-      handleActionMetamagicConfirm: vi.fn(),
-      handleActionMetamagicSkip: vi.fn(),
-      handleActionSpellDamageClick: resolveSpellDamage,
-      handleSpellAttackClick: vi.fn(),
-      handleSpellDamageClick: vi.fn(),
-    });
-    useSpellMetamagicFlow.mockReturnValue({
-      pendingMetamagic: null, gateMetamagic, handleConfirm: vi.fn(), handleSkip: vi.fn(),
-    });
+    useActionSpellMetamagic.mockReturnValue({ ...metamagicDefaults(), handleActionSpellDamageClick: resolveSpellDamage });
+    useSpellMetamagicFlow.mockReturnValue({ ...flowDefaults(), gateMetamagic });
 
     const stats = statsWithSpells([s]);
     await renderActions(stats);
 
     await act(async () => { fireEvent.click(screen.getByText(s.damage)); });
 
-    if (expectedResolve) {
-      expect(resolveSpellDamage).toHaveBeenCalledWith(expectedResolve);
+    if (expectResolve) {
+      // attackItem composition (type/saveDc/saveType/resolved damage) is component-owned.
+      expect(resolveSpellDamage).toHaveBeenCalledTimes(1);
+      expect(resolveSpellDamage).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Fireball', damage: '8d6', saveDc: 13, saveType: 'CON', type: 'Action',
+      }));
       expect(gateMetamagic).not.toHaveBeenCalled();
     } else {
+      // The gate receives the raw authored spell object, by identity.
+      expect(gateMetamagic).toHaveBeenCalledTimes(1);
       expect(gateMetamagic).toHaveBeenCalledWith(stats.spellAbilities.spells[0], {});
       expect(resolveSpellDamage).not.toHaveBeenCalled();
     }
   });
 
-  it('spell name cell shows a wand cast affordance icon with a title hint', async () => {
-    await renderActions(statsWithSpells([
-      spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' }),
-    ]));
+  it('spell name cells carry the wand-cast affordance; weapon name cells stay bare', async () => {
+    await renderActions(statsWithSpells(
+      [spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' })],
+      { attacks: [longsword] },
+    ));
 
-    const nameCell = screen.getByText('Fire Bolt');
-    expect(nameCell).toHaveClass('left', 'clickable');
-    expect(nameCell).toHaveAttribute('title', 'Open spell details to cast');
-    expect(nameCell).toHaveAttribute('data-testid', 'castable-row-fire-bolt');
-    const icon = nameCell.querySelector('i.fa-solid.fa-wand-magic-sparkles');
+    const spellCell = screen.getByText('Fire Bolt');
+    expect(spellCell).toHaveClass('left', 'clickable');
+    expect(spellCell).toHaveAttribute('title', 'Open spell details to cast');
+    expect(spellCell).toHaveAttribute('data-testid', 'castable-row-fire-bolt');
+    const icon = spellCell.querySelector('i.fa-solid.fa-wand-magic-sparkles');
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveClass('spell-cast-icon');
-  });
 
-  it('weapon attack rows keep a bare name cell (no spell icon or cast hint)', async () => {
-    const stats = {
-      ...basePlayerStats,
-      attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-    };
-    await renderActions(stats);
-
-    const nameCell = screen.getByText('Longsword');
-    expect(nameCell.querySelector('i')).toBeNull();
-    expect(nameCell).not.toHaveAttribute('title');
-    expect(nameCell).not.toHaveAttribute('data-testid');
+    const weaponCell = screen.getByText('Longsword');
+    expect(weaponCell.querySelector('i')).toBeNull();
+    expect(weaponCell).not.toHaveAttribute('title');
+    expect(weaponCell).not.toHaveAttribute('data-testid');
   });
 
   it('routes a save-DC attack-row damage click to resolveSpellDamage', async () => {
     const resolveSpellDamage = vi.fn();
-    useActionSpellMetamagic.mockReturnValue({
-      pendingActionMetamagic: null,
-      handleActionMetamagicConfirm: vi.fn(),
-      handleActionMetamagicSkip: vi.fn(),
-      handleActionSpellDamageClick: resolveSpellDamage,
-      handleSpellAttackClick: vi.fn(),
-      handleSpellDamageClick: vi.fn(),
-    });
+    useActionSpellMetamagic.mockReturnValue({ ...metamagicDefaults(), handleActionSpellDamageClick: resolveSpellDamage });
 
     const stats = {
       ...basePlayerStats,
@@ -434,6 +389,7 @@ describe('CharActions spell rendering', () => {
 
     await act(async () => { fireEvent.click(screen.getByText('1d12')); });
 
-    expect(resolveSpellDamage).toHaveBeenCalledWith(stats.attacks[0]);
+    expect(resolveSpellDamage).toHaveBeenCalledTimes(1);
+    expect(resolveSpellDamage).toHaveBeenCalledWith(expect.objectContaining({ name: 'Witch Bolt', saveDc: 14 }));
   });
 });

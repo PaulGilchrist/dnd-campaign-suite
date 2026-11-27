@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-16
+// @maintained-by-ai 2026-11-27
 // Component-level click-lane coverage for CharActions' Hide & Dodge buttons:
-// rendered buttons must reach their handlers with props wired (cannotAct gate,
-// conditionEffects pass-through) and drive runtime-store reads/writes + logs.
-// Branch logic (stealth bonus math, forcedMode selection, Skulker, Pass Without
-// Trace, buff dedup, Dodge deactivate copy) is pinned at hook level in
-// useCharActionsHideAction.test.js and useCharActionsDodgeAction.test.js —
-// not re-pinned here.
+// rendered spans must reach their hook handlers with the component's props
+// wired (playerStats skill data, conditionEffects, cannotAct, name/campaign)
+// and drive the runtime-store write lane + log. Branch logic (already-hidden
+// refusal, success/failure channel with stamps, stealth bonus math, forcedMode
+// selection, Skulker, Pass Without Trace, buff dedup, Dodge toggle payloads and
+// deactivate copy) is byte-pinned at hook level in useCharActionsHideAction.test.js
+// and useCharActionsDodgeAction.test.js — not restated here. Row rendering /
+// clickable-span contract is owned by CharActions.baseActions.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -63,10 +65,9 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
-  buildFeatureDetailHtml: vi.fn((entity) => {
-    if (entity.details) return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    return null;
-  }),
+  // Sentinel only: detail-HTML generation is owned by
+  // CharActions.automationHandler.test.jsx and no row in this lane has details.
+  buildFeatureDetailHtml: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -269,48 +270,21 @@ describe('CharActions Hide/Dodge click lane', () => {
     stubRuntimeState();
   });
 
-  it('Hide: already invisible shows a refusal popup without rolling, writing state, or logging', async () => {
-    const { setPopupHtml, rollSkillCheck } = stubRollLane();
-    stubRuntimeState({ conditions: ['invisible'] });
-
-    await renderCharActions({ playerStats: createStats({ actions: ['Hide'] }) }, setPopupHtml);
-    await clickByText('Hide');
-
-    await waitFor(() => {
-      expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'Hide',
-        description: expect.stringContaining('already hidden'),
-      }));
-    });
-    expect(rollSkillCheck).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('Hide: successful Stealth roll (>= DC 15) adds invisible condition, advantage_on_stealth buff, and logs success', async () => {
+  it('Hide: rendered button click drives the Stealth roll with the playerStats bonus and stamps success through the store lane', async () => {
     const { setPopupHtml, rollSkillCheck } = stubRollLane();
     stubRuntimeState({ lastAttack: { d20: 12, bonus: 5, total: 17 } });
 
     await renderCharActions({ playerStats: makeStealthStats(5) }, setPopupHtml);
     await clickByText('Hide');
 
-    // Exact bonus pins playerStats skill data reaching the roll, empty context = no forced mode.
+    // Exact bonus pins playerStats skill data reaching the roll; {} proves no
+    // forced mode leaks in when no conditionEffects are supplied. The writes
+    // pin the component's getRuntimeValue/setRuntimeValue/addEntry wiring —
+    // byte-exact stamp contents are owned by the hook lane.
     await waitFor(() => {
       expect(rollSkillCheck).toHaveBeenCalledWith('Stealth', 5, {});
-    });
-    await waitFor(() => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeConditions', expect.arrayContaining(['invisible']), CAMPAIGN);
-    });
-    await waitFor(() => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeBuffs', expect.arrayContaining([{ name: 'Hide', effect: 'advantage_on_stealth' }]), CAMPAIGN);
-    });
-    await waitFor(() => {
-      expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'Hide',
-        description: expect.stringContaining('Hide successful'),
-      }));
-    });
-    await waitFor(() => {
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
         type: 'ability_use',
         characterName: 'TestCharacter',
@@ -318,34 +292,6 @@ describe('CharActions Hide/Dodge click lane', () => {
         description: expect.stringContaining('Success'),
       }));
     });
-  });
-
-  it('Hide: failed Stealth roll (< DC 15) pops failure, logs failure, and never writes the invisible condition', async () => {
-    const { setPopupHtml, rollSkillCheck } = stubRollLane();
-    stubRuntimeState({ lastAttack: { d20: 3, bonus: 5, total: 8 } });
-
-    await renderCharActions({ playerStats: makeStealthStats(5) }, setPopupHtml);
-    await clickByText('Hide');
-
-    await waitFor(() => {
-      expect(rollSkillCheck).toHaveBeenCalledWith('Stealth', 5, {});
-    });
-    await waitFor(() => {
-      expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'Hide',
-        description: expect.stringContaining('Hide failed'),
-      }));
-    });
-    await waitFor(() => {
-      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestCharacter',
-        abilityName: 'Hide',
-        description: expect.stringContaining('Failure'),
-      }));
-    });
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'activeConditions', expect.arrayContaining(['invisible']), CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'activeBuffs', expect.arrayContaining([{ name: 'Hide', effect: 'advantage_on_stealth' }]), CAMPAIGN);
   });
 
   it('Hide: conditionEffects prop flows through to the Stealth roll context', async () => {
@@ -376,18 +322,21 @@ describe('CharActions Hide/Dodge click lane', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
-      // RB-1115: the reason lane pops once per press — UI-only feedback.
+      // RB-1115: the reason lane pops exactly once per press — UI-only feedback.
+      expect(setPopupHtml).toHaveBeenCalledTimes(2);
       expect(setPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
     });
   });
 
-  it('Dodge: activation toggles the dodge buff, schedules expiry, pops activated copy, and logs', async () => {
+  it('Dodge: rendered button click toggles the dodge buff with prop-derived name/campaign, pops activated copy, and logs', async () => {
     const { setPopupHtml } = stubRollLane();
     toggleBuff.mockReturnValue({ wasActive: false });
 
     await renderCharActions({ playerStats: createStats() }, setPopupHtml);
     await clickByText('Dodge');
 
+    // Full toggleBuff payload pins playerStats.name + campaignName props reaching
+    // the handler; byte-exact expiry/log copy is owned by the hook lane.
     await waitFor(() => {
       expect(toggleBuff).toHaveBeenCalledWith(
         'TestCharacter',
@@ -396,21 +345,11 @@ describe('CharActions Hide/Dodge click lane', () => {
         CAMPAIGN,
         'TestCharacter'
       );
-    });
-    await waitFor(() => {
-      expect(addExpiration).toHaveBeenCalledWith({
-        attackerName: 'TestCharacter', targetName: 'TestCharacter',
-        effects: expect.any(Array), campaignName: CAMPAIGN,
-        rounds: undefined, expireOnCreatureName: 'TestCharacter',
-      });
-    });
-    await waitFor(() => {
+      expect(addExpiration).toHaveBeenCalled();
       expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
         name: 'Dodge',
         description: expect.stringContaining('Dodge activated'),
       }));
-    });
-    await waitFor(() => {
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
         type: 'ability_use',
         abilityName: 'Dodge',

@@ -1,12 +1,14 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-27
 // Deterministic contract suite for radianceOfDawnHandler: Channel Divinity charge
-// gate, modal payload shape, save/damage resolution, player save prompts, logging,
-// and popup HTML. Dice, damage application, and network are mocked; the only real
-// randomness (NPC auto-save) is spied where outcomes are asserted. Stable handler
-// behaviour — no churn expected as the app evolves.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// gate (zero-spend census), full-shape modal payload, level-resolved damage,
+// ordered NPC save/damage/log commit censuses, player save-prompt registry + SSE
+// POST bodies, persistence, and popup HTML. Dice, damage application, storage, and
+// network are mocked; the real pure helpers (buildSaveDc, computeDamageAfterSave,
+// normalizeSaveType) stay live. Date.now and Math.random are frozen per test. The
+// charge-resolution fallback chain is owned by healingPoolHandler's
+// resolveChannelDivinityCharges contract tests — this lane pins only the wiring.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-let testPendingSaves = {};
 let _pendingSaveRegistry = {};
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -15,43 +17,41 @@ vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => {
-  const mockFn = vi.fn();
-  return {
-    getRuntimeValue: mockFn,
-    setRuntimeValue: vi.fn(async () => {}),
-  };
-});
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
 
 vi.mock('../../../combat/auras/pendingSaveRegistry.js', () => ({
-  registerPendingSavePrompt: vi.fn((id, data) => { _pendingSaveRegistry[id] = data; }),
+  registerPendingSavePrompt: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn(async () => {}),
+  addEntry: vi.fn(),
 }));
 
 vi.mock('../../../encounters/combatData.js', () => ({
-  loadCombatSummary: vi.fn(async () => null),
-  getCombatSummary: vi.fn(() => null),
+  loadCombatSummary: vi.fn(),
+  getCombatSummary: vi.fn(),
 }));
 
+// computeDamageAfterSave + normalizeSaveType are pure — use the REAL ones;
+// only the side-effecting applyDamageToTarget is mocked.
 vi.mock('../../../rules/combat/applyDamage.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  applyDamageToTarget: vi.fn((cs, name, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg })),
-  computeDamageAfterSave: (rawDamage, saveSuccess, dcSuccess) => {
-    if (!saveSuccess) return rawDamage;
-    if (dcSuccess === 'half') return Math.floor(rawDamage / 2);
-    return 0;
-  },
+  applyDamageToTarget: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-  hasIgnoreResistance: vi.fn(() => false),
+  hasIgnoreResistance: vi.fn(),
 }));
 
 vi.mock('../../../rules/features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
+}));
+
+vi.mock('../../../ui/storage.js', () => ({
+  default: { set: vi.fn() },
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -59,50 +59,46 @@ vi.mock('../../../rules/features/invisibilityService.js', () => ({
 import { handle, confirmRadianceOfDawn } from './radianceOfDawnHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as pendingSaveRegistry from '../../../combat/auras/pendingSaveRegistry.js';
 import * as logService from '../../../ui/logService.js';
 import * as combatData from '../../../encounters/combatData.js';
 import * as applyDamage from '../../../rules/combat/applyDamage.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as invisibilityService from '../../../rules/features/invisibilityService.js';
+import storage from '../../../ui/storage.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
+const FROZEN_NOW = 1700000000000;
 
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCleric',
     level: 5,
     proficiency: 3,
-    proficiency_bonus: 3,
     abilities: [
       { name: 'Wisdom', bonus: 2 },
       { name: 'Constitution', bonus: 2 },
     ],
-    ability_scores: { WIS: { bonus: 2 } },
-    class: {
-      class_levels: [
-        undefined,
-        undefined,
-        { channel_divinity: 2 },
-        undefined,
-        undefined,
-      ],
-    },
+    class: { class_levels: [undefined, undefined, { channel_divinity: 2 }] },
     ...overrides,
   };
 }
 
+// Fixture mirrors the real subclasses.json row: type radiance_of_dawn,
+// emanation_30ft, "2d10 + cleric level" scaled up to 6d10 at high level.
 function makeAction(automation = {}) {
   return {
     name: 'Radiance of the Dawn',
     automation: {
+      type: 'radiance_of_dawn',
       saveDc: 'ability',
       saveAbility: 'WIS',
       saveType: 'CON',
       damage: '6d10 + cleric level',
       damageType: 'Radiant',
-      shape: 'burst_20ft',
+      shape: 'emanation_30ft',
       ...automation,
     },
   };
@@ -114,488 +110,392 @@ function makeCreature(name, type = 'npc', overrides = {}) {
     type,
     currentHp: 30,
     maxHp: 60,
-    saveBonuses: { con: 2 },
+    saveBonuses: { con: 0 },
     ...overrides,
   };
 }
 
-function mockCombatSummary(creatureNames) {
-  const creatures = creatureNames.map((n) => makeCreature(n));
+function seedSummary(creatures) {
   const summary = { creatures };
   combatData.loadCombatSummary.mockResolvedValue(summary);
   combatData.getCombatSummary.mockReturnValue(summary);
   return summary;
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+let dispatchSpy;
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  _pendingSaveRegistry = {};
+  // Rejecting-mock survivors: resetAllMocks strips factory implementations,
+  // so every default behavior is re-installed here.
+  useRuntimeState.setRuntimeValue.mockResolvedValue();
+  logService.addEntry.mockResolvedValue();
+  combatData.loadCombatSummary.mockResolvedValue(null);
+  combatData.getCombatSummary.mockReturnValue(null);
+  pendingSaveRegistry.registerPendingSavePrompt.mockImplementation(
+    (id, data) => { _pendingSaveRegistry[id] = data; },
+  );
+  applyDamage.applyDamageToTarget.mockImplementation(
+    (cs, name, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg }),
+  );
+  automationService.hasIgnoreResistance.mockReturnValue(false);
+  diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
+  vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+  // Math.random raw roll = floor(v*20)+1: 0.01→1, 0.55→12, 0.99→20.
+  vi.spyOn(Math, 'random').mockReturnValue(0.55);
+  dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+  // SSE save-prompt POSTs go through fetch — stub it so no real network.
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+// ── handle() ───────────────────────────────────────────────────
 
 describe('radianceOfDawnHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  it('refuses with the exact no-charges popup and a zero-spend census when stored charges are 0', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    const action = makeAction();
 
-  describe('charge validation', () => {
-    it('returns no-charges popup when stored charges is 0', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Radiance of the Dawn');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Radiance of the Dawn',
+        description: 'No Channel Divinity charges remaining.',
+        automation: action.automation,
+      },
     });
+    // Zero-spend census: no charge write, no combat read, no log, no roll.
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([]);
+    expect(combatData.loadCombatSummary.mock.calls).toEqual([]);
+    expect(logService.addEntry.mock.calls).toEqual([]);
+    expect(diceRoller.rollExpression.mock.calls).toEqual([]);
   });
 
-  describe('charge consumption', () => {
-    it('consumes one charge and proceeds to modal', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      mockCombatSummary(['Goblin']);
+  it('consumes exactly one charge and opens the modal with the full payload shape', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    const cs = seedSummary([makeCreature('TestCleric', 'player'), makeCreature('Goblin')]);
+    const action = makeAction();
+    const ps = makePlayerStats();
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        1,
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      ['TestCleric', 'channelDivinityCharges', 1, campaignName],
+    ]);
+    expect(result).toEqual({
+      type: 'modal',
+      modalName: 'radianceOfDawn',
+      payload: {
+        action,
+        playerStats: ps,
         campaignName,
-      );
-      expect(result.type).toBe('modal');
-    });
-
-    it('falls back to class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      mockCombatSummary(['Goblin']);
-
-      const ps = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [
-            undefined,
-            undefined,
-            { channel_divinity: 0, class_specific: { channel_divinity_charges: 4 } },
-          ],
-        },
-      });
-
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        3,
-        campaignName,
-      );
-      expect(result.type).toBe('modal');
+        // Self is excluded; the surviving creature object is passed through intact.
+        creatureTargets: [cs.creatures[1]],
+        saveDc: 13, // 8 + WIS 2 + prof 3 (real buildSaveDc)
+        featureName: 'Radiance of the Dawn',
+        saveType: 'CON',
+        rangeFeet: 30, // emanation_30ft
+        damageExpression: '6d10 + cleric level',
+        damageType: 'Radiant',
+      },
     });
   });
 
-  describe('combat summary check', () => {
-    it('returns modal with empty targets when no combat is active', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      combatData.loadCombatSummary.mockResolvedValue(null);
+  it.each([
+    {
+      title: 'coerces a missing saveDc to the computed ability DC and defaults CON/empty-damage/Radiant/10ft',
+      stats: {},
+      automation: { saveDc: undefined, saveAbility: undefined, saveType: undefined, damage: undefined, damageType: undefined, shape: 'burst_20ft' },
+      expect: { saveDc: 13, saveType: 'CON', damageExpression: '', damageType: 'Radiant', rangeFeet: 10 },
+    },
+    {
+      // The CON fallback would give 8+2+3=13 here; 10 proves saveAbility was read.
+      title: 'resolves the DC from saveAbility WIS, never the CON fallback',
+      stats: { abilities: [{ name: 'Wisdom', bonus: -1 }, { name: 'Constitution', bonus: 2 }] },
+      automation: { saveDc: undefined },
+      expect: { saveDc: 10 },
+    },
+  ])('modal payload: $title', async ({ stats, automation, expect: exp }) => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    seedSummary([makeCreature('Goblin')]);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeAction(automation), makePlayerStats(stats), campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.payload.creatureTargets).toEqual([]);
-    });
+    expect(result.type).toBe('modal');
+    expect(result.payload).toMatchObject(exp);
   });
 
-  describe('creature target filtering', () => {
-    it('excludes the player from creature targets', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      const cs = { creatures: [makeCreature('TestCleric'), makeCreature('Goblin')] };
-      combatData.loadCombatSummary.mockResolvedValue(cs);
-      combatData.getCombatSummary.mockReturnValue(cs);
+  it('opens the modal with empty creatureTargets when no combat is active', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    combatData.loadCombatSummary.mockResolvedValue(null);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.payload.creatureTargets).toEqual([expect.objectContaining({ name: 'Goblin' })]);
-    });
-  });
-
-  describe('modal payload', () => {
-    it('returns a modal with modalName, action references, and creatureTargets', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      const cs = { creatures: [makeCreature('Goblin'), makeCreature('Orc')] };
-      combatData.loadCombatSummary.mockResolvedValue(cs);
-      combatData.getCombatSummary.mockReturnValue(cs);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('radianceOfDawn');
-      expect(result.payload.action).toBe(action);
-      expect(result.payload.playerStats).toBe(ps);
-      expect(result.payload.campaignName).toBe(campaignName);
-      expect(result.payload.creatureTargets).toHaveLength(2);
-    });
-
-    it('uses auto values when provided for saveDc, saveType, damage, and damageType', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      mockCombatSummary(['Goblin']);
-
-      const result = await handle(
-        makeAction({ saveDc: 15, saveType: 'DEX', damage: '4d10', damageType: 'Fire' }),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.saveDc).toBe(15);
-      expect(result.payload.saveType).toBe('DEX');
-      expect(result.payload.damageExpression).toBe('4d10');
-      expect(result.payload.damageType).toBe('Fire');
-      expect(result.payload.featureName).toBe('Radiance of the Dawn');
-    });
-
-    it('falls back to computed saveDc, CON, empty damage, and Radiant when auto values are missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      mockCombatSummary(['Goblin']);
-
-      const action = makeAction({ saveDc: undefined, saveType: undefined, damage: undefined, damageType: undefined });
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.saveDc).toBe(13);
-      expect(result.payload.saveType).toBe('CON');
-      expect(result.payload.damageExpression).toBe('');
-      expect(result.payload.damageType).toBe('Radiant');
-    });
-
-    it('resolves save DC from WIS saveAbility, never the CON fallback', async () => {
-      const stats = makePlayerStats({
-        proficiency: 3,
-        abilities: [
-          { name: 'Wisdom', bonus: -1 },
-          { name: 'Constitution', bonus: 2 },
-        ],
-      });
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      mockCombatSummary(['Goblin']);
-
-      const result = await handle(makeAction({ saveDc: undefined, saveAbility: 'WIS' }), stats, campaignName, null);
-      expect(result.payload.saveDc).toBe(10);
-    });
-
-    it('uses 30ft for emanation shape and 10ft otherwise', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      mockCombatSummary(['Goblin']);
-
-      const emanationResult = await handle(makeAction({ shape: 'emanation_30ft' }), makePlayerStats(), campaignName, null);
-      expect(emanationResult.payload.rangeFeet).toBe(30);
-
-      const burstResult = await handle(makeAction({ shape: 'burst_20ft' }), makePlayerStats(), campaignName, null);
-      expect(burstResult.payload.rangeFeet).toBe(10);
-
-      const missingResult = await handle(makeAction({ shape: undefined }), makePlayerStats(), campaignName, null);
-      expect(missingResult.payload.rangeFeet).toBe(10);
-    });
+    expect(result.type).toBe('modal');
+    expect(result.payload.creatureTargets).toEqual([]);
+    expect(combatData.loadCombatSummary).toHaveBeenCalledTimes(1);
   });
 });
 
+// ── confirmRadianceOfDawn() ────────────────────────────────────
+
 describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    testPendingSaves = {};
-    _pendingSaveRegistry = {};
-    // SSE save-prompt POSTs go through fetch — stub it so the suite makes no
-    // real network attempts (the handler swallows the rejection otherwise).
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
-    useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-      if (prop === 'pendingSavePrompts') return testPendingSaves;
-      return null;
+  it('refuses with the exact roll-failure popup and a zero-spend census', async () => {
+    diceRoller.rollExpression.mockReturnValue(undefined);
+    seedSummary([makeCreature('Goblin')]);
+    const action = makeAction();
+
+    const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
+
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Radiance of the Dawn',
+        description: 'Radiance of the Dawn: Failed to roll damage.',
+        automation: action.automation,
+      },
     });
+    expect(combatData.getCombatSummary.mock.calls).toEqual([]);
+    expect(applyDamage.applyDamageToTarget.mock.calls).toEqual([]);
+    expect(logService.addEntry.mock.calls).toEqual([]);
+    expect(pendingSaveRegistry.registerPendingSavePrompt.mock.calls).toEqual([]);
+    expect(fetch.mock.calls).toEqual([]);
+    expect(storage.set.mock.calls).toEqual([]);
+    expect(dispatchSpy.mock.calls).toEqual([]);
   });
 
-  describe('damage resolution', () => {
-    it('rolls damage using the resolved expression and returns popup', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 23, rolls: [6, 5, 4, 3, 2, 3], modifier: 5 });
-      mockCombatSummary(['Goblin']);
+  it('refuses with the exact no-combat popup and commits nothing', async () => {
+    combatData.getCombatSummary.mockReturnValue(null);
+    const action = makeAction();
 
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
+    const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
 
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('6d10+5');
-      expect(result.type).toBe('popup');
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Radiance of the Dawn',
+        description: 'Radiance of the Dawn: No active combat.',
+        automation: action.automation,
+      },
     });
-
-    it('returns popup when rollExpression fails', async () => {
-      diceRoller.rollExpression.mockReturnValue(null);
-      mockCombatSummary(['Goblin']);
-
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Failed to roll damage');
-    });
+    expect(applyDamage.applyDamageToTarget.mock.calls).toEqual([]);
+    expect(logService.addEntry.mock.calls).toEqual([]);
+    expect(storage.set.mock.calls).toEqual([]);
+    expect(dispatchSpy.mock.calls).toEqual([]);
   });
 
-  describe('combat summary check', () => {
-    it('returns popup when getCombatSummary returns null', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      combatData.getCombatSummary.mockReturnValue(null);
+  it('rolls the level-resolved expression ONCE, damages every failing NPC in order, and commits the full contract', async () => {
+    Math.random.mockReturnValue(0.01); // every NPC saves raw 1
+    const cs = seedSummary([makeCreature('Goblin'), makeCreature('Orc')]);
+    const action = makeAction();
+    const ps = makePlayerStats();
 
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
+    const result = await confirmRadianceOfDawn(action, ps, campaignName, ['Goblin', 'Orc']);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No active combat');
-    });
-  });
-
-  describe('NPC target processing', () => {
-    it('applies ZERO damage on save success and full damage on save failure', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      applyDamage.applyDamageToTarget.mockImplementation((cs, name, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg }));
-      const passSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
-
-      const csPass = { creatures: [makeCreature('Goblin', 'npc', { saveBonuses: { con: 5 } })] };
-      combatData.getCombatSummary.mockReturnValue(csPass);
-      const action = makeAction({ saveDc: 13 });
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-      expect(result.payload.results[0].success).toBe(true);
-      expect(result.payload.results[0].damage).toBe(0);
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, ['Radiant'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestCleric', suppressHpLog: true });
-      passSpy.mockRestore();
-
-      vi.clearAllMocks();
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      applyDamage.applyDamageToTarget.mockImplementation((cs, name, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg }));
-      const failSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
-
-      const csFail = { creatures: [makeCreature('Goblin', 'npc', { saveBonuses: { con: 0 } })] };
-      combatData.getCombatSummary.mockReturnValue(csFail);
-      const result2 = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-      expect(result2.payload.results[0].success).toBe(false);
-      expect(result2.payload.results[0].damage).toBe(20);
-      failSpy.mockRestore();
-    });
-
-    it('skips targets not found in combat summary', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['UnknownCreature']);
-
-      expect(result.payload.results).toHaveLength(0);
-    });
-  });
-
-  describe('player target processing', () => {
-    it('sends a save prompt for player targets via SSE with correct damage info', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 25, rolls: [8, 7, 5, 5], modifier: 0 });
-      const cs = { creatures: [makeCreature('player-1', 'player')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-
-      const action = makeAction({ saveDc: 15, damageType: 'Fire' });
-      await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['player-1']);
-
-      const pendingSave = Object.values(_pendingSaveRegistry)[0];
-      expect(pendingSave.targetName).toBe('player-1');
-      expect(pendingSave.saveDc).toBe(15);
-      expect(pendingSave.damageType).toBe('Fire');
-      expect(pendingSave.rawDamage).toBe(25);
-      expect(pendingSave.attackerName).toBe('TestCleric');
-      expect(pendingSave.saveType).toBe('CON');
-      expect(pendingSave.dcSuccess).toBe('none');
-
-      // SSE dispatch: POST to the target's savePrompt runtime key
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/TestCampaign/savePrompt-player-1',
-        expect.objectContaining({ method: 'POST' }),
-      );
-    });
-  });
-
-  describe('invisibility handling', () => {
-    it('calls endInvisibilityOnHostileAction when NPC takes damage > 0', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 10 });
-
-      const action = makeAction();
-      await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(invisibilityService.endInvisibilityOnHostileAction).toHaveBeenCalledWith(
-        'TestCleric',
-        campaignName,
-      );
-    });
-
-    it('does not call endInvisibilityOnHostileAction when damage is 0', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [0], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 30 });
-
-      const action = makeAction();
-      await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(invisibilityService.endInvisibilityOnHostileAction).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('resistance handling', () => {
-    it('passes ignoreResistance to applyDamageToTarget', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 10 });
-      automationService.hasIgnoreResistance.mockReturnValue(true);
-
-      const action = makeAction();
-      await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(automationService.hasIgnoreResistance).toHaveBeenCalledWith(
-        makePlayerStats(),
-        'Radiant',
-      );
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['Radiant'], { campaignName, characters: expect.any(Array), ignoreResistance: true, attackerName: 'TestCleric', suppressHpLog: true });
-    });
-  });
-
-  describe('logging', () => {
-    it('logs save-damage entries for NPC targets and save-prompt entries for player targets', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 5 });
-      const cs = { creatures: [makeCreature('Goblin'), makeCreature('player-1', 'player')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 10 });
-
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin', 'player-1']);
-
-      const npcLogCalls = logService.addEntry.mock.calls.filter(
-        (call) => call[1]?.type === 'roll' && call[1]?.rollType === 'save-damage',
-      );
-      expect(npcLogCalls.length).toBeGreaterThan(0);
-      expect(npcLogCalls[0][1]).toMatchObject({
+    // "cleric level" resolved to 5, whitespace stripped; rolled exactly once.
+    expect(diceRoller.rollExpression.mock.calls).toEqual([['6d10+5']]);
+    // Ordered per-target damage commits (real computeDamageAfterSave: failed
+    // save + dcSuccess 'none' → full raw damage).
+    expect(applyDamage.applyDamageToTarget.mock.calls.map(([, name, dmg]) => [name, dmg])).toEqual([
+      ['Goblin', 20],
+      ['Orc', 20],
+    ]);
+    // Invisibility ends once damage lands.
+    expect(invisibilityService.endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestCleric', campaignName);
+    // One full-shape save-damage log row per NPC, in target order.
+    expect(logService.addEntry.mock.calls).toEqual([
+      [campaignName, {
+        type: 'roll',
         characterName: 'TestCleric',
         rollType: 'save-damage',
         name: 'Radiance of the Dawn',
+        formula: '6d10 + cleric level',
+        rolls: [10, 10],
+        total: 20,
+        modifier: 0,
+        damageType: 'Radiant',
         targetName: 'Goblin',
         saveType: 'CON',
         saveDc: 13,
         dcSuccess: 'none',
+        saveResult: 'failure',
+        saveRoll: 1,
+        saveBonus: 0,
+        saveRawRolls: [1],
         finalDamage: 20,
-        damageType: 'Radiant',
-      });
+        note: 'combined_save_damage_roll',
+        timestamp: FROZEN_NOW,
+      }],
+      [campaignName, expect.objectContaining({ targetName: 'Orc', rollType: 'save-damage' })],
+    ]);
+    // Persisted summary + one board notification.
+    expect(storage.set.mock.calls).toEqual([['combatSummary', cs, campaignName]]);
+    expect(dispatchSpy.mock.calls.map(([e]) => e.type)).toEqual(['combat-summary-updated']);
 
-      const playerLogCalls = logService.addEntry.mock.calls.filter(
-        (call) => call[1]?.type === 'roll' && call[1]?.rollType === 'save-prompt',
-      );
-      expect(playerLogCalls.length).toBeGreaterThan(0);
-      expect(playerLogCalls[0][1]).toMatchObject({
-        characterName: 'TestCleric',
-        rollType: 'save-prompt',
+    // Full-shape popup: activation twin carries automationType (refusals do not).
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
         name: 'Radiance of the Dawn',
-        targetName: 'player-1',
+        automationType: 'radiance_of_dawn',
+        automation: action.automation,
+        results: [
+          { targetName: 'Goblin', success: false, roll: 1, total: 1, saveBonus: 0, damage: 20, newHp: 10 },
+          { targetName: 'Orc', success: false, roll: 1, total: 1, saveBonus: 0, damage: 20, newHp: 10 },
+        ],
+        description: [
+          '<b>Radiance of the Dawn used!</b><br/><br/>',
+          '<b>Save DC: 13</b> (CON)<br/><br/>',
+          '<b>Rolls:</b> 6d10 + cleric level = 20 Radiant damage<br/><br/>',
+          '<b>Goblin</b>: <span style="color: #f44336;">Failed</span> (1+0=1 vs DC 13) — full damage: 20<br/>',
+          '<b>Orc</b>: <span style="color: #f44336;">Failed</span> (1+0=1 vs DC 13) — full damage: 20<br/>',
+        ].join(''),
+      },
+    });
+  });
+
+  it('applies zero damage on a successful NPC save and never breaks invisibility', async () => {
+    Math.random.mockReturnValue(0.99); // raw 20 beats DC 13
+    seedSummary([makeCreature('Goblin', 'npc', { saveBonuses: { con: 5 } })]);
+
+    const result = await confirmRadianceOfDawn(makeAction(), makePlayerStats(), campaignName, ['Goblin']);
+
+    // Real computeDamageAfterSave(raw, success, 'none') → 0.
+    expect(applyDamage.applyDamageToTarget.mock.calls).toEqual([
+      [expect.any(Object), 'Goblin', 0, ['Radiant'], {
+        campaignName, characters: expect.any(Array), ignoreResistance: false,
+        attackerName: 'TestCleric', suppressHpLog: true,
+      }],
+    ]);
+    expect(invisibilityService.endInvisibilityOnHostileAction.mock.calls).toEqual([]);
+    expect(result.payload.results).toEqual([
+      { targetName: 'Goblin', success: true, roll: 20, total: 25, saveBonus: 5, damage: 0, newHp: 30 },
+    ]);
+    expect(result.payload.description).toContain('(20+5=25 vs DC 13) — no damage: 0<br/>');
+  });
+
+  it('passes the ignoreResistance verdict through to damage application', async () => {
+    Math.random.mockReturnValue(0.01);
+    seedSummary([makeCreature('Goblin')]);
+    automationService.hasIgnoreResistance.mockReturnValue(true);
+    const ps = makePlayerStats();
+
+    await confirmRadianceOfDawn(makeAction(), ps, campaignName, ['Goblin']);
+
+    expect(automationService.hasIgnoreResistance.mock.calls).toEqual([[ps, 'Radiant']]);
+    expect(applyDamage.applyDamageToTarget.mock.calls[0][4]).toMatchObject({ ignoreResistance: true });
+  });
+
+  it.each([
+    { level: undefined, damage: '2d10 + cleric level', rolled: '2d10+1' },
+    { level: 5, damage: '2d10', rolled: '2d10' },
+  ])('resolves the damage expression: level $level, $damage → $rolled', async ({ level, damage, rolled }) => {
+    seedSummary([makeCreature('Goblin')]);
+
+    await confirmRadianceOfDawn(makeAction({ damage }), makePlayerStats({ level }), campaignName, ['Goblin']);
+
+    expect(diceRoller.rollExpression.mock.calls).toEqual([[rolled]]);
+  });
+
+  it('pinned divergence: confirm builds the DC from raw auto, so a missing saveDc falls to 10 (buildSaveDc error path), not handle\'s 13', async () => {
+    // handle() coerces `auto.saveDc || 'ability'` (radianceOfDawnHandler.js:55)
+    // but confirm (line 250) passes auto raw — with the real subclasses.json row
+    // (no saveDc field) the modal shows DC 13 while saves resolve vs DC 10.
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    Math.random.mockReturnValue(0.55); // raw 12 + 0 ≥ DC 10 → success
+    seedSummary([makeCreature('Goblin')]);
+
+    const result = await confirmRadianceOfDawn(makeAction({ saveDc: undefined }), makePlayerStats(), campaignName, ['Goblin']);
+
+    expect(result.payload.results[0]).toMatchObject({ success: true, roll: 12, total: 12 });
+    expect(result.payload.description).toContain('vs DC 10');
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('no saveDc defined'));
+  });
+
+  it.each([1, 2])('registers the save prompt, POSTs the SSE body, and logs save-prompt rows for %i player target(s)', async (count) => {
+    const names = Array.from({ length: count }, (_, i) => `player-${i + 1}`);
+    seedSummary(names.map((n) => makeCreature(n, 'player')));
+
+    const result = await confirmRadianceOfDawn(makeAction(), makePlayerStats(), campaignName, names);
+
+    for (const [i, targetName] of names.entries()) {
+      const promptId = `Radiance_of_the_Dawn_${targetName}_${FROZEN_NOW}`;
+      // Registry holds the full deferred-damage context.
+      expect(_pendingSaveRegistry[promptId]).toEqual({
+        targetName,
+        rawDamage: 20,
+        saveDc: 13,
         saveType: 'CON',
+        dcSuccess: 'none',
+        damageType: 'Radiant',
+        attackerName: 'TestCleric',
+        name: 'Radiance of the Dawn',
+        formula: '6d10 + cleric level',
+        modifier: 0,
+        rolls: [10, 10],
+        campaignName,
+        setPopupHtml: expect.any(Function),
       });
-
-      // Mixed run: only the NPC lands in results; the player shows as rolling.
-      expect(result.payload.results).toHaveLength(1);
-      expect(result.payload.results[0].targetName).toBe('Goblin');
-      expect(result.payload.description).toContain('1 player rolling saves...');
-    });
+      // SSE POST carries the same contract under the target's runtime key.
+      expect(fetch.mock.calls[i]).toEqual([
+        `/api/campaigns/TestCampaign/savePrompt-${targetName}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            value: {
+              promptId,
+              targetName,
+              saveType: 'CON',
+              saveDc: 13,
+              dcSuccess: 'none',
+              damageFormula: '6d10 + cleric level',
+              damageType: 'Radiant',
+              sourceName: 'Radiance of the Dawn',
+              rawDamage: 20,
+            },
+          }),
+        },
+      ]);
+      expect(logService.addEntry.mock.calls[i]).toEqual([campaignName, expect.objectContaining({
+        rollType: 'save-prompt',
+        targetName,
+        saveType: 'CON',
+        saveDc: 13,
+        timestamp: FROZEN_NOW,
+      })]);
+    }
+    expect(logService.addEntry).toHaveBeenCalledTimes(count);
+    // Players roll for themselves: no server-side damage, no invisibility break.
+    expect(applyDamage.applyDamageToTarget.mock.calls).toEqual([]);
+    expect(invisibilityService.endInvisibilityOnHostileAction.mock.calls).toEqual([]);
+    expect(result.payload.results).toEqual([]);
+    expect(result.payload.description).toContain(
+      `<b>${count} player${count !== 1 ? 's' : ''} rolling saves...</b>`,
+    );
   });
 
-  describe('combat summary persistence', () => {
-    it('dispatches combat-summary-updated event', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 15, rolls: [15], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 15 });
+  it('silently skips a target missing from the combat summary but still persists the board', async () => {
+    const cs = seedSummary([makeCreature('Goblin')]);
 
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    const result = await confirmRadianceOfDawn(makeAction(), makePlayerStats(), campaignName, ['UnknownCreature']);
 
-      const action = makeAction();
-      await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-      dispatchSpy.mockRestore();
-    });
-  });
-
-  describe('popup results HTML', () => {
-    it('includes feature name, save DC, damage, and pass/fail results in HTML', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin', 'npc', { saveBonuses: { con: 5 } })] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 20 });
-      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
-
-      const action = makeAction({ saveDc: 15 });
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
-
-      expect(result.payload.description).toContain('Radiance of the Dawn used!');
-      expect(result.payload.description).toContain('DC 15');
-      expect(result.payload.description).toContain('20 Radiant damage');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('no damage');
-      randomSpy.mockRestore();
-    });
-  });
-
-  describe('multiple targets', () => {
-    it('processes multiple NPC targets and returns results for each', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = {
-        creatures: [
-          makeCreature('Goblin'),
-          makeCreature('Orc', 'npc', { saveBonuses: { con: 4 } }),
-        ],
-      };
-      combatData.getCombatSummary.mockReturnValue(cs);
-      applyDamage.applyDamageToTarget
-        .mockReturnValueOnce({ finalDamage: 20, newHp: 10 })
-        .mockReturnValueOnce({ finalDamage: 10, newHp: 25 });
-
-      const action = makeAction({ saveDc: 13 });
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin', 'Orc']);
-
-      expect(result.payload.results).toHaveLength(2);
-      expect(result.payload.results[0].targetName).toBe('Goblin');
-      expect(result.payload.results[1].targetName).toBe('Orc');
-    });
-
-    it('shows correct player count for multiple player targets', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 15, rolls: [15], modifier: 0 });
-      const cs = {
-        creatures: [
-          makeCreature('player-1', 'player'),
-          makeCreature('player-2', 'player'),
-        ],
-      };
-      combatData.getCombatSummary.mockReturnValue(cs);
-
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['player-1', 'player-2']);
-
-      expect(result.payload.description).toContain('2 players rolling saves...');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('handles empty selectedTargets array', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 20, rolls: [10, 10], modifier: 0 });
-      const cs = { creatures: [makeCreature('Goblin')] };
-      combatData.getCombatSummary.mockReturnValue(cs);
-
-      const action = makeAction();
-      const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, []);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.results).toHaveLength(0);
-    });
+    expect(result.payload.results).toEqual([]);
+    expect(applyDamage.applyDamageToTarget.mock.calls).toEqual([]);
+    expect(logService.addEntry.mock.calls).toEqual([]);
+    expect(pendingSaveRegistry.registerPendingSavePrompt.mock.calls).toEqual([]);
+    expect(storage.set.mock.calls).toEqual([['combatSummary', cs, campaignName]]);
+    expect(dispatchSpy.mock.calls.map(([e]) => e.type)).toEqual(['combat-summary-updated']);
   });
 });
