@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai 2026-11-26
 /* Lane: editor save/reset confirmation toasts + playing-state untouched by editor
  * saves (backlog 2026-10-24 — silent Save/Reset + surprise-autoplay risk).
  * Toasts name the mood and follow the .sessions-toast/.encounter-toast pattern
@@ -75,13 +75,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  
   vi.restoreAllMocks();
 });
 
 describe('MusicPlayer editor save/reset toasts', () => {
-  it('toasts "Town tracks saved" (naming the mood) after a successful Save', async () => {
-    const stub = stubMusicServer();
+  it('Save while stopped toasts the mood name, PATCHes overrides only, and stays open', async () => {
+    const stub = stubMusicServer({ mood: null, playing: false });
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     const textarea = openEditor();
     clearSeededRows();
@@ -90,27 +89,15 @@ describe('MusicPlayer editor save/reset toasts', () => {
 
     await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
     expect(toastNode()).not.toHaveClass('music-toast-error');
-    // overrides persisted; editor STAYS OPEN with its content intact
-    // (backlog 2026-11-08 EM — stay-open save face)
-    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
+    // stay-open save face: editor holds with its draft intact (backlog 2026-11-08 EM)
     expect(screen.getByText('Save')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('One YouTube URL or video ID per line').value)
       .toBe('https://youtu.be/aaaaaaaaaaa');
-  });
-
-  it('Save while stopped PATCHes overrides only and leaves playing:false server-side', async () => {
-    const stub = stubMusicServer({ mood: null, playing: false });
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    const textarea = openEditor();
-    clearSeededRows();
-    fireEvent.change(textarea, { target: { value: 'aaaaaaaaaaa' } });
-    fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
-
+    // intent-split merge: a stopped tab must NEVER gain a spurious playing:true
     const patch = stub.posts.at(-1);
     expect('playing' in patch).toBe(false);
     expect('mood' in patch).toBe(false);
-    expect(patch.overrides.town).toHaveLength(1);
+    expect(patch.overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
     expect(stub.server().playing).toBe(false);
     expect(musicState().playing).toBe(false);
   });

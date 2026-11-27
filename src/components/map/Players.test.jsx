@@ -1,4 +1,15 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// ─── Lane: Players — core token face ──────────────────────────────────────────
+// Owned here: token count/geometry, portrait-vs-initial rendering, the image
+// URL law, selection + drag state chrome, the fog cull law (visitor hides,
+// GM sees all), and the per-token pointer wiring (drag opener + right-click
+// opener receive the CORRECT player).
+// Owned in sibling files (not re-pinned here): visitor/owned opener GATE law →
+// Players.context-menu-gate.test.jsx; ring color + hideLabel cosmetics →
+// Players.cosmetics.test.jsx; same-cell stacking transform/fade →
+// Players.token-stacking.test.jsx; zero-chip DOM + ownership ring →
+// Players.token-status.test.jsx; Select-tool exclusion cue →
+// Players.select-armed-cue.test.jsx.
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Players from './Players.jsx';
@@ -41,18 +52,14 @@ const renderComponent = (props = {}, players = [makePlayer()], characters = []) 
     );
 
 describe('Players', () => {
-    it('renders nothing when players array is empty', () => {
-        const { container } = renderComponent({}, []);
-        expect(container.querySelectorAll('g.creature-group').length).toBe(0);
-    });
-
     // Backlog 2026-10-27-M: a whole-document PUT that stripped `players` used
     // to land here as undefined/null and throw "players.map is not a
     // function" — the render path must degrade to an empty token list.
-    it('does not throw when the players prop is undefined or null (players-less doc)', () => {
-        for (const players of [undefined, null]) {
-            const { container } = renderComponent({ players });
+    it('degrades to an empty token list for [], undefined, and null players (players-less-doc guard)', () => {
+        for (const players of [[], undefined, null]) {
+            const { container, unmount } = renderComponent({ players });
             expect(container.querySelectorAll('g.creature-group').length).toBe(0);
+            unmount();
         }
     });
 
@@ -104,12 +111,19 @@ describe('Players', () => {
         expect(image).toHaveAttribute('height', String(RADIUS * 2 - 4));
         expect(image).toHaveAttribute('preserveAspectRatio', 'xMidYMid slice');
         expect(image).toHaveAttribute('clip-path', 'url(#creature-clip-player-1)');
+        expect(container.querySelector('text.creature-initial')).toBeNull();
     });
 
-    it('passes http(s) image URLs through unchanged', () => {
-        const characters = [makeCharacter({ imagePath: 'https://example.com/thorin.png' })];
-        const { container } = renderComponent({}, [makePlayer()], characters);
-        expect(container.querySelector('image.creature-image')).toHaveAttribute('xlink:href', 'https://example.com/thorin.png');
+    it('passes http(s) image URLs through unchanged (no campaign prefix)', () => {
+        for (const url of ['https://example.com/thorin.png', 'http://example.com/thorin.png']) {
+            const { container, unmount } = renderComponent(
+                {},
+                [makePlayer()],
+                [makeCharacter({ imagePath: url })]
+            );
+            expect(container.querySelector('image.creature-image')).toHaveAttribute('xlink:href', url);
+            unmount();
+        }
     });
 
     it('falls back to the uppercase initial at token center when no portrait is available', () => {
@@ -132,7 +146,7 @@ describe('Players', () => {
         }
     });
 
-    it('marks the selected player with class and highlight rect', () => {
+    it('highlights the selected token with class and dashed rect, and nothing else', () => {
         const { container } = renderComponent({ selectedPlayer: { id: 'player-1' } });
         const cx = gridCenterX(2);
         const cy = gridCenterY(3);
@@ -146,85 +160,98 @@ describe('Players', () => {
         expect(rect).toHaveAttribute('fill', 'none');
         expect(rect).toHaveAttribute('stroke-dasharray', '4 2');
         expect(rect).toHaveAttribute('pointer-events', 'none');
-    });
 
-    it('leaves unselected tokens unhighlighted', () => {
+        // Negative path: a different selection or none paints no chrome.
         for (const selectedPlayer of [{ id: 'player-2' }, null]) {
-            const { container } = renderComponent({ selectedPlayer });
-            expect(container.querySelector('circle.creature-circle')).not.toHaveClass('selected');
-            expect(container.querySelector('rect[stroke="#FFD700"]')).toBeNull();
+            const { container: other, unmount } = renderComponent({ selectedPlayer });
+            expect(other.querySelector('circle.creature-circle')).not.toHaveClass('selected');
+            expect(other.querySelector('rect[stroke="#FFD700"]')).toBeNull();
+            unmount();
         }
     });
 
-    it('marks the token being dragged, combined with selection', () => {
-        const { container } = renderComponent({
-            dragging: { playerId: 'player-1', pointerId: 1 },
-            selectedPlayer: { id: 'player-1' },
-        });
-        const circle = container.querySelector('circle.creature-circle');
-        expect(circle).toHaveClass('dragging');
-        expect(circle).toHaveClass('selected');
-    });
-
-    it('flags drag-invalid only for the dragged player over an invalid cell', () => {
-        const cases = [
-            { dragging: { playerId: 'player-1', invalid: true }, invalid: true },
-            { dragging: { playerId: 'player-1', invalid: false }, invalid: false },
-            { dragging: { playerId: 'player-2', invalid: true }, invalid: false },
+    it('marks exactly the dragged disc with the right state classes', () => {
+        const players = [
+            makePlayer({ id: 'p1', gridX: 0, gridY: 0 }),
+            makePlayer({ id: 'p2', gridX: 1, gridY: 1 }),
         ];
-        for (const { dragging, invalid } of cases) {
-            const { container } = renderComponent({ dragging });
-            const circle = container.querySelector('circle.creature-circle');
-            if (invalid) expect(circle).toHaveClass('drag-invalid');
-            else expect(circle).not.toHaveClass('drag-invalid');
+        const STATE_CLASSES = ['dragging', 'selected', 'drag-invalid'];
+        const cases = [
+            {
+                label: 'drag and selection classes stack on one disc',
+                dragging: { playerId: 'p1', pointerId: 1 },
+                selectedPlayer: { id: 'p1' },
+                expected: { p1: ['dragging', 'selected'], p2: [] },
+            },
+            {
+                label: 'invalid cell flags the dragged disc (stacked on dragging)',
+                dragging: { playerId: 'p1', invalid: true },
+                expected: { p1: ['dragging', 'drag-invalid'], p2: [] },
+            },
+            {
+                label: 'valid drag paints dragging without the invalid flag',
+                dragging: { playerId: 'p1', invalid: false },
+                expected: { p1: ['dragging'], p2: [] },
+            },
+            {
+                label: 'dragging another player flags that disc, not this one',
+                dragging: { playerId: 'p2', invalid: true },
+                expected: { p1: [], p2: ['dragging', 'drag-invalid'] },
+            },
+        ];
+        for (const { label, dragging, selectedPlayer, expected } of cases) {
+            const { container, unmount } = renderComponent({ dragging, selectedPlayer }, players);
+            const discs = container.querySelectorAll('circle.creature-circle');
+            expect(discs.length).toBe(2);
+            ['p1', 'p2'].forEach((id, i) => {
+                for (const cls of STATE_CLASSES) {
+                    if (expected[id].includes(cls)) {
+                        expect(discs[i], `${label}: ${id}`).toHaveClass(cls);
+                    } else {
+                        expect(discs[i], `${label}: ${id}`).not.toHaveClass(cls);
+                    }
+                }
+            });
+            unmount();
         }
     });
 
-    it('hides fogged tokens from players but shows them on localhost', () => {
-        const fog = new Set(['2,3']);
-        const player = renderComponent({ isLocalhost: false, fog });
-        expect(player.container.querySelectorAll('g.creature-group').length).toBe(0);
-        const gm = renderComponent({ isLocalhost: true, fog });
-        expect(gm.container.querySelectorAll('g.creature-group').length).toBe(1);
-    });
-
-    it('renders only the unfogged tokens for players', () => {
+    it('culls fogged tokens for visitors while the GM sees every token', () => {
         const players = [
             makePlayer({ id: 'p1', gridX: 1, gridY: 1 }),
             makePlayer({ id: 'p2', gridX: 2, gridY: 2 }),
             makePlayer({ id: 'p3', gridX: 3, gridY: 3 }),
         ];
         const fog = new Set(['1,1', '3,3']);
-        const { container } = renderComponent({ isLocalhost: false, fog }, players);
-        const groups = container.querySelectorAll('g.creature-group');
+        const visitor = renderComponent({ isLocalhost: false, fog }, players);
+        const groups = visitor.container.querySelectorAll('g.creature-group');
         expect(groups.length).toBe(1);
         expect(groups[0].querySelector('circle.creature-circle')).toHaveAttribute('cx', String(gridCenterX(2)));
+        visitor.unmount();
+
+        // The GM (localhost) sees all tokens, including fully-fogged ones.
+        const gm = renderComponent({ isLocalhost: true, fog }, players);
+        expect(gm.container.querySelectorAll('g.creature-group').length).toBe(3);
     });
 
-    it('calls handlePointerDown with the id of each clicked player', () => {
+    it('routes pointerdown and contextmenu to the correct player on every token', () => {
         const players = [
-            makePlayer({ id: 'p1', gridX: 0, gridY: 0 }),
-            makePlayer({ id: 'p2', gridX: 1, gridY: 1 }),
+            makePlayer({ id: 'p1', name: 'Thorin', gridX: 0, gridY: 0 }),
+            makePlayer({ id: 'p2', name: 'Gimli', gridX: 1, gridY: 1 }),
         ];
         const handlePointerDown = vi.fn();
-        const { container } = renderComponent({ handlePointerDown }, players);
+        const setSelectedPlayer = vi.fn();
+        const { container } = renderComponent({ handlePointerDown, setSelectedPlayer }, players);
         const groups = container.querySelectorAll('g.creature-group');
+        expect(groups.length).toBe(2);
         groups.forEach((group, i) => {
             handlePointerDown.mockClear();
+            setSelectedPlayer.mockClear();
             group.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
             expect(handlePointerDown).toHaveBeenCalledWith(expect.any(Object), players[i].id);
+            group.querySelector('circle.creature-circle')
+                .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+            expect(setSelectedPlayer).toHaveBeenCalledWith(players[i]);
         });
-    });
-
-    it('selects the correct player via context menu', () => {
-        const players = [
-            makePlayer({ id: 'p1', name: 'Thorin' }),
-            makePlayer({ id: 'p2', name: 'Gimli' }),
-        ];
-        const setSelectedPlayer = vi.fn();
-        const { container } = renderComponent({ setSelectedPlayer }, players);
-        const circle = container.querySelectorAll('g.creature-group')[1].querySelector('circle.creature-circle');
-        circle.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
-        expect(setSelectedPlayer).toHaveBeenCalledWith(players[1]);
     });
 });

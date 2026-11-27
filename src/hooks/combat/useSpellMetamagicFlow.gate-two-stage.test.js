@@ -1,15 +1,21 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Two-stage flow-orchestration seam for useSpellMetamagicFlow.
 // Owns: gateMetamagic → stage-machine entry, select→advance→confirm→clear+log,
-// and skip semantics for the three two-stage handlers (Enhance Ability:
-// ability→target; Protection from Energy / Resistance: target→type).
-// Per-handler internals (payloads, SP-093 slot pay-at-confirm, popup shape)
-// live in useTwoStageHandlers.* tests. Gate routing → gate.test.js; Sorcerer
-// payment → gate-sorcerer; material gate → gate-material.
+// armed-skip zero-write dismissal, and the flow-level stage-order asymmetry
+// (PfE parks on a skipped stage-1 select; Resistance proceeds) for the three
+// two-stage handlers (Enhance Ability: ability→target; Protection from Energy
+// / Resistance: target→type).
+// Deferred owners: per-handler internals (payloads, SP-093 pay-at-confirm,
+// popup shape, module-unit stage guards) → useTwoStageHandlers.* tests;
+// no-pending misfire superset → handler-guards.test.js; gate-armed simple/
+// complex skip census → skip.test.js; paid-skip refund pair →
+// useConfirmableFlow.skip-paid-gate.test.js; gate routing → gate.test.js;
+// Sorcerer payment → gate-sorcerer; material gate → gate-material.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { setRuntimeValue } from '../runtime/useRuntimeState.js';
 
 // ── Mocks (module-graph boilerplate shared by the lane; keep complete for
 // every named import the flow's handler factories evaluate) ─────────────────
@@ -31,6 +37,10 @@ vi.mock('../../services/npcs/monsterUtils.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  // useConfirmableFlow.js:5 imports both riders; missing exports surface as
+  // swallowed rider-error noise in every confirm.
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -223,9 +233,13 @@ function renderWithSpell(spellName, spellLevel) {
 
 // The three two-stage lanes share one orchestration shape: gate opens the
 // stage machine at firstStage, a mid select advances to secondStage, and the
-// confirm clears stage + pending and logs the cast cast. Levels/spell names
-// mirror public/data/spells.json (Enhance Ability lv2, Protection From Energy
-// lv3, Resistance cantrip).
+// confirm clears stage + pending and logs the cast. An armed skip dismisses
+// with zero writes — every two-stage gate arms UNPAID (pay-at-confirm), so
+// the 2026-11-15 pay-state gate retired the phantom cast row and any slot
+// rollback (refund pair bytes are pinned on the paid lane by
+// useConfirmableFlow.skip-paid-gate.test.js). Levels/spell names mirror
+// public/data/spells.json (Enhance Ability lv2, Protection From Energy lv3,
+// Resistance cantrip).
 const twoStageFlows = [
   {
     spell: 'Enhance Ability',
@@ -240,9 +254,6 @@ const twoStageFlows = [
     confirmArg: { targetName: 'Goblin A' },
     target: 'Goblin A',
     skip: 'handleEnhanceAbilitySkip',
-    skipLogs: false, // 2026-11-15 pay-state gate: the unpaid skip now writes
-                    // nothing at all (no cast log AND no slot rollback — see
-                    // useConfirmableFlow.skip-paid-gate.test.js)
   },
   {
     spell: 'Protection from Energy',
@@ -257,8 +268,6 @@ const twoStageFlows = [
     confirmArg: 'cold',
     target: 'Goblin B',
     skip: 'handleProtectionFromEnergySkip',
-    skipLogs: false, // SP-093 no rollback; 2026-11-15 pay-state gate also retires
-                     // the unpaid skip's phantom cast row — zero writes
   },
   {
     spell: 'Resistance',
@@ -273,8 +282,6 @@ const twoStageFlows = [
     confirmArg: 'fire',
     target: 'Goblin C',
     skip: 'handleResistanceSkip',
-    skipLogs: false, // 2026-11-15 pay-state gate: unpaid skip dismisses with zero
-                     // writes (no log, no free-cast resource credit)
   },
 ];
 
@@ -284,15 +291,13 @@ describe('useSpellMetamagicFlow — two-stage gate flow', () => {
   });
 
   for (const flow of twoStageFlows) {
-    it(`${flow.spell}: gate opens the stage machine at '${flow.firstStage}' with pending state`, () => {
+    it(`${flow.spell}: gate opens at '${flow.firstStage}', mid select advances to '${flow.secondStage}', confirm clears state and logs the cast`, async () => {
       const result = renderWithSpell(flow.spell, flow.level);
 
+      // Stage-machine entry: the effect opens the machine at firstStage the
+      // moment the gate arms pending.
       expect(result.current[flow.stageKey]).toBe(flow.firstStage);
       expect(result.current[flow.pendingKey]).not.toBeNull();
-    });
-
-    it(`${flow.spell}: ${flow.firstStage} → ${flow.secondStage} → confirm clears state and logs the cast`, async () => {
-      const result = renderWithSpell(flow.spell, flow.level);
 
       act(() => {
         result.current[flow.midSelect](flow.midSelectArg);
@@ -313,7 +318,7 @@ describe('useSpellMetamagicFlow — two-stage gate flow', () => {
       }));
     });
 
-    it(`${flow.spell}: skip clears stage and pending${flow.skipLogs ? ' and logs' : ' without a cast log'}`, () => {
+    it(`${flow.spell}: armed skip dismisses with zero writes — clears stage and pending, no cast log, no slot rollback`, () => {
       const result = renderWithSpell(flow.spell, flow.level);
 
       act(() => {
@@ -322,46 +327,14 @@ describe('useSpellMetamagicFlow — two-stage gate flow', () => {
 
       expect(result.current[flow.stageKey]).toBeNull();
       expect(result.current[flow.pendingKey]).toBeNull();
-      if (flow.skipLogs) {
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-          type: 'spell',
-          spellName: flow.spell,
-        }));
-      } else {
-        expect(addEntry).not.toHaveBeenCalled();
-      }
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   }
 
-  it('skip without pending state is a no-op for every two-stage handler', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({
-        playerStats: makePlayerStats(),
-        campaignName: 'test-campaign',
-        onExecute: vi.fn(),
-        setSecondaryTargetModal: null,
-        characters: [],
-        setPopupHtml: vi.fn(),
-      })
-    );
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-    expect(result.current.resistanceStage).toBeNull();
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip();
-      result.current.handleProtectionFromEnergySkip();
-      result.current.handleResistanceSkip();
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-    expect(result.current.resistanceStage).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('Protection from Energy guards type-select without a prior target selection', async () => {
+  // Flow-level stage-order asymmetry (module-unit guard internals live in the
+  // per-handler files; no-pending misfires in handler-guards.test.js).
+  it('Protection from Energy parks the armed machine at target when type-select skips stage 1', async () => {
     const result = renderWithSpell('Protection from Energy', 3);
 
     await act(async () => {
@@ -374,7 +347,7 @@ describe('useSpellMetamagicFlow — two-stage gate flow', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('Resistance has no target guard — type-select without a target proceeds and clears', async () => {
+  it('Resistance has no stage-1 guard — type-select without a target still casts and clears', async () => {
     const result = renderWithSpell('Resistance', 0);
 
     await act(async () => {
@@ -383,5 +356,9 @@ describe('useSpellMetamagicFlow — two-stage gate flow', () => {
 
     expect(result.current.resistanceStage).toBeNull();
     expect(result.current.pendingResistance).toBeNull();
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'spell',
+      spellName: 'Resistance',
+    }));
   });
 });

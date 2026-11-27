@@ -1,28 +1,19 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Per-target re-arm breadth seam for Death Strike (see hitResolution.death-strike
+// and useLoggedDiceRollDamage.death-strike headers, which point here for it):
+// consumption must evict ONLY this target's death_strike row — a sibling effect
+// on the same target and a death_strike armed on another target both survive for
+// later hits. The save-face happy paths (CON prompt → CLA-080 delta leg, log,
+// popup, base-only success, incomplete-te) run the identical createLogDamageAndShow
+// entry and live authoritatively in useLoggedDiceRollDamage.death-strike.test.js.
+// This file adds the success-verdict audit row, which that suite does not assert.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
-        if (!isCrit) return formula;
-        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
-        if (!parsed) return formula;
-        const count = parsed[1] || 1;
-        const sides = parsed[2];
-        const modifierStr = parsed[3];
-        let modifier = 0;
-        if (modifierStr) {
-            const segments = modifierStr.match(/([+-]\d+)/g);
-            for (const seg of segments) { modifier += parseInt(seg, 10); }
-        }
-        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
-        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
-        let result = `${dicePart}*2${rollStr}`;
-        if (modifier > 0) result += `+${modifier}`;
-        else if (modifier < 0) result += `${modifier}`;
-        return result;
-    }),
+    // No crits roll in this suite — identity is enough to satisfy the lane's import.
+    formatDamageFormula: vi.fn((formula) => formula),
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
@@ -140,12 +131,6 @@ describe('Plain damage death strike', () => {
             (key === 'campaign' && prop === 'targetEffects') ? tes : null);
     }
 
-    function slashLegs() {
-        return applyDamageToTarget.mock.calls
-            .filter((call) => call[1] === 'Goblin' && JSON.stringify(call[3]) === JSON.stringify(['slashing']))
-            .map((call) => call[2]);
-    }
-
     function cleanedTargetEffects() {
         const cleanupCall = setRuntimeValue.mock.calls.find(
             (call) => call[0] === 'campaign' && call[1] === 'targetEffects'
@@ -155,7 +140,8 @@ describe('Plain damage death strike', () => {
     }
 
     // Runs a hit through the full damage lane and answers the death-strike
-    // save prompt once the lane has actually dispatched it.
+    // save prompt once the lane has actually dispatched it, using the exact
+    // detail shape SavePromptModal emits (saveBonus/total — never bare `bonus`).
     async function hitThenSave(saveResult) {
         const promise = createLogDamageAndShow(deps)(HIT);
         for (let i = 0; i < 50 && sendSavePrompt.mock.calls.length === 0; i++) {
@@ -168,70 +154,13 @@ describe('Plain damage death strike', () => {
         await promise;
     }
 
-    it('failed save: prompts, pays only the extra-half delta, logs, updates popup (CLA-080)', async () => {
-        armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'strength' });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 14, newHp: -4, damageReduced: false });
-
-        await hitThenSave({ success: false, roll: 5, bonus: 2 });
-
-        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            promptId: PROMPT_ID,
-            targetName: 'Goblin',
-            saveType: 'strength',
-            saveDc: 15,
-            dcSuccess: false,
-            advantage: false,
-            disadvantage: false,
-        }));
-
-        // CLA-080: base 8 applied eagerly, failed save pays ONLY the +8 delta
-        // — two legs summing to 16 = 2× base (never a single extra 16 = 3×).
-        expect(slashLegs()).toEqual([8, 8]);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            type: 'roll',
-            rollType: 'save-damage',
-            name: 'Death Strike',
-            formula: '+1× 1d8+3',
-            total: 8,
-            saveType: 'strength',
-            saveDc: 15,
-            saveResult: 'failure',
-            saveRoll: 5,
-            saveBonus: 2,
-            description: expect.stringContaining('damage doubled (total 16)'),
-            note: 'death_strike_double_delta',
-        }));
-
-        const popupUpdater = deps.setPopupHtml.mock.calls.find((call) => typeof call[0] === 'function');
-        expect(popupUpdater).toBeDefined();
-        expect(popupUpdater[0]({})).toMatchObject({
-            deathStrikeDoubled: true,
-            deathStrikeSaveRoll: 5,
-            deathStrikeSaveBonus: 2,
-            deathStrikeSaveDc: 15,
-            deathStrikeFinalDamage: 14,
-        });
-    });
-
-    it('save success: base damage only, no delta log, no doubled popup, effect consumed', async () => {
-        armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'strength' });
-
-        await hitThenSave({ success: true, roll: 18, bonus: 3 });
-
-        expect(slashLegs()).toEqual([8]);
-        expect(deps.logEntry.mock.calls.some((call) => call[0]?.rollType === 'save-damage')).toBe(false);
-        expect(deps.setPopupHtml.mock.calls.some((call) => typeof call[0] === 'function')).toBe(false);
-        expect(cleanedTargetEffects()).toEqual([]);
-    });
-
-    it('save success logs its verdict: one save_result row (no silent eviction)', async () => {
+    it('save success logs its verdict: prompt names its producer and exactly one save_result row lands (no silent eviction)', async () => {
         armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'CON' });
 
         await hitThenSave({ success: true, roll: 18, total: 21, saveBonus: 3 });
 
-        // The prompt also names its producer (Source: Death Strike) on the
-        // modal — sibling prompts (Shield Bash et al.) never render nameless.
+        // The prompt names its producer (Source: Death Strike) on the modal —
+        // sibling prompts (Shield Bash et al.) never render nameless.
         expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             targetName: 'Goblin',
             sourceName: 'Death Strike',
@@ -255,46 +184,18 @@ describe('Plain damage death strike', () => {
         expect(saveRows[0].description).toContain('not doubled');
     });
 
-    it('save success (legacy detail shape with bonus, no saveBonus/total): row still lands', async () => {
-        armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'CON' });
-
-        await hitThenSave({ success: true, roll: 18, bonus: 3 });
-
-        const saveRow = deps.logEntry.mock.calls.map((call) => call[0]).find((entry) => entry?.type === 'save_result');
-        expect(saveRow).toBeDefined();
-        expect(saveRow.saveBonus).toBe(3);
-    });
-
-    it('re-arms for the next hit: consumes only this target death_strike, keeps other effects', async () => {
+    it('re-arms for the next hit: consumes only this target death_strike, keeps sibling effects and other-target strikes', async () => {
         armCampaignEffects(
-            { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'strength' },
+            { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'CON' },
             { effect: 'no_healing', target: 'Goblin', source: 'Slaad' },
-            { effect: 'death_strike', target: 'Other', saveDc: 15, saveType: 'strength' },
+            { effect: 'death_strike', target: 'Other', saveDc: 15, saveType: 'CON' },
         );
 
-        await hitThenSave({ success: false, roll: 5, bonus: 2 });
+        await hitThenSave({ success: false, roll: 5, total: 7, saveBonus: 2 });
 
         expect(cleanedTargetEffects()).toEqual([
             { effect: 'no_healing', target: 'Goblin', source: 'Slaad' },
-            { effect: 'death_strike', target: 'Other', saveDc: 15, saveType: 'strength' },
+            { effect: 'death_strike', target: 'Other', saveDc: 15, saveType: 'CON' },
         ]);
-    });
-
-    it('incomplete death_strike effect (missing saveDc or saveType): no prompt, no delta, still consumed', async () => {
-        for (const te of [
-            { effect: 'death_strike', target: 'Goblin', saveType: 'strength' },
-            { effect: 'death_strike', target: 'Goblin', saveDc: 15 },
-        ]) {
-            sendSavePrompt.mockClear();
-            applyDamageToTarget.mockClear();
-            setRuntimeValue.mockClear();
-            armCampaignEffects(te);
-
-            await createLogDamageAndShow(deps)(HIT);
-
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-            expect(slashLegs()).toEqual([8]);
-            expect(cleanedTargetEffects()).toEqual([]);
-        }
     });
 });

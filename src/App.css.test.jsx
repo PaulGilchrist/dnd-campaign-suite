@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Contract tests for App.css.
  *
@@ -109,7 +109,7 @@ const { topRules, mediaQueries } = parseStylesheet(css);
 
 /** Sidebar.css keeps its own small-screen @media block; parse it with the
  *  same block-aware parser so media rules never leak into the base lookup. */
-const { mediaQueries: sidebarMediaQueries } = parseStylesheet(sidebarCss);
+const { topRules: sidebarTopRules, mediaQueries: sidebarMediaQueries } = parseStylesheet(sidebarCss);
 
 /** Sessions lane ships a wider planner modal; its width law lives here. */
 const sessionsCss = parseRules(readCss(join(SRC_DIR, 'components/sessions/Sessions.css')));
@@ -239,27 +239,9 @@ describe('App.css', () => {
       });
     });
 
-    it('reserves a gutter in .app-body exactly as wide as the fixed sidebar', () => {
-      // A mismatch slides page content under (or leaves a gap beside) the sidebar.
-      const sidebar = styleFor('.sidebar', parseRules(sidebarCss));
-      expect(sidebar, 'Sidebar.css should style .sidebar').not.toBeNull();
-      expect(sidebar.position, 'sidebar should be fixed').toBe('fixed');
-      // The gutter rides the --sidebar-w token — the single pairing point with
-      // the fixed-overlay family — so the contract is: token feeds the gutter,
-      // and the token's desktop value equals the sidebar width.
-      expect(styleFor('.app-body')['padding-left']).toBe('var(--sidebar-w)');
-      expect(
-        styleFor(':root')['--sidebar-w'],
-        'gutter token must match .sidebar width'
-      ).toBe(sidebar.width);
-    });
-
-    it('renders .half-line as a half-em vertical spacer', () => {
-      expectStyles('.half-line', {
-        height: '0.5em',
-        'line-height': '0.5em',
-      });
-    });
+    // The full gutter contract (token ↔ sidebar-width pairing, dock-breakpoint
+    // release) is pinned by the consolidated "releases the sidebar gutter at
+    // the dock breakpoint" test in the collapsible-sidebar suite below.
   });
 
   describe('loading overlay', () => {
@@ -358,104 +340,79 @@ describe('App.css', () => {
     });
   });
 
-  describe('narrow-viewport toolbar wrap (2026-11-23 backlog)', () => {
-    it('wraps the Initiative header and GM control rows in the lane CSS', () => {
-      // Mirrors the shared .ct-header wrap law: at 420×760 the control row
-      // must drop buttons onto wrapped rows instead of past the window edge.
-      expect(
-        styleFor('.initiative .combat-controls', initiativeCss)?.['flex-wrap'],
-        'Initiative.css: .combat-controls must wrap on overflow'
-      ).toBe('wrap');
-      expect(
-        styleFor('.initiative .combat-header', initiativeCss)?.['flex-wrap'],
-        'Initiative.css: .combat-header must wrap on overflow'
-      ).toBe('wrap');
-    });
+  describe('narrow-viewport lane overflow kit (2026-11-23 backlog)', () => {
+    // One law table for every lane stylesheet that overflowed at 420×760
+    // (all laws live-proved there). Three idioms, chosen per row:
+    //  - wrap: flex rows drop controls onto wrapped rows instead of parking
+    //    them past the window edge (mirrors the shared .ct-header law);
+    //  - scroll: the 645/725px fixed attack/reaction grid tracks cannot wrap
+    //    without breaking the table columns, so the row owns an overflow-x
+    //    scroller and the document holds at innerWidth (row sw 725 / cw 364,
+    //    docSW 420);
+    //  - shrink: flexed inputs carry min-width: 0 so they fit below their
+    //    intrinsic size, and the spells table uses anywhere-wrap instead of
+    //    a scroller (.spell-popup-parent must stay overflow: visible for
+    //    spell popups; its min-content is the sum of seven columns' longest
+    //    unbreakable tokens, ~390px at 420 viewports).
+    const OVERFLOW_LAWS = [
+      ['Initiative.css', initiativeCss, '.initiative .combat-controls', 'flex-wrap', 'wrap'],
+      ['Initiative.css', initiativeCss, '.initiative .combat-header', 'flex-wrap', 'wrap'],
+      ['EncounterBuilder.css', encounterCss, '.encounter-builder .encounter-actions', 'flex-wrap', 'wrap'],
+      ['CharActions.css', charActionsCss, '.char-actions .attacks', 'overflow-x', 'auto'],
+      ['index.css', indexTopRules, '.char-reactions .attacks', 'overflow-x', 'auto'],
+      ['CharSpells.css', charSpellsCss, '.char-spells .table-spells th', 'overflow-wrap', 'anywhere'],
+      ['CharSpellSlots.css', charSlotLevelsCss, '.char-spell-slots.levels', 'flex-wrap', 'wrap'],
+      ['Log.css', logLaneCss, '.log-add-note', 'flex-wrap', 'wrap'],
+      ['Log.css', logLaneCss, '.log-add-note textarea', 'min-width', '0'],
+      ['Log.css', logLaneCss, '.log-add-note input[type="text"]', 'min-width', '0'],
+      ['MapsManager.css', mapsManagerCss, '.maps-manager-create', 'flex-wrap', 'wrap'],
+      ['MapsManager.css', mapsManagerCss, '.maps-manager-item', 'flex-wrap', 'wrap'],
+      ['MapsManager.css', mapsManagerCss, '.maps-manager-item-actions', 'flex-wrap', 'wrap'],
+    ];
 
-    it('wraps the Encounter Builder toolbar in the lane CSS', () => {
+    it('wraps, scrolls or shrinks every lane row that overflows at 420px', () => {
+      for (const [file, rules, selector, prop, value] of OVERFLOW_LAWS) {
+        expect(
+          styleFor(selector, rules)?.[prop],
+          `${file}: "${selector}" must declare "${prop}: ${value}"`
+        ).toBe(value);
+      }
+      // The retired flex-shrink: 0 pinned .maps-manager-item-actions to its
+      // 588px max-content width even on a wrapped line — it must not come back.
       expect(
-        styleFor('.encounter-builder .encounter-actions', encounterCss)?.['flex-wrap'],
-        'EncounterBuilder.css: .encounter-actions must wrap on overflow'
-      ).toBe('wrap');
-    });
-  });
-
-  describe('narrow-viewport lane debt (2026-11-23 backlog)', () => {
-    it('scrolls the fixed-track attack/reaction grids inside their rows', () => {
-      // The 645/725px fixed grid tracks cannot wrap without breaking the
-      // table columns, so the Encounters-lane scroller idiom applies: the
-      // row owns an overflow-x scroller and the document holds at
-      // innerWidth (live-proved 420×760: row sw 725 / cw 364, docSW 420).
-      expect(
-        styleFor('.char-actions .attacks', charActionsCss)?.['overflow-x'],
-        'CharActions.css: .attacks must be its own overflow-x scroller'
-      ).toBe('auto');
-      expect(
-        styleFor('.char-reactions .attacks', indexTopRules)?.['overflow-x'],
-        'index.css: .char-reactions .attacks must be its own overflow-x scroller'
-      ).toBe('auto');
-    });
-
-    it('lets long spell-table tokens wrap instead of forcing width', () => {
-      // The spells table min-content is the SUM of its seven columns'
-      // longest unbreakable tokens (~390px at 420 viewports); anywhere-wrap
-      // shrinks it below the container. A scroller was rejected because
-      // .spell-popup-parent must stay overflow:visible for spell popups.
-      expect(
-        styleFor('.char-spells .table-spells th', charSpellsCss)?.['overflow-wrap'],
-        'CharSpells.css: spell table cells must allow anywhere-wrapping of long tokens'
-      ).toBe('anywhere');
-    });
-
-    it('wraps the spell-slot level row so its grid track can shrink', () => {
-      expect(
-        styleFor('.char-spell-slots.levels', charSlotLevelsCss)?.['flex-wrap'],
-        'CharSpellSlots.css: the slot row must wrap on overflow'
-      ).toBe('wrap');
-    });
-
-    it('wraps the Log composer and shrinks its flexed inputs', () => {
-      expect(
-        styleFor('.log-add-note', logLaneCss)?.['flex-wrap'],
-        'Log.css: the composer row must wrap on overflow'
-      ).toBe('wrap');
-      expect(
-        styleFor('.log-add-note textarea', logLaneCss)?.['min-width'],
-        'Log.css: the flexed textarea must be allowed below its intrinsic size'
-      ).toBe('0');
-      expect(
-        styleFor('.log-add-note input[type="text"]', logLaneCss)?.['min-width'],
-        'Log.css: the flexed input must be allowed below its intrinsic size'
-      ).toBe('0');
-    });
-
-    it('wraps the Maps-manager create row, list rows and action clusters', () => {
-      expect(
-        styleFor('.maps-manager-create', mapsManagerCss)?.['flex-wrap'],
-        'MapsManager.css: the create row must wrap on overflow'
-      ).toBe('wrap');
-      expect(
-        styleFor('.maps-manager-item', mapsManagerCss)?.['flex-wrap'],
-        'MapsManager.css: list rows must wrap (actions drop under the name)'
-      ).toBe('wrap');
-      const actions = styleFor('.maps-manager-item-actions', mapsManagerCss);
-      expect(actions?.['flex-wrap'], 'MapsManager.css: action clusters must wrap on overflow').toBe('wrap');
-      // The retired flex-shrink: 0 pinned the cluster to its 588px
-      // max-content width even on a wrapped line — it must not come back.
-      expect(
-        actions['flex-shrink'],
-        'MapsManager.css: .maps-manager-item-actions must stay shrinkable so wrapping engages'
+        styleFor('.maps-manager-item-actions', mapsManagerCss)['flex-shrink'],
+        'MapsManager.css: action clusters must stay shrinkable so wrapping engages'
       ).not.toBe('0');
     });
   });
 
   describe('collapsible small-screen sidebar (2026-11-23 backlog)', () => {
     const MEDIA = '@media (max-width: 768px)';
-    const sidebarTopRules = parseRules(sidebarCss);
     const sidebarMediaRules = () => sidebarMediaQueries.get(normalize(MEDIA));
 
-    it('releases the 180px gutter to a ≤40px toggle column at small widths', () => {
-      const desktop = parseFloat(styleFor(':root')['--sidebar-w']);
+    it('releases the sidebar gutter at the dock breakpoint', () => {
+      // Full gutter-token lifecycle (absorbs the former desktop-gutter and
+      // dock-zero pins): one token pairs .app-body's gutter, the fixed
+      // sidebar's width, and the overlay family's carve-out (pinned by the
+      // fixed-overlay suite below), and the 768px block releases it.
+      const sidebar = styleFor('.sidebar', sidebarTopRules);
+      expect(sidebar, 'Sidebar.css should style .sidebar').not.toBeNull();
+      expect(sidebar.position, 'sidebar is fixed page chrome').toBe('fixed');
+      const root = styleFor(':root');
+      expect(root, 'App.css must own the :root gutter token').not.toBeNull();
+      expect(root['--sidebar-w'], 'gutter token must match .sidebar width').toBe(sidebar.width);
+      expect(styleFor('.app-body')['padding-left'], 'gutter must ride the token').toBe(
+        'var(--sidebar-w)'
+      );
+      // TV mode unmounts the sidebar, so its 0-2-0 rule reclaims the column.
+      expectStyles('.app-body:not(:has(.sidebar))', { 'padding-left': '0' });
+
+      // Docked: the overlay family releases the carve-out entirely (token →
+      // 0px) while .app-body keeps only the toggle column.
+      const desktop = parseFloat(root['--sidebar-w']);
+      const docked = styleInMedia(MEDIA, ':root');
+      expect(docked, `${MEDIA} must release the overlay carve-out entirely`).not.toBeNull();
+      expect(docked['--sidebar-w']).toBe('0px');
       const mobile = styleInMedia(MEDIA, '.app-body');
       expect(mobile, `expected ${MEDIA} to restyle .app-body`).not.toBeNull();
       const gutter = parseFloat(mobile['padding-left']);
@@ -464,11 +421,13 @@ describe('App.css', () => {
         gutter,
         'reserved gutter must stay ≤40px so a 420px viewport keeps ≥380px of content'
       ).toBeLessThanOrEqual(40);
-      // Tie-hardening: the media rule shares the base rule's 0-1-0
-      // specificity, so document order is load-bearing — the block must come
-      // after the base .app-body rule.
+      // Tie-hardening: both overrides share their base rules' specificity
+      // tiers, so document order is load-bearing — the block must parse
+      // after the base .app-body and :root rules.
       expect(css.indexOf(MEDIA), '768px block must parse after the base .app-body rule')
         .toBeGreaterThan(css.indexOf('.app-body'));
+      expect(css.indexOf(MEDIA), '768px block must parse after the base :root rule')
+        .toBeGreaterThan(css.indexOf(':root'));
     });
 
     it('docks the small-screen sidebar off-canvas until the drawer-open class', () => {
@@ -513,9 +472,9 @@ describe('App.css', () => {
     });
   });
 
+  // The --sidebar-w token's own value/lifecycle (desktop pairing, dock-zero,
+  // document-order tie-hardening) is pinned in the collapsible-sidebar suite.
   describe('fixed-overlay sidebar carve-out (bug-overlay-family-hardcodes-sidebar-carveout)', () => {
-    const MEDIA = '@media (max-width: 768px)';
-
     /** Every fixed scrim that used to hard-code the 180px sidebar gutter.
      *  Below the dock breakpoint the sidebar is out of the flow, so an
      *  overlay that keeps the carve-out loses viewport it no longer needs:
@@ -536,20 +495,6 @@ describe('App.css', () => {
       ['components/char-sheet/modals/NaturalRecoveryModal.css', '.nr-overlay'],
       ['components/char-sheet/modals/FontOfMagicModal.css', '.font-of-magic-overlay'],
     ];
-
-    it('declares --sidebar-w at the sidebar width and zeroes it at the dock breakpoint', () => {
-      expect(styleFor(':root'), 'App.css must own the :root gutter token').not.toBeNull();
-      expect(styleFor(':root')['--sidebar-w']).toBe('180px');
-      const docked = styleInMedia(MEDIA, ':root');
-      expect(docked, `${MEDIA} must release the overlay carve-out entirely`).not.toBeNull();
-      expect(docked['--sidebar-w']).toBe('0px');
-      // Tie-hardening: the override shares the :root tier, so the media block
-      // must parse after the base declaration.
-      expect(
-        css.indexOf(MEDIA),
-        '768px block must parse after the base :root rule'
-      ).toBeGreaterThan(css.indexOf(':root'));
-    });
 
     it('anchors every fixed overlay scrim on the gutter token', () => {
       for (const [file, selector] of OVERLAY_FAMILY) {
@@ -673,43 +618,29 @@ describe('App.css', () => {
       expectStyles('.ct-container .ct-modal-buttons', { 'margin-left': 'auto' });
     });
 
-    it('lets the sessions planner actually widen past the shared 520px card', () => {
-      // Specificity law: `.sessions-modal` alone (0-1-0) LOSES to the shared
+    it('lets lane modals actually widen past the shared 520px card', () => {
+      // Specificity law (sessions planner, then NPCs tranche 3): a bare
+      // `.sessions-modal`/`.npcs-modal` (0-1-0) LOSES to the shared
       // `.ct-container .ct-modal` width (0-2-0), so a bare-class override is
       // dead code — the planner measured 520px live despite claiming 720px.
-      const sessionsWidth = styleFor('.ct-container .ct-modal.sessions-modal', sessionsCss);
-      expect(
-        sessionsWidth,
-        'Sessions.css must out-specify .ct-container .ct-modal (compound selector)'
-      ).not.toBeNull();
-      expect(sessionsWidth.width, 'planner width must be viewport-capped (vw) as well as px').toMatch(
-        /vw/
-      );
-      const px = parseFloat(sessionsWidth.width.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '');
-      const shared = styleFor('.ct-container .ct-modal');
-      expect(px, 'planner must be wider than the shared 520px card').toBeGreaterThan(
-        parseFloat(shared.width)
-      );
-    });
-
-    it('lets the NPC stat editor actually widen past the shared 520px card', () => {
-      // Same specificity law (kit convergence tranche 3): the old bare
-      // `.npcs-modal { max-width: 640px }` (0-1-0) lost to `.ct-container
-      // .ct-modal` (0-2-0) and was dead code — the lane now ships the
-      // compound tier + viewport cap, mirroring the sessions planner.
-      const npcsWidth = styleFor('.ct-container .ct-modal.npcs-modal', npcsCss);
-      expect(
-        npcsWidth,
-        'NPCs.css must out-specify .ct-container .ct-modal (compound selector)'
-      ).not.toBeNull();
-      expect(npcsWidth.width, 'stat editor width must be viewport-capped (vw) as well as px').toMatch(
-        /vw/
-      );
-      const px = parseFloat(npcsWidth.width.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '');
-      expect(
-        px,
-        'stat editor must be wider than the shared 520px card'
-      ).toBeGreaterThan(parseFloat(styleFor('.ct-container .ct-modal').width));
+      // Both lanes must ship the compound tier + a viewport (vw) cap.
+      const shared = parseFloat(styleFor('.ct-container .ct-modal').width);
+      for (const [file, rules, selector, label] of [
+        ['Sessions.css', sessionsCss, '.ct-container .ct-modal.sessions-modal', 'planner'],
+        ['NPCs.css', npcsCss, '.ct-container .ct-modal.npcs-modal', 'stat editor'],
+      ]) {
+        const wide = styleFor(selector, rules);
+        expect(
+          wide,
+          `${file} must out-specify .ct-container .ct-modal (compound selector)`
+        ).not.toBeNull();
+        expect(
+          wide.width,
+          `${file}: ${label} width must be viewport-capped (vw) as well as px`
+        ).toMatch(/vw/);
+        const px = parseFloat(wide.width.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '');
+        expect(px, `${label} must be wider than the shared ${shared}px card`).toBeGreaterThan(shared);
+      }
       // The retired bare-class dead rule must not come back.
       expect(
         styleFor('.npcs-modal', npcsCss),
@@ -719,13 +650,20 @@ describe('App.css', () => {
   });
 
   describe('campaign tool form fields', () => {
-    it('sizes every field type to its container without overflowing', () => {
+    it('sizes every field type to its container and keeps field affordances usable', () => {
       for (const selector of ['.ct-input', '.ct-textarea', '.ct-select']) {
         expectStyles(`.ct-container ${selector}`, {
           width: '100%',
           'box-sizing': 'border-box',
         });
       }
+      expectStyles('.ct-container .ct-label', {
+        display: 'block',
+        color: 'var(--color-text-secondary)',
+      });
+      expectStyles('.ct-container .ct-required', { color: 'var(--color-error)' });
+      expectStyles('.ct-container .ct-textarea', { resize: 'vertical' });
+      expectStyles('.ct-container .ct-select', { cursor: 'pointer' });
     });
 
     it('highlights focused fields with the primary color and a glow ring', () => {
@@ -738,16 +676,6 @@ describe('App.css', () => {
           'var(--color-primary-rgb'
         );
       }
-    });
-
-    it('marks required labels in the error color and keeps field affordances usable', () => {
-      expectStyles('.ct-container .ct-label', {
-        display: 'block',
-        color: 'var(--color-text-secondary)',
-      });
-      expectStyles('.ct-container .ct-required', { color: 'var(--color-error)' });
-      expectStyles('.ct-container .ct-textarea', { resize: 'vertical' });
-      expectStyles('.ct-container .ct-select', { cursor: 'pointer' });
     });
   });
 

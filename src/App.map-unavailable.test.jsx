@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for the player "map unavailable" waiting placeholder.
  *
@@ -267,13 +267,8 @@ describe('App - player map-unavailable waiting placeholder', () => {
     // must be what decides, and the player never sees the maps manager.
     await renderPlayerOnWaitingMapsView([{ fileName: 'battle-arena.json', isActive: false }]);
 
-    const message = screen.getByText(/Waiting for the GM to open a map/);
-    expect(message.closest('.map-unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check Again' })).toBeInTheDocument();
-
-    expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-    expect(window.alert).not.toHaveBeenCalled();
+    expectStillWaiting();
   });
 
   it('"Check Again" loads the current campaign once per click — stays waiting, then opens the GM-activated map', async () => {
@@ -290,11 +285,14 @@ describe('App - player map-unavailable waiting placeholder', () => {
     expectStillWaiting();
 
     // GM activates — the next click opens the map and swaps the placeholder
-    // (message AND retry) out entirely.
+    // (message AND retry) out entirely. One load again — never a hammering
+    // loop on the success path either.
     loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
+    const callsBeforeOpen = loadMaps.mock.calls.length;
     clickCheckAgain();
 
     await waitFor(() => {
+      expect(loadMaps.mock.calls.length).toBe(callsBeforeOpen + 1);
       expect(screen.getByTestId('map-view')).toBeInTheDocument();
       expect(screen.getByTestId('map-name').textContent).toBe('battle-arena');
     });

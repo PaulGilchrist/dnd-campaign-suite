@@ -1,10 +1,17 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
-// Material-component / reagent gate seam of the useSpellMetamagicFlow lane.
-// gateMetamagic (useSpellMetamagicGates.js) checks consumed materials BEFORE
-// spellGates, multi-target, maze/warding-bond refusals, and the sorcerer
-// metamagic queue. This file owns that seam only: block-when-missing, pass-
-// when-carried, popup-without-setPopupHtml, and gate ordering. The Wild
-// Companion waiver is owned by useSpellMetamagicGates.wildCompanionMaterials.
+// @maintained-by-ai 2026-11-26
+// Material-component gate wiring at the HOOK seam: useSpellMetamagicFlow must
+// thread the real hasMaterial/consumeMaterial service, its own setPopupHtml
+// sink, and the campaignName into gateMetamagic (useSpellMetamagicGates.js),
+// where the consumed-material check runs BEFORE spellGates, the sorcerer
+// metamagic queue, and every payment lane. This file owns only that wiring:
+// pass-when-carried / pass-when-no-registry-entry (queues the metamagic
+// chooser), refuse-with-popup-and-audit-row-through-the-hook-sink, and gate
+// ordering against the REAL spellGates module.
+// Deferred to stronger siblings: full refusal bytes + material_refused audit
+// row shape (useSpellMetamagicGates.material-refused), Revivify material
+// precedence + row census (useSpellMetamagicGates.revivify-material-precedence),
+// refusal with an absent popup sink (same material-refused lane), and the
+// Wild Companion waiver (useSpellMetamagicGates.wildCompanionMaterials).
 //
 // The material service is ONLY partially mocked: getConsumedMaterial,
 // hasMaterial, and getMaterialRequirementMessage run for REAL against the
@@ -62,6 +69,7 @@ vi.mock('../useAllySelection.js', () => ({
 
 import { consumeMaterial } from '../../services/rules/spells/materialComponents.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -90,97 +98,69 @@ function renderFlow({ backpack = [], setPopupHtml = vi.fn(), onExecute = vi.fn()
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
-describe('useSpellMetamagicFlow — material component gating', () => {
+describe('useSpellMetamagicFlow — material component gating (hook wiring)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCombatSummary.mockReturnValue({ creatures: [] });
   });
 
-  it('passes a spell with no consumed-material registry entry through unmolested', async () => {
-    // Fireball has a free material in spells.json but no costly/consumed
-    // MATERIAL_REGISTRY row — the gate must not fire, and the sorcerer cast
-    // queues for metamagic selection without popup or consumption.
-    const { result, setPopupHtml, onExecute } = renderFlow();
-
-    await act(async () => {
-      await result.current.gateMetamagic({ name: 'Fireball', level: 3, casting_time: '1 Action', range: '150 ft.' });
-    });
-
-    expect(setPopupHtml).not.toHaveBeenCalled();
-    expect(consumeMaterial).not.toHaveBeenCalled();
-    expect(result.current.pendingMetamagic).not.toBeNull();
-    expect(result.current.pendingMetamagic.spellName).toBe('Fireball');
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
   describe.each([
     {
+      label: 'no consumed-material registry entry (Fireball)',
+      spell: { name: 'Fireball', level: 3, casting_time: '1 Action', range: '150 ft.' },
+      backpack: [],
+    },
+    {
+      label: 'exact-name reagent carried (Greater Restoration + Diamond Dust)',
       spell: { name: 'Greater Restoration', level: 5 },
-      itemName: 'Diamond Dust (100 gp)',
-      requirement: 'Greater Restoration requires diamond dust worth 100+ GP, which the spell consumes.',
+      backpack: ['Diamond Dust (100 gp)'],
     },
-    {
-      spell: { name: 'Forcecage', level: 7 },
-      itemName: 'Ruby Dust (1,500 gp)',
-      requirement: 'Forcecage requires ruby dust worth 1,500+ GP, which the spell consumes.',
-    },
-    {
-      spell: { name: 'Revivify', level: 3 },
-      itemName: 'Diamond (300 gp)',
-      requirement: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
-    },
-  ])('$name without $itemName in backpack', ({ spell, itemName, requirement }) => {
-    it('shows the material_refused popup and blocks the cast', async () => {
-      const { result, setPopupHtml, onExecute } = renderFlow();
+  ])('gate passes — $label', ({ spell, backpack }) => {
+    it('queues the sorcerer metamagic chooser unmolested: no popup, no consumption', async () => {
+      // Fireball carries a free material in spells.json but no costly/consumed
+      // MATERIAL_REGISTRY row (gate must not fire); the carried-leg proves the
+      // real hasMaterial match unlocks the gate. Consumption is deferred — this
+      // lane only queues the chooser.
+      const { result, setPopupHtml, onExecute } = renderFlow({ backpack });
 
       await act(async () => {
         await result.current.gateMetamagic(spell);
       });
 
-      // Refusal-must-popup law (2026-11-10 improve): explicit REFUSAL framing
-      // naming spell + item + backpack, with the verbatim RAW sentence kept as
-      // supporting detail — never just the requirement text + a lone Done.
-      expect(setPopupHtml).toHaveBeenCalledTimes(1);
-      expect(setPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: spell.name,
-        automationType: 'material_refused',
-        description: `${spell.name} refused: material component ${itemName} is not in TestSorcerer's backpack. Nothing spent. ${requirement}`,
-      });
+      expect(setPopupHtml).not.toHaveBeenCalled();
       expect(consumeMaterial).not.toHaveBeenCalled();
+      expect(result.current.pendingMetamagic).not.toBeNull();
+      expect(result.current.pendingMetamagic.spellName).toBe(spell.name);
       expect(onExecute).not.toHaveBeenCalled();
-      expect(result.current.pendingMetamagic).toBeNull();
     });
   });
 
-  it('proceeds to metamagic pending when the consumed material is carried', async () => {
-    // Exact-name backpack match (hasMaterial) unlocks the gate; consumption
-    // is deferred — the sorcerer lane only queues the metamagic chooser here.
-    const { result, setPopupHtml, onExecute } = renderFlow({
-      backpack: ['Diamond Dust (100 gp)'],
-    });
+  it('refuses a missing reagent through the hook sink: material_refused popup + audit row, nothing spent', async () => {
+    // Full refusal bytes and the audit-row shape are pinned stronger by
+    // useSpellMetamagicGates.material-refused; this pins the HOOK wiring: the
+    // refusal reaches the caller's setPopupHtml, is logged under the hook's
+    // campaignName, blocks the cast, and never arms the metamagic queue.
+    const { result, setPopupHtml, onExecute } = renderFlow();
 
     await act(async () => {
       await result.current.gateMetamagic({ name: 'Greater Restoration', level: 5 });
     });
 
-    expect(setPopupHtml).not.toHaveBeenCalled();
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'automation_info',
+      name: 'Greater Restoration',
+      automationType: 'material_refused',
+      description: expect.stringMatching(
+        /^Greater Restoration refused: material component Diamond Dust \(100 gp\) is not in TestSorcerer's backpack\. Nothing spent\./
+      ),
+    }));
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      automationType: 'material_refused',
+      material: 'Diamond Dust (100 gp)',
+    }));
     expect(consumeMaterial).not.toHaveBeenCalled();
-    expect(result.current.pendingMetamagic).not.toBeNull();
-    expect(result.current.pendingMetamagic.spellName).toBe('Greater Restoration');
     expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('still blocks the cast when setPopupHtml is missing', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderFlow({ setPopupHtml: undefined, onExecute });
-
-    await act(async () => {
-      await result.current.gateMetamagic({ name: 'Greater Restoration', level: 5 });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(consumeMaterial).not.toHaveBeenCalled();
     expect(result.current.pendingMetamagic).toBeNull();
   });
 

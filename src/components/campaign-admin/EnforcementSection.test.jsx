@@ -1,9 +1,13 @@
-// @maintained-by-ai 2026-10-14: 2026-10-24
+// @maintained-by-ai 2026-11-26
 /**
- * L5-001 — EnforcementSection behavior: master switch label/state, sub-flag
+ * L5-001 — EnforcementSection UI lane: master switch label/state, sub-flag
  * gating (disabled until enforcement is ON), merged writes through the
- * synced-store boundary, and rendering of saved server state (missing, null,
- * or partial pre-migration shapes) via ENFORCEMENT_DEFAULTS.
+ * synced-store boundary behind the trailing write-debounce, and rendering of
+ * saved server state (missing, null, or partial pre-migration shapes) via
+ * ENFORCEMENT_DEFAULTS. The preset DATA contracts (shape completeness,
+ * distinct on-sets, consequence copy, matchPreset law) live in
+ * src/config/enforcementPresets.test.js — this file only pins how the
+ * component wires them to the debounced write lane and the DOM.
  *
  * Write-lane debounce (backlog 2026-10-24, mirror of the currency-chip fix
  * 97165afc2): every checkbox click updates the optimistic UI instantly but the
@@ -22,6 +26,7 @@ import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js';
+import { ENFORCEMENT_PRESETS, describeConsequences } from '../../config/enforcementPresets.js';
 
 // Seedable in-memory synced store: `seed.enforcement` injects server-side
 // state before render; `writes` records every setter payload in order;
@@ -114,14 +119,11 @@ describe('EnforcementSection (L5-001)', () => {
         expect(masterSwitch()).not.toBeChecked();
         expect(screen.getByText('Enforcement OFF')).toBeInTheDocument();
         SUB_FLAGS.forEach((label) => expect(subFlag(label)).not.toBeChecked());
-    });
 
-    it('does not render controls for the removed assignable referee role', () => {
-        // Authority is hostname-derived (localhost IS the GM) — any lingering
-        // referee key/client-id plumbing here is a regression. (The plan-A
-        // consequence card legitimately says "Referee will…" in prose — the
-        // pin is on CONTROLS, matching this test's original intent.)
-        render(<EnforcementSection campaignName={CAMPAIGN} />);
+        // Authority is hostname-derived (localhost IS the GM) — no assignable
+        // referee plumbing may resurface as a control here. (The consequence
+        // card legitimately says "Referee will…" in prose; the pin is on
+        // interactive controls.)
         expect(screen.queryByRole('button', { name: /Referee/i })).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox', { name: /Referee/i })).not.toBeInTheDocument();
         expect(screen.queryByRole('textbox', { name: /Referee/i })).not.toBeInTheDocument();
@@ -235,32 +237,6 @@ describe('EnforcementSection (L5-001)', () => {
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on' });
     });
 
-    it('surfaces serverDice with a label + hint row and toggling it writes only that flag', () => {
-        // §7.4 oracle flag (campaigns-roll.js / applyRuling.js) — surfaced so
-        // the GM can arm it without hand-editing runtime state.
-        store.seed = { enforcement: { mode: 'on', turnLock: true } };
-        render(<EnforcementSection campaignName={CAMPAIGN} />);
-
-        const row = subFlag('Server dice');
-        expect(row).not.toBeChecked();
-        // The hint <em> sits inside the label, so it rides the accessible name.
-        expect(row).toHaveAccessibleName(/SERVER oracle[\s\S]*cannot be forged client-side/);
-
-        // Check: serverDice:true rides on the stored state, others untouched.
-        fireEvent.click(row);
-        expect(row).toBeChecked(); // instant optimistic flip on the UI lane
-        expect(store.writes).toHaveLength(0); // write is debounced
-        settle();
-        expect(store.writes).toHaveLength(1);
-        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, serverDice: true });
-
-        // Uncheck: flips only serverDice back to false.
-        fireEvent.click(row);
-        expect(row).not.toBeChecked();
-        settle();
-        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, serverDice: false });
-    });
-
     it('gates every sub-flag behind the master switch: disabled while OFF, interactive once ON', () => {
         render(<EnforcementSection campaignName={CAMPAIGN} />);
 
@@ -278,25 +254,6 @@ describe('EnforcementSection (L5-001)', () => {
         expect(store.writes).toHaveLength(0);
         settle();
         expect(store.writes).toHaveLength(1);
-    });
-
-    it('Select All arms every sub-flag in one debounced write and keeps enforcement ON', () => {
-        // Bulk button on a partial flag set: one click, one coalesced POST with
-        // all 10 sub-flags true; every flag rides on top of the stored state.
-        store.seed = { enforcement: { mode: 'on', turnLock: true } };
-        render(<EnforcementSection campaignName={CAMPAIGN} />);
-
-        fireEvent.click(screen.getByRole('button', { name: /Select All/ }));
-        // UI lane is instant: every checkbox flips on the same tick, write is debounced.
-        SUB_FLAGS.forEach((label) => expect(subFlag(label)).toBeChecked());
-        expect(store.writes).toHaveLength(0);
-        settle();
-        expect(store.writes).toHaveLength(1);
-        expect(lastWrite()).toEqual({
-            ...ENFORCEMENT_DEFAULTS,
-            mode: 'on',
-            ...Object.fromEntries(SUB_FLAG_KEYS.map(k => [k, true])),
-        });
     });
 
     it('Clear All disarms every sub-flag but leaves enforcement armed (unlike master-off)', () => {
@@ -374,7 +331,7 @@ describe('EnforcementSection (L5-001)', () => {
         });
     });
 
-    it('renders saved server state and every sub-flag toggle writes the full merged shape', () => {
+    it('renders a partial server blob, recovers missing keys on every toggle, and hints ride the accessible name', () => {
         // Partial (pre-migration) server shape: only mode + one flag survive.
         store.seed = { enforcement: { mode: 'on', turnLock: true } };
         render(<EnforcementSection campaignName={CAMPAIGN} />);
@@ -382,6 +339,9 @@ describe('EnforcementSection (L5-001)', () => {
         expect(masterSwitch()).toBeChecked();
         expect(subFlag('Turn lock')).toBeChecked();
         expect(subFlag('Action economy')).not.toBeChecked();
+        // §7.4 oracle flag surfaced with its hint inside the label (the hint
+        // <em> rides the accessible name) so the GM can arm it blind-free.
+        expect(subFlag('Server dice')).toHaveAccessibleName(/SERVER oracle[\s\S]*cannot be forged client-side/);
 
         // Checking a new flag rides on top of the stored state and recovers
         // the missing keys as defaults — the write is merged, never reset.
@@ -395,9 +355,16 @@ describe('EnforcementSection (L5-001)', () => {
         expect(subFlag('Action economy')).toBeChecked();
         settle();
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: false, actionEconomy: true });
+
+        // serverDice toggles independently: only that flag moves.
+        fireEvent.click(subFlag('Server dice'));
+        settle();
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: false, actionEconomy: true, serverDice: true });
     });
 
     // ---- Preset row + consequence card (deferred plan A) ----
+    // Composition/matchPreset/consequence-copy contracts are owned by
+    // src/config/enforcementPresets.test.js; here only the DOM wiring.
 
     const presetButton = (label) => screen.getByRole('button', { name: label });
     const isActive = (el) => el.className.split(' ').includes('active');
@@ -414,11 +381,12 @@ describe('EnforcementSection (L5-001)', () => {
         expect(flagsGroup().contains(presetButton('Gentle'))).toBe(false);
     });
 
-    it.each([
-        ['Gentle', ['turnLock', 'actionEconomy', 'movementBudget']],
-        ['Standard', SUB_FLAG_KEYS.filter(k => k !== 'serverDice')],
-        ['Strict', SUB_FLAG_KEYS],
-    ])('clicking %s writes mode:on + exactly its flags through the debounced lane, flipping checkboxes on the same tick', (label, onKeys) => {
+    // On-sets are DERIVED from the preset definitions (the composition itself
+    // is pinned in enforcementPresets.test.js) — this pins the click→write lane.
+    it.each(ENFORCEMENT_PRESETS.map(p => [
+        p.label,
+        Object.keys(p.flagMap).filter(k => p.flagMap[k]),
+    ]))('clicking %s writes mode:on + exactly its flags through the debounced lane, flipping checkboxes on the same tick', (label, onKeys) => {
         render(<EnforcementSection campaignName={CAMPAIGN} />);
         fireEvent.click(presetButton(label));
 
@@ -442,14 +410,17 @@ describe('EnforcementSection (L5-001)', () => {
         expect(isActive(screen.getByText('Custom'))).toBe(false);
     });
 
-    it('Custom auto-adopts the moment a checkbox moves after a preset click (derived, never stored)', () => {
+    it('derives the matching preset chip from the server blob at mount and drops to Custom the moment a checkbox drifts', () => {
+        // A fresh client rendering a server-stored Gentle blob activates the
+        // chip from the flags alone (no client memory, no stored preset key)...
+        store.seed = {
+            enforcement: { ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, actionEconomy: true, movementBudget: true },
+        };
         render(<EnforcementSection campaignName={CAMPAIGN} />);
-        fireEvent.click(presetButton('Gentle'));
-        settle();
         expect(isActive(presetButton('Gentle'))).toBe(true);
 
+        // ...and the optimistic draft re-derives on the SAME tick as the drift.
         fireEvent.click(subFlag('Zones & areas'));
-        // Optimistic draft re-derives on the same tick — no stored preset key.
         expect(isActive(presetButton('Gentle'))).toBe(false);
         expect(isActive(screen.getByText('Custom'))).toBe(true);
         settle();
@@ -463,31 +434,24 @@ describe('EnforcementSection (L5-001)', () => {
         });
     });
 
-    it('re-renders the server blob with the matching preset chip active (no client memory needed)', () => {
-        store.seed = {
-            enforcement: { ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, actionEconomy: true, movementBudget: true },
-        };
-        render(<EnforcementSection campaignName={CAMPAIGN} />);
-        expect(isActive(presetButton('Gentle'))).toBe(true);
-    });
-
-    it('consequence card derives from the flags: will/will-not lists, gone when everything is on', () => {
-        store.seed = {
-            enforcement: { ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, actionEconomy: true, movementBudget: true },
-        };
+    it('renders the consequence card as the flag-derived partition and keeps it live with every change', () => {
+        const gentle = { ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, actionEconomy: true, movementBudget: true };
+        store.seed = { enforcement: gentle };
         render(<EnforcementSection campaignName={CAMPAIGN} />);
         // The <b> head splits the line's own text node — assert via the row.
         const willLine = () => screen.getByText('Referee will:').closest('p');
         const willNotLine = () => screen.getByText('Referee will not:').closest('p');
-        expect(willLine()).toHaveTextContent(
-            'refuse off-turn actions; charge one Action + Bonus Action + Reaction per turn; clamp token drags to remaining speed'
-        );
-        expect(willNotLine()).toHaveTextContent('deny attacks without line of sight');
+        // The clause COPY is owned by enforcementPresets.test.js; here pin the
+        // wiring: the card renders describeConsequences' partition, joined live.
+        const derived = describeConsequences(gentle);
+        expect(willLine()).toHaveTextContent(derived.will.join('; '));
+        expect(willNotLine()).toHaveTextContent(derived.willNot.join('; '));
 
         fireEvent.click(presetButton('Strict'));
         settle();
         // All-on: the will-not line disappears entirely (nothing is excluded).
         expect(screen.queryByText('Referee will not:')).not.toBeInTheDocument();
+
         // Master-off zeroes every flag (existing law), so the card stays a
         // live preview of the inert state rather than going blank.
         fireEvent.click(masterSwitch());

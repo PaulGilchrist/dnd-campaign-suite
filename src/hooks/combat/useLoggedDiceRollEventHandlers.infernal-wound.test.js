@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-15: 2026-10-23
+// @maintained-by-ai 2026-11-26
 // MA-0367 (PC-target combo save-result seam): Bearded Devil Infernal Glaive —
 // a failed DC 12 CON save inflicts the wound via infernalWoundService; the
 // dc_success:"full" arm keeps the attack damage FULL on BOTH outcomes (the save
 // gates only the wound); a successful save grants ZERO wound state.
 // Owns the EVENT-BUS wiring seam only — the inline saveProcessing lane is
 // covered by saveProcessing.infernal-wound.test.js; the 'full' damage math
-// against the REAL applyDamage by applyDamage.save-full.test.js.
+// against the REAL applyDamage by applyDamage.save-full.test.js; the service
+// internals (exact te bytes, already-wounded refusal / idempotence, clocks,
+// bleed ticks) by infernalWoundService.test.js — never mirrored on this lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
@@ -126,11 +128,17 @@ describe('MA-0367 save-result seam — full damage both legs + wound grant', () 
         getPendingSavePrompt.mockReturnValue(glaivePending());
         await fire({ promptId: 'p1', targetName: TARGET, success: false, roll: 5, saveType: 'CON', saveDc: 12, dcSuccess: 'full' });
 
+        // single-dispatch census: the once-per-file install + one event must
+        // apply damage and grant exactly ONCE (leaked/stacked listeners re-fire)
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 7, ['Slashing'], expect.anything());
+        expect(grantInfernalWound).toHaveBeenCalledTimes(1);
         expect(grantInfernalWound).toHaveBeenCalledWith(expect.objectContaining({
             campaignName: CAMPAIGN,
             attackerName: DEVIL,
             targetName: TARGET,
+            // BY-name anchor: 1d10 comes from the disk row through
+            // parseInfernalWoundClause — never re-derive it here
             bleedDie: '1d10',
         }));
     });
@@ -140,6 +148,7 @@ describe('MA-0367 save-result seam — full damage both legs + wound grant', () 
         await fire({ promptId: 'p2', targetName: TARGET, success: true, roll: 19, saveType: 'CON', saveDc: 12, dcSuccess: 'full' });
 
         expect(grantInfernalWound).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 7, ['Slashing'], expect.anything());
     });
 
@@ -147,6 +156,10 @@ describe('MA-0367 save-result seam — full damage both legs + wound grant', () 
         getPendingSavePrompt.mockReturnValue({ ...glaivePending(), infernalWound: null });
         await fire({ promptId: 'p3', targetName: TARGET, success: false, roll: 5, saveType: 'CON', saveDc: 12, dcSuccess: 'full' });
 
+        // the guard only gates the WOUND — the ordinary save-fail damage leg
+        // must still land exactly once with the arm absent
         expect(grantInfernalWound).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 7, ['Slashing'], expect.anything());
     });
 });

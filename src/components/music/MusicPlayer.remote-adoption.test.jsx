@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-11-26
 /* Lane: remote music-state adoption (bug-music-player-no-remote-state-adoption).
  * The shared 'music' campaign key mirrors across tabs via SSE, but the YouTube
  * player is a per-tab singleton — so a transition committed by ANOTHER client
@@ -91,7 +91,7 @@ describe('MusicPlayer remote-state adoption', () => {
     expect(loggedActions()).toEqual(['set_ambience']);
   });
 
-  it('never re-commands the player for this tab\'s own commits (SSE echo skip)', () => {
+  it('commands the transport exactly once per own commit and logs the audit rows', () => {
     stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton());
@@ -100,6 +100,14 @@ describe('MusicPlayer remote-state adoption', () => {
     fireEvent.click(screen.getByTitle('Play')); // local resume
     expect(ambiencePlayer.resume).toHaveBeenCalledTimes(1);
     expect(ambiencePlayer.stop).not.toHaveBeenCalled();
+    // own SSE echoes append no extra rows either — exactly one per command
+    expect(loggedActions()).toEqual(['set_ambience', 'pause', 'resume']);
+    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'music', action: 'pause', mood: 'town', message: 'Paused Town ambience'
+    }));
+    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'music', action: 'resume', mood: 'town', message: 'Resumed Town ambience'
+    }));
   });
 
   it('releases this tab\'s frame when another tab starts ambience (no double audio)', () => {
@@ -146,21 +154,6 @@ describe('MusicPlayer remote-state adoption', () => {
     expect(ambiencePlayer.pause).not.toHaveBeenCalled();
     expect(frame(container)).toBeNull();
   });
-
-  it('logs pause and resume rows so the audit trail shows who commanded the transport', () => {
-    stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.click(townButton());
-    fireEvent.click(screen.getByTitle('Pause'));
-    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'music', action: 'pause', mood: 'town', message: 'Paused Town ambience'
-    }));
-
-    fireEvent.click(screen.getByTitle('Play'));
-    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'music', action: 'resume', mood: 'town', message: 'Resumed Town ambience'
-    }));
-  });
 });
 
 // bug-music-volume-no-cross-tab-adoption: volume was the write-only zombie
@@ -170,15 +163,14 @@ describe('MusicPlayer remote-state adoption', () => {
 describe('MusicPlayer volume adoption', () => {
   const volumeInput = () => screen.getByTitle('Volume');
 
-  it('seeds the slider from a synchronously-persisted volume on mount', () => {
+  it('seeds the slider from the persisted volume whether it arrives before or after mount', () => {
     stubMusicServer();
     getStore('campaign').set('music', { mood: null, playing: false, volume: 0.7, overrides: {} });
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    expect(volumeInput().value).toBe('70');
-  });
+    const owned = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    expect(volumeInput().value).toBe('70'); // synchronous mount seed
+    owned.unmount();
 
-  it('seeds the slider when the persisted volume lands AFTER mount (hydration race)', () => {
-    stubMusicServer();
+    getStore('campaign').delete('music');
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     expect(volumeInput().value).toBe('60'); // default before hydration arrives
 
@@ -187,20 +179,7 @@ describe('MusicPlayer volume adoption', () => {
     expect(volumeInput().value).toBe('20'); // re-seeded, not stuck at 60
   });
 
-  it('live-mirrors another tab\'s volume into this owner\'s slider and iframe', () => {
-    stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.click(townButton()); // this tab owns the player
-    ambiencePlayer.setVolume.mockClear();
-
-    remoteMusic({ mood: 'town', playing: true, volume: 0.25, overrides: {} });
-
-    expect(volumeInput().value).toBe('25');
-    expect(ambiencePlayer.setVolume).toHaveBeenCalledTimes(1);
-    expect(ambiencePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.25));
-  });
-
-  it('never re-commands the player for this tab\'s own volume echo, yet still adopts remote volume', () => {
+  it('mirrors remote volume into the owner\'s slider and iframe, and never re-commands on its own echo', () => {
     stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton());
@@ -213,8 +192,8 @@ describe('MusicPlayer volume adoption', () => {
     expect(ambiencePlayer.setVolume).not.toHaveBeenCalled(); // echo skipped, in-flight state intact
 
     remoteMusic({ mood: 'town', playing: true, volume: 0.45, overrides: {} }); // foreign change
-    expect(volumeInput().value).toBe('45');
-    expect(ambiencePlayer.setVolume).toHaveBeenCalledTimes(1);
+    expect(volumeInput().value).toBe('45'); // live-mirrored into the slider...
+    expect(ambiencePlayer.setVolume).toHaveBeenCalledTimes(1); // ...and the owner's iframe
     expect(ambiencePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.45));
   });
 });

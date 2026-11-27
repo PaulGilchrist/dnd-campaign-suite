@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -68,20 +68,17 @@ const descriptionsData = {
   },
 };
 
-const SIZE_CASES = [
-  { size: 'village', population: '50-100 souls', description: 'A quiet village', atmosphere: 'Peaceful', government: 'Village council', threat: 'Wild animals' },
-  { size: 'town', population: '800-1,500 souls', description: 'A bustling town', atmosphere: 'Lively', government: 'Mayor', threat: 'Bandits' },
-  { size: 'city', population: '5,000-12,000 souls', description: 'A great city', atmosphere: 'Cosmopolitan', government: 'City council', threat: 'Crime' },
-  { size: 'metropolis', population: '50,000-100,000 souls', description: 'A vast metropolis', atmosphere: 'Diverse', government: 'Duke', threat: 'Political intrigue' },
-];
-
-// Sizes whose mock data is missing (partially or wholly): population must
-// still come from the component's built-in ranges; missing text fields stay
-// empty and the threat field stays hidden.
-const PARTIAL_CASES = [
-  { label: 'village, missing atmospheres/governments/threats', data: { village: { descriptions: ['A quiet village'] } }, size: 'village', population: '50-100 souls', description: 'A quiet village', atmosphere: '', government: '' },
-  { label: 'town, missing threats', data: { town: { descriptions: ['A bustling town'], atmospheres: ['Lively'], governments: ['Mayor'] } }, size: 'town', population: '800-1,500 souls', description: 'A bustling town', atmosphere: 'Lively', government: 'Mayor' },
-  { label: 'city, no data at all', data: {}, size: 'city', population: '5,000-12,000 souls', description: '', atmosphere: '', government: '' },
+// Choosing a size in the NEW-settlement modal fills population from the
+// component's built-in per-size ranges and description/atmosphere/government/
+// threat from the fetched data. The rows collectively pin all four size→
+// population ranges plus every data-availability branch: complete data shows
+// and fills the threat field; a missing threats array or a wholly missing
+// size key leaves text fields empty and keeps the threat field hidden.
+const SIZE_FILL_CASES = [
+  { label: 'complete village data', data: descriptionsData, size: 'village', population: '50-100 souls', description: 'A quiet village', atmosphere: 'Peaceful', government: 'Village council', threat: 'Wild animals' },
+  { label: 'complete metropolis data', data: descriptionsData, size: 'metropolis', population: '50,000-100,000 souls', description: 'A vast metropolis', atmosphere: 'Diverse', government: 'Duke', threat: 'Political intrigue' },
+  { label: 'town data missing only threats', data: { town: { descriptions: ['A bustling town'], atmospheres: ['Lively'], governments: ['Mayor'] } }, size: 'town', population: '800-1,500 souls', description: 'A bustling town', atmosphere: 'Lively', government: 'Mayor', threat: null },
+  { label: 'no data for city', data: {}, size: 'city', population: '5,000-12,000 souls', description: '', atmosphere: '', government: '', threat: null },
 ];
 
 const THREAT_PLACEHOLDER = /current dangers or tensions/i;
@@ -111,23 +108,9 @@ describe('Settlements - form fields (behavioral)', () => {
   });
 
   describe('Size auto-population', () => {
-    it.each(SIZE_CASES)(
-      'auto-populates population, description, atmosphere, government, and threat for $size',
-      async ({ size, population, description, atmosphere, government, threat }) => {
-        await openNewModal();
-        changeSize(size);
-
-        expect(screen.getByLabelText('Population')).toHaveValue(population);
-        expect(screen.getByPlaceholderText(/describe what the settlement looks/i)).toHaveValue(description);
-        expect(screen.getByPlaceholderText(/mood and ambiance/i)).toHaveValue(atmosphere);
-        expect(screen.getByPlaceholderText(/how is this settlement governed/i)).toHaveValue(government);
-        expect(screen.getByPlaceholderText(THREAT_PLACEHOLDER)).toHaveValue(threat);
-      },
-    );
-
-    it.each(PARTIAL_CASES)(
-      'fills built-in population and only the available text fields for $label',
-      async ({ data, size, population, description, atmosphere, government }) => {
+    it.each(SIZE_FILL_CASES)(
+      'fills population and available text fields for $label',
+      async ({ data, size, population, description, atmosphere, government, threat }) => {
         await openNewModal(data);
         changeSize(size);
 
@@ -135,7 +118,12 @@ describe('Settlements - form fields (behavioral)', () => {
         expect(screen.getByPlaceholderText(/describe what the settlement looks/i)).toHaveValue(description);
         expect(screen.getByPlaceholderText(/mood and ambiance/i)).toHaveValue(atmosphere);
         expect(screen.getByPlaceholderText(/how is this settlement governed/i)).toHaveValue(government);
-        expect(screen.queryByPlaceholderText(THREAT_PLACEHOLDER)).not.toBeInTheDocument();
+
+        if (threat === null) {
+          expect(screen.queryByPlaceholderText(THREAT_PLACEHOLDER)).not.toBeInTheDocument();
+        } else {
+          expect(screen.getByPlaceholderText(THREAT_PLACEHOLDER)).toHaveValue(threat);
+        }
       },
     );
 
@@ -165,13 +153,21 @@ describe('Settlements - form fields (behavioral)', () => {
   });
 
   describe('Name field validation', () => {
-    it('enables save only once the name has content', async () => {
+    it('enables Save only for a non-blank name, re-disabling on blank or whitespace-only input', async () => {
       await openNewModal();
 
       const saveBtn = screen.getByRole('button', { name: /save/i });
       expect(saveBtn).toBeDisabled();
 
-      fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'My Settlement' } });
+      const nameInput = screen.getByLabelText(/name/i);
+      fireEvent.change(nameInput, { target: { value: 'My Settlement' } });
+      expect(saveBtn).toBeEnabled();
+
+      // Trimmed: whitespace-only names do not count as content.
+      fireEvent.change(nameInput, { target: { value: '   ' } });
+      expect(saveBtn).toBeDisabled();
+
+      fireEvent.change(nameInput, { target: { value: 'My Settlement' } });
       expect(saveBtn).toBeEnabled();
     });
   });

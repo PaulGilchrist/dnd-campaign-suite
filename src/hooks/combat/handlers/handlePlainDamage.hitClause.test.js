@@ -1,4 +1,20 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Generic MA-0010 hit-clause lane owner (family map in
+// handlePlainDamage.ma1732-wyvern-sting-poisoned-grant.test.js): grant
+// payload + provenance meta + reason bytes, clause-absent/unresolved-hit
+// zero-write, already-active dedupe, Large-or-smaller size ladder (incl.
+// Huge refusal and 'Medium or Small' pass), PFEG ward split, and the
+// buildHitConditionClause null negatives deferred here by
+// handlePlainDamage.ma1489-life-drain.test.js (the parseHitHpMaxReduce
+// truth tables live in MonsterCardHelpers.ma1645-nightbringer-bite-drain
+// .test.js). Per-row monsters.json bytes are pinned ONCE by the catalogue
+// test below; lane execution is shape-identical across rows, so the
+// end-to-end run covers each clause shape (cond+DC, cond-only, te-only,
+// combined) with one representative row — the te-only row is the
+// aberrant-spirit-slaad Claw, whose data row healingBlock.test.js's header
+// delegates to this file. te→attack-mode consumer folds are NOT repeated
+// here: conditionEffectsCompute.test.js (registry census) and
+// conditionEffects.test.js (combineAttackModes matrix) own those bytes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -99,7 +115,6 @@ import { playerIsImmuneToCondition } from '../../../services/combat/automation/a
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
-import { computeConditionEffects, combineAttackModes } from '../../../services/combat/conditions/conditionEffects.js';
 import monsters from '../../../../public/data/monsters.json';
 
 const TARGET = 'Bandit 1';
@@ -180,42 +195,7 @@ async function resolveHit(action, attackerName) {
     return rowDeps.logEntry;
 }
 
-describe('buildHitConditionClause — generic clause shapes', () => {
-    it('arms conditions + escapeDc from hit_conditions + escape_dc', () => {
-        expect(buildHitConditionClause({ name: 'Tentacle Lash', attack_bonus: 7, hit_conditions: ['grappled', 'restrained'], escape_dc: 14 })).toEqual({
-            conditions: ['grappled', 'restrained'],
-            escapeDc: 14,
-            attackName: 'Tentacle Lash',
-            targetEffect: null,
-        });
-    });
-
-    it('arms a targetEffect-only clause from hit_target_effect', () => {
-        expect(buildHitConditionClause({ name: 'Claw', hit_target_effect: 'no_healing' })).toEqual({
-            conditions: [],
-            escapeDc: null,
-            attackName: 'Claw',
-            targetEffect: 'no_healing',
-        });
-    });
-
-    it('arms the combined conditions + targetEffect clause', () => {
-        expect(buildHitConditionClause({ name: 'Beard', hit_conditions: ['poisoned'], hit_target_effect: 'no_healing' })).toEqual({
-            conditions: ['poisoned'],
-            escapeDc: null,
-            attackName: 'Beard',
-            targetEffect: 'no_healing',
-        });
-    });
-
-    it('returns null for actions without any hit rider', () => {
-        expect(buildHitConditionClause(undefined)).toBeNull();
-        expect(buildHitConditionClause({ name: 'Mind Rot', attack_bonus: 7 })).toBeNull();
-        expect(buildHitConditionClause({ name: 'X', hit_conditions: [] })).toBeNull();
-    });
-});
-
-// ── Table-driven generic lane over every authored monsters.json hit-clause row ──
+// ── Data catalogue over every authored monsters.json hit-clause row ──
 // [index, action, attack_bonus, primary dice, damage type, hit_conditions, escape_dc, hit_target_effect]
 // Expectations verified against public/data/monsters.json (MA-0010/0016/0018/0287/0288/0291/0302/0320/
 // 0334/0335/0354/0361/0366/0434/0442/0443/0477/0480/0487/0490/0499/0508/0522/0527/0542/0546/0550/0553/
@@ -281,25 +261,40 @@ const HIT_CLAUSE_ROWS = [
     ['wolf', 'Bite', 4, '1d6 + 2', 'Piercing', ['prone'], null, null],
 ];
 
-describe.each(HIT_CLAUSE_ROWS)('%s — %s hit-clause lane', (monsterIndex, actionName, attackBonus, dice, damageType, conditions, escapeDc, targetEffect) => {
+describe('monsters.json hit-clause catalogue', () => {
+    it('every authored row keeps its numerics, rider fields, and clause fingerprint', () => {
+        for (const [monsterIndex, actionName, attackBonus, dice, damageType, conditions, escapeDc, targetEffect] of HIT_CLAUSE_ROWS) {
+            const row = `${monsterIndex} / ${actionName}`;
+            const action = findAction(monsterIndex, actionName);
+            expect(action.attack_bonus, `${row}: attack_bonus`).toBe(attackBonus);
+            expect(action.damage_dice_primary, `${row}: damage_dice_primary`).toBe(dice);
+            expect(action.damage_type_primary, `${row}: damage_type_primary`).toBe(damageType);
+            expect(action.hit_conditions ?? [], `${row}: hit_conditions`).toEqual(conditions);
+            expect(action.escape_dc ?? null, `${row}: escape_dc`).toEqual(escapeDc);
+            expect(action.hit_target_effect ?? null, `${row}: hit_target_effect`).toEqual(targetEffect);
+            expect(buildHitConditionClause(action), `${row}: clause`).toEqual({
+                conditions,
+                escapeDc,
+                attackName: actionName,
+                targetEffect,
+            });
+        }
+    });
+});
+
+// Lane execution is shape-identical across rows, so the end-to-end grant
+// runs once per clause shape: conditions+escapeDc, DC-less conditions,
+// targetEffect-only, and the combined shape.
+const LANE_SHAPE_ROWS = HIT_CLAUSE_ROWS.filter(([idx, name]) =>
+    (idx === 'aberrant-cultist' && name === 'Tentacle Lash')
+    || (idx === 'otyugh' && name === 'Bite')
+    || (idx === 'aberrant-spirit-slaad' && name === 'Claw')
+    || (idx === 'bearded-devil' && name === 'Beard'));
+
+describe.each(LANE_SHAPE_ROWS)('%s — %s hit-clause lane', (monsterIndex, actionName, _attackBonus, _dice, _damageType, conditions, escapeDc, targetEffect) => {
     const monster = monsters.find(m => m.index === monsterIndex);
     const attackerName = `${monster.name} 1`;
     const action = findAction(monsterIndex, actionName);
-
-    it('data-lock: row numerics and rider fields arm the expected clause', () => {
-        expect(action.attack_bonus).toBe(attackBonus);
-        expect(action.damage_dice_primary).toBe(dice);
-        expect(action.damage_type_primary).toBe(damageType);
-        expect(action.hit_conditions ?? []).toEqual(conditions);
-        expect(action.escape_dc ?? null).toEqual(escapeDc);
-        expect(action.hit_target_effect ?? null).toEqual(targetEffect);
-        expect(buildHitConditionClause(action)).toEqual({
-            conditions,
-            escapeDc,
-            attackName: actionName,
-            targetEffect,
-        });
-    });
 
     it('grants on a resolved hit with provenance meta, pays damage once, and keeps lane-shaped writes honest', async () => {
         const logEntry = await resolveHit(action, attackerName);
@@ -362,6 +357,29 @@ describe.each(HIT_CLAUSE_ROWS)('%s — %s hit-clause lane', (monsterIndex, actio
     });
 });
 
+describe('buildHitConditionClause — rows without a hit rider never arm the lane', () => {
+    it('rejects no-rider shapes and save-only rows alike', () => {
+        // Negatives deferred here by handlePlainDamage.ma1489-life-drain.test.js.
+        expect(buildHitConditionClause(undefined)).toBeNull();
+        expect(buildHitConditionClause({ name: 'Mind Rot', attack_bonus: 7 })).toBeNull();
+        expect(buildHitConditionClause({ name: 'X', hit_conditions: [] })).toBeNull();
+        // Real save-axis rows: save_dc alone must stay save-only.
+        for (const [monsterIndex, actionName] of [
+            ['otyugh', 'Tentacle Slam'],
+            ['vine-blight', 'Entangling Plants'],
+            ['vampire-spawn', 'Bite'],
+            ['scarecrow', 'Terrifying Glare'],
+        ]) {
+            const action = findAction(monsterIndex, actionName);
+            expect(action.save_dc, `${monsterIndex}/${actionName}: save_dc`).toBeTruthy();
+            expect(action.hit_conditions, `${monsterIndex}/${actionName}: hit_conditions`).toBeUndefined();
+            expect(action.escape_dc, `${monsterIndex}/${actionName}: escape_dc`).toBeUndefined();
+            expect(action.hit_target_effect, `${monsterIndex}/${actionName}: hit_target_effect`).toBeUndefined();
+            expect(buildHitConditionClause(action), `${monsterIndex}/${actionName}: clause`).toBeNull();
+        }
+    });
+});
+
 describe('hit-clause miss flows (generic)', () => {
     it('no hitClause in context (plain attack / miss leg) writes no condition state', async () => {
         const action = findAction('arch-hag', 'Spectral Claw');
@@ -401,11 +419,11 @@ describe('hit-clause miss flows (generic)', () => {
 });
 
 describe('hit-clause size gate (MA-0553/MA-1459 ladder)', () => {
+    // Medium/Small passes are exercised by every other lane test (default
+    // victim is Medium); this ladder pins the boundary + range-size parse.
     it.each([
-        ['Medium', true],
-        ['Small', true],
-        ['Medium or Small', true],
         ['Large', true],
+        ['Medium or Small', true],
         ['Huge', false],
         ['Gargantuan', false],
     ])('%s victim passes gate: %s', async (size, grants) => {
@@ -424,22 +442,6 @@ describe('hit-clause size gate (MA-0553/MA-1459 ladder)', () => {
     });
 });
 
-describe('save-axis rows never arm the hit lane', () => {
-    it.each([
-        ['otyugh', 'Tentacle Slam', 14],
-        ['vine-blight', 'Entangling Plants', 12],
-        ['vampire-spawn', 'Bite', 14],
-        ['scarecrow', 'Terrifying Glare', 11],
-    ])('%s — %s (save_dc %i stays save-only)', (monsterIndex, actionName, saveDc) => {
-        const action = findAction(monsterIndex, actionName);
-        expect(action.save_dc).toBe(saveDc);
-        expect(action.hit_conditions).toBeUndefined();
-        expect(action.escape_dc).toBeUndefined();
-        expect(action.hit_target_effect).toBeUndefined();
-        expect(buildHitConditionClause(action)).toBeNull();
-    });
-});
-
 describe('no_healing heal-block consumer (MA-0016/MA-0556 shape)', () => {
     it('the granted te shape is the shape isHealingBlocked reads', async () => {
         getRuntimeValue.mockImplementation((char, key) => {
@@ -451,22 +453,6 @@ describe('no_healing heal-block consumer (MA-0016/MA-0556 shape)', () => {
         const { getHealingBlockEffect, isHealingBlocked } = await import('../../../services/rules/combat/healingBlock.js');
         expect(getHealingBlockEffect(TARGET, 'test-campaign')).toMatchObject({ effect: 'no_healing', source: 'Death Cultist 1' });
         expect(isHealingBlocked(TARGET, 'test-campaign', 5)).toMatchObject({ effect: 'no_healing' });
-    });
-});
-
-describe('hit-clause te consumers (conditionEffects channels)', () => {
-    it.each([
-        ['disadvantage_attack_rolls', 'attackDisadvantageCount', 'disadvantage'],
-        ['disadvantage_next_attack', 'attackDisadvantageCount', 'disadvantage'],
-        ['distracting_strike_advantage', 'targetAdvantageCount', 'advantage'],
-    ])('%s folds into combineAttackModes as %s', (te, countKey, mode) => {
-        const fx = computeConditionEffects({ targetEffects: [{ effect: te, target: TARGET, source: 'Attacker 1' }] });
-        expect(fx[countKey]).toBeGreaterThanOrEqual(1);
-        const empty = computeConditionEffects({});
-        const combined = mode === 'disadvantage'
-            ? combineAttackModes(fx, empty, null, TARGET)
-            : combineAttackModes(empty, fx, null, TARGET);
-        expect(combined).toBe(mode);
     });
 });
 

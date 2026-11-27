@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-11-17
+// @maintained-by-ai 2026-11-26
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -56,6 +56,12 @@ async function renderLoadedModal(props = baseProps) {
     await waitFor(() => {
         expect(document.querySelectorAll('.wild-shape-beast-item').length).toBeGreaterThan(0);
     });
+    // waitFor resolves on the rows' DOM mutation, but the entrance pull lives
+    // in a passive effect flushed via React 19's scheduler — under full-suite
+    // load the scheduler lags the awaited continuation and focus is still on
+    // BODY at assertion time (batch224 flake). One macrotask tick inside act
+    // (the file's settle bound) guarantees the effect ran before we assert.
+    await flush();
     return result;
 }
 

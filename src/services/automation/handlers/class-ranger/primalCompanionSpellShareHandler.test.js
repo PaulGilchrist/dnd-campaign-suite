@@ -1,5 +1,12 @@
-// @maintained-by-ai 2026-10-15 — deterministic: runtime store, logService, rangeCheck all mocked at module;
-// pins handler branch behaviour (guards, range gate, dedupe, share mirroring) and own-composition strings.
+// @maintained-by-ai 2026-11-26
+// Spell-share HANDLER lane: owns the handler-direct branches of primalCompanionSpellShareHandler.js —
+// guard popups (type gate > strict-alive gate > spell gate), the 30-ft range-gate refusal with a
+// zero-spend census, the caster-effect match window (spellEffectKey normalization + `${spellKey}_`
+// guard, unpinned by the service/chain siblings), full write-envelope pins, seeded dedupe, and the
+// applySpellShare modal-confirm entry. Service trigger gates live in
+// primalCompanionSpellShareService.test.js; the service->handler composition seam (real rangeToFeet,
+// read/write order census, chain re-share) lives in primalCompanionSpellShare.share-chain.test.js —
+// never re-grow those here (ownership split ratified #1395).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applySpellShare } from './primalCompanionSpellShareHandler.js';
 
@@ -18,13 +25,16 @@ vi.mock('../../../rules/combat/rangeCheck.js', () => ({
     isWithinRange: vi.fn(async () => true),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const { setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
 
+const PLAYER = 'RangerBoy';
+const COMPANION = 'Primal Companion (Beast of the Land)';
+
 function makePlayerStats(overrides = {}) {
     return {
-        name: 'RangerBoy',
+        name: PLAYER,
         ...overrides,
     };
 }
@@ -44,18 +54,23 @@ function makeAction(overrides = {}) {
     };
 }
 
-function seedCasterEffect(targetEffects) {
+// Live companion with the caster's Pass Without Trace te landed (shaped as passWithoutTraceService writes it).
+function seedLiveCaster(targetEffects = [{ ...PWT_TE }]) {
+    store[`${PLAYER}.primalCompanionType`] = 'Beast of the Land';
+    store[`${PLAYER}.primalCompanionAlive`] = true;
     store['campaign.targetEffects'] = targetEffects;
 }
 
 const PWT_TE = {
-    target: 'RangerBoy',
+    target: PLAYER,
     effect: 'pass_without_trace_bonus',
-    source: 'RangerBoy',
+    source: PLAYER,
     slotLevel: 2,
     duration: 'concentration',
     bonusExpression: '+10',
 };
+// The handler's mirror: caster row verbatim, retargeted, with the Share Spells provenance flag.
+const SHARED_TE = { ...PWT_TE, target: COMPANION, sharedBy: 'Share Spells' };
 
 describe('primalCompanionSpellShareHandler', () => {
     beforeEach(() => {
@@ -65,57 +80,62 @@ describe('primalCompanionSpellShareHandler', () => {
     });
 
     describe('handle', () => {
-        it('auto-applies the shared targetEffect to the companion and logs Share Spells', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
-            seedCasterEffect([{ ...PWT_TE }]);
+        // Positive control for the alive-gate family below: alive === true is the ONLY
+        // dispatching state (the old `=== false` gate detail lives in the fix#104(c) table).
+        it('auto-applies the shared targetEffect with full commit envelopes and logs Share Spells', async () => {
+            seedLiveCaster();
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            const written = store['campaign.targetEffects'];
-            const shared = written.find(
-                te => te.target === 'Primal Companion (Beast of the Land)' && te.effect === 'pass_without_trace_bonus'
-            );
-            expect(shared).toBeDefined();
-            expect(shared.sharedBy).toBe('Share Spells');
-            expect(shared.bonusExpression).toBe('+10');
-            expect(shared.slotLevel).toBe(2);
-            expect(shared.duration).toBe('concentration');
-            expect(store['RangerBoy.lastSpellShare']).toBe('Pass Without Trace');
+            // Full-shape pin: caster row untouched, mirror appended verbatim (no stray fields).
+            expect(store['campaign.targetEffects']).toEqual([PWT_TE, SHARED_TE]);
+            expect(store[`${PLAYER}.lastSpellShare`]).toBe('Pass Without Trace');
+            // Ordered commit census: targetEffects first, lastSpellShare second, nothing else.
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['campaign', 'targetEffects', expect.any(Array), 'test-campaign'],
+                [PLAYER, 'lastSpellShare', 'Pass Without Trace', 'test-campaign'],
+            ]);
 
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'automation',
+                characterName: PLAYER,
                 automationType: 'primal_companion_spell_share',
                 name: 'Share Spells',
                 spellName: 'Pass Without Trace',
-                targetName: 'Primal Companion (Beast of the Land)',
-                description: expect.stringContaining('Share Spells'),
-            }));
+                spellLevel: 2,
+                targetName: COMPANION,
+                description: `Share Spells: ${PLAYER} shares Pass Without Trace with ${COMPANION}.`,
+                timestamp: expect.any(Number),
+            });
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: expect.objectContaining({
+                    type: 'automation_info',
+                    name: 'Share Spells',
+                    description: `Pass Without Trace shared with ${COMPANION}.`,
+                }),
+            });
         });
 
         it('consults the 30-ft range gate and denies the share, writing nothing, when out of range', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
-            seedCasterEffect([{ ...PWT_TE }]);
+            seedLiveCaster();
             isWithinRange.mockResolvedValue(false);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            expect(isWithinRange).toHaveBeenCalledWith('RangerBoy', 'Primal Companion (Beast of the Land)', 30);
+            expect(isWithinRange).toHaveBeenCalledWith(PLAYER, COMPANION, 30);
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('more than 30 feet');
-            expect(store['campaign.targetEffects']).toHaveLength(1);
+            expect(result.payload.description).toBe(`${COMPANION} is more than 30 feet away. Spell not shared.`);
+            // Zero-spend census: refusal leaves the store and log untouched.
+            expect(store['campaign.targetEffects']).toEqual([PWT_TE]);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('is a silent no-op when the spell effect has not landed on the caster yet', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
-            seedCasterEffect([{ target: 'Primal Companion (Beast of the Land)', source: 'RangerBoy', effect: 'summoned' }]);
+            seedLiveCaster([{ target: COMPANION, source: PLAYER, effect: 'summoned' }]);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
@@ -124,18 +144,44 @@ describe('primalCompanionSpellShareHandler', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns info popup when companion is not alive', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Sea';
-            store['RangerBoy.primalCompanionAlive'] = false;
+        // Caster-effect match window: spellEffectKey strips apostrophes (straight AND curly) and
+        // non-alphanumerics, and only the exact key or the `${spellKey}_` prefix shares. This
+        // branch is unpinned in the service and chain siblings (both use apostrophe-free PWT).
+        it.each([
+            ['straight apostrophe', "Melf's Minute Meteors"],
+            ['curly apostrophe', 'Melf\u2019s Minute Meteors'],
+        ])('normalizes a %s spell name and mirrors only the matching caster row', async (_label, spellName) => {
+            seedLiveCaster([
+                { target: PLAYER, source: PLAYER, effect: 'melfs_minute_meteors_bonus', slotLevel: 9 },
+                // Near-miss (one char short of the key + '_'): must NOT share.
+                { target: PLAYER, source: PLAYER, effect: 'melfs_minute_meteor_bonus', slotLevel: 9 },
+            ]);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+            const result = await handle(
+                makeAction({ spell: { name: spellName, level: 9, range: 'Self' }, spellSlotLevel: 9 }),
+                makePlayerStats(),
+                'test-campaign',
+            );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Share Spells');
-            expect(result.payload.description).toBe('Primal companion is not alive.');
-            expect(result.payload.automation).toBeDefined();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result.payload.description).toBe(`${spellName} shared with ${COMPANION}.`);
+            expect(store['campaign.targetEffects']).toEqual([
+                { target: PLAYER, source: PLAYER, effect: 'melfs_minute_meteors_bonus', slotLevel: 9 },
+                { target: PLAYER, source: PLAYER, effect: 'melfs_minute_meteor_bonus', slotLevel: 9 },
+                { target: COMPANION, source: PLAYER, effect: 'melfs_minute_meteors_bonus', slotLevel: 9, sharedBy: 'Share Spells' },
+            ]);
+            expect(store[`${PLAYER}.lastSpellShare`]).toBe(spellName);
+        });
+
+        it('replaces an existing shared effect in place instead of duplicating it', async () => {
+            seedLiveCaster([
+                { ...PWT_TE },
+                { target: COMPANION, effect: 'pass_without_trace_bonus', source: PLAYER, slotLevel: 1, sharedBy: 'Share Spells' },
+            ]);
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            // Full-array pin: stale slotLevel-1 row upgraded to 2 at its original index, no push.
+            expect(store['campaign.targetEffects']).toEqual([PWT_TE, SHARED_TE]);
         });
 
         // fix#104(c) twin (#1348 four-arm table, mirroring the service alive-gate pin in
@@ -143,70 +189,55 @@ describe('primalCompanionSpellShareHandler', () => {
         // handler too. Producer census: 'primalCompanionAlive' is written true only at
         // summon/restore (primalCompanionHandler.js:305/:533) — never false — so the old
         // `=== false` gate never armed for unknown-alive companions and the share dispatched.
-        describe('alive gate: strict === true (false/null/undefined all refuse, handler-local infoPopup decline)', () => {
-            it.each([
-                ['false', false],
-                ['null', null],
-                ['undefined (key absent)', undefined],
-            ])('%s refuses with the not-alive popup before the range gate, writing nothing', async (_label, alive) => {
-                store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-                if (alive === undefined) {
-                    delete store['RangerBoy.primalCompanionAlive'];
-                } else {
-                    store['RangerBoy.primalCompanionAlive'] = alive;
-                }
-                seedCasterEffect([{ ...PWT_TE }]); // caster effect PRESENT: without the gate the share would land
+        // The true-dispatch arm is the top positive-control test above.
+        it.each([
+            ['false', false],
+            ['null', null],
+            ['undefined (key absent)', undefined],
+        ])('alive=%s refuses with the not-alive popup before the range gate, writing nothing', async (_label, alive) => {
+            store[`${PLAYER}.primalCompanionType`] = 'Beast of the Land';
+            if (alive === undefined) {
+                delete store[`${PLAYER}.primalCompanionAlive`];
+            } else {
+                store[`${PLAYER}.primalCompanionAlive`] = alive;
+            }
+            store['campaign.targetEffects'] = [{ ...PWT_TE }]; // caster effect PRESENT: without the gate the share would land
 
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toBe('Primal companion is not alive.');
-                expect(isWithinRange).not.toHaveBeenCalled(); // decline happens at the gate, not mid-apply
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-                expect(addEntry).not.toHaveBeenCalled();
-                expect(store['campaign.targetEffects']).toHaveLength(1); // only the caster's own te remains
-                expect(store['RangerBoy.lastSpellShare']).toBeUndefined();
+            expect(result).toEqual({
+                type: 'popup',
+                payload: expect.objectContaining({
+                    type: 'automation_info',
+                    name: 'Share Spells',
+                    description: 'Primal companion is not alive.',
+                }),
             });
-
-            it('true is the ONLY dispatching alive state', async () => {
-                store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-                store['RangerBoy.primalCompanionAlive'] = true;
-                seedCasterEffect([{ ...PWT_TE }]);
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
-                expect(isWithinRange).toHaveBeenCalledWith('RangerBoy', 'Primal Companion (Beast of the Land)', 30);
-            });
-
-            it('alive key is consulted only after the companion-type gate (read-order parity with the service)', async () => {
-                delete store['RangerBoy.primalCompanionType'];
-                store['RangerBoy.primalCompanionAlive'] = true;
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.payload.description).toBe('No primal companion summoned.');
-                const aliveReads = getRuntimeValue.mock.calls.filter(
-                    ([, key]) => key === 'primalCompanionAlive'
-                );
-                expect(aliveReads).toHaveLength(0); // type-absent declines before the alive key is read
-            });
+            expect(isWithinRange).not.toHaveBeenCalled(); // decline happens at the gate, not mid-apply
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(store['campaign.targetEffects']).toHaveLength(1); // only the caster's own te remains
+            expect(store[`${PLAYER}.lastSpellShare`]).toBeUndefined();
         });
 
-        it('returns info popup when no companion is summoned', async () => {
+        // Read-order pin (type gate strictly before alive gate) via popup identity: with
+        // alive=true but no type, a swapped guard order would fall through to applyShareEffects'
+        // DIFFERENT 'No primal companion to share spell with.' message — no mock census needed.
+        it('declines with the summoned-popup when no companion type is set, even while alive=true', async () => {
+            store[`${PLAYER}.primalCompanionAlive`] = true;
+            store['campaign.targetEffects'] = [{ ...PWT_TE }];
+
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toBe('No primal companion summoned.');
             expect(result.payload.automation).toBeDefined();
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('returns info popup when triggered without a cast spell', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
+            seedLiveCaster();
 
             const result = await handle(makeAction({ spell: undefined }), makePlayerStats(), 'test-campaign');
 
@@ -214,39 +245,21 @@ describe('primalCompanionSpellShareHandler', () => {
             expect(result.payload.description).toBe('No spell cast to share.');
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-
-        it('replaces an existing shared effect instead of duplicating it', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
-            seedCasterEffect([
-                { ...PWT_TE },
-                { target: 'Primal Companion (Beast of the Land)', effect: 'pass_without_trace_bonus', source: 'RangerBoy', slotLevel: 1, sharedBy: 'Share Spells' },
-            ]);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            const shared = store['campaign.targetEffects'].filter(
-                te => te.target === 'Primal Companion (Beast of the Land)' && te.effect === 'pass_without_trace_bonus'
-            );
-            expect(shared).toHaveLength(1);
-            expect(shared[0].slotLevel).toBe(2);
-        });
     });
 
     describe('applySpellShare', () => {
-        it('confirmed share delegates to the same apply path (full pins live in the handle tests)', async () => {
-            // applySpellShare is the modal-confirm entry (wired in automation/index.js);
-            // the share-chain integration only exercises handle, so pin the confirmed delegation here.
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            seedCasterEffect([{ ...PWT_TE }]);
+        it('confirmed share delegates to the same apply path, skipping the handle alive gate', async () => {
+            // applySpellShare is the modal-confirm entry (wired in automation/index.js); the share-chain
+            // integration only exercises handle, so pin the confirmed delegation here. NOTE the seam
+            // behavior: alive is deliberately NOT seeded — the confirmed entry checks type only.
+            store[`${PLAYER}.primalCompanionType`] = 'Beast of the Land';
+            store['campaign.targetEffects'] = [{ ...PWT_TE }];
 
             const result = await applySpellShare(makeAction(), makePlayerStats(), 'test-campaign', true);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
-            expect(store['campaign.targetEffects'].some(
-                te => te.target === 'Primal Companion (Beast of the Land)' && te.effect === 'pass_without_trace_bonus'
-            )).toBe(true);
+            expect(result.payload.description).toBe(`Pass Without Trace shared with ${COMPANION}.`);
+            expect(store['campaign.targetEffects']).toEqual([PWT_TE, SHARED_TE]);
         });
 
         it('returns info popup when sharing is declined', async () => {
@@ -259,11 +272,12 @@ describe('primalCompanionSpellShareHandler', () => {
         });
 
         it('returns info popup when no companion exists', async () => {
-            seedCasterEffect([{ ...PWT_TE }]);
+            store['campaign.targetEffects'] = [{ ...PWT_TE }];
 
             const result = await applySpellShare(makeAction(), makePlayerStats(), 'test-campaign', true);
 
             expect(result.type).toBe('popup');
+            // Handler-local applyShareEffects vocabulary, distinct from handle's '...summoned.' popup.
             expect(result.payload.description).toBe('No primal companion to share spell with.');
             expect(result.payload.automation).toBeDefined();
             expect(setRuntimeValue).not.toHaveBeenCalled();

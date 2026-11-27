@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // GENERIC save-margin-rider authority (MA-0639 origin: Drow Hand Crossbow
 // "If the saving throw fails by 5 or more, the target is also unconscious
 // while poisoned in this way"). applySaveMarginRider is armed SOLELY by the
@@ -151,6 +151,8 @@ describe('save-margin-rider (generic)', () => {
         // unconscious — threshold, rider condition AND duration come from data.
         expect(TK_ROW.save_dc).toBe(11);
         expect(marginOf(TK_ROW)).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
+        // The release-advisory fork reads the row's structured repeat_save key.
+        expect(TK_ROW.repeat_save).toBeTruthy();
     });
 
     it.each([
@@ -173,7 +175,6 @@ describe('save-margin-rider (generic)', () => {
         expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned', 'Unconscious']);
         expect(uncons.sourceName).toBe(DROW);
         expect(uncons.sourceAbility).toBe('Hand Crossbow');
-        expect(uncons.description).toMatch(/failed the save by 10/);
         // Parity pin: the drow-shaped grant-log copy is byte-locked — the
         // data-driven template must keep emitting the canonical drow prose.
         expect(uncons.description).toBe('Bandit 1 failed the save by 10 (DC 13, total 3) — also unconscious while poisoned (1 hour; waking on damage/shake is GM-enforced).');
@@ -191,25 +192,37 @@ describe('save-margin-rider (generic)', () => {
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it.each([
-        { label: 'deep at threshold', total: TK_ROW.save_dc - 5, conditions: ['poisoned', 'paralyzed'], clock: true },
-        { label: 'shallow, base only', total: TK_ROW.save_dc - 4, conditions: ['poisoned'], clock: false },
-    ])('generic rider is data-driven (Thri-Kreen also:paralyzed, DC 11) — $label', async ({ total, conditions, clock }) => {
-        await resolveNpcSave(thriKreenContext(total));
+    it('generic rider is data-driven (Thri-Kreen also:paralyzed, DC 11): shallow fail by 4 keeps base only, no clock', async () => {
+        await resolveNpcSave(thriKreenContext(TK_ROW.save_dc - 4));
 
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(conditions);
-        expect(addExpiration).toHaveBeenCalledTimes(clock ? 1 : 0);
-        if (clock) {
-            // Authored duration is the clock: the Thri-Kreen row's "1 minute"
-            // poison band → minutes×10 = rounds:10 (NOT the drow's 600).
-            expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
-                rounds: 10,
-                effects: [
-                    { type: 'condition', condition: 'poisoned' },
-                    { type: 'condition', condition: 'paralyzed' },
-                ],
-            }));
-        }
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned']);
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    // Genericity pin (bug save-margin-rider-hardcoded-log-prose, was a
+    // deliberate it.fails FIXME): deep fail at the Thri-Kreen's own threshold
+    // proves threshold AND rider condition come from data, the merged clock
+    // follows the row's authored duration ("1 minute" → minutes×10 =
+    // rounds:10, NOT the drow's 600), and the grant-log prose is
+    // data-derived — naming margin.also (Paralyzed), the row's duration, and
+    // the row's release advisory (turn-END repeat save from the structured
+    // repeat_save key) — never the drow-specific facts.
+    it('deep fail at the data threshold: paralyzed + merged rounds:10 clock + data-derived prose', async () => {
+        await resolveNpcSave(thriKreenContext(TK_ROW.save_dc - 5));
+
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'paralyzed']);
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+            rounds: 10,
+            effects: [
+                { type: 'condition', condition: 'poisoned' },
+                { type: 'condition', condition: 'paralyzed' },
+            ],
+        }));
+        const log = appliedLogs().find(e => e.condition === 'Paralyzed');
+        expect(log.description).toBe('Bandit 1 failed the save by 5 (DC 11, total 6) — also paralyzed while poisoned (1 minute; the poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success).');
+        expect(log.description).not.toMatch(/unconscious/i);
+        expect(log.description).not.toMatch(/1 hour/i);
     });
 
     it('byte-inert without the structured key: poisoned grant + no clock (legacy row)', async () => {
@@ -223,9 +236,17 @@ describe('save-margin-rider (generic)', () => {
     // Owner ruling 2026-11-10: the clock derives from the row's AUTHORED
     // duration — and a row that authors NO duration keeps the legacy 600-round
     // (1-hour) ceiling. The drow context above already proves the "1 hour" →
-    // 600 leg; this pins the duration-less fallback on one merged clock.
+    // 600 leg; this pins the duration-less fallback on one merged clock,
+    // armed through the REAL parseSaveMarginClause transport (a synthetic
+    // save_effect that authors no "for N" duration) rather than a hand-built
+    // key clone.
     it('margin with no authored duration falls back to the single 600-round clock', async () => {
-        await resolveNpcSave(drowContext(3, { failsBy: 5, also: 'unconscious' }));
+        const durationless = parseSaveMarginClause({
+            save_margin: { fails_by: 5, also: 'Unconscious' },
+            save_effect: 'Failure: be poisoned.',
+        });
+        expect(durationless).toEqual({ failsBy: 5, also: 'unconscious' });
+        await resolveNpcSave(drowContext(3, durationless));
 
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
@@ -253,21 +274,5 @@ describe('save-margin-rider (generic)', () => {
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['unconscious', 'poisoned']);
         expect(addExpiration).toHaveBeenCalledTimes(1);
-    });
-
-    // Genericity pin (bug save-margin-rider-hardcoded-log-prose, was a
-    // deliberate it.fails FIXME): the grant-log prose is derived from the
-    // structured margin data — it names margin.also (Paralyzed), honours the
-    // base clause's authored duration (Thri-Kreen poisoned 1 minute), and
-    // carries the row's own release advisory (turn-END repeat save from the
-    // structured repeat_save key) — never the drow-specific facts.
-    it('generic rider log prose names the granted condition (Thri-Kreen paralyzed)', async () => {
-        await resolveNpcSave(thriKreenContext(TK_ROW.save_dc - 5));
-
-        const log = appliedLogs().find(e => e.condition === 'Paralyzed');
-        expect(log.description).toMatch(/paralyzed/i);
-        expect(log.description).toBe('Bandit 1 failed the save by 5 (DC 11, total 6) — also paralyzed while poisoned (1 minute; the poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success).');
-        expect(log.description).not.toMatch(/unconscious/i);
-        expect(log.description).not.toMatch(/1 hour/i);
     });
 });

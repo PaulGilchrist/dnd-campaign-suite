@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
@@ -122,19 +122,23 @@ vi.mock('../../hooks/useAllySelection.js', () => ({
     getAllyList: vi.fn(),
 }));
 
-import { getRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { applyDamageToTarget, rollSaveForCreature } from '../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 
-// Seam only: effect matching, prompt payload, saveDc fallback, the
-// pendingSavePrompts lifecycle and save_result log content are owned by
-// handlers/handleSanctuarySave.test.js. This file guards the
-// useLoggedDiceRollDamage wiring — the WIS gate runs before any damage
-// dispatch, and a blocked gate shows the Sanctuary popup and aborts the
-// spell entirely (no combat-summary load, no damage apply, no log entry).
+// Seam only: this file guards the useLoggedDiceRollDamage wiring — the WIS
+// gate runs BEFORE any damage dispatch, a blocked gate shows the Sanctuary
+// popup and aborts the spell entirely (no combat-summary load, no damage
+// apply, no UI log entry), and a resolved gate leaves the pending-prompt
+// bucket drained. Effect matching, saveDc fallback and full save_result log
+// wording are authority in handlers/handleSanctuarySave.test.js; the
+// sanctuary-block "no lastAttack stamp" pin is owned by
+// useLoggedDiceRollDamage.last-attack.test.js. Sanctuary ≥1 minute is
+// combat-scoped (no-timers canon): this lane never writes targetEffects or a
+// rounds countdown, so no duration byte is pinned here.
 
 const PROMPT_ID = 'test-guid-1234';
 
@@ -186,68 +190,115 @@ describe('useLoggedDiceRollDamage sanctuary gate', () => {
         rollSaveForCreature.mockReturnValue({ success: true, roll: 15, total: 18, bonus: 3 });
     });
 
-    it('dispatches save damage normally when nothing is warded', async () => {
+    it('runs the whole save-damage lane untouched when nothing is warded', async () => {
         mockTargetEffects([]);
 
         await createLogDamageAndShow(deps)(fireball);
 
+        // Gate silent: no prompt sent, no pending-prompt registration, no popup.
+        // (lastAttack stamping on this path is owned by the last-attack lane.)
         expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'pendingSavePrompts', expect.anything(), expect.any(String));
         expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
             expect.objectContaining({ name: 'Sanctuary' })
         );
+        // The lane completes exactly once: damage applied, one hp_change log,
+        // one UI log entry, one damage popup — and no sanctuary save_result.
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change' }));
         expect(addEntry).not.toHaveBeenCalledWith(
             expect.any(String),
             expect.objectContaining({ type: 'save_result' })
         );
-        expect(applyDamageToTarget).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
     });
 
-    it('prompts the attacker, blocks damage and loses the spell on a failed WIS save', async () => {
+    it('registers the WIS prompt, blocks damage and loses the spell on a failed save', async () => {
         mockTargetEffects([sanctuaryOnGoblin()]);
 
         const invoke = createLogDamageAndShow(deps)(fireball);
         dispatchSaveResult(false);
         await invoke;
 
-        // Save-prompt route: the WIS save is the ATTACKER's, against the caster's DC.
+        // Full-shape registration write: the ward's own DC (13), not the
+        // spell's (15), and the ATTACKER (Wizard1) must save — wiring the
+        // wrapper's characterName through to the store row.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', {
+            [PROMPT_ID]: {
+                promptId: PROMPT_ID,
+                campaignName: 'test-campaign',
+                targetName: 'Wizard1',
+                attackerName: 'Cleric1',
+                saveType: 'WIS',
+                saveDc: 13,
+                dcSuccess: 'none',
+                disadvantage: false,
+                advantage: false,
+                condition: 'sanctuary',
+                sourceName: 'Cleric1',
+            },
+        }, 'test-campaign');
+        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
         expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             promptId: PROMPT_ID,
             targetName: 'Wizard1',
-            attackerName: 'Cleric1',
             saveType: 'WIS',
             saveDc: 13,
             condition: 'sanctuary',
         }));
 
+        // Resolution drains the last row via deleteRuntimeKey (drain-to-evict).
+        expect(deleteRuntimeKey).toHaveBeenCalledTimes(1);
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', 'test-campaign');
+
+        // Exactly one log line — the failed save_result — and no damage log.
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'save_result',
+            success: false,
+            saveType: 'WIS',
+        }));
+
+        // The block popup is the only UI feedback; the spell aborts before
+        // any damage dispatch.
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
         expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
             type: 'automation_info',
             name: 'Sanctuary',
             description: expect.stringContaining('Wizard1 failed WIS save against Sanctuary on Goblin'),
         }));
         expect(deps.setPopupHtml.mock.calls[0][0].description).toContain('spell is lost');
-
-        // The spell aborts before any damage dispatch.
         expect(loadCombatSummary).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalled();
     });
 
-    it('proceeds to save damage on a successful WIS save', async () => {
+    it('continues the save-damage lane exactly once on a successful save', async () => {
         mockTargetEffects([sanctuaryOnGoblin()]);
 
         const invoke = createLogDamageAndShow(deps)(fireball);
         dispatchSaveResult(true);
         await invoke;
 
+        // Gate logs the pass, then the spell flows through the normal NPC
+        // save-damage lane once: ordered census save_result → hp_change,
+        // one damage popup (no Sanctuary popup), one UI log, one apply.
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        expect(addEntry.mock.calls.map(c => c[1].type)).toEqual(['save_result', 'hp_change']);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'save_result',
             success: true,
             saveType: 'WIS',
         }));
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', 'test-campaign');
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
         expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
             expect.objectContaining({ name: 'Sanctuary' })
         );
-        // Spell continues through the normal NPC save-damage lane.
-        expect(applyDamageToTarget).toHaveBeenCalled();
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
     });
 });

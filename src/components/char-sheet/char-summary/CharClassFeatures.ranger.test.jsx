@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -190,14 +190,12 @@ describe('RangerFeatures', () => {
 
   describe('fighting styles', () => {
     // Branch matrix of the row condition: fightingStyles truthy && level > 1.
+    // (An absent key hits the same falsy branch as null, so it is not a
+    // separate case.)
     it.each([
       ['shown with clickable entries at level 2', rangerStats(2, {}, { fightingStyles: ['Defense', 'Two-Weapon Fighting'] }), true],
-      ['hidden at level 1', rangerStats(1, {}, { fightingStyles: ['Defense'] }), false],
-      ['hidden when fightingStyles is null', rangerStats(2, {}, { fightingStyles: null }), false],
-      ['hidden when fightingStyles is absent from class', buildPlayerStats({
-        level: 2,
-        class: { name: 'Ranger', major: {}, subclass: {}, class_levels: [{ level: 2 }] },
-      }), false],
+      ['hidden at level 1 (level gate)', rangerStats(1, {}, { fightingStyles: ['Defense'] }), false],
+      ['hidden when fightingStyles is null (truthiness gate)', rangerStats(2, {}, { fightingStyles: null }), false],
     ])('%s', (_label, stats, shown) => {
       const section = renderRanger(stats);
       if (shown) {

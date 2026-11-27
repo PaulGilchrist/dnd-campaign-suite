@@ -1,10 +1,11 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // L5-005 §9.2 — AI referee console (component lane only): visibility gating,
 // suggest confirm gate, autopilot auto-apply scope, §10.4 proposal override,
 // config save/refuse notices, and campaign-scoped requests.
 // Lane internals (server dice oracle, effect registry, HP floor) are covered
-// by applyRuling.test.js; world keeper cards by AiWorldConsole.test.jsx —
-// not re-tested here.
+// by applyRuling.test.js; the actorStats projection and the "(No actor)"
+// select lane by AiRefereeSection.no-actor.test.jsx; world keeper cards by
+// AiWorldConsole.test.jsx — not re-tested here.
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { vi } from 'vitest';
@@ -71,10 +72,11 @@ function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, 
 const askButton = () => screen.getByRole('button', { name: /Ask AI referee|AI thinking/ });
 const confirmButton = () => screen.getByRole('button', { name: /Confirm & Apply/ });
 const saveButton = () => screen.getByRole('button', { name: /Save AI config/ });
+const composer = () => screen.getByPlaceholderText(/Describe what a player does/);
 
 /** Type an action and hit Ask. */
 function askAbout(text) {
-    fireEvent.change(screen.getByPlaceholderText(/Describe what a player does/), { target: { value: text } });
+    fireEvent.change(composer(), { target: { value: text } });
     fireEvent.click(askButton());
 }
 
@@ -122,7 +124,7 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         const fetchMock = stubFetch();
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument()); // settle status fetch
-        const box = screen.getByPlaceholderText(/Describe what a player does/);
+        const box = composer();
         // Backlog ai-instruction-inputs-undersized: the describe box is a
         // full conversational surface, not a two-line strip.
         expect(box.tagName).toBe('TEXTAREA');
@@ -238,6 +240,8 @@ describe('AiRefereeSection — suggest mode: AI proposes, human disposes', () =>
         askAbout('I swing my sword at the goblin');
 
         await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        // stats-less roster row ⇒ exactly the pre-projection body (actorStats
+        // projection itself is locked by AiRefereeSection.no-actor.test.jsx)
         expect(refereePosts(fetchMock)).toEqual([{
             url: expect.stringContaining(`/campaigns/${CN}/ai/referee`),
             body: { action: 'I swing my sword at the goblin', characterName: 'Rakan' },
@@ -270,89 +274,48 @@ describe('AiRefereeSection — suggest mode: AI proposes, human disposes', () =>
         expect(auditEntries()).toHaveLength(0);
     });
 
+    // Backlog 2026-11-13 — the wasted attempt must never cost the GM their
+    // thought: the composer keeps the text through the card AND the dismiss.
     // Backlog 2026-10-31 — needs_human card is dismiss-only: the applier can
     // only refuse (applyRuling.js APPLIERS.needs_human), so rendering Confirm
     // was a dead end. Gate mirrors the world console (AiWorldConsole.jsx).
-    it('needs_human proposal renders its content but NO Confirm & Apply — dismiss writes nothing', async () => {
+    it('needs_human proposal renders dismiss-only — no Confirm, no side effects, the typed thought survives', async () => {
         synced.aiConfig = CONFIGURED;
         stubFetch({ referee: { ok: false, code: 'AI_NEEDS_HUMAN', ruling: { type: 'needs_human', text: 'AI referee unavailable — the referee adjudicates this turn. (invalid ruling: text required and non-empty)' } } });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('hmm?');
+        askAbout('I do something vague');
 
         await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
         expect(screen.getByText(/invalid ruling: text required/)).toBeInTheDocument(); // content stays visible
         expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // the gate
         expect(screen.queryByText(/Applied:|Not applied:/)).toBeNull();
+        expect(composer()).toHaveValue('I do something vague'); // nothing lost mid-rephrase
 
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
         await waitFor(() => expect(screen.queryByText(/AI proposes: needs_human/)).toBeNull());
         expect(auditEntries()).toHaveLength(0); // no ai_ruling_applied audit row
         expect(rollExpression).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled(); // no targetEffect/roll side effects
+        expect(composer()).toHaveValue('I do something vague'); // still there after Dismiss
     });
 
-    it('referee transport failure says so honestly — no proposal, no apply', async () => {
+    it('referee transport failure says so honestly — no proposal, no apply, the thought survives for a retry', async () => {
         synced.aiConfig = CONFIGURED;
         stubFetch({ referee: { error: 'AI backend exploded' }, refereeStatus: 500 });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('I cast detect magic');
+        askAbout('I try to pick the lock');
+
         await waitFor(() => expect(screen.getByText(/Not applied:.*AI backend exploded/)).toBeInTheDocument());
         expect(screen.queryByText(/AI proposes:/)).toBeNull();
         expect(rollExpression).not.toHaveBeenCalled();
-    });
-});
-
-// Backlog 2026-10-31 — stat-blind dice rulings fix: the ask must project the
-// selected character's REAL modifiers (read from the raw character-file
-// shape, mirroring public/campaigns/test-campaign/DivinationWizard.json).
-describe('AiRefereeSection — actor stats projection in the ask payload', () => {
-    const WIZARD = {
-        name: 'DivinationWizard',
-        level: 20,
-        rules: '2024',
-        class: { name: 'Wizard', subclass: { name: 'Evoker' } },
-        abilities: [
-            { name: 'Strength', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-            { name: 'Dexterity', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-            { name: 'Constitution', baseScore: 10, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
-            { name: 'Intelligence', baseScore: 16, featIncrease: 4, backgroundIncrease: 1, miscIncrease: 0 },
-            { name: 'Wisdom', baseScore: 10, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
-            { name: 'Charisma', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-        ],
-        skillProficiencies: ['Arcana', 'History', 'Sleight of Hand'],
-        expertSkills: ['Arcana'],
-    };
-
-    it('ask body carries the compact actorStats projection for the selected character', async () => {
-        synced.aiConfig = CONFIGURED;
-        const fetchMock = stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={[WIZARD]} />);
-        askAbout('I check the arcana of the rune');
-        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
-        const [post] = refereePosts(fetchMock);
-        expect(post.body.characterName).toBe('DivinationWizard');
-        // INT 16+4+1 = 21 → clamp 20 → +5; level 20 → PB +6
-        expect(post.body.actorStats).toEqual({
-            name: 'DivinationWizard',
-            abilityMods: { str: -1, dex: -1, con: 0, int: 5, wis: 0, cha: -1 },
-            proficiencyBonus: 6,
-            skillProficiencies: ['Arcana', 'History', 'Sleight of Hand'],
-            expertSkills: ['Arcana'],
-        });
-    });
-
-    it('stats-less roster row ⇒ the body is exactly the pre-projection shape (regression)', async () => {
-        synced.aiConfig = CONFIGURED;
-        const fetchMock = stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('wave at the goblin');
-        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
-        expect(refereePosts(fetchMock)[0].body).toEqual({ action: 'wave at the goblin', characterName: 'Rakan' });
+        expect(auditEntries()).toHaveLength(0);
+        expect(composer()).toHaveValue('I try to pick the lock'); // hard failure keeps the thought…
+        expect(askButton()).toBeEnabled(); // …ready to re-fire the same ask
     });
 });
 
 describe('AiRefereeSection — autopilot scope', () => {
-    it('atomic dice rulings auto-apply at once, through the engine (never the AI)', async () => {
+    it('atomic dice rulings auto-apply at once, through the engine (never the AI), and consume the thought', async () => {
         synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };
         stubFetch();
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
@@ -361,25 +324,26 @@ describe('AiRefereeSection — autopilot scope', () => {
         expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // auto, no click awaited
         expect(rollExpression).toHaveBeenCalledWith('1d20+5');
         expect(auditEntries()).toHaveLength(1);
+        expect(composer()).toHaveValue(''); // the auto-applied thought is consumed too
     });
 
-    it('automation rulings auto-apply NEVER — the card waits for the referee', async () => {
+    it('nothing but dice auto-applies: automation rulings wait for the referee, needs_human stays dismiss-only', async () => {
         synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };
+        // automation ruling: the card waits for a human approval
         stubFetch({ referee: { ok: true, ruling: { type: 'automation', actionName: 'Breath Weapon', explanation: 'fire' } } });
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        const first = render(<AiRefereeSection campaignName={CN} characters={characters} />);
         askAbout('the dragon breathes');
         await waitFor(() => expect(screen.getByText(/AI proposes: automation/)).toBeInTheDocument());
         expect(confirmButton()).toBeInTheDocument(); // referee may still approve
         expect(screen.queryByText(/Applied:/)).toBeNull();
         expect(rollExpression).not.toHaveBeenCalled();
         expect(auditEntries()).toHaveLength(0);
-    });
+        first.unmount();
 
-    it('needs_human is surfaced verbatim for the referee, never applied — even in autopilot', async () => {
-        synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };
+        // needs_human: surfaced verbatim, dismiss-only, never auto-applied — even in autopilot
         stubFetch({ referee: { ok: false, code: 'AI_NEEDS_HUMAN', ruling: { type: 'needs_human', text: 'AI referee unavailable — the referee adjudicates.' } } });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('hmm?');
+        askAbout('the druid tries something odd');
         await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
         expect(screen.getByText(/the referee adjudicates/)).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // dismiss-only, even in autopilot
@@ -555,7 +519,7 @@ describe('AiRefereeSection — override preservation + decoding/temperature cont
         });
     });
 
-    it('decoding tri-state writes absent/true/false; blank temperature writes absent', async () => {
+    it('decoding tri-state writes absent/true/false; probe + blank temperature returns the payload to the minimal four keys', async () => {
         synced.aiConfig = CONFIGURED; // no overrides stored
         const fetchMock = stubFetch();
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
@@ -576,14 +540,19 @@ describe('AiRefereeSection — override preservation + decoding/temperature cont
         await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(2));
         expect(aiConfigPosts(fetchMock)[1]).toMatchObject({ jsonSchema: false, temperature: 1.4 });
 
-        // probe + blank temperature → both keys REMOVED from the merged blob
+        // probe + blank temperature → both keys REMOVED; nothing is invented on
+        // a save whose controls sit at defaults (this also covers the plain,
+        // never-touched save — the payload is exactly the minimal shape).
         fireEvent.change(decodingSelect(), { target: { value: '' } });
         fireEvent.change(tempInput(), { target: { value: '' } });
         fireEvent.click(saveButton());
         await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(3));
-        expect('jsonSchema' in aiConfigPosts(fetchMock)[2]).toBe(false);
-        expect('temperature' in aiConfigPosts(fetchMock)[2]).toBe(false);
-        expect(aiConfigPosts(fetchMock)[2]).toMatchObject({ mode: 'suggest', model: 'llama3.1:8b' });
+        expect(aiConfigPosts(fetchMock)[2]).toEqual({
+            mode: 'suggest',
+            endpoint: 'http://localhost:11434',
+            model: 'llama3.1:8b',
+            provider: 'openai',
+        });
     });
 
     it('blanking an API-set override removes ONLY that key — the rest is preserved', async () => {
@@ -598,27 +567,12 @@ describe('AiRefereeSection — override preservation + decoding/temperature cont
         expect('temperature' in value).toBe(false); // explicitly blanked ⇒ removed
         expect(value).toMatchObject({ jsonSchema: true, futureKey: 'keep-me' }); // untouched
     });
-
-    it('an untouched save never invents override keys (payload stays minimal)', async () => {
-        synced.aiConfig = CONFIGURED;
-        const fetchMock = stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument());
-        fireEvent.click(saveButton()); // save as-is
-        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(1));
-        const value = aiConfigPosts(fetchMock)[0];
-        expect('jsonSchema' in value).toBe(false);
-        expect('temperature' in value).toBe(false);
-        expect(value).toMatchObject(CONFIGURED);
-    });
 });
 
-// Backlog 2026-11-13 XA — composer lifecycle between asks: a SUCCESSFUL ask
-// consumes the thought (textarea renders EMPTY so a second thought can never
-// silently CONCATENATE); both failure legs (hard failure, AI_NEEDS_HUMAN)
-// PRESERVE the text so the GM never loses a thought mid-rephrase.
-describe('AiRefereeSection — composer clears on success, preserves on failure', () => {
-    const composer = () => screen.getByPlaceholderText(/Describe what a player does/);
+// Backlog 2026-11-13 XA — a SUCCESSFUL ask consumes the thought (textarea
+// renders EMPTY so a second thought can never silently CONCATENATE). The
+// failure legs keep it (locked with the cards above).
+describe('AiRefereeSection — composer clears on success', () => {
     const actorSelect = () => screen.getByRole('combobox', { name: 'Acting character' });
 
     it('suggest success: card appears with an EMPTY composer, and a second ask sends only its own text', async () => {
@@ -641,39 +595,5 @@ describe('AiRefereeSection — composer clears on success, preserves on failure'
             url: expect.stringContaining(`/campaigns/${CN}/ai/referee`),
             body: { action: 'I check for traps', characterName: 'Rakan' }, // no mega-prompt
         });
-    });
-
-    it('autopilot auto-apply success clears the composer too', async () => {
-        synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };
-        stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('I cast magic missile');
-
-        await waitFor(() => expect(screen.getByText(/Applied:.*→ 9/)).toBeInTheDocument());
-        expect(composer()).toHaveValue(''); // auto-applied thought is consumed as well
-    });
-
-    it('hard failure (e.g. AI_UNAVAILABLE) keeps the thought for a retry', async () => {
-        synced.aiConfig = CONFIGURED;
-        stubFetch({ referee: { error: 'AI backend exploded' }, refereeStatus: 500 });
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('I try to pick the lock');
-
-        await waitFor(() => expect(screen.getByText(/Not applied:.*AI backend exploded/)).toBeInTheDocument());
-        expect(composer()).toHaveValue('I try to pick the lock'); // nothing lost
-        expect(askButton()).toBeEnabled(); // ready to re-fire the same thought
-    });
-
-    it('needs_human dismiss-only card keeps the thought for re-phrasing', async () => {
-        synced.aiConfig = CONFIGURED;
-        stubFetch({ referee: { ok: false, code: 'AI_NEEDS_HUMAN', ruling: { type: 'needs_human', text: 'AI referee unavailable — the referee adjudicates this turn.' } } });
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('I do something vague');
-
-        await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
-        expect(composer()).toHaveValue('I do something vague'); // wasted attempt — text survives…
-        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-        await waitFor(() => expect(screen.queryByText(/AI proposes: needs_human/)).toBeNull());
-        expect(composer()).toHaveValue('I do something vague'); // …and still there after Dismiss
     });
 });

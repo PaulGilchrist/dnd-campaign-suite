@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Base event-handlers lane for useLoggedDiceRollEventHandlers.setupEventListeners:
 // listener registration/install-guard lifecycle, generic save-result event dispatch
-// (pending-prompt resolution, evasion/damage plumbing, HP sync, logging, popup),
-// death-save-result and concentration-result events. Feature lanes live beside this
-// file: useLoggedDiceRollEventHandlers.ma0298-soul-tome.test.js (Soul Tome trap +
-// crit secondary doubling) and useLoggedDiceRollEventHandlers.infernal-wound.test.js
-// (MA-0367 Infernal Glaive 'full' arm) — their pending-row arms stay there.
+// (pending-prompt resolution, resilient-sphere short-circuit, evasion/damage plumbing,
+// HP sync, logging, lastAttack ownership, Vicious Mockery, popup), death-save-result
+// and concentration-result events. Feature lanes live beside this file:
+// useLoggedDiceRollEventHandlers.ma0298-soul-tome.test.js (Soul Tome trap + crit
+// secondary doubling) and useLoggedDiceRollEventHandlers.infernal-wound.test.js
+// (MA-0367 Infernal Glaive 'full' arm) — their pending-row arms stay there. The
+// listener-bucket GM-ownership drain law is owned by the drain-gm-ownership sibling.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const flush = () => new Promise(r => setTimeout(r, 0));
@@ -57,6 +59,8 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../runtime/useRuntimeState.js';
 import { computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
+import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
@@ -67,6 +71,7 @@ import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 
 const CAMPAIGN = 'test-campaign';
+const FROZEN_NOW = 1700000000000;
 const deps = { characterName: 'TestWizard', campaignName: CAMPAIGN, logEntry: vi.fn(), charactersRef: { current: [] } };
 
 // Install the window listeners ONCE per file — window persists across tests, and
@@ -76,6 +81,7 @@ setupEventListeners(deps);
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
     _registry = {};
     _pendingSavesRegistry = {};
     deps.charactersRef.current = [];
@@ -84,6 +90,7 @@ beforeEach(() => {
     getRuntimeValue.mockReset().mockReturnValue(null);
     hasSoulstitchProtection.mockReturnValue(false);
     playerIsImmuneToCondition.mockReturnValue(false);
+    isResilientSphereActive.mockReturnValue(false);
     applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 5, damageReduced: false });
     rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
 });
@@ -120,16 +127,27 @@ describe('setupEventListeners — lifecycle', () => {
 });
 
 describe('save-result event', () => {
-    it('applies damage and logs a combined save-damage roll on a failed save (feature lanes inert)', async () => {
+    it('applies damage and logs the save + combined save-damage rows on a failed save (feature lanes inert)', async () => {
         createSavePrompt('p1');
         await fire({ promptId: 'p1', targetName: 'Goblin' });
 
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'Goblin', 15, ['fire'],
             expect.objectContaining({ campaignName: CAMPAIGN, attackerName: 'TestWizard', suppressHpLog: true, isSpellDamage: false }));
+        // Ordered log census: exactly the plain save row, then the combined row.
+        expect(deps.logEntry.mock.calls.map(c => c[0].rollType)).toEqual(['save', 'save-damage']);
+        expect(deps.logEntry.mock.calls[0][0]).toEqual({
+            type: 'roll', characterName: 'Goblin', rollType: 'save', name: 'Fireball',
+            rolls: [8], mode: 'normal', total: 11, bonus: 3, isNatural20: false, isNatural1: false,
+            targetName: 'Goblin', saveResult: 'failure', attackerName: 'TestWizard', dcSuccess: 'half',
+            timestamp: FROZEN_NOW, id: 'test-guid-1234',
+        });
         const combined = findLogEntry(e => e.note === 'combined_save_damage_roll');
         expect(combined).toEqual(expect.objectContaining({
-            type: 'roll', rollType: 'save-damage', name: 'Fireball', targetName: 'Goblin',
-            saveResult: 'failure', soulstitchProtected: false, isAoe: false, aoeAffectedCount: null,
+            type: 'roll', rollType: 'save-damage', characterName: 'TestWizard', name: 'Fireball',
+            formula: '8d6', rolls: [3, 4, 5, 2, 3, 3], total: 15, modifier: 0, damageType: 'fire',
+            targetName: 'Goblin', dcSuccess: 'half', saveResult: 'failure', saveRoll: 8, saveBonus: 3,
+            forcedMode: 'normal', finalDamage: 10, isAoe: false, aoeAffectedCount: null, soulstitchProtected: false,
         }));
         // generic rows never touch the feature-lane grant services
         expect(grantSoulTomeTrap).not.toHaveBeenCalled();
@@ -173,29 +191,38 @@ describe('save-result event', () => {
         expect(findLogEntry(e => e.note === 'combined_save_damage_roll')).toEqual(expect.objectContaining({ saveResult: 'soulstitch_auto_success', soulstitchProtected: true }));
     });
 
-    it('delivers save-damage popup data to the registered prompt setter', async () => {
+    it('delivers full save-damage popup data to the registered prompt setter', async () => {
         const setPopupHtml = vi.fn();
         createSavePrompt('p5');
         registerPendingPopupSetter('p5', setPopupHtml);
         await fire({ promptId: 'p5' });
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'save-damage', name: 'Fireball', damageApplied: true }));
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'save-damage', name: 'Fireball', formula: '8d6', targetName: 'Goblin',
+            total: 10, finalDamage: 10, targetCurrentHp: 5, damageApplied: true,
+            saveResult: { roll: 8, total: 11, bonus: 3, success: false },
+        }));
     });
 
     // --- evasion (CLA-211 chooser-gated; pure math owned by computeDamageAfterEvasion lane) ---
-    it("target's own matching evasion flags evasionActive", async () => {
+    it("target's own matching evasion flags evasionActive and logs its own ledger row", async () => {
         deps.charactersRef.current = [{ name: 'Goblin', computedStats: { evasionEffects: [{ saveType: 'DEX' }] } }];
         createSavePrompt('p6');
         await fire({ promptId: 'p6' });
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', true);
+        expect(findLogEntry(e => e.rollType === 'evasion')).toEqual(expect.objectContaining({
+            name: 'Evasion', characterName: 'Goblin', targetName: 'Goblin', saveResult: 'failure', dcSuccess: 'half', timestamp: FROZEN_NOW, id: 'test-guid-1234',
+        }));
     });
 
-    it('incapacitated target cannot use its own evasion', async () => {
+    it('incapacitated target cannot use its own evasion and logs no evasion row', async () => {
         getRuntimeValue.mockImplementation((name, prop) =>
             (name === 'Ally' && prop === 'activeConditions') ? ['incapacitated'] : null);
         deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX' }] } }];
         createSavePrompt('p7', { targetName: 'Ally' });
         await fire({ promptId: 'p7', targetName: 'Ally' });
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', false);
+        expect(findLogEntry(e => e.rollType === 'evasion')).toBeUndefined();
     });
 
     it('CLA-211: shareable-holder presence alone does NOT fold without the GM chooser stamp', async () => {
@@ -206,6 +233,7 @@ describe('save-result event', () => {
         createSavePrompt('p8', { targetName: 'Ally' });
         await fire({ promptId: 'p8', targetName: 'Ally' });
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', false);
+        expect(findLogEntry(e => e.rollType === 'evasion')).toBeUndefined();
     });
 
     it('CLA-211: GM-stamped leadingEvasionSelections folds shared evasion for the ticked target', async () => {
@@ -218,6 +246,7 @@ describe('save-result event', () => {
         createSavePrompt('p9', { targetName: 'Ally' });
         await fire({ promptId: 'p9', targetName: 'Ally' });
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', true);
+        expect(findLogEntry(e => e.rollType === 'evasion')).toEqual(expect.objectContaining({ name: 'Leading Evasion', characterName: 'Ally' }));
     });
 
     it('shield absorbs Magic Missile at zero but never gates other spells', async () => {
@@ -287,9 +316,19 @@ describe('save-result event', () => {
         });
         await fire({ promptId: 'p18' });
         expect(rollExpression).toHaveBeenCalledWith('1d10');
-        expect(applyDamageToTarget).toHaveBeenCalledTimes(2); // primary + secondary
+        // Ordered apply census: primary (concentration total folded in), then secondary.
+        const applies = applyDamageToTarget.mock.calls;
+        expect(applies).toHaveLength(2); // primary + secondary arity
+        expect(applies[0][2]).toBe(15); // unhalved fail damage
+        expect(applies[0][4]).toEqual(expect.objectContaining({ concentrationTotalDamage: 25 }));
+        expect(applies[1][2]).toBe(10); // secondary roll total
+        expect(applies[1][3]).toEqual(['necrotic']);
+        expect(applies[1][4]).toEqual(expect.objectContaining({ skipConcentration: true }));
         const combined = findLogEntry(e => e.note === 'combined_save_damage_roll');
-        expect(combined).toEqual(expect.objectContaining({ secondaryName: 'Secondary', secondaryFormula: '1d10', secondaryDamageType: 'necrotic' }));
+        expect(combined).toEqual(expect.objectContaining({
+            secondaryName: 'Secondary', secondaryFormula: '1d10', secondaryRolls: [5, 5],
+            secondaryTotal: 10, secondaryModifier: 0, secondaryDamageType: 'necrotic', secondaryFinalDamage: 10,
+        }));
     });
 
     // --- overchannel self-damage: CLA-244 dicePerLevel = max(2, useCount) x spellLevel ---
@@ -297,15 +336,21 @@ describe('save-result event', () => {
         createSavePrompt('p19', { overchannelActive: true, overchannelUseCount: 3, overchannelSpellLevel: 2 });
         await fire({ promptId: 'p19' });
         expect(rollExpression).toHaveBeenLastCalledWith('6d12');
+        expect(findLogEntry(e => e.rollType === 'overchannel-damage')).toEqual(expect.objectContaining({
+            formula: '6d12', damageType: 'Necrotic', characterName: 'TestWizard', targetName: 'TestWizard', total: 10,
+        }));
 
         createSavePrompt('p20', { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 });
         await fire({ promptId: 'p20' });
         expect(rollExpression).toHaveBeenLastCalledWith('4d12');
 
         rollExpression.mockClear();
+        const rowsBefore = deps.logEntry.mock.calls.length;
         createSavePrompt('p21', { overchannelActive: true, overchannelUseCount: 1, overchannelSpellLevel: 2 });
         await fire({ promptId: 'p21' });
         expect(rollExpression).not.toHaveBeenCalled();
+        // p21 adds only the two base rows — no overchannel-damage row of its own.
+        expect(deps.logEntry.mock.calls.slice(rowsBefore).map(c => c[0].rollType)).toEqual(['save', 'save-damage']);
     });
 
     // --- status effects on failed save ---
@@ -329,6 +374,46 @@ describe('save-result event', () => {
         createSavePrompt('p24', { statusEffects: ['poisoned'], saveType: 'CON' });
         await fire({ promptId: 'p24', saveType: 'CON' });
         expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    // --- generic short-circuit / dispatch seams ---
+    it('Resilient Sphere enclosing the target short-circuits the save with zero rows and zero damage', async () => {
+        isResilientSphereActive.mockImplementation((name) => name === 'Goblin');
+        createSavePrompt('p25');
+        await fire({ promptId: 'p25' });
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('triggers Vicious Mockery disadvantage only on the failed save (CLA-377)', async () => {
+        createSavePrompt('p26', { viciousMockerySpell: 'Vicious Mockery', viciousMockeryMapName: 'Cave' });
+        await fire({ promptId: 'p26', saveDc: 15 });
+        expect(triggerViciousMockeryForGeneric).toHaveBeenCalledTimes(1);
+        expect(triggerViciousMockeryForGeneric).toHaveBeenCalledWith('Vicious Mockery', { spellSaveDc: 15, targetName: 'Goblin' }, undefined, CAMPAIGN, 'Cave');
+
+        createSavePrompt('p27', { viciousMockerySpell: 'Vicious Mockery', viciousMockeryMapName: 'Cave' });
+        await fire({ promptId: 'p27', success: true, saveDc: 15, roll: 18, total: 21 });
+        expect(triggerViciousMockeryForGeneric).toHaveBeenCalledTimes(1); // no second call on success
+    });
+
+    it('writes the save lastAttack row unless a spell-save handler already owns lastAttack', async () => {
+        createSavePrompt('p28');
+        await fire({ promptId: 'p28' });
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', expect.objectContaining({
+            attackerName: 'TestWizard', targetName: 'Goblin', rollType: 'attack', saveResult: 'failure',
+            damageFormula: '8d6', attackName: 'Fireball', rawDamage: 15, actualDamage: 10, damageApplied: true,
+            timestamp: FROZEN_NOW,
+        }), CAMPAIGN);
+
+        // Spell-handler ownership skip: an existing 'spell-save' row for the same
+        // spell must not be overwritten by this generic lane.
+        getRuntimeValue.mockImplementation((name, prop) =>
+            (name === 'campaign' && prop === 'lastAttack') ? { rollType: 'spell-save', attackName: 'Fireball' } : null);
+        setRuntimeValue.mockClear();
+        createSavePrompt('p29');
+        await fire({ promptId: 'p29' });
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'lastAttack', expect.anything(), CAMPAIGN);
     });
 });
 

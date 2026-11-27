@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -178,11 +178,10 @@ describe('DruidFeatures', () => {
   });
 
   describe('circle of the stars', () => {
+    // Boundary pair only: levels 2 and 20 hit the same <6 / >=6 branches.
     it.each([
-      [2, false],
       [5, false],
       [6, true],
-      [20, true],
     ])('at level %i renders cosmic omen tracked resources: %s', (level, expected) => {
       renderDruid(starsStats(level));
       for (const resourceKey of ['cosmicOmenUses', '_Star_Map_freeCastCount']) {
@@ -208,8 +207,8 @@ describe('DruidFeatures', () => {
       ['Fortune, even', JSON.stringify({ type: 'Fortune', isEven: true }), 'Cosmic Omen: Fortune (Even)'],
       ['Bane, odd', JSON.stringify({ type: 'Bane', isEven: false }), 'Cosmic Omen: Bane (Odd)'],
       ['Fortune with isEven absent', JSON.stringify({ type: 'Fortune' }), 'Cosmic Omen: Fortune (Odd)'],
+      // Empty string hits the same falsy guard as null, so it is not listed.
       ['null', null, null],
-      ['an empty string', '', null],
       ['invalid JSON', 'invalid json', null],
       ['JSON without a type', '{"isEven":true}', null],
     ])('renders the omen badge from cosmicOmenEffect %s', (_label, effect, expectedText) => {
@@ -253,27 +252,25 @@ describe('DruidFeatures', () => {
       }
     });
 
-    it.each([3, 9])('CLA-230: hides Restore Uses below level 10 (level %i)', (level) => {
-      renderDruid(moonStats(level));
+    // Boundary level only: 3 and 9 fail the same level >= 10 branch.
+    it('CLA-230: hides Restore Uses below level 10', () => {
+      renderDruid(moonStats(9));
       expect(screen.queryByRole('button', { name: /Restore Uses/i })).not.toBeInTheDocument();
+      // The tracker itself is not level-gated — only the restore button is.
+      expect(screen.getByTestId('tracked-resource-moonlightStepUses')).toBeInTheDocument();
     });
   });
 
   describe('circle badges (land and storm)', () => {
-    it('renders the Circle of the Land badge with its chosen type', () => {
-      mockRuntime({ circleOfTheLandType: 'Forest' });
-      const section = renderDruid(landStats(3));
-      expect(section.textContent).toContain('Circle of the Land: Forest');
-    });
-
     it.each([
-      ['null', null],
-      ['an empty string', ''],
-      ['undefined', undefined],
-    ])('omits the Circle of the Land badge when the type is %s', (_label, type) => {
+      ['Forest', 'Circle of the Land: Forest'],
+      // Empty string and undefined hit the same falsy branch as null, so they are not listed.
+      [null, null],
+    ])('renders the Circle of the Land badge for type %s', (type, expectedText) => {
       mockRuntime({ circleOfTheLandType: type });
       const section = renderDruid(landStats(3));
-      expect(section.textContent).not.toContain('Circle of the Land');
+      if (expectedText) expect(section.textContent).toContain(expectedText);
+      else expect(section.textContent).not.toContain('Circle of the Land');
     });
 
     it.each([
@@ -312,9 +309,9 @@ describe('DruidFeatures', () => {
       expect(section.textContent).not.toContain('Speak with Animals');
     });
 
+    // null is the realistic store default; false hits the same falsy branch.
     it.each([
       [true, true],
-      [false, false],
       [null, false],
     ])('shows the free-cast-used badge only when the flag is truthy (%s)', (used, expected) => {
       mockGetRuntime({ freeCastUsed: used });
@@ -323,11 +320,11 @@ describe('DruidFeatures', () => {
     });
   });
 
+  // undefined is the realistic store default; false hits the same falsy branch.
   it.each([
-    ['true', true],
-    ['false', false],
-    ['undefined', false],
-  ])('shows the Wrath of the Sea badge only when wrathOfTheSeaActive is %s', (_label, active) => {
+    ['active', true],
+    ['inactive', undefined],
+  ])('shows the Wrath of the Sea badge only when wrathOfTheSeaActive is set (%s)', (_label, active) => {
     mockRuntime({ wrathOfTheSeaActive: active });
     const section = renderDruid(seaStats());
     // Match badge nodes (not raw textContent — the 'Circle of the Sea' badge
@@ -338,20 +335,19 @@ describe('DruidFeatures', () => {
   });
 
   describe('multi-minute buff badges', () => {
-    it.each([
-      ['1_minute', true],
-      ['10_minutes', true],
-      ['hour', true],
-      ['long_rest', true],
-      ['while_illusion_active', true],
-      ['instant', false],
-      ['1_round', false],
-      [undefined, false],
-    ])('renders buff badge for duration %s: %s', (duration, expected) => {
-      mockRuntime({ buffs: [{ name: 'Test Buff', duration }] });
-      const section = renderDruid(druidStats(2));
-      if (expected) expect(section.textContent).toContain(`Test Buff: ${duration}`);
-      else expect(section.textContent).not.toContain('Test Buff');
+    // Set membership (MULTI_MINUTE_DURATIONS) is owned by the bard sibling's
+    // filter test; the druid-only behavior is the "name: duration" text with
+    // formatDuration passthrough for non-special durations.
+    it('badges multi-minute buffs as "name: duration" and filters non-members', () => {
+      mockRuntime({ buffs: [
+        { name: 'Long Buff', duration: '1_minute' },
+        { name: 'Rest Buff', duration: 'long_rest' },
+        { name: 'Round Buff', duration: '1_round' },
+        { name: 'Unlisted Buff', duration: '1_hour' },
+      ] });
+      const badges = [...renderDruid(druidStats(2)).querySelectorAll('.automation-badge')]
+        .map(el => el.textContent.trim());
+      expect(badges).toEqual(['Long Buff: 1_minute', 'Rest Buff: long_rest']);
     });
 
     it.each([
@@ -374,11 +370,10 @@ describe('DruidFeatures', () => {
       expect(section.textContent).toContain(`Wild Shape: ${expected}`);
     });
 
-    it.each([
-      ['undefined', undefined],
-      ['null', null],
-    ])('survives a non-array activeBuffs value (%s) while still rendering wild shape basics', (_label, buffs) => {
-      mockRuntime({ buffs });
+    // The Array.isArray guard branch is also owned by the bard sibling's
+    // corrupted-value tests; here we verify the druid section itself survives.
+    it('survives a non-array activeBuffs value while still rendering wild shape basics', () => {
+      mockRuntime({ buffs: undefined });
       const section = renderDruid(druidStats(2));
       expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
       expect(section.textContent).toContain('Wild Shape Limitations:');

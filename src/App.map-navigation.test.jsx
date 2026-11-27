@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for map view navigation (App.jsx → handleMapsClick /
  * handleEnterMap / handleBackFromMap):
@@ -23,17 +23,16 @@
  *    triggers no reload.
  *  - Leaving to another view (Log) and back re-mounts the map view and
  *    re-resolves the active map (a GM activation while away is honored).
- *  - Back from a map with an EMPTY stack no longer strands the player on the
- *    waiting placeholder while a map is active — the Back-transition self-
- *    heal seed re-opens the active map with zero clicks (backlog 2026-11-05
- *    CV); the placeholder-only face (no active map) is covered in
- *    App.map-self-heal.test.jsx. Never the manager either way.
  *  - With no active map, re-clicking "Maps" re-runs the load (campaign-
- *    scoped) and opens the map once the GM has activated one.
+ *    scoped) and opens the map once the GM has activated one (the Maps-
+ *    button re-query lane only; the "Check Again" button lane lives in
+ *    App.map-unavailable.test.jsx).
  *
- * Waiting-placeholder rendering, "Check Again", failed-load quietness, and
- * map-activate SSE auto-open are covered by App.map-unavailable.test.jsx
- * and App.map-activate.test.jsx — not re-tested here.
+ * Back-from-map self-heal (both the armed-active-map face and the
+ * placeholder-only face) is covered by App.map-self-heal.test.jsx; waiting-
+ * placeholder rendering, "Check Again", failed-load quietness, and
+ * map-activate SSE auto-open by App.map-unavailable.test.jsx and
+ * App.map-activate.test.jsx — not re-tested here.
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -365,10 +364,10 @@ describe('App - Map Navigation & View Management', () => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
 
-      // Leave and switch to a different, characterless campaign: the select
-      // callback never resets activeView onto a sheet AND (owner doctrine
-      // 2026-11-23) never auto-opens the creation wizard — while the
+      // Leave and switch to a different, characterless campaign: while the
       // campaignName effect clears mapsView to 'none', the blank sub-state.
+      // (The zero-character view's own face — sheet gone, no wizard — is
+      // owned by App.no-auto-wizard / App.state-transitions.)
       fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
@@ -381,7 +380,6 @@ describe('App - Map Navigation & View Management', () => {
       await waitFor(() => {
         expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
       });
-      expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
       await flushEffects();
 
       // Campaign select now resets activeView (regression bug-stale-character-
@@ -477,7 +475,7 @@ describe('App - Map Navigation & View Management', () => {
       expect(window.alert).not.toHaveBeenCalled();
     });
 
-    it('Maps exits the POI stack to the manager and clears history, and re-clicking it there is a no-op', async () => {
+    it('Maps exits the POI stack to the manager and a fresh open starts on a clean stack', async () => {
       clickMaps();
       openMapFromManager();
       await expectMapShowing('dungeon-1');
@@ -485,23 +483,18 @@ describe('App - Map Navigation & View Management', () => {
       await expectMapShowing('inner-cave');
 
       // "Maps" exits the stack to the manager — history must not survive
+      // (re-clicking the open listing itself is its own regression test).
       clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
         expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
       });
 
-      // Already on the manager listing: clicking "Maps" again stays put
-      clickMaps();
-      await flushEffects();
-      expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-
       // Fresh open starts a fresh stack: back goes straight to the manager
-      // (if 'inner-cave' had survived on the stack, back would show it)
+      // (if 'inner-cave' had survived on the stack, back would show it), and
+      // the manager-exit clear also reset the dynamic Back-label mirror.
       openMapFromManager();
       await expectMapShowing('dungeon-1');
-      // The manager-exit clear also reset the dynamic Back-label mirror.
       expect(screen.getByTestId('map-back-target').textContent).toBe('');
       backFromMap();
       await waitFor(() => {
@@ -587,41 +580,25 @@ describe('App - Map Navigation & View Management', () => {
 
     // Backlog 2026-11-05 CV: Back with an empty stack used to land on the
     // "Waiting for the GM to open a map…" placeholder even while the map was
-    // still active on the server (only NEW activation SSE events auto-opened
-    // while blank). The Back-transition self-heal seed now re-opens the view from
-    // the armed active-map context with zero clicks — and never the manager.
-    it('back from a map self-heals onto the still-active map, never the manager', async () => {
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
-      });
-      await renderInCampaign('example.com');
-      clickMaps();
-      await expectMapShowing('dungeon-1');
+    // still active — the Back-transition self-heal seed. That lane (armed
+    // re-open AND the deactivated placeholder face) is owned, more strongly,
+    // by App.map-self-heal.test.jsx.
 
-      backFromMap();
-      await waitFor(() => {
-        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
-      });
-      // Re-opened from the armed context — no waiting pane, no manager,
-      // no manual "Check Again", and no extra server round-trip needed.
-      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
-      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      expect(window.alert).not.toHaveBeenCalled();
-    });
-
-    it('waits quietly with no active map, then re-clicking Maps re-queries and opens the GM-activated map', async () => {
+    // The Maps-button re-query lane (the placeholder's own "Check Again"
+    // button is covered by App.map-unavailable.test.jsx): a player left
+    // waiting must be able to rejoin the table by clicking "Maps" again.
+    it('re-clicking Maps while waiting re-runs one campaign-scoped load and opens the GM-activated map', async () => {
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: false }],
       });
       await renderInCampaign('example.com');
 
-      // First click: no active map → friendly placeholder, never an alert
+      // First click: no active map → resting in the waiting state, never an
+      // alert (placeholder face itself owned by map-unavailable).
       clickMaps();
       await waitFor(() => {
         expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
-        expect(screen.getByText('Check Again')).toBeInTheDocument();
       });
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
 
       // GM activates the map — a second Maps click must re-run the load
@@ -634,8 +611,7 @@ describe('App - Map Navigation & View Management', () => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
         expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
       });
-      // Exactly one fresh, campaign-scoped re-query via the Maps button
-      // (the "Check Again" retry button is covered by map-unavailable).
+      // Exactly one fresh, campaign-scoped re-query via the Maps button.
       expect(loadMaps.mock.calls.length).toBe(loadCallsBefore + 1);
       expect(loadMaps).toHaveBeenLastCalledWith('test-campaign');
       expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();

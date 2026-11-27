@@ -1,10 +1,11 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Rendering smoke tests for CampaignAdmin: what the admin view looks like
- * on load, before any interaction. One render per behavioral contract:
- * header, section headings (child consoles wired in), the action-card
- * table (heading + warning copy + enabled, correctly styled control, one
- * loop), the upload label, and the idle negative path.
+ * on load, before any interaction. One render per behavioral contract: the
+ * mount census (container, header, section headings incl. child consoles),
+ * the action-card table (heading + warning copy + enabled, correctly styled
+ * control, one loop), the upload label, the idle negative path, and the
+ * starter-card label parity.
  *
  * Interaction flows are covered by sibling files and are deliberately NOT
  * repeated here: rename (incl. modal chrome), delete, data-management,
@@ -107,16 +108,13 @@ const ACTION_CARDS = [
 const BUSY_TEXTS = ['Creating snapshot...', 'Rolling back...', 'Preparing download...', 'Uploading and extracting...', 'Clearing change data...', 'Clearing log...', 'Performing full reset...'];
 
 describe('CampaignAdmin - Rendering', () => {
-    it('renders the admin container with the campaign name in the header', () => {
+    it('mounts the container, campaign header, and every section console', () => {
+        // One load-time census: the admin shell plus all sections. The child
+        // consoles (Enforcement, Session, AI Referee) have their own unit
+        // tests; here we only verify the admin view wires them in.
         const { container } = renderAdmin();
         expect(container.querySelector('.ct-container.campaign-admin')).toBeInTheDocument();
         expect(screen.getByRole('heading', { level: 2, name: `Admin — ${CAMPAIGN}` })).toBeInTheDocument();
-    });
-
-    it('renders all section headings, mounting the Enforcement, Session, and AI Referee consoles', () => {
-        // The child consoles have their own test files for behavior;
-        // here we only verify the admin view wires them in.
-        renderAdmin();
         ['Appearance', 'Campaign Management', 'Data Management', 'Change-Data Census', 'Backup & Restore'].forEach((heading) => {
             expect(screen.getByRole('heading', { level: 3, name: heading })).toBeInTheDocument();
         });

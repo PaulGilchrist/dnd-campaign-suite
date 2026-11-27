@@ -1,17 +1,25 @@
-// @maintained-by-ai 2026-10-15: 2026-11-15
+// @maintained-by-ai 2026-11-26
 // Flow-wiring lane for SIMPLE_SPELL_SPECS (useSimpleSpellHandlers.js): one shared
-// table drives both sweeps of the createConfirmHandler/createSkipHandler contract:
+// table drives BOTH legs of the createConfirmHandler/createSkipHandler contract in
+// ONE test per spec —
 //   gate → pending armed → confirm dispatches the spec's apply/trigger fn exactly
-//   once, logs one spell entry, clears pending; skip clears WITHOUT dispatch and
-//   WITHOUT any write (2026-11-15 pay-state gate — the armed pending is unpaid;
-//   see useConfirmableFlow.skip-paid-gate.test.js for the paid-lane refund pair).
+//   once, logs one spell entry, clears pending; then re-arm → skip clears WITHOUT
+//   dispatch and WITHOUT any write (2026-11-15 pay-state gate — the armed pending
+//   is unpaid; see useConfirmableFlow.skip-paid-gate.test.js for the paid-lane
+//   refund pair). Both legs ride the uniform factory loop (no spec in SPELL_ROWS
+//   customizes skipTargets), so they share one test; confirm breadth still catches
+//   per-spec mis-wiring (wrong fn thunk, wrong key, stray deferCastLog).
 // Owned elsewhere — do not duplicate here:
 //   - no-pending misfire guards:        useSpellMetamagicFlow.handler-guards.test.js
-//   - complex/area/custom skip clears:  useSpellMetamagicFlow.skip.test.js
-//   - SP-100 Revivify refusal refunds:  useSpellMetamagicFlow.revivifyRefusal.test.js
+//   - complex/gate-lane skip clears:    useSpellMetamagicFlow.skip.test.js
+//     (incl. the Web + Revivify skip rows)
+//   - Web confirm payload/clear:        useSpellMetamagicFlow.webStamp.test.js (SP-126)
+//   - SP-100 Revivify confirm success/refusal cast-row bytes:
+//                                       useSpellMetamagicFlow.revivifyRefusal.test.js
 //   - exposed return-value surface:     useSpellMetamagicFlow.returnValue.test.js
 //   - per-handler payload internals:    useSpellMetamagicFlow/useSimpleSpellHandlers.*.test.js
-// Adding a spec to SIMPLE_SPELL_SPECS? Add one row to SPELL_ROWS below.
+// Adding a spec to SIMPLE_SPELL_SPECS? Add one row to SPELL_ROWS below (Web/Revivify
+// stay out — their confirm legs are fully owned by the dedicated lanes above).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -26,7 +34,6 @@ import {
 } from '../../services/automation/index.js';
 import { triggerFaerieFire } from '../../services/rules/features/faerieFireService.js';
 import { triggerForesight } from '../../services/rules/features/foresightService.js';
-import { triggerRevivify } from '../../services/rules/features/revivifyService.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -51,9 +58,8 @@ vi.mock('../../services/npcs/monsterUtils.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
-    // Goblin C dead (0 HP) so the SP-100 Revivify dead-target gate arms pending.
     // Goblin A is a dying PC (runtime 0 HP) so the SP-110 Spare the Dying gate arms pending.
-    creatures: [{ name: 'Goblin A', type: 'player' }, { name: 'Goblin B' }, { name: 'Goblin C', type: 'monster', currentHp: 0 }],
+    creatures: [{ name: 'Goblin A', type: 'player' }, { name: 'Goblin B' }],
   })),
 }));
 
@@ -179,7 +185,8 @@ function renderFlow() {
 
 // One row per SIMPLE_SPELL_SPECS member owned by this flow lane.
 // fn = the dispatch fn the spec's runner must invoke exactly once on confirm.
-// skipOwnedElsewhere: Web/Revivify skip-clears live in skip.test.js.
+// Web/Revivify omitted: their confirm legs are owned stronger by
+// webStamp.test.js / revivifyRefusal.test.js, skip legs by skip.test.js.
 const SPELL_ROWS = [
   { spell: 'Bane', level: 0, key: 'Bane', fn: applyBaneEffect },
   { spell: 'Bless', level: 1, key: 'Bless', fn: applyBlessEffect },
@@ -201,9 +208,7 @@ const SPELL_ROWS = [
   { spell: 'Sanctuary', level: 1, key: 'Sanctuary', fn: handleSanctuary, arg: 'Goblin A' },
   { spell: 'Foresight', level: 9, key: 'Foresight', fn: triggerForesight },
   { spell: 'Slow', level: 3, key: 'Slow', fn: executeHandler },
-  { spell: 'Web', level: 1, key: 'Web', fn: executeHandler, skipOwnedElsewhere: true },
   { spell: 'Sleet Storm', level: 3, key: 'SleetStorm', fn: executeHandler },
-  { spell: 'Revivify', level: 5, key: 'Revivify', fn: triggerRevivify, arg: { targetName: 'Goblin A' }, skipOwnedElsewhere: true },
 ];
 
 // Default confirm payload for array-target selectors (allTargets/toArray lanes).
@@ -221,47 +226,43 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     vi.clearAllMocks();
   });
 
-  describe('confirm dispatches, logs, clears pending', () => {
-    for (const tc of SPELL_ROWS) {
-      it(`${tc.spell}: handle${tc.key}Confirm dispatches once, logs the cast, clears pending`, async () => {
-        const { result } = renderFlow();
-        await armPending(result, tc);
+  // Both legs in one test per spec: the skip leg needs the pending the confirm
+  // leg consumed, so re-arm between legs (uniform factory loop — no row here
+  // customizes skipTargets, so one pass per spec suffices).
+  for (const tc of SPELL_ROWS) {
+    it(`${tc.spell}: confirm dispatches once + logs + clears; skip clears unpaid with zero writes`, async () => {
+      const { result } = renderFlow();
 
-        await act(async () => {
-          await result.current[`handle${tc.key}Confirm`](tc.arg || TARGETS);
-        });
-
-        expect(tc.fn).toHaveBeenCalledTimes(1);
-        expect(addEntry).toHaveBeenCalledTimes(1);
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-          type: 'spell',
-          spellName: tc.spell,
-          targets: expect.any(Array),
-        }));
-        expect(result.current[`pending${tc.key}`]).toBeNull();
+      // ── Confirm leg: dispatch exactly once, one spell row, pending cleared.
+      await armPending(result, tc);
+      await act(async () => {
+        await result.current[`handle${tc.key}Confirm`](tc.arg || TARGETS);
       });
-    }
-  });
 
-  describe('skip clears pending with zero writes without dispatching', () => {
-    for (const tc of SPELL_ROWS.filter(r => !r.skipOwnedElsewhere)) {
-      it(`${tc.spell}: handle${tc.key}Skip clears pending, writes nothing, dispatches nothing`, async () => {
-        const { result } = renderFlow();
-        await armPending(result, tc);
+      expect(tc.fn).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        type: 'spell',
+        spellName: tc.spell,
+        targets: expect.any(Array),
+      }));
+      expect(result.current[`pending${tc.key}`]).toBeNull();
 
-        await act(async () => {
-          result.current[`handle${tc.key}Skip`]();
-        });
-
-        // 2026-11-15 pay-state gate (bug-revivify-chooser-skip-rollback-inflates-
-        // unspent-slot): the gate armed UNPAID (createConfirmHandler pays at
-        // CONFIRM), so skip dismisses with NO phantom cast row and NO refund.
-        expect(tc.fn).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
-        expect(result.current[`pending${tc.key}`]).toBeNull();
+      // ── Skip leg: re-arm, then dismiss. 2026-11-15 pay-state gate
+      // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the gate
+      // armed UNPAID (createConfirmHandler pays at CONFIRM), so skip dismisses
+      // with NO phantom cast row and NO refund.
+      vi.clearAllMocks();
+      await armPending(result, tc);
+      await act(async () => {
+        result.current[`handle${tc.key}Skip`]();
       });
-    }
-  });
+
+      expect(tc.fn).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(result.current[`pending${tc.key}`]).toBeNull();
+    });
+  }
 
   // #1417 DUAL-PRODUCER census (2026-10-22): the runSlow bypass lane must
   // route THROUGH the canonical slowHandler chokepoint (automation/index.js

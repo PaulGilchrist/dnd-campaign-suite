@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Form-change behavior while editing an existing settlement: typing into fields
 // updates the draft, and the conditional threat field tracks its value.
 // Intentionally NOT duplicated here (covered in sibling files):
@@ -82,6 +82,8 @@ describe('Settlements - form field changes', () => {
     expect(screen.getByLabelText('Population')).toHaveValue('800-1,500 souls');
     expect(screen.getByPlaceholderText(/how is this settlement governed/i)).toHaveValue('Council');
     expect(screen.getByPlaceholderText(/additional gm notes/i)).toHaveValue('Updated notes');
+    // Untouched fields survive the merge (catches whole-draft overwrite bugs).
+    expect(screen.getByRole('combobox', { name: /size/i })).toHaveValue('village');
   });
 
   it('shows the threat field with its value while editing, updates when typed, and hides it when cleared', () => {
@@ -94,6 +96,8 @@ describe('Settlements - form field changes', () => {
     expect(threatField).toHaveValue('Dragon sightings');
 
     fireEvent.change(threatField, { target: { value: '' } });
-    expect(screen.queryByText('Threats')).not.toBeInTheDocument();
+    // The field is conditionally rendered on the draft value: clearing it
+    // removes the field itself, not just its text.
+    expect(screen.queryByPlaceholderText(/current dangers or tensions/i)).not.toBeInTheDocument();
   });
 });

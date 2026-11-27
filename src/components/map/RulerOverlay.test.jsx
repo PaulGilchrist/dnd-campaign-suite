@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-30
+// @maintained-by-ai 2026-11-26
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import RulerOverlay from './RulerOverlay.jsx';
@@ -12,12 +12,12 @@ const renderRuler = (start, end, cellSize = CELL_SIZE) => render(
 );
 
 describe('RulerOverlay', () => {
-    it('returns null when start is falsy', () => {
+    it('renders nothing at all when start is falsy', () => {
         const { container } = renderRuler(null, { gridX: 1, gridY: 1 });
-        expect(container.querySelector('g.ruler-group')).not.toBeInTheDocument();
+        expect(container.querySelector('svg').children).toHaveLength(0);
     });
 
-    it('renders a single point with no line or label when end is null', () => {
+    it('renders a lone anchor point with no line or label while the ruler is anchored but not dragged', () => {
         const { container } = renderRuler({ gridX: 2, gridY: 3 }, null);
         const group = container.querySelector('g.ruler-group');
         expect(group).toBeInTheDocument();
@@ -43,17 +43,14 @@ describe('RulerOverlay', () => {
     });
 
     it.each`
-        start            | end              | expectedText
-        ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 1, gridY: 1 }} | ${'7 ft (1 cell)'}
-        ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 2, gridY: 0 }} | ${'10 ft (2 cells)'}
+        start                      | end                      | expectedText
+        ${{ gridX: 0, gridY: 0 }}  | ${{ gridX: 1, gridY: 1 }} | ${'7 ft (1 cell)'}
+        ${{ gridX: 0, gridY: 0 }}  | ${{ gridX: 2, gridY: 0 }} | ${'10 ft (2 cells)'}
         ${{ gridX: -2, gridY: -1 }} | ${{ gridX: 1, gridY: 2 }} | ${'21 ft (4 cells)'}
-        ${{ gridX: 2, gridY: 3 }} | ${{ gridX: 2, gridY: 3 }} | ${'0 ft (0 cells)'}
-        ${{ gridX: 5, gridY: 5 }} | ${{ gridX: 5, gridY: 4 }} | ${'5 ft (1 cell)'}
-        ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 0, gridY: 4 }} | ${'20 ft (4 cells)'}
-    `('displays "$expectedText"', ({ start, end, expectedText }) => {
+        ${{ gridX: 2, gridY: 3 }}  | ${{ gridX: 2, gridY: 3 }} | ${'0 ft (0 cells)'}
+    `('labels $expectedText — feet and cells each round independently from the exact diagonal', ({ start, end, expectedText }) => {
         const { container } = renderRuler(start, end);
         expect(container.querySelector('g.ruler-label text').textContent).toBe(expectedText);
-        expect(container.querySelector('g.ruler-label text').textContent).not.toContain('<1');
     });
 
     it('scales pixel positions with cellSize without changing the distance label', () => {

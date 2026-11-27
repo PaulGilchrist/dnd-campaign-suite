@@ -1,4 +1,11 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Core-view smoke tests for PartyInventory. Lane-level behaviors live in the
+// sibling suites: currency chips/debounce (chip-delta-lane, currency-debounce,
+// rapid-currency), move/give confirms (move-confirmation, give-confirmation),
+// add/edit/delete intents + reconcile (item-intent-lane, delete-item-log,
+// failed-save-reconcile, stale-save-banner), labels (row-labels), autofill
+// (equipment-autofill), read-only view (localhost-readonly), modal background
+// (modal-background), player purse (player-currency).
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
@@ -52,6 +59,8 @@ const defaultProps = {
   ],
 };
 
+// Server shape: items arrive deliberately UNsorted (Torch before Antitoxin) so
+// the view's name sort is observable.
 const baseInventory = () => ({
   currency: { pp: 1, gp: 50, sp: 20, cp: 0 },
   items: [
@@ -60,33 +69,11 @@ const baseInventory = () => ({
   ],
 });
 
-// Fake per-row ledger mirroring POST /inventory/item: each intent mutates only its
-// target row on the "server" list — no whole-list snapshot ever reaches this lane.
-let serverItems;
-
-function applyIntentToLedger(intent) {
-  if (intent.action === 'add' || intent.action === 'update') {
-    const row = { name: intent.item.name, quantity: intent.item.quantity, description: intent.item.description };
-    const index = serverItems.findIndex(i => i.id === intent.item.id);
-    if (index >= 0) serverItems[index] = { ...serverItems[index], ...row };
-    else serverItems.push({ id: intent.item.id, ...row });
-  } else if (intent.action === 'setQty') {
-    serverItems.find(i => i.id === intent.id).quantity = intent.quantity;
-  } else {
-    serverItems = serverItems.filter(i => i.id !== intent.id);
-  }
-  return { currency: { pp: 1, gp: 50, sp: 20, cp: 0 }, items: serverItems };
-}
-
 beforeEach(() => {
-  serverItems = baseInventory().items;
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => applyIntentToLedger(intent));
-  mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => ({
-    currency: { pp: 1, gp: 50 + (amount.gp || 0), sp: 20, cp: amount.cp || 0 },
-    items: [],
-  }));
-  mockTransferInventory.mockReset().mockResolvedValue({ inventory: baseInventory(), character: { name: 'War Cleric', inventory: {} } });
+  mockApplyItemIntent.mockReset().mockResolvedValue(baseInventory());
+  mockAdjustCurrency.mockReset().mockResolvedValue(baseInventory());
+  mockTransferInventory.mockReset().mockResolvedValue({ inventory: baseInventory() });
   sseHandler = null;
 });
 
@@ -94,10 +81,6 @@ async function renderReady(props = defaultProps) {
   const result = render(<PartyInventory {...props} />);
   await screen.findByText('Party Inventory');
   return result;
-}
-
-async function selectPlayer(name) {
-  fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: name } });
 }
 
 describe('PartyInventory', () => {
@@ -110,105 +93,18 @@ describe('PartyInventory', () => {
     expect(itemNames).toEqual(['Antitoxin', 'Torch']);
   });
 
-  it('adds currency via stepper chips through the atomic delta lane, never a snapshot', async () => {
+  it('lists the selected player backpack with itemMeta quantities and a ×1 default', async () => {
     await renderReady();
-    fireEvent.click(screen.getByTitle('Add 10 gp'));
-    await waitFor(() => {
-      expect(mockAdjustCurrency).toHaveBeenCalledWith('test-campaign', { pp: 0, gp: 10, sp: 0, cp: 0 });
-    });
-    // The chip write must never ride the item-intent lane.
-    expect(mockApplyItemIntent).not.toHaveBeenCalled();
-  });
-
-  it('disables the remove chip when it would go below zero', async () => {
-    await renderReady();
-    expect(screen.getByTitle('Remove 100 cp').disabled).toBe(true);
-    expect(screen.getByTitle('Remove 10 sp').disabled).toBe(false);
-  });
-
-  it('gives item-row action buttons item-named aria-labels matching their titles', async () => {
-    await renderReady();
-    const row = screen.getByText('Antitoxin').closest('tr');
-    // QA backlog 2026-11-24: labels name the row item, so an exact-name query
-    // resolves ONE row's control page-wide (the old generic copies duplicated).
-    const edit = within(row).getByRole('button', { name: 'Edit "Antitoxin"', exact: true });
-    const move = within(row).getByRole('button', { name: 'Move "Antitoxin" to player', exact: true });
-    const del = within(row).getByRole('button', { name: 'Delete "Antitoxin" from party inventory', exact: true });
-    for (const [btn, label] of [
-      [edit, 'Edit "Antitoxin"'],
-      [move, 'Move "Antitoxin" to player'],
-      [del, 'Delete "Antitoxin" from party inventory'],
-    ]) {
-      expect(btn).toHaveAttribute('aria-label', label);
-      expect(btn).toHaveAttribute('title', label);
-    }
-    expect(screen.getAllByRole('button', { name: 'Edit "Antitoxin"', exact: true })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Delete "Antitoxin" from party inventory', exact: true })).toHaveLength(1);
-    // Icon-only Edit/Delete carry no visible text; accessible name comes from aria-label.
-    expect(edit.textContent).toBe('');
-    expect(del.textContent).toBe('');
-    // Click behavior unchanged: role+name click still opens the prefilled edit modal.
-    fireEvent.click(edit);
-    const modal = (await screen.findByText('Edit Antitoxin')).closest('.pi-modal');
-    expect(within(modal).getByDisplayValue('Antitoxin')).toBeInTheDocument();
-    fireEvent.click(within(modal).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByText('Edit Antitoxin')).not.toBeInTheDocument();
-  });
-
-  it('moves an item to a player through the move modal + shared in-app confirm', async () => {
-    await renderReady();
-    // QA backlog 2026-11-24: native confirm retired onto the role="dialog"
-    // tier; a native confirm firing here is a regression.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
-      throw new Error('native window.confirm fired on the move-modal path');
-    });
-    const row = screen.getByText('Torch').closest('tr');
-    fireEvent.click(within(row).getByTitle('Move "Torch" to player'));
-    fireEvent.click(await screen.findByRole('button', { name: /Move to Player/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'Move to Player' });
-    expect(dialog).toHaveTextContent('Move 5 × Torch to War Cleric?');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
-    expect(confirmSpy).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
-        direction: 'party-to-player',
-        playerName: 'War Cleric',
-        itemName: 'Torch',
-        quantity: 5,
-      });
-    });
-    confirmSpy.mockRestore();
-  });
-
-  it('lists the player backpack and moves an item to the party with quantity from itemMeta', async () => {
-    await renderReady();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await selectPlayer('War Cleric');
-    // Backpack entries without itemMeta still list, defaulting to ×1
+    fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'War Cleric' } });
     expect(await screen.findByText("Thieves' Tools")).toBeTruthy();
-    expect(screen.getByText('×1')).toBeTruthy();
-    // Row-scoped accessible name (improve 2026-11-17 CD): the button labels itself with
-    // the exact confirm copy instead of an undifferentiated "To Party".
-    fireEvent.click(screen.getByRole('button', {
+    // itemMeta quantity drives the row's default move amount…
+    expect(screen.getByRole('button', {
       name: 'Move 3 × Rope, Hempen from War Cleric to party inventory', exact: true,
-    }));
-    // In-app confirm armed by the row-scoped button (native retired 2026-11-24).
-    const confirmSpyOn = vi.spyOn(window, 'confirm').mockImplementation(() => {
-      throw new Error('native window.confirm fired on the To Party path');
-    });
-    const dialog = await screen.findByRole('dialog', { name: 'Move to Party' });
-    expect(dialog).toHaveTextContent('Move 3 × Rope, Hempen from War Cleric to party inventory?');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Move' }));
-    expect(confirmSpyOn).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
-        direction: 'player-to-party',
-        playerName: 'War Cleric',
-        itemName: 'Rope, Hempen',
-        quantity: 3,
-      });
-    });
-    confirmSpy.mockRestore();
+    })).toBeInTheDocument();
+    // …and a backpack entry with no itemMeta at all defaults to 1.
+    expect(screen.getByRole('button', {
+      name: "Move 1 × Thieves' Tools from War Cleric to party inventory", exact: true,
+    })).toBeInTheDocument();
   });
 
   it('offers equipment suggestions while typing a new item name and fills its description', async () => {
@@ -224,48 +120,16 @@ describe('PartyInventory', () => {
     await waitFor(() => expect(desc.value).toContain('hempen rope'));
   });
 
-  it('allows free-text names not present in equipment.json', async () => {
-    await renderReady();
-    fireEvent.click(screen.getByRole('button', { name: /Add Item/ }));
-    const nameInput = screen.getByLabelText(/Name/);
-    fireEvent.change(nameInput, { target: { value: 'Goblin Idol' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save/ }));
-    await waitFor(() => {
-      // One atomic ADD intent for just the new row — never a whole-list snapshot.
-      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        action: 'add',
-        item: expect.objectContaining({ name: 'Goblin Idol' }),
-      }));
-    });
-  });
-
-  it('deletes an item after the shared in-app confirm', async () => {
-    await renderReady();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
-      throw new Error('native window.confirm fired on the delete path');
-    });
-    const row = screen.getByText('Antitoxin').closest('tr');
-    fireEvent.click(within(row).getByTitle('Delete "Antitoxin" from party inventory'));
-    const dialog = screen.getByRole('dialog', { name: 'Delete Party Item' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Delete' }));
-    expect(confirmSpy).not.toHaveBeenCalled();
-    await waitFor(() => {
-      // One atomic row-delete intent — siblings stay on the server ledger untouched.
-      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        action: 'delete',
-        id: 'i1',
-      }));
-      expect(serverItems.map(i => i.id)).toEqual(['i2']);
-    });
-  });
-
-  it('live-updates from SSE inventory events', async () => {
+  it('live-updates the item table from SSE inventory events', async () => {
     await renderReady();
     const next = baseInventory();
+    next.items = next.items.filter(i => i.name !== 'Antitoxin');
     next.items.push({ id: 'i3', name: 'Ziggurat Map', quantity: 1, description: '' });
     await act(async () => {
       sseHandler({ key: 'inventory-test-campaign', data: next });
     });
+    // Additions and removals from another window's write both repaint here.
     expect(await screen.findByText('Ziggurat Map')).toBeTruthy();
+    expect(screen.queryByText('Antitoxin')).not.toBeInTheDocument();
   });
 });

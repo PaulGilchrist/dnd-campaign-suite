@@ -1,10 +1,12 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCListItem from './NPCListItem.jsx';
 
-// Row contract only: the npcHasStatBlock/npcHasAttacks guard matrix is
-// covered in src/services/encounters/npcStatBlockUtils.test.js.
+// Row contract only. Lanes covered elsewhere and NOT re-pinned here:
+// - npcHasStatBlock/npcHasAttacks guard matrix → src/services/encounters/npcStatBlockUtils.test.js
+// - campaign-scoped avatar src prefixing → common/AvatarImage.test.jsx + avatarSrc.test.js
+// - Print Card button (ungated, swallows row click) → NPCListItem.print.test.jsx
 describe('NPCListItem', () => {
   const mockOnEdit = vi.fn();
   const mockOnAddToInitiative = vi.fn();
@@ -57,168 +59,124 @@ describe('NPCListItem', () => {
     vi.clearAllMocks();
   });
 
-  it('renders a focusable row button labelled with the NPC name', () => {
-    const { container } = renderListItem({ name: 'Aragorn' });
+  it('renders a focusable row button labelled for editing that shows the NPC name', () => {
+    renderListItem({ name: 'Aragorn' });
     const button = listItemFor('Aragorn');
     expect(button).toHaveAttribute('aria-label', 'Edit NPC: Aragorn');
     expect(button).toHaveAttribute('tabIndex', '0');
-    expect(button.className).toContain('ct-list-item');
-    expect(container.querySelector('.ct-list-name')).toHaveTextContent('Aragorn');
+    expect(button).toHaveTextContent('Aragorn');
   });
 
-  it('renders no avatar element when imagePath is absent', () => {
-    const { container } = renderListItem();
-    expect(container.querySelector('.avatar-wrapper')).not.toBeInTheDocument();
-  });
-
-  it('renders the avatar image with campaign-scoped src and name as alt', () => {
-    const { container } = renderListItem({ name: 'Aragorn', imagePath: 'images/aragorn.png' });
-    const img = container.querySelector('.avatar-wrapper img');
+  it('renders an avatar image only when imagePath is set (no initials disc otherwise)', () => {
+    const { container: withImage, unmount } = renderListItem({
+      name: 'Aragorn',
+      imagePath: 'images/aragorn.png',
+    });
+    const img = withImage.querySelector('.avatar-wrapper img');
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('alt', 'Aragorn');
-    expect(img).toHaveAttribute('src', 'campaigns/test-campaign/images/aragorn.png');
+    unmount();
+
+    // NPCListItem hides the avatar entirely for imageless rows — stronger than
+    // AvatarImage's own initials-disc fallback, so it is the row's contract.
+    const { container: withoutImage } = renderListItem();
+    expect(withoutImage.querySelector('.avatar-wrapper')).not.toBeInTheDocument();
   });
 
-  describe('stat block badge and initiative button', () => {
-    it('disables the button with a hint and shows no badge while combat stats are missing', () => {
-      renderListItem();
-      expect(screen.queryByTitle('Has stat block')).not.toBeInTheDocument();
-      const button = gatedChip();
-      expect(button).toBeDisabled();
-      expect(button).toHaveAttribute('aria-label',
-        "Fill in Gandalf's AC and HP (Stats tab) before adding to Initiative");
-      expect(button.title).toMatch(/Fill in Gandalf.*AC and HP/);
-      expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
-    });
-
-    it('shows the stat badge and enables the button once AC and HP are set', () => {
-      renderListItem(combatReady);
-      expect(screen.getByTitle('Has stat block')).toBeInTheDocument();
-      expect(screen.getByTitle('Add Gandalf to Initiative')).toBeEnabled();
-      expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
-    });
-
-    it('pins the init chip accessible name to its title, dynamically per NPC name', () => {
-      const { unmount } = renderListItem(combatReady);
-      const chip = enabledChip();
-      expect(chip).toHaveAttribute('aria-label', 'Add Gandalf to Initiative');
-      expect(chip.getAttribute('aria-label')).toBe(chip.getAttribute('title'));
-      expect(screen.getAllByRole('button', { name: 'Add Gandalf to Initiative' })).toHaveLength(1);
-
-      unmount();
-      renderListItem({ ...combatReady, name: 'Marta Copperkettle' });
-      const marta = enabledChip('Marta Copperkettle');
-      expect(marta).toHaveAttribute('aria-label', 'Add Marta Copperkettle to Initiative');
-      expect(marta).toBeEnabled();
-    });
-
-    it('warns with a no-attacks badge when stats are ready but no usable attack exists', () => {
-      renderListItem({ ...combatReady, actions: [] });
-      const badge = screen.getByTitle(/Unarmed Strike/);
-      expect(badge).toHaveTextContent('No attacks');
-    });
-
-    it('calls onAddToInitiative with the npc without triggering onEdit', () => {
-      const { npc } = renderListItem(combatReady);
-      fireEvent.click(screen.getByTitle('Add Gandalf to Initiative'));
-      expect(mockOnAddToInitiative).toHaveBeenCalledWith(npc);
-      expect(mockOnEdit).not.toHaveBeenCalled();
-    });
+  it('gates a combat-less row: disabled chip naming the cause beside it, no stat badge', () => {
+    const { container } = renderListItem();
+    const chip = gatedChip();
+    expect(chip).toBeDisabled();
+    expect(chip.getAttribute('title')).toBe(chip.getAttribute('aria-label'));
+    expect(screen.queryByTitle('Has stat block')).not.toBeInTheDocument();
+    expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
+    const cause = container.querySelector('.npcs-init-cause');
+    expect(cause).not.toBeNull();
+    expect(cause).toHaveTextContent('Fill in AC and HP (Stats tab) first');
   });
 
-  it('omits attitude, subtitle, and tags when they are empty', () => {
+  it('unlocks a combat-ready row: stat badge, single enabled chip, no cause text', () => {
+    const { container } = renderListItem(combatReady);
+    expect(screen.getByTitle('Has stat block')).toBeInTheDocument();
+    const chip = enabledChip();
+    expect(chip).toBeEnabled();
+    expect(chip.getAttribute('title')).toBe(chip.getAttribute('aria-label'));
+    expect(screen.getAllByRole('button', { name: 'Add Gandalf to Initiative' })).toHaveLength(1);
+    expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
+    expect(container.querySelector('.npcs-init-cause')).toBeNull();
+  });
+
+  it('warns with a no-attacks badge when stats are ready but no usable attack exists', () => {
+    renderListItem({ ...combatReady, actions: [] });
+    expect(screen.getByTitle(/Unarmed Strike/)).toHaveTextContent('No attacks');
+  });
+
+  it('calls onAddToInitiative with the npc without triggering onEdit', () => {
+    const { npc } = renderListItem(combatReady);
+    fireEvent.click(enabledChip());
+    expect(mockOnAddToInitiative).toHaveBeenCalledWith(npc);
+    expect(mockOnEdit).not.toHaveBeenCalled();
+  });
+
+  it('badges AI-draft rows and leaves approved rows clean', () => {
+    const { container: drafted, unmount } = renderListItem({ draft: true });
+    expect(drafted.querySelector('.ct-draft-flag')).toHaveTextContent('draft');
+    unmount();
+    const { container: live } = renderListItem();
+    expect(live.querySelector('.ct-draft-flag')).toBeNull();
+  });
+
+  it('omits attitude, subtitle, and tags when their fields are empty', () => {
     const { container } = renderListItem();
     expect(container.querySelector('.ct-list-attitude')).not.toBeInTheDocument();
     expect(container.querySelector('.npcs-list-subtitle')).not.toBeInTheDocument();
     expect(container.querySelector('.npcs-list-tags')).not.toBeInTheDocument();
   });
 
-  it('renders the attitude badge with its text as title', () => {
-    const { container } = renderListItem({ attitude: 'positive' });
+  it('renders the attitude badge, race/classRole subtitle, and tags when set', () => {
+    const { container } = renderListItem({
+      attitude: 'positive',
+      race: 'Elf',
+      classRole: 'Archer',
+      tags: 'ally, quest-giver',
+    });
     const badge = container.querySelector('.ct-list-attitude');
     expect(badge).toHaveTextContent('positive');
     expect(badge).toHaveAttribute('title', 'positive');
-  });
-
-  it('renders race and classRole in the subtitle, separated only when both are set', () => {
-    const { container, unmount } = renderListItem({ race: 'Elf', classRole: 'Archer' });
     const subtitle = container.querySelector('.npcs-list-subtitle');
     expect(subtitle).toHaveTextContent('Elf');
     expect(subtitle).toHaveTextContent('Archer');
     expect(subtitle.querySelector('.npcs-list-separator')).toBeInTheDocument();
-
-    unmount();
-    for (const [partial, expected] of [
-      [{ race: 'Human', classRole: '' }, 'Human'],
-      [{ race: '', classRole: 'Wizard' }, 'Wizard'],
-    ]) {
-      const { container: singleContainer } = renderListItem(partial);
-      const single = singleContainer.querySelector('.npcs-list-subtitle');
-      expect(single).toHaveTextContent(expected);
-      expect(single.querySelector('.npcs-list-separator')).not.toBeInTheDocument();
-    }
-  });
-
-  it('renders tags with a tags icon', () => {
-    const { container } = renderListItem({ tags: 'ally, quest-giver' });
     const tagsEl = container.querySelector('.npcs-list-tags');
     expect(tagsEl).toHaveTextContent('ally, quest-giver');
     expect(tagsEl.querySelector('i.fa-tags')).toBeInTheDocument();
   });
 
-  describe('edit interaction', () => {
-    it('calls onEdit with the npc when the row is clicked', () => {
-      const { npc } = renderListItem();
-      fireEvent.click(listItemFor());
-      expect(mockOnEdit).toHaveBeenCalledWith(npc);
-    });
-
-    it.each(['Enter', ' '])('calls onEdit on %s key press', (key) => {
-      const { npc } = renderListItem();
-      fireEvent.keyDown(listItemFor(), { key });
-      expect(mockOnEdit).toHaveBeenCalledWith(npc);
-    });
-
-    it('does not call onEdit for other keys', () => {
-      renderListItem();
-      fireEvent.keyDown(listItemFor(), { key: 'Escape' });
-      expect(mockOnEdit).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe('NPCListItem — AI draft badge (campaign-authoring Phase 3)', () => {
-  it('badges draft rows and leaves approved rows clean', () => {
-    const { container: drafted } = render(
-      <NPCListItem npc={{ name: 'Oldhem', draft: true }} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
-    );
-    const flag = drafted.querySelector('.ct-draft-flag');
-    expect(flag).not.toBeNull();
-    expect(flag.textContent).toBe('draft');
-
-    const { container: live } = render(
-      <NPCListItem npc={{ name: 'Marta' }} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
-    );
-    expect(live.querySelector('.ct-draft-flag')).toBeNull();
-  });
-});
-
-describe('NPCListItem — disabled-cause text (Item 7, F21)', () => {
-  const row = (npc) => render(
-    <NPCListItem npc={npc} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
-  );
-
-  it('names the cause beside the disabled Add-to-Initiative on a statless row', () => {
-    const { container } = row({ name: 'Marta' });
-    const cause = container.querySelector('.npcs-init-cause');
-    expect(cause).not.toBeNull();
-    expect(cause.textContent).toMatch(/Fill in AC and HP \(Stats tab\) first/);
-    expect(container.querySelector('.npcs-init-btn')).toBeDisabled();
+  it.each([
+    [{ race: 'Human', classRole: '' }, 'Human'],
+    [{ race: '', classRole: 'Wizard' }, 'Wizard'],
+  ])('omits the subtitle separator when only one of race/classRole is set', (partial, expected) => {
+    const { container } = renderListItem(partial);
+    const subtitle = container.querySelector('.npcs-list-subtitle');
+    expect(subtitle).toHaveTextContent(expected);
+    expect(subtitle.querySelector('.npcs-list-separator')).not.toBeInTheDocument();
   });
 
-  it('shows no cause chip when the row already has stats', () => {
-    const { container } = row({ name: 'Cap', armorClass: 15, hitPoints: '30', actions: [{ name: 'Mace', attack_bonus: '+4' }] });
-    expect(container.querySelector('.npcs-init-cause')).toBeNull();
-    expect(container.querySelector('.npcs-init-btn')).toBeEnabled();
+  it('calls onEdit when the row is clicked', () => {
+    const { npc } = renderListItem();
+    fireEvent.click(listItemFor());
+    expect(mockOnEdit).toHaveBeenCalledWith(npc);
+  });
+
+  it.each(['Enter', ' '])('calls onEdit on %s key press', (key) => {
+    const { npc } = renderListItem();
+    fireEvent.keyDown(listItemFor(), { key });
+    expect(mockOnEdit).toHaveBeenCalledWith(npc);
+  });
+
+  it('does not call onEdit for other keys', () => {
+    renderListItem();
+    fireEvent.keyDown(listItemFor(), { key: 'Escape' });
+    expect(mockOnEdit).not.toHaveBeenCalled();
   });
 });

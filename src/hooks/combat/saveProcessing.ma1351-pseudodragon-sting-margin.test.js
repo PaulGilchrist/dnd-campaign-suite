@@ -1,20 +1,31 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1351: Pseudodragon Sting fail-margin bands on the DAMAGE-BEARING save
 // leg — unlike the MA-0639/MA-1000 rider-only composites (save chip pays no
 // damage), Sting's save adjudicates its own 2d4 Poison pool, so the DC chip
 // routes applySaveOutcome → applySaveDamage and the structured context.saveMargin
-// rider must fire there too (saveProcessing.js:1705, gated on the base
-// condition landing). Context derived live from the monsters.json Sting row
-// (dcSuccess authored 'none' on the disk row — fix#172 family; the modal
-// default for unauthored rows was 'half', MonsterCardModal.jsx :1332).
-// Shallow fail (margin < failsBy): POISONED only + FULL pool, no clock.
-// Deep fail (margin >= failsBy): applySaveMarginRider adds UNCONSCIOUS with
-// ONE merged rounds:600 clock (§37/§170). Success: half damage, zero conditions.
-// Pre-fix fingerprints: ungated unconscious over-grant (deep band left in
-// save_effect, no save_margin key) and deep-band inert if the damage-leg
-// wiring regresses to the rider-only fork — byte-inert legacy test guards both.
-// Generic rider mechanics: saveProcessing.save-margin-rider.test.js;
-// rider-only twin: saveProcessing.ma1000-homunculus-margin-band.test.js.
+// rider must fire there too, gated on the base condition actually landing
+// ("unconscious WHILE poisoned"). Context is derived through the SAME live
+// transport the modal arms (parseSaveMarginClause +
+// extractConditionsFromSaveEffect over the monsters.json Sting row). The
+// merged clock follows the owner ruling 2026-11-10: the base clause authors
+// "for 1 hour" → hours×600 → rounds:600 (pinned as the source encodes today).
+// Lane fingerprints (pre-fix guards):
+// - shallow fail (margin < failsBy): POISONED only + FULL pool, no clock —
+//   no ungated unconscious over-grant;
+// - deep fail at the boundary: rider fires THROUGH the damage leg — both
+//   conditions on ONE merged rounds:600 clock AND the full 2d4 still pays
+//   (inert rider = deep-band lost when the :1705 wiring regresses to the
+//   rider-only fork);
+// - success: dc_success "none" (fix#172 family, Failure:-only prose) pays
+//   ZERO, not half (the MA-0030 placement byte this row's only fingerprint
+//   lives here — dc-success-half-leak-family cite-skips MA-1351);
+// - byte-inert: no structured key → legacy poisoned + full damage, no clock.
+// Delegated elsewhere, not re-anchored here:
+// - generic rider mechanics (≥-gate, beyond-band prose, merged clock,
+//   byte-inert, immunity, no-double-grant, duration→rounds encoding):
+//   saveProcessing.save-margin-rider.test.js
+// - rider-only twin: saveProcessing.ma1000-homunculus-margin-band.test.js
+// - parseSaveMarginClause unit contract: MonsterCardHelpers.save-margin.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -30,8 +41,7 @@ vi.mock('../../services/ui/utils.js', () => ({
 }));
 
 // 2d4 face pinned to the row's average ("5 (2d4)"): fail pays 5; success
-// pays ZERO — the mock mirrors the real computeDamageAfterEvasion branch and
-// forwards dcSuccess (authored 'none' on the disk row, fix#172 family).
+// pays ZERO via the mocked half/none branch below.
 const rollExpression = vi.fn(() => ({ total: 5, rolls: [2, 3], modifier: 0 }));
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: (...args) => rollExpression(...args),
@@ -74,30 +84,32 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 
 import { readFileSync } from 'node:fs';
 import { processSaveRoll } from './saveProcessing.js';
+import { parseSaveMarginClause, extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const campaignName = 'test-campaign';
 const ATTACKER = 'Pseudodragon 1';
 const TARGET = 'Bandit 1';
 
-// Live monsters.json row — the disk row buildAbilitySaveRollContext arms into
-// the damage-bearing save-chip context (autoDamageFormula '2d4' rides
-// applySaveOutcome → applySaveDamage; saveConditions ['poisoned'] from the
-// truncated shallow-band save_effect).
+// Live monsters.json row — the disk row the modal's save-chip transport arms
+// into the damage-bearing context (autoDamageFormula '2d4' rides
+// applySaveOutcome → applySaveDamage). Margin and conditions come through the
+// REAL parsers (live-lane parity), not hand-built constants.
 const stingRow = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'))
     .find(m => m.name === 'Pseudodragon').actions.find(a => a.name === 'Sting');
 const SAVE_DC = stingRow.save_dc;
 const SAVE_TYPE = stingRow.save_type.slice(0, 3).toUpperCase();
-const MARGIN = { failsBy: stingRow.save_margin.fails_by, also: stingRow.save_margin.also };
+const MARGIN = parseSaveMarginClause(stingRow) ?? {};
+const SAVE_CONDITIONS = extractConditionsFromSaveEffect(stingRow.save_effect);
 
 const stingContext = (total, saveMargin = MARGIN) => ({
     saveDc: SAVE_DC,
     saveType: SAVE_TYPE,
     attackerName: ATTACKER,
     actionName: stingRow.name,
-    dcSuccess: stingRow.dc_success ?? 'half',
+    dcSuccess: stingRow.dc_success,
     autoDamageFormula: stingRow.damage_dice_primary,
     autoDamageDamageType: stingRow.damage_type_primary,
-    saveConditions: ['poisoned'],
+    saveConditions: SAVE_CONDITIONS,
     saveMargin,
     effectiveD20: total,
     effectiveBonus: 0,
@@ -127,11 +139,14 @@ beforeEach(() => {
 });
 
 describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', () => {
-    it('monsters.json data lock: damage-bearing row arms DC/CON margin context', () => {
+    it('monsters.json data lock: damage-bearing row arms the live margin/zero-success context', () => {
         expect(SAVE_DC).toBe(12);
         expect(SAVE_TYPE).toBe('CON');
-        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious' });
-        expect(stingRow.save_effect).toMatch(/Poisoned/);
+        expect(SAVE_CONDITIONS).toEqual(['poisoned']);
+        // Real-parser anchor: shallow band ends at Poisoned ("for 1 hour" —
+        // the authored duration feeding the merged clock's hours×600);
+        // deep-band rider is the structured save_margin key.
+        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 hour' });
         // The damage-bearing fork vs the MA-1000 rider-only twin: this row
         // carries its own save-leg pool.
         expect(stingRow.damage_dice_primary).toBe('2d4');
@@ -154,23 +169,19 @@ describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', ()
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(5);
     });
 
-    it(`deep fail at the boundary, margin exactly ${MARGIN.failsBy} (total ${SAVE_DC - MARGIN.failsBy}): Poisoned + Unconscious with source meta + log`, async () => {
+    it(`deep fail at the boundary, margin exactly ${MARGIN.failsBy} (total ${SAVE_DC - MARGIN.failsBy}): both legs grant AND the full pool still pays, ONE merged rounds:600 clock`, async () => {
         await resolveNpcSave(SAVE_DC - MARGIN.failsBy);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
-        const conds = appliedLogs().map(e => e.condition);
-        expect(conds).toContain('Poisoned');
+        expect(runtimeStore[`${TARGET}.activeConditionMeta`].poisoned).toMatchObject({ source: ATTACKER });
+        expect(runtimeStore[`${TARGET}.activeConditionMeta`].unconscious).toMatchObject({ source: ATTACKER });
+        expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned', 'Unconscious']);
         const uncons = appliedLogs().find(e => e.condition === 'Unconscious');
         expect(uncons.sourceName).toBe(ATTACKER);
         expect(uncons.sourceAbility).toBe(stingRow.name);
         expect(uncons.description).toMatch(new RegExp(`failed the save by ${MARGIN.failsBy}`));
-    });
-
-    it(`deep fail beyond the band (nat 2, margin ${SAVE_DC - 2}): ONE merged rounds:600 clock, both legs (§37/§170)`, async () => {
-        await resolveNpcSave(2);
-
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
-        expect(appliedLogs().find(e => e.condition === 'Unconscious').description).toMatch(new RegExp(`failed the save by ${SAVE_DC - 2}`));
+        // Rider fires THROUGH the damage leg: a single merged clock carries
+        // both condition legs at the authored "1 hour" → 600 rounds...
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: ATTACKER,
@@ -182,6 +193,9 @@ describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', ()
                 { type: 'condition', condition: MARGIN.also },
             ],
         }));
+        // ...and the deep fail never forfeits the save-leg 2d4 pool.
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(5);
     });
 
     it(`success (total ${SAVE_DC}): ZERO damage (authored dc_success none, fix#172 family), zero conditions, zero clock`, async () => {
@@ -203,5 +217,6 @@ describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', ()
         expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned']);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(5);
     });
 });

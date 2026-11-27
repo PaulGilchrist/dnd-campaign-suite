@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for the `map-activate` SSE event (App.jsx →
  * handleMapActivateEvent):
@@ -7,17 +7,23 @@
  *    auto-opened onto the activated map with zero further clicks, straight
  *    from the pushed payload — the still-"no active map" maps listing must
  *    not block the auto-open (no re-fetch).
- *  - Activation never hijacks a player off the character sheet or off a map
- *    they are already viewing.
- *  - The GM (localhost) never auto-navigates — they manage maps via the
- *    manager listing — but the event MUST still arm the GM tab's own map
- *    context (the roller lanes consume activeMapName via Initiative →
+ *  - Activation never hijacks a player off the character sheet. (The
+ *    never-re-switch-an-open-map-view face is pinned by
+ *    App.map-self-heal.test.jsx; the advisory UI on the orphaned board by
+ *    App.map-deactivated-advisory.test.jsx.)
+ *  - The GM (localhost) never auto-navigates — activation pushes keep them
+ *    on the manager listing — but the event MUST still arm the GM tab's own
+ *    map context (the roller lanes consume activeMapName via Initiative →
  *    MonsterCardModal mapData; bug-gm-activate-without-open-gridless-roller-lane).
+ *  - A `null` activeMap (server-side deactivation) DISARMS each tab's
+ *    context without navigating or ejecting anyone; MapContextSync would
+ *    otherwise force-stamp the stale map back into '__map__' (re-select
+ *    resurrection vector).
  *  - Deleting the ACTIVE map from the manager clears the GM tab's armed map
  *    context; deleting a non-active map leaves it armed.
- *  - Events scoped to another campaign, and malformed payloads (null data,
- *    empty activeMap), are ignored without navigating, alerting, or
- *    crashing.
+ *  - Events scoped to another campaign and payloads that carry nothing to
+ *    arm (null data, empty/null activeMap) are ignored without navigating,
+ *    alerting, or crashing.
  *
  * Click-driven map navigation lives in App.map-navigation.test.jsx;
  * waiting-placeholder rendering in App.map-unavailable.test.jsx.
@@ -193,21 +199,50 @@ function dispatch(event) {
   });
 }
 
-// Render as a network player with the given maps listing on the server.
-async function renderAsPlayer(maps) {
+function activate(activeMap) {
+  return { key: 'map-activate-test-campaign', data: { activeMap } };
+}
+
+// Render with the given maps listing on the server, as a network player by
+// default (pass 'localhost' for the GM tab).
+async function renderApp(maps, hostname = 'example.com') {
   const { loadMaps } = await import('./services/maps/mapsService.js');
   loadMaps.mockResolvedValue({ maps });
   mockState.characters = [{ name: 'Aragorn', level: 1 }];
-  setHostname('example.com');
+  setHostname(hostname);
   render(<App />);
   await selectCampaign();
   return loadMaps;
 }
 
+// GM tab parked on the maps-manager listing. The mock manager's Delete
+// button always calls onMapDeleted('dungeon-1').
+async function renderGmOnManager(maps) {
+  await renderApp(maps, 'localhost');
+  await openManager();
+}
+
+async function openManager() {
+  fireEvent.click(screen.getByTestId('maps-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+  });
+}
+
+// Visit Initiative and read the mapName prop the roller lanes consume
+// ('' when the tab's map context is disarmed).
+async function expectRollerMap(name) {
+  fireEvent.click(screen.getByTestId('initiative-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('initiative')).toBeInTheDocument();
+  });
+  expect(screen.getByTestId('init-map-name').textContent).toBe(name);
+}
+
 // Player who clicked "Map" while no map was active — stranded on the
 // "Waiting for the GM to open a map" view.
 async function setupPlayerOnBlankMapView() {
-  const loadMaps = await renderAsPlayer([
+  const loadMaps = await renderApp([
     { fileName: 'battle-arena.json', isActive: false },
   ]);
   fireEvent.click(screen.getByTestId('maps-btn'));
@@ -283,10 +318,7 @@ describe('App - map-activate SSE auto-open', () => {
     const loadMaps = await setupPlayerOnBlankMapView();
     const loadCallsBefore = loadMaps.mock.calls.length;
 
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'battle-arena' },
-    });
+    await dispatch(activate('battle-arena'));
 
     await waitFor(() => {
       expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
@@ -300,56 +332,16 @@ describe('App - map-activate SSE auto-open', () => {
     expect(loadMaps.mock.calls.length).toBe(loadCallsBefore);
   });
 
-  it('never hijacks a player away from the view they are already on', async () => {
-    // GM has already activated the map; player is on the character sheet —
-    // the activation must not appear until they navigate to Maps themselves
-    // (click-to-open itself is covered by App.map-navigation.test.jsx).
-    await renderAsPlayer([{ fileName: 'battle-arena.json', isActive: true }]);
+  it('never hijacks a player sitting on the character sheet', async () => {
+    // The GM has already activated the map; activation pushes must not
+    // surface on the sheet — the player reaches the map via their own Maps
+    // click (owned by App.map-navigation.test.jsx).
+    await renderApp([{ fileName: 'battle-arena.json', isActive: true }]);
     expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
 
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'battle-arena' },
-    });
+    await dispatch(activate('battle-arena'));
 
     expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-
-    // Player opens Maps, then a fresh activation must not swap the map out
-    // from under them mid-session.
-    fireEvent.click(screen.getByTestId('maps-btn'));
-    await waitFor(() => {
-      expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
-    });
-
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'test-map' },
-    });
-
-    expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
-    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
-  });
-
-  it('does not auto-open maps on localhost (GM stays on the manager listing)', async () => {
-    const { loadMaps } = await import('./services/maps/mapsService.js');
-    loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: false }] });
-    mockState.characters = [{ name: 'Aragorn', level: 1 }];
-    setHostname('localhost');
-    render(<App />);
-    await selectCampaign();
-    fireEvent.click(screen.getByTestId('maps-btn'));
-    await waitFor(() => {
-      expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-    });
-
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'battle-arena' },
-    });
-
-    // GM manages maps manually — activation pushes do not navigate them.
-    expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
   });
 
@@ -359,66 +351,36 @@ describe('App - map-activate SSE auto-open', () => {
   // every MonsterCardModal lane fed by Initiative's mapName prop then runs
   // with mapData:null and measured range/aura gating silently degrades to
   // tokenless leniency on the GM's own tab.
-  describe('GM (localhost) map-context arming without navigation', () => {
-    async function renderGmOnManager(maps) {
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({ maps });
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      setHostname('localhost');
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    }
-
-    it('arms the GM tab map context on activate — no navigation, later activations re-arm', async () => {
+  describe('GM (localhost) map-context arming and clearing', () => {
+    it('arms the GM tab map context on activate — staying on the manager listing, and re-arms on later activations', async () => {
       await renderGmOnManager([{ fileName: 'battle-arena.json', isActive: false }]);
 
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: 'battle-arena' },
-      });
+      await dispatch(activate('battle-arena'));
 
-      // No hijack: the manager listing stays put (the intent of the original
-      // localhost early-return is preserved).
+      // No hijack: GMs manage maps manually — activation pushes never
+      // navigate them off the manager listing.
       expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
 
       // The GM tab's own roller context (Initiative → MonsterCardModal
-      // mapName/mapData chain) adopted the activated map.
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
+      // mapName/mapData chain) adopted the activated map without any Open.
+      await expectRollerMap('battle-arena');
 
-      // A subsequent activation swaps the armed context without any Open.
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: 'test-map' },
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('test-map');
+      await dispatch(activate('test-map'));
+      await expectRollerMap('test-map');
     });
 
     it('clears the GM map context when the manager deletes the ACTIVE map', async () => {
       await renderGmOnManager([{ fileName: 'dungeon-1.json', isActive: false }]);
 
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: 'dungeon-1' },
-      });
-      // Mock manager's Delete button calls onMapDeleted('dungeon-1') —
-      // deleting the map this tab has armed must clear the stale context.
+      await dispatch(activate('dungeon-1'));
+
+      // The mock Delete button calls onMapDeleted('dungeon-1') — deleting
+      // the map this tab has armed must clear the stale context.
       fireEvent.click(screen.getByTestId('delete-map-btn'));
       await flushEffects();
 
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('');
+      await expectRollerMap('');
     });
 
     it('leaves the armed context in place when the deleted map is not the active one', async () => {
@@ -427,34 +389,26 @@ describe('App - map-activate SSE auto-open', () => {
         { fileName: 'dungeon-1.json', isActive: false },
       ]);
 
-      // Select-time load arms battle-arena (isActive listing); deleting a
-      // DIFFERENT map must not blank it.
-      await waitFor(async () => {
-        fireEvent.click(screen.getByTestId('initiative-btn'));
-        await flushEffects();
-        expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
-      });
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
+      // Select-time load arms the listing's active map (no SSE event needed).
+      await expectRollerMap('battle-arena');
+      await openManager();
 
+      // Delete 'dungeon-1' — a different map must not blank the armed one.
       fireEvent.click(screen.getByTestId('delete-map-btn'));
       await flushEffects();
 
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
+      await expectRollerMap('battle-arena');
     });
   });
 
   it.each([
-    ['another campaign', 'map-activate-other-campaign', { activeMap: 'somewhere-else' }],
-    ['null data', 'map-activate-test-campaign', null],
-    ['an empty activeMap', 'map-activate-test-campaign', { activeMap: '' }],
-  ])('leaves the player waiting when map-activate is scoped to %s', async (_label, key, data) => {
+    ['scoped to another campaign', 'map-activate-other-campaign', { activeMap: 'somewhere-else' }],
+    ['with null data', 'map-activate-test-campaign', null],
+    ['with an empty activeMap', 'map-activate-test-campaign', { activeMap: '' }],
+    // The /deactivate route publishes this key with null — a legitimate
+    // disarm signal, never an open signal for a waiting player.
+    ['with a null activeMap (server-side deactivation)', 'map-activate-test-campaign', { activeMap: null }],
+  ])('leaves the player waiting when map-activate is %s', async (_label, key, data) => {
     await setupPlayerOnBlankMapView();
 
     await dispatch({ key, data });
@@ -462,89 +416,44 @@ describe('App - map-activate SSE auto-open', () => {
     expectStillWaitingOnBlankMapView();
   });
 
-  // Backlog 2026-11-04 CQ: the /deactivate route publishes the same
-  // map-activate key with { activeMap: null }. Every tab must ADOPT the null
-  // (disarm its roller context) or MapContextSync's next transition
-  // force-stamps the stale map back into '__map__' (re-select resurrection
-  // vector). A null payload must never navigate or eject anyone either.
+  // Backlog 2026-11-04 CQ: a null payload must DISARM every tab's context
+  // (or MapContextSync's next transition force-stamps the stale map back
+  // into '__map__' — re-select resurrection vector) without ever
+  // navigating or ejecting anyone. The waiting-player face of null is
+  // covered by the ignored-payload rows above.
   describe('map-activate SSE with activeMap null (server-side deactivation)', () => {
-    // Same GM wiring as the arming suite above (helper is block-scoped there).
-    async function renderGmOnManager(maps) {
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({ maps });
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      setHostname('localhost');
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    }
-
     it('disarms the GM tab map context — no navigation, later activation re-arms', async () => {
       await renderGmOnManager([{ fileName: 'battle-arena.json', isActive: false }]);
 
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: 'battle-arena' },
-      });
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: null },
-      });
+      await dispatch(activate('battle-arena'));
+      await dispatch(activate(null));
 
       // Manager listing stays put — a deactivation never navigates the GM.
       expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
 
       // Roller context adopted the null (gridless until the next activation).
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('');
+      await expectRollerMap('');
 
       // A fresh activation after the deactivation re-arms normally.
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: 'test-map' },
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('test-map');
-    });
-
-    it('leaves a waiting player waiting (null is not an open signal)', async () => {
-      await setupPlayerOnBlankMapView();
-
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: null },
-      });
-
-      expectStillWaitingOnBlankMapView();
+      await dispatch(activate('test-map'));
+      await expectRollerMap('test-map');
     });
 
     it('never hijacks a player off a map view but still disarms the context', async () => {
-      await renderAsPlayer([{ fileName: 'battle-arena.json', isActive: true }]);
+      await renderApp([{ fileName: 'battle-arena.json', isActive: true }]);
       fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
       });
 
-      await dispatch({
-        key: 'map-activate-test-campaign',
-        data: { activeMap: null },
-      });
+      await dispatch(activate(null));
 
       // Their view is theirs — the map stays rendered (no ejection, no alert)…
       expect(screen.getByTestId('map-view')).toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
       // …but the roller-lane context (activeMapName prop chain) adopted null.
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('init-map-name').textContent).toBe('');
+      await expectRollerMap('');
     });
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -76,11 +76,11 @@ describe('ClericFeatures', () => {
     runtimeState.useRuntimeValue.mockReturnValue([]);
   });
 
+  // Service always returns a number; only the falsy-with-fallback path matters.
   it.each([
     [2, '2/2'],
     [0, '0/0'],
-    [undefined, '0/0'],
-  ])('renders Channel Divinity %s from the service and receives the exact playerStats (missing falls back to 0)', (max, expectedText) => {
+  ])('renders Channel Divinity %s from the service and receives the exact playerStats (0 falls back to 0/0)', (max, expectedText) => {
     mockClericFeatures({ maxChannelDivinity: max });
     const stats = clericStats(2);
     renderCleric(stats);
@@ -89,10 +89,11 @@ describe('ClericFeatures', () => {
       .toHaveTextContent(`Channel Divinity Charges: ${expectedText}`);
   });
 
+  // 0 must still render (the guard is `!== null`, not truthiness); 0.5 is a
+  // real disk value (Cleric L5/L6) proving fractional CRs pass through.
   it.each([
     [0, true],
     [0.5, true],
-    [5, true],
     [null, false],
   ])('renders the Destroy Undead row for CR %p, and omits it entirely when the rating is null (row shown: %s)', (cr, shown) => {
     mockClericFeatures({ destroyUndeadCR: cr });
@@ -120,9 +121,10 @@ describe('ClericFeatures', () => {
     }
   });
 
+  // -2 exercises the Math.max clamp on a truthy negative; missing exercises
+  // the optional-chain → || 0 fallback (same output as bonus 0, so dropped).
   it.each([
     [3, '3/3'],
-    [0, '1/1'],
     [-2, '1/1'],
     [undefined, '1/1'],
   ])('caps Warding Flare uses at max(1, Wisdom modifier %s)', (wisBonus, expectedText) => {

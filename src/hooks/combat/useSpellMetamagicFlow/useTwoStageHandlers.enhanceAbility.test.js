@@ -1,14 +1,25 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
-// Enhance Ability handler internals for useTwoStageHandlers (per-handler owner —
-// flow orchestration / stage-machine seam lives in ../useSpellMetamagicFlow.gate-two-stage.test.js).
-// Pins the SP-039/CLA-113 call shape: handleEnhanceAbilityConfirm passes a SINGLE object
-// keyed to enhanceAbilityHandler.applyEnhanceAbility({action, playerStats, campaignName,
-// targetNames, ability}) — the old positional call sent targetNames/ability as undefined,
-// the handler silently returned null and the targetEffect was never stamped.
-// Also owns: confirm target normalization, ability-guard parking, the EA pay-at-confirm
-// seam (slot-owe fix: prepareSpellCast at FINAL confirm only + pending.slotConsumed
-// stamp, CLA-312 effective-level gate, PFEG SP-093 twin), skip pay-state gate
-// (unpaid ⇒ zero-write dismiss, paid ⇒ byte-identical lv2 rollback), popup pass-through.
+// @maintained-by-ai 2026-11-26
+// Enhance Ability handler internals for useTwoStageHandlers (per-handler owner).
+// Owns: the SP-039/CLA-113 call shape — handleEnhanceAbilityConfirm passes a SINGLE
+// object keyed to enhanceAbilityHandler.applyEnhanceAbility({action, playerStats,
+// campaignName, targetNames, ability}); the old positional call sent
+// targetNames/ability as undefined, the handler silently returned null and the
+// targetEffect was never stamped. Also owns: confirm target normalization (array |
+// {targetName} | bare string), the ability-guard park (guard runs BEFORE any
+// clear/write and is non-destructive), the confirm pay seam's CALL SHAPE
+// (prepareSpellCast options, CLA-312 effective-level gate, slotConsumed stamp,
+// row→pay→apply ordering), the stage-internal PAID-skip refund, and popup
+// pass-through.
+// Deferred to stronger siblings: REAL-gate flow composition + armed-skip UNPAID
+// zero-write dismissal census → ../useSpellMetamagicFlow.gate-two-stage.test.js;
+// no-pending confirm/skip guards → useSpellMetamagicFlow.handler-guards.test.js;
+// numeric slot bytes (correct key / −1 / repeat / floor) against the REAL
+// prepareSpellCast → ./useTwoStageHandlers.enhanceAbility.pay.test.js.
+// Dismissal is asserted OBSERVABLY (run2#1733: no cfClearPending prop-spy
+// assertions): the rig wires the clear callback into getPending, so a handler that
+// fails to clear pending lets the hook's arm effect re-arms the stage from null
+// back to 'ability' — a stage that stays null after skip/confirm therefore PROVES
+// the pending clear.
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useTwoStageHandlers } from './useTwoStageHandlers.js'
@@ -52,157 +63,12 @@ const eaSpell = {
   automation: { type: 'enhance_ability', range: 'Touch' },
 }
 
-function makePending() {
-  return {
-    spell: eaSpell,
-    spellName: eaSpell.name,
-    spellLevel: eaSpell.level,
-    castingTime: eaSpell.casting_time,
-    range: eaSpell.range,
-    creatureTargets: [CASTER, 'HexWarlock'],
-  }
-}
-
-function renderEA() {
-  const playerStats = { name: CASTER, class: { name: 'Druid' }, level: 20, spellAbilities: { saveDc: 17, spell_slots_level_2: 4 } }
-  let cleared = false
-  const cfClearPending = vi.fn(() => { cleared = true })
-  const getPending = (type) => (type === 'enhanceAbility' && !cleared ? makePending() : null)
-  const setPopupHtml = vi.fn()
-  const { result } = renderHook(() =>
-    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml })
-  )
-  return { result, playerStats, cfClearPending, setPopupHtml }
-}
-
-// Paid-rig twin: same lane with a pending stamped slotConsumed (the money-state
-// flag createConfirmHandler's pay seam produces) — the skip refund must survive.
-function renderEAPaid() {
-  const playerStats = { name: CASTER, class: { name: 'Druid' }, level: 20, spellAbilities: { saveDc: 17, spell_slots_level_2: 4 } }
-  let cleared = false
-  const cfClearPending = vi.fn(() => { cleared = true })
-  const getPending = (type) => (type === 'enhanceAbility' && !cleared ? { ...makePending(), slotConsumed: true } : null)
-  const setPopupHtml = vi.fn()
-  const { result } = renderHook(() =>
-    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml })
-  )
-  return { result, playerStats, cfClearPending, setPopupHtml }
-}
-
-// Confirm normalizes its modal result into targetNames (array | {targetName} | bare
-// string) and always calls applyEnhanceAbilityEffect with ONE object argument —
-// never positional args (SP-039/CLA-113).
-const confirmCases = [
-  { name: 'array confirm result', ability: 'CHA', confirmResult: [TARGET], targetNames: [TARGET] },
-  { name: 'object confirm result', ability: 'STR', confirmResult: { targetName: 'HexWarlock' }, targetNames: ['HexWarlock'] },
-  { name: 'bare-string confirm result', ability: 'DEX', confirmResult: 'HexWarlock', targetNames: ['HexWarlock'] },
-]
-
-describe('handleEnhanceAbilityConfirm — object call-shape into applyEnhanceAbilityEffect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  for (const testCase of confirmCases) {
-    it(`normalizes ${testCase.name} and applies once with a signature-shaped object`, async () => {
-      const { result, playerStats, cfClearPending } = renderEA()
-
-      await act(async () => {
-        result.current.handleEnhanceAbilityAbilitySelect(testCase.ability)
-      })
-      await act(async () => {
-        await result.current.handleEnhanceAbilityConfirm(testCase.confirmResult)
-      })
-
-      expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
-      expect(applyEnhanceAbilityEffect.mock.calls[0].length).toBe(1)
-      const arg = applyEnhanceAbilityEffect.mock.calls[0][0]
-      expect(typeof arg).toBe('object')
-      expect(arg.targetNames).toEqual(testCase.targetNames)
-      expect(arg.ability).toBe(testCase.ability)
-      expect(arg.playerStats).toBe(playerStats)
-      expect(arg.campaignName).toBe(CAMPAIGN)
-      expect(arg.action.name).toBe('Enhance Ability')
-      expect(arg.action.spell).toBe(eaSpell)
-      expect(arg.action.automation).toEqual({ type: 'enhance_ability', range: 'Touch' })
-
-      expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
-      expect(result.current.enhanceAbilityStage).toBeNull()
-      expect(result.current.enhanceAbilitySelectedAbility).toBeNull()
-      expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    })
-  }
-
-  it('surfaces the apply result popup via setPopupHtml', async () => {
-    const { result, setPopupHtml } = renderEA()
-    const popup = { type: 'popup', payload: { type: 'automation_info', name: 'Enhance Ability' } }
-    applyEnhanceAbilityEffect.mockResolvedValueOnce(popup)
-
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('WIS')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
-
-    expect(setPopupHtml).toHaveBeenCalledWith(popup.payload)
-  })
-
-  it('confirms without a selected ability are guarded — nothing applied, stage stays parked', async () => {
-    const { result, cfClearPending } = renderEA()
-
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
-
-    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
-    expect(cfClearPending).not.toHaveBeenCalled()
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(result.current.enhanceAbilityStage).toBe('ability')
-  })
-
-  it('skip on an UNPAID pending dismisses with zero writes — clears pending, no rollback (2026-11-15 pay-state gate)', () => {
-    // The old pin title read "rolls back the unspent slot" — that WAS the bug
-    // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the gate arms
-    // this pending unpaid, so the unconditional rollback credited lv2 above max.
-    const { result, cfClearPending } = renderEA()
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip()
-    })
-
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
-    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
-    expect(result.current.enhanceAbilityStage).toBeNull()
-  })
-
-  it('skip on a PAID pending keeps the byte-identical lv2 rollback', () => {
-    // laneScope for genuinely paid pendings: the refund pair survives behind the
-    // slotConsumed stamp (pinned producer: useConfirmableFlow pay seam).
-    const { result, playerStats, cfClearPending } = renderEAPaid()
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip()
-    })
-
-    expect(rollbackSpellSlot).toHaveBeenCalledWith(CASTER, 'Enhance Ability', 2, playerStats, CAMPAIGN)
-    expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
-    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
-    expect(result.current.enhanceAbilityStage).toBeNull()
-  })
-})
-
-// ─── Slot-owe fix (bug-enhance-ability-stone-skin-confirms-never-pay, owner ruling
-// 2026-11-15): the EA confirm previously consumed NOTHING — a lv2 concentration
-// spell castable unbounded per rest. Payment now rides the canonical seam at the
-// FINAL confirm only, mirroring the SP-093 PFEG leg (same options shape, CLA-312
-// effective-level free-cast gate) + createConfirmHandler's pending.slotConsumed
-// stamp. Numeric slot bytes (correct key / −1 / repeat / floor) run against the
-// REAL prepareSpellCast in ./useTwoStageHandlers.enhanceAbility.pay.test.js.
-
-// Rig with a STABLE pending object so the slotConsumed stamp is observable.
-function renderEACaptured(spell = eaSpell) {
+// ONE rig for the whole lane. The pending object is STABLE so the slotConsumed
+// pay stamp is observable; `paid: true` pre-stamps the money flag the
+// createConfirmHandler/consumeEnhanceAbilitySlot producers write (paid-skip
+// refund twin). The clear callback drives getPending — see header for why that
+// makes stage-null an observable pending-clear proof.
+function renderEA({ spell = eaSpell, paid = false } = {}) {
   const playerStats = { name: CASTER, class: { name: 'Druid' }, level: 20, spellAbilities: { saveDc: 17, spell_slots_level_2: 4 } }
   const pending = {
     spell,
@@ -212,29 +78,147 @@ function renderEACaptured(spell = eaSpell) {
     range: spell.range,
     creatureTargets: [CASTER, 'HexWarlock'],
   }
+  if (paid) pending.slotConsumed = true
   let cleared = false
-  const cfClearPending = vi.fn(() => { cleared = true })
   const getPending = (type) => (type === 'enhanceAbility' && !cleared ? pending : null)
+  const setPopupHtml = vi.fn()
   const { result } = renderHook(() =>
-    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml: vi.fn() })
+    useTwoStageHandlers({
+      playerStats,
+      campaignName: CAMPAIGN,
+      cfClearPending: () => { cleared = true },
+      getPending,
+      setPopupHtml,
+    })
   )
-  return { result, playerStats, pending, cfClearPending }
+  return { result, playerStats, pending, setPopupHtml }
 }
 
+async function selectAndConfirm(result, ability, confirmResult) {
+  await act(async () => {
+    result.current.handleEnhanceAbilityAbilitySelect(ability)
+  })
+  await act(async () => {
+    await result.current.handleEnhanceAbilityConfirm(confirmResult)
+  })
+}
+
+// Confirm normalizes its modal result into targetNames and always calls
+// applyEnhanceAbilityEffect with ONE object argument — never positional args
+// (SP-039/CLA-113). toHaveBeenCalledWith asserts the FULL argument list, so a
+// positional regression fails on arity as well as shape. The last row pins the
+// no-target misfire honestly: `result?.targetName || result` wraps undefined into
+// [undefined] and the lane still pays + applies — the same no-target defect shape
+// as the filed Resistance bug (useTwoStageHandlers.js:78-79, targets=[[]]).
+const confirmCases = [
+  { name: 'array confirm result', ability: 'CHA', confirmResult: [TARGET], targetNames: [TARGET] },
+  { name: 'object confirm result', ability: 'STR', confirmResult: { targetName: 'HexWarlock' }, targetNames: ['HexWarlock'] },
+  { name: 'bare-string confirm result', ability: 'DEX', confirmResult: 'HexWarlock', targetNames: ['HexWarlock'] },
+  { name: 'undefined confirm result (no-target misfire — [undefined] twin of the filed useTwoStageHandlers.js:78-79 defect)', ability: 'CON', confirmResult: undefined, targetNames: [undefined] },
+]
+
+describe('handleEnhanceAbilityConfirm — single-object call shape into applyEnhanceAbilityEffect (SP-039/CLA-113)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  for (const testCase of confirmCases) {
+    it(`normalizes ${testCase.name} and applies once with a signature-shaped object`, async () => {
+      const { result, playerStats, setPopupHtml } = renderEA()
+
+      await selectAndConfirm(result, testCase.ability, testCase.confirmResult)
+
+      expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
+      expect(applyEnhanceAbilityEffect).toHaveBeenCalledWith({
+        action: { name: 'Enhance Ability', spell: eaSpell, automation: { type: 'enhance_ability', range: 'Touch' } },
+        playerStats,
+        campaignName: CAMPAIGN,
+        targetNames: testCase.targetNames,
+        ability: testCase.ability,
+      })
+
+      // Observable dismissal: the arm effect could not leave the stage null while
+      // pending still answers getPending — null + no re-arms ⇒ pending was cleared.
+      expect(result.current.enhanceAbilityStage).toBeNull()
+      expect(result.current.enhanceAbilitySelectedAbility).toBeNull()
+      // A null apply result (default mock) pops nothing.
+      expect(setPopupHtml).not.toHaveBeenCalled()
+      // Confirm never refunds (the pay seam spends).
+      expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    })
+  }
+
+  it('surfaces a non-null apply result via setPopupHtml(popup.payload)', async () => {
+    const { result, setPopupHtml } = renderEA()
+    const popup = { type: 'popup', payload: { type: 'automation_info', name: 'Enhance Ability' } }
+    applyEnhanceAbilityEffect.mockResolvedValueOnce(popup)
+
+    await selectAndConfirm(result, 'WIS', [TARGET])
+
+    expect(setPopupHtml).toHaveBeenCalledWith(popup.payload)
+  })
+
+  it('a confirm with no ability selected is guarded zero-write, parks the stage, and stays recoverable', async () => {
+    const { result } = renderEA()
+
+    await act(async () => {
+      await result.current.handleEnhanceAbilityConfirm([TARGET])
+    })
+
+    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(prepareSpellCast).not.toHaveBeenCalled()
+    expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    // Parked at 'ability': the guard returned before any clear.
+    expect(result.current.enhanceAbilityStage).toBe('ability')
+    expect(result.current.enhanceAbilitySelectedAbility).toBeNull()
+
+    // Non-destructive: selecting the ability then confirming still completes once.
+    await selectAndConfirm(result, 'CHA', [TARGET])
+    expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
+    expect(result.current.enhanceAbilityStage).toBeNull()
+  })
+
+  it('skip on a PAID pending keeps the byte-identical lv2 refund — rollback-only, no cast row', () => {
+    // laneScope for genuinely paid pendings: the refund survives behind the
+    // slotConsumed stamp (pinned producer: the pay seam). EA's paid skip branch
+    // rolls back WITHOUT a log row (unlike the Resistance/PFEG skip lanes).
+    // The UNPAID zero-write dismiss census is gate-owned:
+    // gate-two-stage.test.js (real gate, real rollbackSpellSlot observed via
+    // setRuntimeValue) + enhanceAbility.pay.test.js (real slot math).
+    const { result, playerStats } = renderEA({ paid: true })
+
+    act(() => {
+      result.current.handleEnhanceAbilitySkip()
+    })
+
+    expect(rollbackSpellSlot).toHaveBeenCalledWith(CASTER, 'Enhance Ability', 2, playerStats, CAMPAIGN)
+    expect(addEntry).not.toHaveBeenCalled()
+    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
+    // Observable dismissal without the prop spy: an uncleared skip would let the
+    // arm effect re-arms the stage to 'ability'.
+    expect(result.current.enhanceAbilityStage).toBeNull()
+    expect(result.current.enhanceAbilitySelectedAbility).toBeNull()
+  })
+})
+
+// Slot-owe fix (bug-enhance-ability-stone-skin-confirms-never-pay, owner ruling
+// 2026-11-15): the EA confirm previously consumed NOTHING — a lv2 concentration
+// spell castable unbounded per rest. Payment now rides the canonical seam at the
+// FINAL confirm only, mirroring the SP-093 PFEG leg (same options shape, CLA-312
+// effective-level free-cast gate) + createConfirmHandler's pending.slotConsumed
+// stamp. This file owns the mocked-seam CALL SHAPE + ordering; numeric slot byte
+// legality (correct key / −1 / repeat / floor, zero-slot no-write) is pinned
+// against the REAL prepareSpellCast in ./useTwoStageHandlers.enhanceAbility.pay.test.js.
 describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2026-11-15 slot-owe fix)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('pays EXACTLY ONE cast via prepareSpellCast with the PFEG/createConfirmHandler options shape, stamps slotConsumed, adds no accompanying row', async () => {
-    const { result, playerStats, pending } = renderEACaptured()
+    const { result, playerStats, pending } = renderEA()
 
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('CHA')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
+    await selectAndConfirm(result, 'CHA', [TARGET])
 
     // CLA-312: authorization consulted at the EFFECTIVE level — never hardcoded around.
     expect(isFreeCastAuthorized).toHaveBeenCalledTimes(1)
@@ -267,11 +251,10 @@ describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2
     })
     expect(addEntry.mock.invocationCallOrder[0]).toBeLessThan(prepareSpellCast.mock.invocationCallOrder[0])
     expect(prepareSpellCast.mock.invocationCallOrder[0]).toBeLessThan(applyEnhanceAbilityEffect.mock.invocationCallOrder[0])
-    expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
   })
 
   it('the ABILITY-select stage pays nothing — payment is confirm-only (criterion 1)', async () => {
-    const { result, pending } = renderEACaptured()
+    const { result, pending } = renderEA()
 
     await act(async () => {
       result.current.handleEnhanceAbilityAbilitySelect('STR')
@@ -282,20 +265,6 @@ describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2
     expect(addEntry).not.toHaveBeenCalled()
     expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
     expect(pending.slotConsumed).toBeUndefined()
-  })
-
-  it('skip BEFORE confirm stays the zero-write unpaid dismiss (73bc0c5e7 survives the pay fix)', () => {
-    const { result, cfClearPending, pending } = renderEACaptured()
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip()
-    })
-
-    expect(prepareSpellCast).not.toHaveBeenCalled()
-    expect(addEntry).not.toHaveBeenCalled()
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(pending.slotConsumed).toBeUndefined()
-    expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
   })
 
   const levelCases = [
@@ -314,14 +283,9 @@ describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2
   ]
   for (const testCase of levelCases) {
     it(testCase.name, async () => {
-      const { result, playerStats } = renderEACaptured(testCase.spell)
+      const { result, playerStats } = renderEA({ spell: testCase.spell })
 
-      await act(async () => {
-        result.current.handleEnhanceAbilityAbilitySelect('DEX')
-      })
-      await act(async () => {
-        await result.current.handleEnhanceAbilityConfirm([TARGET])
-      })
+      await selectAndConfirm(result, 'DEX', [TARGET])
 
       expect(isFreeCastAuthorized).toHaveBeenCalledWith(CASTER, 'Enhance Ability', testCase.gateLevel, playerStats, CAMPAIGN)
       expect(prepareSpellCast).toHaveBeenCalledWith(testCase.spell, {}, {
@@ -335,14 +299,9 @@ describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2
 
   it('a genuine free-cast authorization is honored (threaded true, not hardcoded around)', async () => {
     isFreeCastAuthorized.mockReturnValueOnce(true)
-    const { result, playerStats } = renderEACaptured()
+    const { result, playerStats } = renderEA()
 
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('WIS')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
+    await selectAndConfirm(result, 'WIS', [TARGET])
 
     expect(prepareSpellCast).toHaveBeenCalledWith(eaSpell, {}, {
       playerName: CASTER,
@@ -355,54 +314,12 @@ describe('handleEnhanceAbilityConfirm — pay-at-final-confirm canonical seam (2
   })
 
   it('a cantrip-level pending pays nothing but still applies (PFEG cantrip mirror)', async () => {
-    const { result } = renderEACaptured({ ...eaSpell, level: 0, spellLevel: 0 })
+    const { result } = renderEA({ spell: { ...eaSpell, level: 0 } })
 
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('INT')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
+    await selectAndConfirm(result, 'INT', [TARGET])
 
     expect(prepareSpellCast).not.toHaveBeenCalled()
     expect(isFreeCastAuthorized).not.toHaveBeenCalled()
     expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
-  })
-
-  it('confirm without pending is a pure no-op — zero pay, zero log, zero apply (criterion 4)', async () => {
-    const playerStats = { name: CASTER, class: { name: 'Druid' }, level: 20 }
-    const cfClearPending = vi.fn()
-    const { result } = renderHook(() =>
-      useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending: () => null, setPopupHtml: vi.fn() })
-    )
-
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
-
-    expect(prepareSpellCast).not.toHaveBeenCalled()
-    expect(addEntry).not.toHaveBeenCalled()
-    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
-    expect(cfClearPending).not.toHaveBeenCalled()
-  })
-
-  it('a zero-slot cast answers like the PFEG/createConfirmHandler precedent — no invented refusal, lane bytes unchanged (numeric zero-write proof: consumeBaseSlot/consumeUpcastSlot floor, pinned numerically in the .pay real-rig)', async () => {
-    prepareSpellCast.mockResolvedValueOnce({ slotConsumed: false, freeCastUsed: false, modifiedSpell: {}, metaCtx: {} })
-    const { result, pending } = renderEACaptured()
-
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('CON')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm([TARGET])
-    })
-
-    // Precedent verdict: the out-of-resources refusal face lives in SpellDetailPopup
-    // canCast ("No spell slots available for this level.") at CAST time; the confirm
-    // lanes never branch on slotResult — the seam wrote zero slot bytes on its own.
-    expect(prepareSpellCast).toHaveBeenCalledTimes(1)
-    expect(addEntry).toHaveBeenCalledTimes(1)
-    expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
-    expect(pending.slotConsumed).toBe(true) // canonical unconditional stamp (createConfirmHandler twin)
   })
 })

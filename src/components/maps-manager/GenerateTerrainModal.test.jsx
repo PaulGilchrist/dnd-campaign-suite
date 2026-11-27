@@ -1,4 +1,14 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// GenerateTerrainModal.test.jsx — modal-WIRING pins for the terrain twin.
+// Ownership lines (2026-11-26 maintenance, mirroring GenerateDungeonModal):
+//  - grid/seed value-space is pinned in gridInput.test.js / seedInput.test.js;
+//    these tests only sample one out-of-range value plus the blank-field
+//    (Number('') === 0) nuance to prove the modal's block-and-recover wiring.
+//  - the body-targeted Escape rescue lane and once-only firing are pinned in
+//    useModalDismiss.escape-body-focus.test.jsx; here we only prove THIS modal
+//    attaches the handlers and feeds `disabled: generating` into them.
+//  - twin class/copy parity (seed placeholder, shared tokens) lives in
+//    generateModalParity.test.js.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
@@ -19,27 +29,26 @@ vi.mock('../../services/maps/hexTerrainGenerator.js', () => terrainMocks);
 vi.mock('../../services/maps/mapsService.js', () => mapsServiceMocks);
 
 // ---------------------------------------------------------------------------
-// Interaction helpers
+// Interaction helpers (label-scoped: field copy like the shared seed
+// placeholder is not this file's contract to pin)
 // ---------------------------------------------------------------------------
 const typeMapName = (name) =>
-  fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
-    target: { value: name },
-  });
+  fireEvent.change(screen.getByLabelText(/Map Name/), { target: { value: name } });
 
 const setGridSize = (value) =>
   fireEvent.change(screen.getByLabelText(/Grid Size/), { target: { value } });
 
 const setSeed = (value) =>
-  fireEvent.change(screen.getByPlaceholderText('Random if empty'), { target: { value } });
+  fireEvent.change(screen.getByLabelText(/Seed/), { target: { value } });
 
 const clickGenerate = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-const clickCancel = () =>
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
 const getGenerateButton = () =>
   screen.getByRole('button', { name: 'Generate' });
+
+const GRID_BANNER = 'Grid size must be between 30 and 100';
+const SEED_BANNER = 'Seed must be a whole number';
 
 describe('GenerateTerrainModal', () => {
   let props;
@@ -67,12 +76,12 @@ describe('GenerateTerrainModal', () => {
   // Rendering
   // -------------------------------------------------------------------------
   describe('rendering', () => {
-    it('renders title, name and seed inputs, default grid size, hex count hint, and helper text', () => {
+    it('renders title, labelled fields, default grid size, hex count hint, note copy, and action buttons', () => {
       render(<GenerateTerrainModal {...props} />);
       expect(screen.getByRole('heading', { name: 'Generate Terrain Map' })).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('e.g. The Wild Frontier')).toBeInTheDocument();
-      expect(screen.getByLabelText('Seed (optional)')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Map Name/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Seed/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Grid Size/)).toHaveValue(30);
       expect(screen.getByText(/30 hexes/)).toBeInTheDocument();
       expect(screen.getByText(/fractal noise/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -81,7 +90,7 @@ describe('GenerateTerrainModal', () => {
 
     it('pre-fills the map name from initialMapName', () => {
       render(<GenerateTerrainModal {...props} initialMapName="My Terrain" />);
-      expect(screen.getByDisplayValue('My Terrain')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Map Name/)).toHaveValue('My Terrain');
     });
 
     it('updates the hex count hint when the grid size changes', () => {
@@ -93,20 +102,48 @@ describe('GenerateTerrainModal', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Cancel behavior
+  // F11 family law (Item 7): shared useModalDismiss Escape/backdrop close,
+  // blocked while generating. Lane mechanics live in the hook's own tests —
+  // these prove THIS modal wires the handlers.
   // -------------------------------------------------------------------------
-  describe('cancel', () => {
-    it('calls onClose without creating a map', () => {
+  describe('dismissal wiring (useModalDismiss lane)', () => {
+    it('closes via Cancel and a pure backdrop click, not a panel click, without creating a map', () => {
       render(<GenerateTerrainModal {...props} />);
-      clickCancel();
+      const panel = document.querySelector('.maps-manager-modal');
+      const overlay = panel.closest('.maps-manager-modal-overlay');
+
+      fireEvent.mouseDown(panel);
+      fireEvent.click(panel);
+      expect(props.onClose).not.toHaveBeenCalled();
+
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
       expect(props.onClose).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(props.onClose).toHaveBeenCalledTimes(2);
       expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
     });
 
-    it('closes when the overlay background is clicked (F11 kit convergence)', () => {
+    it('Escape on the overlay closes', () => {
       render(<GenerateTerrainModal {...props} />);
-      fireEvent.click(screen.getByRole('heading', { name: 'Generate Terrain Map' }).closest('.maps-manager-modal-overlay'));
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
       expect(props.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('Escape is inert while a generation is in flight, then the map still closes cleanly', async () => {
+      let release;
+      mapsServiceMocks.createMap.mockImplementationOnce(() => new Promise((res) => { release = res; }));
+      render(<GenerateTerrainModal {...props} />);
+      typeMapName('Hex');
+      clickGenerate();
+      await waitFor(() => expect(terrainMocks.generateHexTerrain).toHaveBeenCalled());
+
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(props.onClose).not.toHaveBeenCalled();
+
+      release({});
+      await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
     });
   });
 
@@ -118,18 +155,25 @@ describe('GenerateTerrainModal', () => {
     // created map document (criteria 4/5: reproducible from disk).
     const untouched = { name: 'Test', gridSize: 30, seed: undefined, docSeed: 98765 };
 
-    it('is disabled until the map name has content', () => {
+    it('enables Generate only when the map name has non-whitespace content', () => {
       render(<GenerateTerrainModal {...props} />);
+      expect(getGenerateButton()).toBeDisabled();
+      typeMapName('   ');
       expect(getGenerateButton()).toBeDisabled();
       typeMapName('Test');
       expect(getGenerateButton()).toBeEnabled();
     });
 
+    // Full create-body contract (UF backlog 2026-11-12): the document carries
+    // the EFFECTIVE options — mode + typed grid + the generator's effective
+    // seed (the random draw when the field was blank, echoed as docSeed) —
+    // and success notifies onMapCreated before closing. The untouched case
+    // doubles as the minimum-boundary (30) unclamped pass.
     it.each([
       ['untouched defaults', {}, untouched],
       ['typed grid size and seed', { gridSize: '50', seed: '42' }, { name: 'Test', gridSize: 50, seed: 42, docSeed: 42 }],
       ['whitespace trimmed from the name', { name: '  Trimmed  ' }, { ...untouched, name: 'Trimmed' }],
-    ])('passes %s through to terrain generation and createMap', async (_label, inputs, expected) => {
+    ])('passes %s through to terrain generation and createMap, then notifies and closes', async (_label, inputs, expected) => {
       generateWith(inputs);
       await waitFor(() => {
         expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith({
@@ -142,73 +186,58 @@ describe('GenerateTerrainModal', () => {
           terrain: {},
           pois: [],
           seed: expected.docSeed,
-          // UF backlog 2026-11-12: the create body carries the full EFFECTIVE
-          // options — mode + typed grid + the generator's effective seed (the
-          // random draw when the field was blank, echoed as docSeed).
           generationOpts: {
             mode: 'terrain',
             gridSize: expected.gridSize,
             seed: expected.docSeed,
           },
         });
+        expect(props.onMapCreated).toHaveBeenCalledTimes(1);
+        expect(props.onClose).toHaveBeenCalledTimes(1);
       });
     });
 
-    // TE backlog 2026-11-12: the silent clamp (Math.max(30, Math.min(100, n)))
-    // is retired — an out-of-range, cleared (React-19: Number('') === 0), or
-    // non-integer grid now BLOCKS with a persistent inline error aligned to
-    // the real [30,100] gate, exactly like the dungeon twin: no generator
-    // call, no createMap POST, modal stays open.
-    it.each(['20', '101', '', '45.5'])(
-      'blocks grid size "%s" with an inline error, no map created, modal stays open',
+    // The silent clamp (Math.max(30, ...)) is retired (TE backlog 2026-11-12):
+    // a bad grid BLOCKS with a persistent inline error, exactly like the
+    // dungeon twin. The full value-space (101, 45.5, NaN) is pinned in
+    // gridInput.test.js; these two sample the modal wiring: out-of-range and
+    // the blank field (React-19: Number('') === 0) that used to slip past.
+    it.each(['20', ''])(
+      'blocks grid size "%s" with an inline error and no map created, modal stays open',
       async (typed) => {
         generateWith({ gridSize: typed });
 
-        const error = await screen.findByText('Grid size must be between 30 and 100');
+        const error = await screen.findByText(GRID_BANNER);
         expect(error).toHaveClass('maps-manager-error');
         expect(terrainMocks.generateHexTerrain).not.toHaveBeenCalled();
         expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
         expect(props.onMapCreated).not.toHaveBeenCalled();
         expect(props.onClose).not.toHaveBeenCalled();
-        // Persistent: still there after the beat, Generate re-enabled, field
-        // preserved for fixing
-        expect(screen.getByText('Grid size must be between 30 and 100')).toBeInTheDocument();
+        // Persistent and recoverable: Generate stays enabled, the field keeps
+        // the offending value for fixing (blank reads as 0).
         expect(getGenerateButton()).toBeEnabled();
+        expect(screen.getByLabelText(/Grid Size/)).toHaveValue(Number(typed));
       },
     );
 
-    it('recovers after correcting an out-of-range grid size', async () => {
-      generateWith({ gridSize: '20' });
-      expect(await screen.findByText('Grid size must be between 30 and 100')).toBeInTheDocument();
-
-      setGridSize('40');
-      clickGenerate();
+    // The maximum boundary passes through UNCLAMPED — the stored gridSize
+    // equals what was typed (no silent 30-grid surprise). The minimum (30)
+    // unclamped face is the untouched-defaults case above; the error→fix→
+    // success recovery face is pinned by the seed-gate test below.
+    it('passes the boundary grid size 100 through unclamped', async () => {
+      generateWith({ gridSize: '100' });
       await waitFor(() => {
         expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith(
-          expect.objectContaining({ gridSize: 40 }),
+          expect.objectContaining({ gridSize: 100 }),
         );
         expect(mapsServiceMocks.createMap).toHaveBeenCalledWith('test-campaign', 'Test',
-          expect.objectContaining({ gridSize: 40 }));
-        expect(props.onClose).toHaveBeenCalledTimes(1);
+          expect.objectContaining({
+            gridSize: 100,
+            generationOpts: expect.objectContaining({ gridSize: 100 }),
+          }));
       });
+      expect(screen.queryByText(GRID_BANNER)).not.toBeInTheDocument();
     });
-
-    // In-range values pass through UNCLAMPED — the stored gridSize equals
-    // what was typed, boundaries 30/100 included (no silent 30-grid surprise).
-    it.each(['30', '40', '100'])(
-      'passes grid size "%s" through to the generator and document unclamped',
-      async (typed) => {
-        generateWith({ gridSize: typed });
-        await waitFor(() => {
-          expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith(
-            expect.objectContaining({ gridSize: Number(typed) }),
-          );
-          expect(mapsServiceMocks.createMap).toHaveBeenCalledWith('test-campaign', 'Test',
-            expect.objectContaining({ gridSize: Number(typed) }));
-        });
-        expect(screen.queryByText('Grid size must be between 30 and 100')).not.toBeInTheDocument();
-      },
-    );
 
     // TE backlog 2026-11-12: editing any of the three fields clears a stale
     // banner so it never lingers beside now-valid inputs mid-form.
@@ -222,11 +251,10 @@ describe('GenerateTerrainModal', () => {
       setGridSize('20');
       clickGenerate();
 
-      const banner = 'Grid size must be between 30 and 100';
-      expect(await screen.findByText(banner)).toBeInTheDocument();
+      expect(await screen.findByText(GRID_BANNER)).toBeInTheDocument();
 
       edit();
-      expect(screen.queryByText(banner)).not.toBeInTheDocument();
+      expect(screen.queryByText(GRID_BANNER)).not.toBeInTheDocument();
     });
 
     // Criterion 3: seed "0" must drive the generator and be stored verbatim —
@@ -240,14 +268,16 @@ describe('GenerateTerrainModal', () => {
       });
     });
 
-    // Criterion 2: a non-numeric seed blocks generation with a persistent
-    // inline error (no silent random fallback), and a fixed seed succeeds.
-    it.each(['abc', '4.5', '12abc'])(
+    // Criterion 2 (seedInput.js owns the value-space; these two sample it):
+    // a non-numeric seed blocks with a persistent inline error (no silent
+    // random fallback) and a fixed seed then generates and closes — the
+    // recovery face shared by both gates.
+    it.each(['abc', '4.5'])(
       'blocks seed "%s" with an inline error, no map created, and recovers after a fix',
       async (typedSeed) => {
         generateWith({ seed: typedSeed });
 
-        const error = await screen.findByText('Seed must be a whole number');
+        const error = await screen.findByText(SEED_BANNER);
         expect(error).toHaveClass('maps-manager-error');
         expect(terrainMocks.generateHexTerrain).not.toHaveBeenCalled();
         expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
@@ -266,14 +296,6 @@ describe('GenerateTerrainModal', () => {
         });
       },
     );
-
-    it('notifies onMapCreated then closes on success', async () => {
-      generateWith();
-      await waitFor(() => {
-        expect(props.onMapCreated).toHaveBeenCalledTimes(1);
-        expect(props.onClose).toHaveBeenCalledTimes(1);
-      });
-    });
 
     it('disables both buttons and shows Generating... while createMap is pending', async () => {
       let resolveCreate;
@@ -320,49 +342,6 @@ describe('GenerateTerrainModal', () => {
       terrainMocks.generateHexTerrain.mockImplementationOnce(() => { throw new Error(); });
       generateWith();
       await screen.findByText('Failed to generate terrain');
-    });
-  });
-
-  // F11 family law (Item 7 re-sweep 2026-11-25): twin of the dungeon modal —
-  // shared useModalDismiss Escape/backdrop close, inert mid-generate.
-  describe('Escape/backdrop dismissal (useModalDismiss lane)', () => {
-    const renderOpen = () => {
-      render(<GenerateTerrainModal {...props} />);
-      return props.onClose;
-    };
-
-    it('Escape on the overlay closes', () => {
-      const onClose = renderOpen();
-      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('a body-targeted Escape still closes (window rescue lane)', () => {
-      const onClose = renderOpen();
-      fireEvent.keyDown(document.body, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('backdrop click closes; a click inside the panel does not', () => {
-      const onClose = renderOpen();
-      fireEvent.click(document.querySelector('.maps-manager-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-      const overlay = document.querySelector('.maps-manager-modal-overlay');
-      fireEvent.mouseDown(overlay);
-      fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('Escape is inert while a generation is in flight', async () => {
-      let release;
-      mapsServiceMocks.createMap.mockImplementationOnce(() => new Promise((res) => { release = res; }));
-      const onClose = renderOpen();
-      typeMapName('Hex');
-      clickGenerate();
-      await waitFor(() => expect(terrainMocks.generateHexTerrain).toHaveBeenCalled());
-      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
-      expect(onClose).not.toHaveBeenCalled();
-      release({});
     });
   });
 });

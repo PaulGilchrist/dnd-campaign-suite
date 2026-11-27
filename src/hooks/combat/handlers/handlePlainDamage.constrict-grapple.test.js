@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1842: Apep Constrict ongoing grapple-damage producer — the hit-clause
 // leg registers the registered constrict_grapple te + ONE rounds:100 backstop
 // clock ONLY while Grappled stands on the victim, and logs every grant and
@@ -86,6 +86,7 @@ import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import monsters from '../../../../public/data/monsters.json';
 
@@ -148,7 +149,9 @@ beforeEach(() => {
 });
 
 describe('MA-1842 ongoing grapple-damage producer', () => {
-    it('when Grappled stands: registers constrict_grapple te + ONE rounds:100 clock, logs grant and condition reason', async () => {
+    // The condition-leg reason/meta bytes are owned by hitClause.test.js —
+    // this lane pins ONLY the rider: te payload, exactly ONE clock, grant log.
+    it('when Grappled stands: registers constrict_grapple te + exactly ONE rounds:100 clock, logs the grant', async () => {
         mockGrappledStanding(true);
         const fn = createLogDamageAndShow(deps);
         await fn(constrictRoll(hitContext()));
@@ -167,32 +170,43 @@ describe('MA-1842 ongoing grapple-damage producer', () => {
             rounds: 100,
             effects: [{ type: 'remove_target_effect', effectKey: 'constrict_grapple', source: 'Apep 1', target: 'ElderPaladin' }],
         }));
+        // "ONE backstop clock" is the contract: a duplicate second grant
+        // (per-condition or per-leg misfire) would stack prunes — pin count.
+        expect(registerTargetEffect).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'automation',
             automationType: 'constrict_grapple_granted',
             characterName: 'ElderPaladin',
             sourceName: 'Apep 1',
         }));
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            type: 'condition',
-            reason: 'Constrict (escape DC 26)',
-        }));
     });
 
-    it('when the grapple did not stand: escape DC 26 meta still stamped, zero te / zero clock, refusal logged', async () => {
+    // Production-faithful refusal (fix#363 order: rider reads AFTER the
+    // condition leg): meta/dc stamping only ever exists ALONGSIDE a landing
+    // grappled write, so the real refusal route is the immunity split —
+    // applyHitClauseConditions early-returns with ZERO writes, then the
+    // rider reads no Grappled and refuses. (The old mock stamped meta while
+    // refusing — a byte-combination production cannot reach.)
+    it('when the grapple never lands (Grappled-immune victim): zero condition/meta writes, zero te / zero clock, refusal logged, never a grant', async () => {
+        playerIsImmuneToCondition.mockReturnValue(true);
         mockGrappledStanding(false);
         const fn = createLogDamageAndShow(deps);
         await fn(constrictRoll(hitContext()));
 
-        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
-        expect(metaCall).toBeTruthy();
-        expect(metaCall[2].grappled).toMatchObject({ dc: 26, ability: 'str', source: 'Apep 1' });
+        const victimStateWrites = setRuntimeValue.mock.calls.filter(
+            c => c[0] === 'ElderPaladin' && (c[1] === 'activeConditions' || c[1] === 'activeConditionMeta')
+        );
+        expect(victimStateWrites).toEqual([]);
         expect(registerTargetEffect).not.toHaveBeenCalled();
         expect(addExpiration).not.toHaveBeenCalled();
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'automation',
             automationType: 'constrict_grapple_refused',
+            characterName: 'ElderPaladin',
+            sourceName: 'Apep 1',
         }));
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ automationType: 'constrict_grapple_granted' }));
     });
 
     it('is byte-inert for sibling grapple rows without the structured key (Vine Blight)', async () => {

@@ -1,5 +1,10 @@
-// @maintained-by-ai: 2026-10-14
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @maintained-by-ai 2026-11-26
+// Lane: local mount/resume/re-queue mechanics (lazy iframe, pause/resume reuse,
+// persisted re-queue, active-mood highlight, volume forwarding) + the
+// unparseable-editor-input no-op. Stop/commit/audit rows live in
+// local-stop-unmount + transport-chrome; paste-parse-on-save lives in
+// mixed-save-warning; override-driven play queue lives in local-tracks.
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -40,18 +45,18 @@ beforeEach(() => {
 });
 
 describe('MusicPlayer', () => {
-  it('renders the full player for non-localhost clients (ambience duty is delegable to players)', () => {
-    const { container } = renderPlayer({ isLocalhost: false });
-    expect(container.querySelector('.music-player')).not.toBeNull();
-  });
-
-  it('renders mood buttons and transport controls on localhost', () => {
-    renderPlayer();
-    expect(screen.getByText('Music')).toBeInTheDocument();
-    for (const mood of MOODS) {
-      expect(screen.getByTitle(`Play ${mood.label} ambience`)).toBeInTheDocument();
+  it('renders every mood chip and the volume slider for GM and player tabs alike (ambience duty is delegable to players)', () => {
+    for (const isLocalhost of [true, false]) {
+      const { container, unmount } = render(
+        <MusicPlayer campaignName="test-campaign" isLocalhost={isLocalhost} />
+      );
+      expect(container.querySelector('.music-player')).not.toBeNull();
+      for (const mood of MOODS) {
+        expect(screen.getByTitle(`Play ${mood.label} ambience`)).toBeInTheDocument();
+      }
+      expect(screen.getByTitle('Volume')).toBeInTheDocument();
+      unmount();
     }
-    expect(screen.getByTitle('Volume')).toBeInTheDocument();
   });
 
   it('lazy-mounts the iframe on first mood play, queues tracks, stores state, and logs', () => {
@@ -71,7 +76,7 @@ describe('MusicPlayer', () => {
     );
   });
 
-  it('re-queues persisted tracks when resuming after reload', () => {
+  it('re-queues persisted tracks when resuming after reload (never a bare resume)', () => {
     getStore('campaign').set('music', { mood: 'town', playing: false, volume: 0.7, overrides: {} });
     const { container } = renderPlayer();
     expect(container.querySelector('.yt-music-frame')).toBeNull();
@@ -85,7 +90,7 @@ describe('MusicPlayer', () => {
     expect(musicState().playing).toBe(true);
   });
 
-  it('reuses the iframe across pause, resume, and mood switches', () => {
+  it('reuses the one iframe across pause, resume, and mood switches (audio continuity)', () => {
     const { container } = renderPlayer();
     fireEvent.click(screen.getByTitle('Play Town ambience'));
     const frame = container.querySelector('.yt-music-frame');
@@ -105,82 +110,38 @@ describe('MusicPlayer', () => {
     expect(ambiencePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('combat'), 'test-campaign');
   });
 
-  it('highlights the active mood button only while playing', () => {
+  it('highlights the active mood chip only while playing', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Play Combat ambience'));
     expect(screen.getByTitle('Play Combat ambience').className).toContain('active');
     expect(screen.getByTitle('Play Town ambience').className).not.toContain('active');
+
     fireEvent.click(screen.getByTitle('Pause'));
     expect(screen.getByTitle('Play Combat ambience').className).not.toContain('active');
   });
 
-  it('stops playback and logs the stop', () => {
-    renderPlayer();
-    fireEvent.click(screen.getByTitle('Play Dungeon ambience'));
-    fireEvent.click(screen.getByTitle('Stop'));
-    expect(ambiencePlayer.stop).toHaveBeenCalled();
-    expect(musicState()).toMatchObject({ mood: null, playing: false });
-    expect(mockAddEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({ type: 'music', action: 'stop' })
-    );
-  });
-
-  it('forwards volume changes to the player and store', () => {
+  it('forwards volume changes to the player and the store', () => {
     renderPlayer();
     fireEvent.change(screen.getByTitle('Volume'), { target: { value: '40' } });
     expect(ambiencePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.4));
     expect(musicState().volume).toBeCloseTo(0.4);
   });
 
-  it('lets a player override a mood with pasted YouTube URLs', async () => {
-    // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
-    let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {
-      if (opts.method === 'POST' && String(url).endsWith('/music')) {
-        const body = JSON.parse(opts.body);
-        serverMusic = { ...serverMusic, ...('value' in body ? body.value : body) };
-      }
-      return { ok: true, status: 200, json: async () => ({ music: serverMusic, message: 'ok' }), text: async () => '' };
-    });
+  it('ignores unparseable editor input: console.debug trace, zero writes', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
-    // Item 3b: starter moods seed bundled /audio/ beds — clear the seeded
-    // local rows so this scenario pins the PASTE lane end-to-end alone.
+    // Drop the seeded bundled beds so the draft is truly empty and the only
+    // input is the junk line.
     let removeBtn;
     while ((removeBtn = document.querySelector('.music-editor-local-tracks button'))) {
       fireEvent.click(removeBtn);
     }
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), {
-      target: { value: 'https://youtu.be/aaaaaaaaaaa\nhttps://www.youtube.com/watch?v=bbbbbbbbbbb' }
+      target: { value: 'not a url' }
     });
-    fireEvent.click(screen.getByText('Save'));
-
-    await waitFor(() => expect(musicState().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']));
-
-    fireEvent.click(screen.getByTitle('Play Town ambience'));
-    expect(ambiencePlayer.playTracks).toHaveBeenCalledWith(
-      [
-        { kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' },
-        { kind: 'youtube', src: 'bbbbbbbbbbb', title: 'bbbbbbbbbbb' }
-      ],
-      'test-campaign'
-    );
-    globalThis.fetch.mockRestore();
-  });
-
-  it('ignores unparseable editor input', () => {
-    renderPlayer();
-    fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
-    // Item 3b: drop the seeded bundled beds so the draft is truly empty.
-    let removeBtn;
-    while ((removeBtn = document.querySelector('.music-editor-local-tracks button'))) {
-      fireEvent.click(removeBtn);
-    }
-    fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), { target: { value: 'not a url' } });
     // Invalid input drops at console.debug (backlog 2026-11-08 EK: user-input
     // validation is not console-noise); console.error stays reserved for
-    // genuine faults.
+    // genuine faults. The refusal UI itself is pinned in live-validation.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.click(screen.getByText('Save'));

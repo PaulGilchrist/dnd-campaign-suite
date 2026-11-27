@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -21,7 +21,7 @@ vi.mock('../../../services/ui/utils.js', () => ({
     },
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../runtime/useRuntimeState.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { handleSanctuarySave } from './handleSanctuarySave.js';
@@ -147,8 +147,8 @@ describe('handleSanctuarySave', () => {
             expect(finalPending).toHaveProperty('other-prompt');
         });
 
-        it('allows damage and logs when the save succeeds', async () => {
-            mockSanctuaryActive({ 'other-prompt': { promptId: 'other-prompt' } });
+        it('allows damage, logs, and evicts the pending-bucket key when the last row resolves', async () => {
+            mockSanctuaryActive();
 
             const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
             dispatchSaveResult({ promptId: PROMPT_ID, success: true });
@@ -166,7 +166,10 @@ describe('handleSanctuarySave', () => {
                 saveType: 'WIS',
             }));
 
-            expect(lastPendingWrite()).not.toHaveProperty(PROMPT_ID);
+            // Drain-to-evict: resolving the handler's own ONLY pending row
+            // deletes the bucket key outright instead of persisting {}
+            // (unrelated-row preservation is asserted in the fail test above).
+            expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', 'test-campaign');
         });
 
         it('ignores save-result events with a mismatched promptId', async () => {
@@ -194,11 +197,11 @@ describe('handleSanctuarySave', () => {
 
             await invokePromise;
 
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[sanctuary] Missing saveDc on targetEffect for target',
-                'Ally',
-                '— defaulting to 8'
-            );
+            // The missing DC must be surfaced in the console (project
+            // error-logging convention) without pinning the exact wording.
+            expect(consoleSpy.mock.calls.some(
+                ([msg]) => String(msg).includes('Missing saveDc')
+            )).toBe(true);
             expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 saveDc: 8,
             }));

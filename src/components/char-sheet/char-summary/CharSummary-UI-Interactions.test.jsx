@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation): popup CLICK wiring —
 // user clicks in the summary that open detail popups. OWNED HERE (unique):
@@ -16,25 +16,24 @@
 //   - Ally modal confirm/cancel, short-rest button, window events
 //     → CharSummary-Ally-Initiative / -Prerequisites / -EventHandlers.test.jsx
 //
+// Improvements (2026-11-26): 3 runs → 3 runs (no redundancy found; both lanes
+//   verified unique by grep over all CharSummary-* siblings — only this file
+//   asserts showBackgroundPopup calls or the 'Armor Class (<base>) =' string).
+//   - AC popup STRENGTHENED: the header claimed it pinned base-vs-modified AC,
+//     but with no modifiers the row also read 18, so a source that switched to
+//     the computed total would still have passed. Now conditionEffects
+//     { acPenalty: 2 } splits the values: row shows 16, popup must still quote
+//     base 18 (CharSummary.jsx:676 reads playerStats.armorClass directly).
+//   - renderSummary gains an extraProps slot for component props beyond stats.
+//
 // Improvements (2026-10-14): 4 runs → 3 runs
-//   - it.each trimmed: the { rules: '5e' } explicit case was redundant with the
-//     '2024' passthrough case (same code path — value forwarded verbatim) and
-//     with the `rules || '5e'` fallback case. Kept the two that pin distinct
-//     branches: a real passthrough (2024) and the default fallback (absent→5e).
-//   - Unmocked DiceRollContext (trivial React context — Prerequisites/
-//     Ally-Initiative precedent): tests render through the real Provider with a
+//   - it.each trimmed to the two cases pinning distinct rules branches: real
+//     passthrough (2024) and `rules || '5e'` fallback (absent→5e).
+//   - Unmocked DiceRollContext: tests render through the real Provider with a
 //     setPopupHtml spy, so the popup callback is proven wired through real
-//     context plumbing. Deleted the module-level `let setPopupHtml` +
-//     mockImplementation-in-beforeEach dance.
-//   - Removed the window.location.defineProperty fiddle — vitest jsdom runs at
-//     http://localhost/ (vitest.config.js), so isLocalhost was already true.
-//   - Import shared mockPlayerStats/mockCampaignName (dropped ~30-line local dup).
-//   - fireEvent.click replaces raw element.click(); added toHaveBeenCalledTimes(1)
-//     so double-fire regressions fail.
-//   - Added rules default/pass-through cases — the `playerStats.rules || '5e'`
-//     fallback at CharSummary.jsx:456 had zero coverage before.
-//   - Added AC formula popup click (unowned family gap): pins the verbatim
-//     popup string, incl. that it reports the BASE AC, not the modified total.
+//     context plumbing.
+//   - Removed window.location fiddle; shared mockPlayerStats/mockCampaignName;
+//     fireEvent.click + toHaveBeenCalledTimes(1) for double-fire regressions.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -92,7 +91,7 @@ beforeEach(() => {
 
 // Render through the REAL DiceRollContext.Provider so the setPopupHtml spy
 // flows to the component exactly as it does in the app. Returns the spy.
-function renderSummary(statsOverride = {}) {
+function renderSummary(statsOverride = {}, extraProps = {}) {
     const setPopupHtml = vi.fn();
     render(
         <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml }}>
@@ -100,6 +99,7 @@ function renderSummary(statsOverride = {}) {
                 playerStats={{ ...mockPlayerStats, ...statsOverride }}
                 campaignName={mockCampaignName}
                 exhaustionLevel={0}
+                {...extraProps}
             />
         </DiceRollContext.Provider>
     );
@@ -130,13 +130,19 @@ describe('CharSummary - Background Popup', () => {
 // Armor Class formula popup — clicking the AC row shows the base-AC formula.
 // ---------------------------------------------------------------------------
 describe('CharSummary - Armor Class Formula Popup', () => {
-    it('opens the popup with the exact base-AC formula when the Armor Class row is clicked', () => {
-        const setPopupHtml = renderSummary({
-            armorClass: 18,
-            armorClassFormula: '16 + 2 (shield)',
-        });
+    it('reports the BASE AC in the popup even while the row shows the modified total', () => {
+        // acPenalty 2 makes the row display 16; the popup must still quote the
+        // base armorClass field (18), so the two values are separable here —
+        // a source that switched to the computed total would fail.
+        const setPopupHtml = renderSummary(
+            { armorClass: 18, armorClassFormula: '16 + 2 (shield)' },
+            { conditionEffects: { acPenalty: 2 } }
+        );
 
-        fireEvent.click(screen.getByText('Armor Class:'));
+        const acRow = screen.getByText('Armor Class:').closest('.clickable');
+        expect(acRow).toHaveTextContent(/^Armor Class: 16/);
+
+        fireEvent.click(acRow);
 
         expect(setPopupHtml).toHaveBeenCalledTimes(1);
         expect(setPopupHtml).toHaveBeenCalledWith('Armor Class (18) = 16 + 2 (shield)');

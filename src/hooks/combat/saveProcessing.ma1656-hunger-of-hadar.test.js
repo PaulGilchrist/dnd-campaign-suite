@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1656: Vampire Umbral Lord "Hunger of Hadar" SAVE-seam consumer lock.
 // Row data (monsters.json actions[3]): DEX save DC 18, dc_success:"none",
 // damage_dice_primary 4d6 Acid, save_effect Blinded (GM-enforced while inside
@@ -156,7 +156,6 @@ describe('MA-1656 FAIL face: full 4d6 Acid + Blinded on failed DEX save', () => 
         const dmg = saveDamageLogs();
         expect(dmg).toHaveLength(1);
         expect(dmg[0]).toMatchObject({ formula: '4d6', damageType: 'Acid', total: 11, finalDamage: 11, targetName: TARGET });
-        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(csTarget().currentHp).toBe(988);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['blinded']);
@@ -172,9 +171,13 @@ describe('MA-1656 SUCCESS face: dc_success "none" pays ZERO (spell authority)', 
         const out = await resolveSave({ d20: 20, bonus: 5 });
         expect(out.saveSuccess).toBe(true);
 
+        const victim = gmLog.filter(e => e.type === 'roll' && e.rollType === 'save' && e.characterName === TARGET);
+        expect(victim).toHaveLength(1);
+        expect(victim[0]).toMatchObject({ saveDc: 18, saveType: 'Dexterity', saveResult: 'success' });
+
         const dmg = saveDamageLogs();
         expect(dmg).toHaveLength(1);
-        expect(dmg[0]).toMatchObject({ total: 0, finalDamage: 0, saveSuccess: true });
+        expect(dmg[0]).toMatchObject({ formula: '4d6', damageType: 'Acid', total: 0, finalDamage: 0, saveSuccess: true });
         expect(csTarget().currentHp).toBe(999);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-2022: Thunderbird legendary_actions[3] "Storm Call (Costs 2 Actions)" shipped
 // `delegates_to:"Thunderstrike (Recharge 5-6)"` with NO own save/damage fields — the
 // gated press spent 2 legendary uses honestly (MA-1883 name-parse) then routed through
@@ -24,10 +24,10 @@ import { legendaryDelegateAction, legendaryActionCost } from '../../services/enc
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const THUNDERBIRD = monsters.find((m) => m.index === 'thunderbird');
-const STORM_CALL = THUNDERBIRD.legendary_actions[3]; // brittle positional index noted — outside #1126's cited range, next-touch rec
+const STORM_CALL = THUNDERBIRD.legendary_actions.find((a) => a.name === 'Storm Call (Costs 2 Actions)');
 
 describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save row', () => {
-  it('RAW identity + own save fields authored + costs-2 name parse — delegates_to GONE (§204/§225 hijack dead)', () => {
+  it('own save fields + costs-2 name parse + delegates_to GONE; rider/uses/advisory ABSENT and recharge decoupled (§204/§225 hijack dead, §165/§211)', () => {
     expect(THUNDERBIRD.name).toBe('Thunderbird');
     expect(STORM_CALL.name).toBe('Storm Call (Costs 2 Actions)');
     expect(STORM_CALL.description).toBe('The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage.');
@@ -44,9 +44,7 @@ describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save r
     // can never run (MonsterCardModal numeric-self-resolve seam, ma1952 pattern).
     expect(STORM_CALL.delegates_to).toBeUndefined();
     expect(legendaryDelegateAction(THUNDERBIRD, STORM_CALL)).toBeNull();
-  });
-
-  it('no save_effect/range/uses/advisory/recharge — no condition rider, shapeless-inline lane, header owns economy, recharge decoupled (§165/§211)', () => {
+    // No condition rider, shapeless-inline lane, header owns economy:
     expect(STORM_CALL.save_effect).toBeUndefined();
     expect(extractConditionsFromSaveEffect(STORM_CALL.save_effect)).toEqual([]); // no condition payload on either face
     expect(STORM_CALL.range).toBeUndefined();
@@ -59,12 +57,12 @@ describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save r
     expect(monsterRechargeGate(STORM_CALL, { Thunderstrike: { recharged: false, threshold: 5 } })).toBeNull();
   });
 
-    // master Thunderstrike byte re-drive (:63-72) dropped per rec #1126:
-    // DC24/DEX/12d10/Lightning/recharge 5-6/dc_success-absence/key+threshold
-    // + gate arithmetic OWNED verbatim by monsterRecharge.ma2017-
-    // thunderbird-thunderstrike.test.js :80-99 + whole-DB split :121 (same
-    // disk row). This lane's distinctive decoupling proof is the STORM_CALL
-    // gate-null leg above — never re-drive the master's numbers here.
+  // master Thunderstrike byte re-drive dropped per rec #1126: DC24/DEX/12d10/
+  // Lightning/recharge 5-6/dc_success-absence/key+threshold + gate arithmetic
+  // OWNED verbatim by monsterRecharge.ma2017-thunderbird-thunderstrike.test.js
+  // :80-99 + whole-DB split :121 (same disk row). This lane's distinctive
+  // decoupling proof is the STORM_CALL gate-null leg above — never re-drive
+  // the master's numbers here.
 });
 
 // ── Live-lane unit: saveProcessing NPC-inline branch driven from the disk row's OWN

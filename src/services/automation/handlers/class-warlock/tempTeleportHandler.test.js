@@ -1,61 +1,63 @@
+// @maintained-by-ai 2026-11-26
+// L5-003 §8.1: token-move seam — default OFF keeps legacy prose byte-identical.
+// Swap-with-illusion (CLA-366) coverage lives in tempTeleportHandler.cla366-transposition.test.js;
+// this file owns the plain/shadow/moonlight main lane, slot economy, and extended-flag contract.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle, confirmTeleport, clearExtendedFlag, isExtendedAvailable } from './tempTeleportHandler.js';
 
-// ── Mocks ──────────────────────────────────────────────────────
+// ── Mocks (no factory-baked impls — every default is re-seeded in beforeEach) ──
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(async () => {}),
+    setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-    evaluateAutoExpression: vi.fn(() => 3),
+    evaluateAutoExpression: vi.fn(),
 }));
 
 vi.mock('../../common/savePrompt.js', () => ({
-    buildSaveDc: vi.fn(() => 13),
-    createSaveListener: vi.fn(() => ({ promptId: 'test-id' })),
+    buildSaveDc: vi.fn(),
+    createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../common/targetResolver.js', () => ({
-    resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
+    resolveTarget: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../../rules/effects/expirationQueue.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-// L5-003 §8.1: token-move seam — default OFF keeps legacy prose byte-identical.
-// Swap-with-illusion (CLA-366) coverage lives in tempTeleportHandler.cla366-transposition.test.js;
-// this file owns the plain/shadow/moonlight main lane, slot economy, and extended-flag contract.
-// @maintained-by-ai 2026-10-15
 vi.mock('../../../combat/teleportService.js', () => ({
-    applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
+    applyTeleportTokenMove: vi.fn(),
 }));
-
-import * as teleportService from '../../../combat/teleportService.js';
 
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { buildSaveDc } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirationQueue.js';
+import { applyTeleportTokenMove } from '../../../combat/teleportService.js';
 
 // ── Constants ──────────────────────────────────────────────────
 
 const CAMPAIGN_NAME = 'test-campaign';
 const PLAYER_NAME = 'TestHero';
+const FROZEN_NOW = 1750000000000;
 
 // ── Helpers ────────────────────────────────────────────────────
 
 function makeAction(overrides = {}) {
+    const { automation: autoOverrides, ...rest } = overrides;
     return {
         name: 'Shadow of Moil',
         description: 'Teleport ability.',
@@ -63,9 +65,9 @@ function makeAction(overrides = {}) {
             type: 'teleport',
             distance: '60 ft',
             effect: 'teleport',
-            ...overrides.automation,
+            ...autoOverrides,
         },
-        ...overrides,
+        ...rest,
     };
 }
 
@@ -89,463 +91,454 @@ function setupMoonlightStepMocks(uses) {
     });
 }
 
+/** All `campaign/targetEffects` list writes made so far, newest last. */
+function targetEffectWrites() {
+    return setRuntimeValue.mock.calls
+        .filter(c => c[0] === 'campaign' && c[1] === 'targetEffects')
+        .map(c => c[2]);
+}
+
+/** All setRuntimeValue writes to a given key, as raw [name, key, value, campaign] rows. */
+function writesFor(key) {
+    return setRuntimeValue.mock.calls.filter(c => c[1] === key);
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('tempTeleportHandler', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
         getRuntimeValue.mockReturnValue(null);
+        setRuntimeValue.mockResolvedValue(undefined);
+        evaluateAutoExpression.mockReturnValue(3);
         buildSaveDc.mockReturnValue(13);
+        createSaveListener.mockReturnValue({ promptId: 'test-id' });
         resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        addEntry.mockResolvedValue(undefined);
+        applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'token-moving-off' });
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
     });
 
     afterEach(() => {
+        // Drain any save-result listener still registered by the handler so a
+        // mock-promptId match cannot leak into a later test (success:true skips
+        // the write leg and only unsubscribes).
+        window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: 'test-id', success: true } }));
         document.dispatchEvent(new Event('cleanup'));
+        vi.restoreAllMocks();
     });
 
     describe('handle', () => {
-        it('returns teleport modal with payload for basic teleport', async () => {
+        it('returns the teleport modal with the exact payload and touches nothing', async () => {
             const action = makeAction();
             const stats = makePlayerStats();
 
             const result = await handle(action, stats, CAMPAIGN_NAME, 'test-map');
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('teleport');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBe(stats);
-            expect(result.payload.campaignName).toBe(CAMPAIGN_NAME);
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'teleport',
+                payload: { action, playerStats: stats, campaignName: CAMPAIGN_NAME },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
         });
-        it('returns teleport modal when action is null', async () => {
-            const stats = makePlayerStats();
-            const result = await handle(null, stats, CAMPAIGN_NAME, 'test-map');
+
+        it('opens the teleport modal for a null action', async () => {
+            const result = await handle(null, makePlayerStats(), CAMPAIGN_NAME, 'test-map');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
+            expect(result.payload.action).toBeNull();
         });
 
-        it('returns info popup when moonlight_step_teleport has zero uses and no spell slots', async () => {
+        it('refuses moonlight_step at zero uses with no slots: info popup, zero writes', async () => {
             getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'test-map');
+            const result = await handle(
+                makeAction({ automation: { effect: 'moonlight_step_teleport' } }),
+                makePlayerStats(),
+                CAMPAIGN_NAME,
+                'test-map'
+            );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Shadow of Moil');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain('Long Rest');
-        });
-
-        it('returns moonlightStepFallback modal when moonlight_step_teleport has zero uses but spell slots available', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'moonlightStepUses') return 0;
-                if (key === 'targetEffects') return [];
-                if (key === 'spell_slots_level_2') return 3;
-                if (key === 'spell_slots_level_3') return 2;
-                return null;
-            });
-            const stats = makePlayerStats({
-                spellAbilities: { spell_slots_level_2: 3 },
-            });
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            const result = await handle(action, stats, CAMPAIGN_NAME, 'test-map');
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('moonlightStepFallback');
-            expect(result.payload.slotLevel).toBe(2);
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBe(stats);
-            expect(result.payload.campaignName).toBe(CAMPAIGN_NAME);
-        });
-
-        it('returns moonlightStepFallback modal using highest available spell slot level', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'moonlightStepUses') return 0;
-                if (key === 'spell_slots_level_2') return 0;
-                if (key === 'spell_slots_level_3') return 1;
-                return null;
-            });
-            const stats = makePlayerStats({
-                spellAbilities: {
-                    spell_slots_level_2: 3,
-                    spell_slots_level_3: 2,
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Shadow of Moil',
+                    automationType: 'teleport',
+                    description: 'Shadow of Moil has no uses remaining. Recharges on a Long Rest.',
+                    automation: { type: 'teleport', distance: '60 ft', effect: 'moonlight_step_teleport' },
                 },
             });
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            const result = await handle(action, stats, CAMPAIGN_NAME, 'test-map');
-
-            expect(result.modalName).toBe('moonlightStepFallback');
-            expect(result.payload.slotLevel).toBe(3);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns modal when moonlight_step_teleport has uses remaining or null', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
+        it.each([
+            ['both levels open at runtime', { 2: 3, 3: 2 }, 2],
+            ['level 2 exhausted at runtime, level 3 live', { 2: 0, 3: 1 }, 3],
+        ])('opens moonlightStepFallback at slot level %i when %s', async (_label, slots, expectedLevel) => {
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'moonlightStepUses') return 0;
+                const match = /^spell_slots_level_(\d)$/.exec(key);
+                return match ? slots[match[1]] ?? 0 : null;
             });
+            const stats = makePlayerStats({
+                spellAbilities: { spell_slots_level_2: 3, spell_slots_level_3: 2 },
+            });
+            const action = makeAction({ automation: { effect: 'moonlight_step_teleport' } });
+
+            const result = await handle(action, stats, CAMPAIGN_NAME, 'test-map');
+
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'moonlightStepFallback',
+                payload: { action, playerStats: stats, campaignName: CAMPAIGN_NAME, slotLevel: expectedLevel },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['uses remaining', 1],
+            ['uses never initialised (falls back to WIS-modifier max of 3)', null],
+        ])('lets moonlight_step through to the plain teleport modal with %s', async (_label, uses) => {
+            getRuntimeValue.mockImplementation((_name, key) => (key === 'moonlightStepUses' ? uses : null));
+            const action = makeAction({ automation: { effect: 'moonlight_step_teleport' } });
+
             const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'test-map');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
     describe('confirmTeleport', () => {
-        it('returns popup with distance from automation for basic teleport', async () => {
+        it('returns the exact plain-teleport popup and writes no state or expirations', async () => {
             const action = makeAction();
             const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Shadow of Moil');
-            expect(result.payload.automationType).toBe('teleport');
-            expect(result.payload.description).toContain('Shadow of Moil');
-            expect(result.payload.description).toContain('60 ft');
-            expect(result.payload.description).toContain('Teleported');
-        });
-
-        it('uses extended distance when useExtended is true', async () => {
-            const action = makeAction({
-                automation: { extendedDistance: '150 ft' },
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Shadow of Moil',
+                    automationType: 'teleport',
+                    description: 'Shadow of Moil: Teleported 60 ft to an unoccupied space you can see.',
+                    automation: action.automation,
+                },
             });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('150 ft');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                '_teleportExtendedUsed',
-                true,
-                CAMPAIGN_NAME,
-            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
         });
 
-        it('uses default 150 ft extended distance when extendedDistance is not specified', async () => {
-            const action = makeAction({
-                automation: {},
+        it.each([
+            ['authored extendedDistance', { extendedDistance: '120 ft' }, true, '120 ft'],
+            ['default extended range', {}, true, '150 ft'],
+            ['default base range', { distance: undefined }, false, '60 ft'],
+        ])('distance lane — %s (useExtended %s) resolves to %s', async (_label, auto, useExtended, feet) => {
+            const result = await confirmTeleport(
+                makeAction({ automation: auto }),
+                makePlayerStats(),
+                CAMPAIGN_NAME,
+                useExtended
+            );
+
+            expect(result.payload.description).toBe(
+                `Shadow of Moil: Teleported ${feet} to an unoccupied space you can see.`
+            );
+            const latch = writesFor('_teleportExtendedUsed');
+            if (useExtended) {
+                expect(latch).toEqual([[PLAYER_NAME, '_teleportExtendedUsed', true, CAMPAIGN_NAME]]);
+            } else {
+                expect(latch).toEqual([]);
+            }
+        });
+
+        it('grants the caster an exact next_attack_advantage te row on moonlight_step', async () => {
+            setupMoonlightStepMocks(0);
+            await confirmTeleport(
+                makeAction({ automation: { effect: 'moonlight_step_teleport' } }),
+                makePlayerStats(),
+                CAMPAIGN_NAME,
+                false
+            );
+
+            const writes = targetEffectWrites();
+            expect(writes).toHaveLength(1);
+            expect(writes[0]).toContainEqual({
+                target: PLAYER_NAME,
+                source: 'Shadow of Moil',
+                effect: 'next_attack_advantage',
+                value: null,
+                duration: 'until_end_of_turn',
             });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
-
-            expect(result.payload.description).toContain('150 ft');
         });
 
-        it('adds next_attack_advantage effect for moonlight_step teleport', async () => {
-            setupMoonlightStepMocks(0);
-
-            const moonlightAction = makeAction({ automation: { effect: 'moonlight_step_teleport' } });
-            await confirmTeleport(moonlightAction, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        effect: 'next_attack_advantage',
-                        target: PLAYER_NAME,
-                    }),
-                ]),
-                CAMPAIGN_NAME,
-            );
-        });
-
-        it('CLA-230: replaces an existing same-source advantage te instead of stacking', async () => {
-            setupMoonlightStepMocks(0);
-            const existing = {
+        it('CLA-230: replaces the same-source advantage te without stacking and preserves unrelated rows', async () => {
+            const bless = { effect: 'blessed', target: PLAYER_NAME, source: 'Bless' };
+            const stale = {
                 effect: 'next_attack_advantage',
                 target: PLAYER_NAME,
                 source: 'Moonlight Step',
-                value: null,
+                value: 'stale',
                 duration: 'until_end_of_turn',
             };
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'moonlightStepUses') return 0;
-                if (key === 'targetEffects') return [existing];
+                if (key === 'targetEffects') return [bless, stale];
                 return null;
             });
 
-            const moonlightAction = makeAction({ automation: { effect: 'moonlight_step_teleport' } });
-            await confirmTeleport(moonlightAction, makePlayerStats(), CAMPAIGN_NAME, false);
+            await confirmTeleport(
+                makeAction({ name: 'Moonlight Step', automation: { effect: 'moonlight_step_teleport' } }),
+                makePlayerStats(),
+                CAMPAIGN_NAME,
+                false
+            );
 
-            const writes = setRuntimeValue.mock.calls.filter(
-                c => c[0] === 'campaign' && c[1] === 'targetEffects'
+            const writes = targetEffectWrites();
+            expect(writes).toHaveLength(1);
+            const advantage = writes[0].filter(
+                te => te.effect === 'next_attack_advantage' && te.target === PLAYER_NAME
             );
-            const finalList = writes[writes.length - 1][2];
-            const matching = finalList.filter(
-                te => te.effect === 'next_attack_advantage' && te.target === PLAYER_NAME && te.source === 'Moonlight Step'
-            );
-            expect(matching).toHaveLength(1);
+            // Exactly one row, and it is the FRESH one (value: null proves the
+            // stale row was replaced, not kept alongside).
+            expect(advantage).toEqual([{
+                target: PLAYER_NAME,
+                source: 'Moonlight Step',
+                effect: 'next_attack_advantage',
+                value: null,
+                duration: 'until_end_of_turn',
+            }]);
+            expect(writes[0]).toContainEqual(bless);
         });
 
-        it('CLA-230: preserves unrelated te while replacing same-source advantage te', async () => {
-            setupMoonlightStepMocks(0);
-            const unrelated = { effect: 'blessed', target: PLAYER_NAME, source: 'Bless' };
-            const stale = { effect: 'next_attack_advantage', target: PLAYER_NAME, source: 'Moonlight Step' };
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'moonlightStepUses') return 0;
-                if (key === 'targetEffects') return [unrelated, stale];
-                return null;
-            });
-
-            const moonlightAction = makeAction({ automation: { effect: 'moonlight_step_teleport' } });
-            await confirmTeleport(moonlightAction, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            const writes = setRuntimeValue.mock.calls.filter(
-                c => c[0] === 'campaign' && c[1] === 'targetEffects'
-            );
-            const finalList = writes[writes.length - 1][2];
-            expect(finalList).toContainEqual(expect.objectContaining({ source: 'Bless' }));
-            expect(finalList.filter(te => te.source === 'Moonlight Step')).toHaveLength(1);
-        });
-
-        it('adds Improved Shadow Step effects when passive exists', async () => {
+        it('Improved Shadow Step: exact perception te row, WIS save dispatch and prose', async () => {
             setupMoonlightStepMocks(0);
             const stats = makePlayerStats({
                 automation: { passives: [{ name: 'Improved Shadow Step' }] },
             });
-            const action = makeAction({
-                automation: { effect: 'shadow_step_teleport' },
-            });
-            const result = await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
-
-            expect(result.payload.description).toContain('Improved Shadow Step');
-            expect(result.payload.description).toContain('disadvantage');
-            expect(result.payload.description).toContain('Blinded');
-            expect(resolveTarget).toHaveBeenCalledWith(CAMPAIGN_NAME, PLAYER_NAME);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.any(Array),
+            const result = await confirmTeleport(
+                makeAction({ automation: { effect: 'shadow_step_teleport' } }),
+                stats,
                 CAMPAIGN_NAME,
+                false
+            );
+
+            expect(result.payload.description).toContain(
+                'Improved Shadow Step: Goblin has perception disadvantage and must make a WIS save (DC 13) or be Blinded.'
+            );
+            expect(targetEffectWrites().at(-1)).toContainEqual({
+                target: 'Goblin',
+                source: 'Improved Shadow Step',
+                effect: 'disadvantage_perception_checks',
+                value: null,
+                duration: 'until_start_of_next_turn',
+            });
+            expect(resolveTarget).toHaveBeenCalledWith(CAMPAIGN_NAME, PLAYER_NAME);
+            expect(buildSaveDc).toHaveBeenCalledWith({ saveDc: 'ability', saveAbility: 'WIS' }, stats);
+            expect(createSaveListener).toHaveBeenCalledWith(
+                CAMPAIGN_NAME,
+                { targetName: 'Goblin', saveType: 'WIS', saveDc: 13 }
             );
         });
 
-        it('adds Shared Moonlight effect when Lunar Form passive exists', async () => {
+        it('Lunar Form: Shared Moonlight grants the ally the advantage te and prose', async () => {
             setupMoonlightStepMocks(0);
             const stats = makePlayerStats({
                 automation: { passives: [{ name: 'Lunar Form' }] },
             });
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            const result = await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
-
-            expect(result.payload.description).toContain('Shared Moonlight');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        effect: 'next_attack_advantage',
-                        source: 'Shared Moonlight',
-                    }),
-                ]),
+            const result = await confirmTeleport(
+                makeAction({ automation: { effect: 'moonlight_step_teleport' } }),
+                stats,
                 CAMPAIGN_NAME,
+                false
             );
+
+            expect(result.payload.description).toContain(
+                'Shared Moonlight: Goblin also gains Advantage on their next attack roll.'
+            );
+            expect(targetEffectWrites().at(-1)).toContainEqual({
+                target: 'Goblin',
+                source: 'Shared Moonlight',
+                effect: 'next_attack_advantage',
+                value: null,
+                duration: 'until_end_of_turn',
+            });
         });
 
-        it('does not add Shared Moonlight when resolveTarget returns no target', async () => {
+        it('Lunar Form with no resolved ally: no Shared Moonlight prose, only the self expiration', async () => {
             setupMoonlightStepMocks(0);
             resolveTarget.mockResolvedValue({ target: null });
             const stats = makePlayerStats({
                 automation: { passives: [{ name: 'Lunar Form' }] },
             });
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            const result = await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
+            const result = await confirmTeleport(
+                makeAction({ automation: { effect: 'moonlight_step_teleport' } }),
+                stats,
+                CAMPAIGN_NAME,
+                false
+            );
 
             expect(result.payload.description).not.toContain('Shared Moonlight');
+            expect(addExpiration).toHaveBeenCalledTimes(1); // caster self-row only
         });
 
-        it('decrements moonlight step uses when above zero', async () => {
-            setupMoonlightStepMocks(3);
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'moonlightStepUses',
-                2,
+        it.each([
+            ['3 uses left', 3, 2],
+            ['uses never initialised (WIS-modifier max 3)', null, 2],
+            ['0 uses left', 0, null],
+        ])('moonlight_step decrements uses exactly once when %s', async (_label, uses, expected) => {
+            setupMoonlightStepMocks(uses);
+            await confirmTeleport(
+                makeAction({ automation: { effect: 'moonlight_step_teleport' } }),
+                makePlayerStats(),
                 CAMPAIGN_NAME,
+                false
             );
+
+            const writes = writesFor('moonlightStepUses');
+            if (expected === null) {
+                expect(writes).toEqual([]);
+            } else {
+                expect(writes).toEqual([[PLAYER_NAME, 'moonlightStepUses', expected, CAMPAIGN_NAME]]);
+            }
         });
 
-        it('does not decrement moonlight step uses when at zero', async () => {
-            setupMoonlightStepMocks(0);
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'moonlightStepUses',
-                expect.any(Number),
+        it.each([
+            ['3 allies, authored range', { bringAllies: true, allyCount: 3, teleportRange: '5 ft' }, true, 'up to 3 willing creatures within 5 ft'],
+            ['2 allies, default range', { bringAllies: true, allyCount: 2 }, true, 'up to 2 willing creatures within 10 ft'],
+            ['allyCount zero', { bringAllies: true, allyCount: 0 }, true, null],
+            ['allies configured but base (non-extended) teleport', { bringAllies: true, allyCount: 3, teleportRange: '5 ft' }, false, null],
+        ])('bring-allies prose with %s', async (_label, auto, useExtended, suffix) => {
+            const result = await confirmTeleport(
+                makeAction({ automation: { extendedDistance: '150 ft', ...auto } }),
+                makePlayerStats(),
                 CAMPAIGN_NAME,
+                useExtended
             );
+
+            if (suffix) {
+                expect(result.payload.description).toBe(
+                    `Shadow of Moil: Teleported 150 ft to an unoccupied space you can see. Also brought ${suffix} of your destination.`
+                );
+            } else {
+                expect(result.payload.description).not.toContain('willing creatures');
+            }
         });
 
-        it('brings allies when useExtended with allyCount', async () => {
-            setupMoonlightStepMocks(0);
-            const action = makeAction({
-                automation: {
-                    extendedDistance: '150 ft',
-                    bringAllies: true,
-                    allyCount: 3,
-                    teleportRange: '10 ft',
-                },
-            });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
+        it.each([
+            ['level 3 with runtime 2 of max 3', 3, 2, 1],
+            ['level 3 with runtime unset (falls back to max 3)', 3, null, 2],
+            ['level 3 with no slots left', 3, 0, null],
+            ['no consumedSlotLevel requested', undefined, 2, null],
+        ])('slot economy — %s', async (_label, slotLevel, runtime, expected) => {
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === 'spell_slots_level_3' ? runtime : null
+            );
+            const stats = makePlayerStats({ spellAbilities: { spell_slots_level_3: 3 } });
 
-            expect(result.payload.description).toContain('150 ft');
-            expect(result.payload.description).toContain('3 willing creatures');
-            expect(result.payload.description).toContain('10 ft');
+            await confirmTeleport(makeAction(), stats, CAMPAIGN_NAME, false, slotLevel);
+
+            const writes = writesFor('spell_slots_level_3');
+            if (expected === null) {
+                expect(writes).toEqual([]);
+            } else {
+                expect(writes).toEqual([[PLAYER_NAME, 'spell_slots_level_3', expected, CAMPAIGN_NAME]]);
+            }
         });
 
-        it('omits ally text when bringAllies is false or allyCount is zero', async () => {
+        it.each([
+            ['shadow_step', { effect: 'shadow_step_teleport' }, undefined,
+                `${PLAYER_NAME} used Shadow of Moil to teleport 60 ft. Gains Advantage on next attack roll.`],
+            ['bonus_teleport', { effect: 'bonus_teleport' }, undefined,
+                `${PLAYER_NAME} used Shadow of Moil to teleport 60 ft.`],
+            ['moonlight_step spending a level 3 slot', { effect: 'moonlight_step_teleport' }, 3,
+                `${PLAYER_NAME} used Shadow of Moil to teleport 60 ft. Gains Advantage on next attack roll. Expend a level 3 spell slot.`],
+        ])('logs one full-shape ability_use row for %s', async (_label, auto, slotLevel, description) => {
             setupMoonlightStepMocks(0);
-            const action = makeAction({
-                automation: {
-                    extendedDistance: '150 ft',
-                    bringAllies: true,
-                    allyCount: 0,
-                },
-            });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
-            expect(result.payload.description).not.toContain('willing creatures');
-        });
-
-        it('consumes a spell slot when consumedSlotLevel is provided and slots are available', async () => {
-            setupMoonlightStepMocks(0);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [];
-                if (key === 'spell_slots_level_3') return 2;
-                return null;
-            });
-            const stats = makePlayerStats({
-                spellAbilities: { spell_slots_level_3: 3 },
-            });
-            const action = makeAction();
-            await confirmTeleport(action, stats, CAMPAIGN_NAME, false, 3);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'spell_slots_level_3',
-                1,
+            await confirmTeleport(
+                makeAction({ automation: auto }),
+                makePlayerStats(),
                 CAMPAIGN_NAME,
+                false,
+                slotLevel
             );
-        });
 
-        it('does not consume a spell slot when consumedSlotLevel is provided but no slots are available', async () => {
-            setupMoonlightStepMocks(0);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [];
-                if (key === 'spell_slots_level_3') return 0;
-                return null;
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+                type: 'ability_use',
+                characterName: PLAYER_NAME,
+                abilityName: 'Shadow of Moil',
+                description,
+                timestamp: FROZEN_NOW,
             });
-            const stats = makePlayerStats({
-                spellAbilities: { spell_slots_level_3: 3 },
-            });
-            const action = makeAction();
-            await confirmTeleport(action, stats, CAMPAIGN_NAME, false, 3);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'spell_slots_level_3',
-                expect.any(Number),
-                CAMPAIGN_NAME,
-            );
         });
 
-        it('does not consume a spell slot when consumedSlotLevel is not provided', async () => {
-            setupMoonlightStepMocks(0);
-            const stats = makePlayerStats({
-                spellAbilities: { spell_slots_level_3: 3 },
-            });
-            const action = makeAction();
-            await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
+        it('a rejected log write surfaces console.error once without breaking the popup', async () => {
+            addEntry.mockRejectedValueOnce(new Error('log down'));
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'spell_slots_level_3',
-                expect.any(Number),
+            const result = await confirmTeleport(
+                makeAction({ automation: { effect: 'bonus_teleport' } }),
+                makePlayerStats(),
                 CAMPAIGN_NAME,
+                false
             );
-        });
 
-        it('logs ability_use for shadow_step teleport with advantage description', async () => {
-            setupMoonlightStepMocks(0);
-            const action = makeAction({ automation: { effect: 'shadow_step_teleport' } });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(addEntry).toHaveBeenCalledWith(
-                CAMPAIGN_NAME,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: PLAYER_NAME,
-                    abilityName: 'Shadow of Moil',
-                    description: expect.stringContaining('Gains Advantage on next attack roll'),
-                }),
-            );
-        });
-
-        it('logs ability_use for bonus_teleport effect', async () => {
-            const action = makeAction({ automation: { effect: 'bonus_teleport' } });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(addEntry).toHaveBeenCalledWith(
-                CAMPAIGN_NAME,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: PLAYER_NAME,
-                    abilityName: 'Shadow of Moil',
-                }),
-            );
+            expect(result.type).toBe('popup');
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(errSpy).toHaveBeenCalledTimes(1);
         });
     });
 
     // CLA-191 regression: cloud effects must enqueue pendingExpirations so they
     // clear at the start of the caster's next turn instead of persisting forever.
     describe('CLA-191 expiration enforcement', () => {
-        function makeShadowStepStats() {
-            return makePlayerStats({
-                automation: { passives: [{ name: 'Improved Shadow Step' }] },
-            });
-        }
-
-        it('enqueues expiration for caster next_attack_advantage on shadow_step teleport', async () => {
-            setupMoonlightStepMocks(null);
-            const action = makeAction({ name: 'Shadow Step', automation: { effect: 'shadow_step_teleport' } });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: PLAYER_NAME, effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shadow Step', target: PLAYER_NAME }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
-        });
-
-        it('enqueues expiration for caster next_attack_advantage on moonlight_step teleport', async () => {
+        it.each([
+            ['shadow_step', 'shadow_step_teleport'],
+            ['moonlight_step', 'moonlight_step_teleport'],
+        ])('enqueues the caster-advantage expiration keyed by action name on %s teleports', async (_label, effect) => {
             setupMoonlightStepMocks(2);
-            const action = makeAction({ name: 'Blink', automation: { effect: 'moonlight_step_teleport' } });
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
+            await confirmTeleport(
+                makeAction({ name: 'Blink', automation: { effect } }),
+                makePlayerStats(),
+                CAMPAIGN_NAME,
+                false
+            );
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: PLAYER_NAME, effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Blink', target: PLAYER_NAME }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: PLAYER_NAME,
+                targetName: PLAYER_NAME,
+                effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Blink', target: PLAYER_NAME }],
+                campaignName: CAMPAIGN_NAME,
+                rounds: undefined,
+                expireOnCreatureName: PLAYER_NAME,
+            });
         });
 
         it('enqueues expirations for Improved Shadow Step perception te and blinded condition', async () => {
             setupMoonlightStepMocks(null);
+            const stats = makePlayerStats({
+                automation: { passives: [{ name: 'Improved Shadow Step' }] },
+            });
             const action = makeAction({ name: 'Shadow Step', automation: { effect: 'shadow_step_teleport' } });
-            await confirmTeleport(action, makeShadowStepStats(), CAMPAIGN_NAME, false);
+            await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Goblin', effects: [
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: PLAYER_NAME,
+                targetName: 'Goblin',
+                effects: [
                     { type: 'remove_target_effect', effectKey: 'disadvantage_perception_checks', source: 'Improved Shadow Step', target: 'Goblin' },
                     { type: 'condition', condition: 'blinded' },
-                ], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
+                ],
+                campaignName: CAMPAIGN_NAME,
+                rounds: undefined,
+                expireOnCreatureName: PLAYER_NAME,
+            });
         });
 
         it('enqueues expiration for Shared Moonlight ally advantage te', async () => {
@@ -556,13 +549,23 @@ describe('tempTeleportHandler', () => {
             const action = makeAction({ name: 'Blink', automation: { effect: 'moonlight_step_teleport' } });
             await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Goblin', effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: 'Goblin' }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: PLAYER_NAME,
+                targetName: 'Goblin',
+                effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: 'Goblin' }],
+                campaignName: CAMPAIGN_NAME,
+                rounds: undefined,
+                expireOnCreatureName: PLAYER_NAME,
+            });
         });
 
-        it('applies Blinded on failed save with pending expiration already registered', async () => {
+        it('applies Blinded once on a failed save, then unsubscribes (repeat saves are ignored)', async () => {
             setupMoonlightStepMocks(null);
+            const stats = makePlayerStats({
+                automation: { passives: [{ name: 'Improved Shadow Step' }] },
+            });
             const action = makeAction({ name: 'Shadow Step', automation: { effect: 'shadow_step_teleport' } });
-            await confirmTeleport(action, makeShadowStepStats(), CAMPAIGN_NAME, false);
+            await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
 
             const expirationsBeforeSave = addExpiration.mock.calls.length;
 
@@ -577,20 +580,18 @@ describe('tempTeleportHandler', () => {
                 CAMPAIGN_NAME,
             );
             expect(addExpiration.mock.calls.length).toBe(expirationsBeforeSave);
-        });
 
-        it('does not enqueue expirations for basic teleport', async () => {
-            setupMoonlightStepMocks(null);
-            const action = makeAction();
-            await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(addExpiration).not.toHaveBeenCalled();
+            // The listener must be one-shot: a second event changes nothing.
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'test-id', success: false },
+            }));
+            expect(writesFor('activeConditions')).toHaveLength(1);
         });
     });
 
-    describe('clearExtendedFlag', () => {
-        it('sets extended used flag to false', async () => {
-            await clearExtendedFlag(PLAYER_NAME, CAMPAIGN_NAME);
+    describe('extended flag', () => {
+        it('clearExtendedFlag resets the latch to false', () => {
+            clearExtendedFlag(PLAYER_NAME, CAMPAIGN_NAME);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 PLAYER_NAME,
@@ -599,46 +600,66 @@ describe('tempTeleportHandler', () => {
                 CAMPAIGN_NAME,
             );
         });
-    });
 
-    describe('isExtendedAvailable', () => {
-        it('returns false when flag is true', () => {
-            getRuntimeValue.mockReturnValue(true);
-            expect(isExtendedAvailable(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-        });
-
-        it('returns true when flag is falsy', () => {
-            getRuntimeValue.mockReturnValue(null);
-            expect(isExtendedAvailable(PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
+        it.each([
+            [false, 'a used latch', true],
+            [true, 'an unset latch', null],
+            [true, 'a cleared latch', false],
+        ])('isExtendedAvailable is %s when %s', (expected, _label, flag) => {
+            getRuntimeValue.mockReturnValue(flag);
+            expect(isExtendedAvailable(PLAYER_NAME, CAMPAIGN_NAME)).toBe(expected);
         });
     });
 
     describe('§8.1 teleport token-move seam', () => {
-        // fix#363 #1068: softened shape confirmed at bytes — seam args pinned via
-        // toHaveBeenCalledWith(objectContaining); coordinates arrive THROUGH the
-        // seam mock and only appear as prose toContain (no in-test re-derivation).
-        it('passes the resolved target as anchor with the chosen distance in feet', async () => {
+        it.each([
+            ['a resolved combat target', { target: { name: 'Goblin' } }, 'Goblin'],
+            ['no selected target (degrades to a null anchor)', { target: null }, null],
+        ])('passes the exact 5-field seam args when the lane has %s', async (_label, resolved, anchorName) => {
+            resolveTarget.mockResolvedValue(resolved);
+
             await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
 
-            expect(teleportService.applyTeleportTokenMove).toHaveBeenCalledWith(
-                expect.objectContaining({ campaignName: CAMPAIGN_NAME, creatureName: PLAYER_NAME, anchorName: 'Goblin', maxFeet: 60 }),
+            expect(applyTeleportTokenMove).toHaveBeenCalledWith({
+                campaignName: CAMPAIGN_NAME,
+                mapName: null,
+                creatureName: PLAYER_NAME,
+                anchorName,
+                maxFeet: 60,
+            });
+        });
+
+        it('seam OFF leaves the legacy prose byte-identical and fires no token log', async () => {
+            applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'no-target-selected' });
+            const result = await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
+
+            expect(result.payload.description).toBe(
+                'Shadow of Moil: Teleported 60 ft to an unoccupied space you can see.'
             );
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('OFF / degrade ⇒ prose byte-identical, no coordinate suffix', async () => {
-            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'no-target-selected' });
+        it('seam ON appends rounded coordinates to the prose and logs a full-shape token-move row', async () => {
+            applyTeleportTokenMove.mockResolvedValue({
+                moved: true,
+                from: { gridX: 4, gridY: 4 },
+                to: { gridX: 6, gridY: 2 },
+                distanceFeet: 19.6,
+            });
             const result = await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
 
-            expect(result.payload.description).not.toContain('Token moved');
-        });
-
-        it('ON + moved ⇒ description carries coordinates and a token-move log fires', async () => {
-            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: true, from: { gridX: 4, gridY: 4 }, to: { gridX: 6, gridY: 4 }, distanceFeet: 10 });
-            const result = await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(result.payload.description).toContain('Token moved (4,4) → (6,4)');
-            const moveLog = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'teleport_token_move');
-            expect(moveLog?.description).toContain('(4,4) → (6,4)');
+            expect(result.payload.description).toBe(
+                'Shadow of Moil: Teleported 60 ft to an unoccupied space you can see. Token moved (4,4) → (6,2) — 20 ft.'
+            );
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+                type: 'automation',
+                characterName: PLAYER_NAME,
+                automationType: 'teleport_token_move',
+                name: 'Shadow of Moil',
+                description: 'Shadow of Moil: token relocated (4,4) → (6,2) within 60 ft.',
+                timestamp: FROZEN_NOW,
+            });
         });
     });
 });

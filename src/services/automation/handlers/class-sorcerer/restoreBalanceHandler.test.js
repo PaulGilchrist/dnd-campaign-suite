@@ -1,51 +1,54 @@
-// @maintained-by-ai 2026-10-15 — deterministic contract pin for restoreBalanceHandler (CLA-295).
+// @maintained-by-ai 2026-11-26
 // Owns the handler lane only: uses accounting (exact runtime keys), refusal guards,
-// popup/log full-string composition. Armed-state internals (armRestoreBalance /
-// isRestoreBalanceArmed / consumeArmedRestoreBalance) are owned by
-// src/services/combat/restoreBalanceState.test.js — here arming is pinned as
+// popup/log full-shape pins, commit write+log census. Armed-state internals
+// (armRestoreBalance / isRestoreBalanceArmed / consumeArmedRestoreBalance) are owned
+// by src/services/combat/restoreBalanceState.test.js — here arming is pinned as
 // delegation only, matching useLoggedDiceRollAttack.restore-balance.test.js.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// The ability-modifier lookup is NOT mocked: the real getAbilityModifier is a pure
+// lookup and usesMax is observable through the popup/log strings.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+const { callOrder } = vi.hoisted(() => ({ callOrder: [] }));
 
 import { handle } from './restoreBalanceHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(async () => {}),
+    getRuntimeValue: vi.fn((...args) => {
+        callOrder.push('getRuntimeValue');
+        return args;
+    }),
+    setRuntimeValue: vi.fn(async () => {
+        callOrder.push('setRuntimeValue');
+    }),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(async () => {}),
-}));
-
-vi.mock('../../../shared/abilityLookup.js', () => ({
-    // Mirrors real canonicalization (cha → Charisma) so usesMax pins are faithful.
-    getAbilityModifier: vi.fn((abilities, ability) => {
-        const canonical =
-            { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' }[
-                String(ability).toLowerCase()
-            ] || ability;
-        const ab = abilities?.find((a) => a.name === canonical);
-        return ab?.bonus ?? 0;
+    addEntry: vi.fn(async (...args) => {
+        callOrder.push('addEntry');
+        return args;
     }),
 }));
 
 vi.mock('../../../combat/restoreBalanceState.js', () => ({
-    isRestoreBalanceArmed: vi.fn(() => false),
-    armRestoreBalance: vi.fn(async () => {}),
+    isRestoreBalanceArmed: vi.fn(() => {
+        callOrder.push('isRestoreBalanceArmed');
+        return false;
+    }),
+    armRestoreBalance: vi.fn(async () => {
+        callOrder.push('armRestoreBalance');
+    }),
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
 const { addEntry } = await import('../../../ui/logService.js');
-const { getAbilityModifier } = await import(
-    '../../../shared/abilityLookup.js'
-);
 const { isRestoreBalanceArmed, armRestoreBalance } = await import(
     '../../../combat/restoreBalanceState.js'
 );
 
 const campaignName = 'TestCampaign';
+const FROZEN_NOW = 1_700_000_000_000;
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -57,146 +60,135 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
-function makeAction(automation = {}) {
-    return {
-        name: 'Restore Balance',
-        automation: { type: 'restore_balance', range: '60_ft', ...automation },
-    };
-}
+const action = {
+    name: 'Restore Balance',
+    automation: { type: 'restore_balance', range: '60_ft' },
+};
 
 // Exact-key router over the handler's runtime reads. Armed state is consulted
 // via the mocked restoreBalanceState module, never via a direct key read.
 function mockRuntime({ uses = null, armed = false }) {
-    isRestoreBalanceArmed.mockReturnValue(armed);
+    // Re-pin per-test while keeping the call-order tracking.
+    isRestoreBalanceArmed.mockImplementation(() => {
+        callOrder.push('isRestoreBalanceArmed');
+        return armed;
+    });
     getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'restoreBalanceUses') return uses;
-        return null;
+        callOrder.push('getRuntimeValue');
+        return key === 'restoreBalanceUses' ? uses : null;
     });
 }
 
+const armedPopup = (description) => ({
+    type: 'popup',
+    payload: {
+        type: 'automation_info',
+        name: 'Restore Balance',
+        description,
+        automation: { type: 'restore_balance', range: '60_ft' },
+    },
+});
+
+const ARMED_PREFIX =
+    'Restore Balance armed: the next d20 roll with Advantage or Disadvantage by a creature you can see within 60 feet will be without Advantage or Disadvantage. Uses: ';
+const LOG_PREFIX =
+    'TestSorcerer used Restore Balance (Reaction). Armed: the next d20 roll with Advantage or Disadvantage by a creature you can see within 60 feet is without Advantage or Disadvantage. Uses: ';
+
 describe('restoreBalanceHandler.handle', () => {
     beforeEach(() => {
-        vi.resetAllMocks();
-        // Re-pin factory impls so a reset can never leave addEntry returning
-        // undefined (the handler chains .catch on its promise).
-        setRuntimeValue.mockResolvedValue(undefined);
-        addEntry.mockResolvedValue(undefined);
-        armRestoreBalance.mockResolvedValue(undefined);
-        isRestoreBalanceArmed.mockReturnValue(false);
+        vi.clearAllMocks();
+        callOrder.length = 0;
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
     });
 
-    it('arms and returns an automation_info popup with the exact description', async () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('commit census: reads uses, spends one, arms, logs, and returns the armed popup in order', async () => {
         mockRuntime({ uses: 3 });
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+        const result = await handle(action, makePlayerStats(), campaignName);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Restore Balance');
-        expect(result.payload.automation).toEqual({ type: 'restore_balance', range: '60_ft' });
-        expect(result.payload.description).toBe(
-            'Restore Balance armed: the next d20 roll with Advantage or Disadvantage by a creature you can see within 60 feet will be without Advantage or Disadvantage. Uses: 2/3.',
+        expect(result).toEqual(
+            armedPopup(`${ARMED_PREFIX}2/3.`)
         );
+        expect(callOrder).toEqual([
+            'getRuntimeValue',
+            'isRestoreBalanceArmed',
+            'setRuntimeValue',
+            'armRestoreBalance',
+            'addEntry',
+        ]);
+        expect(getRuntimeValue.mock.calls).toEqual([
+            ['TestSorcerer', 'restoreBalanceUses'],
+        ]);
+        expect(isRestoreBalanceArmed.mock.calls).toEqual([
+            ['TestSorcerer', campaignName],
+        ]);
+        expect(setRuntimeValue.mock.calls).toEqual([
+            ['TestSorcerer', 'restoreBalanceUses', 2, campaignName],
+        ]);
+        expect(armRestoreBalance.mock.calls).toEqual([
+            ['TestSorcerer', FROZEN_NOW, campaignName],
+        ]);
+        expect(addEntry.mock.calls).toEqual([
+            [
+                campaignName,
+                {
+                    type: 'ability_use',
+                    characterName: 'TestSorcerer',
+                    abilityName: 'Restore Balance',
+                    description: `${LOG_PREFIX}2/3.`,
+                    timestamp: FROZEN_NOW,
+                },
+            ],
+        ]);
     });
 
-    it('spends one use and delegates arming to restoreBalanceState', async () => {
-        mockRuntime({ uses: 3 });
+    it.each([
+        ['spends the explicit last use down to 0', 3, 1, 0, '0/3'],
+        ['defaults a null runtime value to usesMax = chaMod', 3, null, 2, '2/3'],
+        ['clamps the default to 1 use when the CHA modifier is negative', -1, null, 0, '0/1'],
+    ])(
+        '%s',
+        async (_name, chaBonus, uses, expectedWrite, expectedCounts) => {
+            mockRuntime({ uses });
 
-        await handle(makeAction(), makePlayerStats(), campaignName);
+            const result = await handle(
+                action,
+                makePlayerStats({ abilities: [{ name: 'Charisma', bonus: chaBonus }] }),
+                campaignName
+            );
 
-        expect(getAbilityModifier).toHaveBeenCalledWith(expect.any(Array), 'CHA');
-        expect(getRuntimeValue).toHaveBeenCalledWith('TestSorcerer', 'restoreBalanceUses');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestSorcerer',
-            'restoreBalanceUses',
-            2,
-            campaignName,
-        );
-        expect(isRestoreBalanceArmed).toHaveBeenCalledWith('TestSorcerer', campaignName);
-        // Handler-side arming is delegation; payload shape owned by restoreBalanceState.test.js.
-        expect(armRestoreBalance).toHaveBeenCalledWith('TestSorcerer', expect.any(Number), campaignName);
-    });
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['TestSorcerer', 'restoreBalanceUses', expectedWrite, campaignName],
+            ]);
+            expect(result).toEqual(armedPopup(`${ARMED_PREFIX}${expectedCounts}.`));
+        }
+    );
 
-    it('writes 0 when spending the last use', async () => {
-        mockRuntime({ uses: 1 });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestSorcerer',
-            'restoreBalanceUses',
-            0,
-            campaignName,
-        );
-        expect(result.payload.description).toContain('Uses: 0/3.');
-    });
-
-    it('logs an ability_use entry with the exact description', async () => {
-        mockRuntime({ uses: 2 });
-
-        await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(addEntry).toHaveBeenCalledWith(campaignName, {
-            type: 'ability_use',
-            characterName: 'TestSorcerer',
-            abilityName: 'Restore Balance',
-            description:
-                'TestSorcerer used Restore Balance (Reaction). Armed: the next d20 roll with Advantage or Disadvantage by a creature you can see within 60 feet is without Advantage or Disadvantage. Uses: 1/3.',
-            timestamp: expect.any(Number),
-        });
-    });
-
-    it('defaults uses to max(1, chaMod) when the runtime value is null', async () => {
-        mockRuntime({ uses: null }); // cha bonus 3 → usesMax 3
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestSorcerer',
-            'restoreBalanceUses',
-            2,
-            campaignName,
-        );
-        expect(result.payload.description).toContain('Uses: 2/3.');
-    });
-
-    it('clamps default uses to 1 when the CHA modifier is negative', async () => {
-        mockRuntime({ uses: null });
-        getAbilityModifier.mockReturnValue(-1);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestSorcerer',
-            'restoreBalanceUses',
-            0,
-            campaignName,
-        );
-        expect(result.payload.description).toContain('Uses: 0/1.');
-    });
-
-    it('refuses when no uses remain without touching anything', async () => {
-        mockRuntime({ uses: 0 });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe('No uses remaining. Recharges on a Long Rest.');
-        expect(isRestoreBalanceArmed).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(armRestoreBalance).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
-    });
-
-    it('refuses to arm twice without spending a second use', async () => {
-        mockRuntime({ uses: 2, armed: true });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe(
+    it.each([
+        [
+            'refuses with no uses remaining (never consults armed state)',
+            { uses: 0, armedQueries: [] },
+            'No uses remaining. Recharges on a Long Rest.',
+        ],
+        [
+            'refuses to arm twice without spending a second use',
+            { uses: 2, armed: true, armedQueries: [['TestSorcerer', campaignName]] },
             'Restore Balance is already armed — the next d20 roll with Advantage or Disadvantage by a creature you can see within 60 feet will be a normal roll.',
-        );
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(armRestoreBalance).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
+        ],
+    ])('%s', async (_name, { uses, armed = false, armedQueries }, expectedDescription) => {
+        mockRuntime({ uses, armed });
+
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result).toEqual(armedPopup(expectedDescription));
+        // Zero-spend census: nothing written, armed, or logged.
+        expect(isRestoreBalanceArmed.mock.calls).toEqual(armedQueries);
+        expect(setRuntimeValue.mock.calls).toEqual([]);
+        expect(armRestoreBalance.mock.calls).toEqual([]);
+        expect(addEntry.mock.calls).toEqual([]);
     });
 });

@@ -1,22 +1,27 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Data Management flows of CampaignAdmin: Clear Change Data, Clear Campaign
  * Log, and Full Reset. QA backlog 2026-11-24: the trio's native
  * window.confirm gates are retired onto the shared DeleteConfirmModal
  * role="dialog" tier (the Admin Regenerate/delete precedent) — this matrix
- * pins the dialog face (open naming the loss, focus on Cancel,
- * Cancel/Escape/backdrop ZERO-WRITE), correct endpoint + URL-encoding of the
- * campaign name, busy state, and success/error status rendering (non-OK
- * response vs rejected fetch — two distinct handler branches), and the
- * acting-tab reload semantics: Full Reset reloads on success like the
- * rollback/upload lanes (mirroring the reload assertions in
- * CampaignAdmin.rollback-upload.test.jsx), while the sibling clears and
- * every failure path stay put. A native confirm firing anywhere here is a
- * regression — the spy throws.
+ * pins the per-lane dialog face (open naming the loss, focus on Cancel,
+ * Cancel ZERO-WRITE), correct endpoint + URL-encoding of the campaign name,
+ * busy state, and success/error status rendering. The acting-tab reload
+ * semantics mirror the rollback/upload lanes: Full Reset reloads on success,
+ * the sibling clears and every failure path stay put (reload assertions
+ * shaped like CampaignAdmin.rollback-upload.test.jsx). A native confirm
+ * firing anywhere here is a regression — the spy throws.
+ *
+ * Escape/backdrop dismiss routing to onCancel is the shared component's
+ * contract, pinned by src/components/common/DeleteConfirmModal.test.jsx;
+ * the Cancel-inert test below proves this host's onCancel (clearing the
+ * armed descriptor) writes nothing, so dismiss paths are not re-exercised
+ * per lane here. Likewise the busy-text idle negatives live in
+ * CampaignAdmin.rendering.test.jsx and the per-lane success advisory copy
+ * in CampaignAdmin.clear-advisory.test.jsx — not duplicated here.
  *
  * Other CampaignAdmin flows are covered by sibling files: backup-restore,
- * rollback-upload, rename, delete, rendering, and theme-toggle tests —
- * behaviors already tested there are not duplicated here.
+ * rollback-upload, rename, delete, rendering, and theme-toggle tests.
  */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -25,9 +30,12 @@ import CampaignAdmin from './CampaignAdmin.jsx';
 const CAMPAIGN = 'test-campaign';
 
 // The three destructive Data Management actions share one code shape
-// (arm dialog → confirm POST → status), so they are exercised through one
-// matrix. `dialog` is the shared tier's accessible name; `confirmPattern`
-// keeps the retired native copy verbatim (minus its "Continue?" tail).
+// (arm dialog → confirm POST → status). `dialog` is the shared tier's
+// accessible name; `confirmPattern` keeps the retired native copy verbatim
+// (minus its "Continue?" tail). The arm message and the POST endpoint are
+// per-lane code, so those two tests run the full matrix; the busy-disable,
+// error-render, and transport-failure shapes are shared across the trio and
+// get one representative lane each.
 const DATA_ACTIONS = [
     {
         button: 'Clear Change Data',
@@ -59,6 +67,8 @@ const DATA_ACTIONS = [
         confirmPattern: /FULL RESET: This will delete both the campaign log AND all change data/,
     },
 ];
+
+const action = (name) => DATA_ACTIONS.find(({ button }) => button === name);
 
 const postUrl = (name, path) =>
     `/api/campaigns/${encodeURIComponent(name)}/admin/${path}`;
@@ -123,6 +133,8 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+// Per-lane differences that MUST be exercised once per action: the armed
+// dialog's data-loss message and the endpoint the confirm POSTs to.
 describe.each(DATA_ACTIONS)('$button', ({ button, path, dialog, yes, busyText, confirmPattern, reloads }) => {
     const url = postUrl(CAMPAIGN, path);
 
@@ -142,29 +154,13 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, dialog, yes, busyText, c
 
         fireEvent.click(within(el).getByRole('button', { name: 'Cancel' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-        // Decline wrote nothing: no POST on any wipe route, no status, buttons live.
+        // Decline wrote nothing: no POST on ANY wipe route, no status, buttons live.
+        // Escape/backdrop share this exact onCancel path (pinned by the shared
+        // modal's own tests), so this covers all three dismiss routes.
         DATA_ACTIONS.forEach(({ path: p }) =>
             expect(countPosts(fetchMock, postUrl(CAMPAIGN, p))).toBe(0));
         expect(document.querySelector('.campaign-admin .admin-status')).toBeNull();
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
-    });
-
-    it('ESCAPE and BACKDROP dismiss the dialog zero-write', async () => {
-        const fetchMock = stubFetch();
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        const el = armDialog(button, dialog);
-        fireEvent.keyDown(within(el).getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
-        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-
-        const el2 = armDialog(button, dialog);
-        fireEvent.click(document.querySelector('.modal-shell-overlay'));
-        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-        void el2;
-
-        DATA_ACTIONS.forEach(({ path: p }) =>
-            expect(countPosts(fetchMock, postUrl(CAMPAIGN, p))).toBe(0));
-        expect(document.querySelector('.campaign-admin .admin-status')).toBeNull();
     });
 
     it('posts to /admin/$path exactly once, shows the server success message, and reloads=$reloads', async () => {
@@ -190,8 +186,17 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, dialog, yes, busyText, c
             expect(window.location.reload).not.toHaveBeenCalled();
         }
     });
+});
 
-    it('shows a busy state and blocks repeat requests while $path is in flight', async () => {
+describe('Shared wipe-lane invariants (one representative action)', () => {
+    // The busy flag, the BUSY_STATUS_TEXT lookup, the trio-wide button
+    // disabling, and the !res.ok / catch status branches are one shared
+    // shape across the three lanes; Full Reset stands in (the lane where a
+    // duplicate POST would be most costly). Idle busy-text negatives are
+    // pinned by CampaignAdmin.rendering.test.jsx.
+    it('shows a busy state and blocks repeat requests while full-reset is in flight', async () => {
+        const { button, path, dialog, yes, busyText } = action('Full Reset');
+        const url = postUrl(CAMPAIGN, path);
         const fetchMock = stubFetch(new Promise(() => {}));
         render(<CampaignAdmin {...createDefaultProps()} />);
 
@@ -210,22 +215,22 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, dialog, yes, busyText, c
         expect(window.confirm).not.toHaveBeenCalled();
     });
 
-    it('surfaces the server error message and re-enables the buttons without reloading when $path fails', async () => {
-        stubFetch(jsonResponse({ error: `${button} declined by server` }, false));
+    it('surfaces the server error message and re-enables the buttons when the response is not OK', async () => {
+        const { button, dialog, yes } = action('Clear Change Data');
+        stubFetch(jsonResponse({ error: 'Server declined' }, false));
         render(<CampaignAdmin {...createDefaultProps()} />);
 
         const el = armDialog(button, dialog);
         fireEvent.click(within(el).getByRole('button', { name: yes }));
 
-        const status = await screen.findByText(`${button} declined by server`);
+        const status = await screen.findByText('Server declined');
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
         expect(window.location.reload).not.toHaveBeenCalled();
     });
-});
 
-describe('CampaignAdmin - Data Management network failures', () => {
-    // Distinct branch from the non-OK response test: the fetch itself rejects.
+    // Distinct branch from the non-OK test: the fetch itself rejects, so
+    // there is no response to read — the failure reason is the Error message.
     it('shows the failure reason when the request never reaches the server', async () => {
         const fetchMock = stubFetch(new Error('Network failed'));
         render(<CampaignAdmin {...createDefaultProps()} />);

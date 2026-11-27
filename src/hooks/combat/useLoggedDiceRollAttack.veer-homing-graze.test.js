@@ -1,15 +1,21 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Owns the combined veer→homing→graze WIRING seam of createLogAndShow:
 // hitResolution.js and attackPostProcessing.js are mocked so the resolved
 // verdict (veer redirect / homing-strike conversion, owned live by the
 // living-legend-veer sibling) can be driven, and the seam asserted to thread
-// the FINAL hit/isAutoMiss + graze context into processAttackAfterResult in
-// the right order (graze fires only when it sees hit:false && isAutoMiss:false
-// && grazeDamage; a homing-converted hit or veer-decline auto-miss disarms it).
-// Real graze consumption lives in the graze sibling; the homing damage lane in
-// the potent-cantrip sibling; blockers/sanctuary resolution in blocked-attacks.
-// Kept here (unique): the pre-phase abort echo — the only guard that
-// runAttackPrePhase's `return true` stops the roll before resolveHit.
+// the FINAL verdict into the graze guard's EXACT predicate — the real guard
+// (attackPostProcessing.js:60) reads finalHit/finalAutoMiss from `state` and
+// grazeDamage from `context`, not the top-level hit/isAutoMiss args; a
+// homing-converted hit or veer-decline auto-miss disarms it. Also uniquely
+// owned here: homing popup flag normalization (homingStrikesUsed === true /
+// homingStrikesBonus || 0 — the only family file pinning it), the
+// save-prompt popup skip (player target + saveDc), and BI-offense threading
+// through the ATTACK hook (popup-data sibling covers the damage hook only).
+// Real graze consumption lives in the graze sibling; blocker aborts are owned
+// live by blocked-attacks (real BLOCKERS table, zero-write census) so the
+// blocked half of the pre-phase echo is dropped here — only the
+// sanctuary-save refusal (the one other runAttackPrePhase `return true`)
+// keeps its stop-the-roll-before-any-resolve echo.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -140,7 +146,6 @@ import { computeD20Roll } from './d20RollComputation.js';
 import { resolveTarget } from './targetResolution.js';
 import { resolveHit } from './hitResolution.js';
 import { processAttackAfterResult } from './attackPostProcessing.js';
-import { checkAttackBlockers } from './attackBlockers.js';
 import { handleSanctuarySave } from './handlers/sanctuarySave.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
@@ -186,7 +191,6 @@ beforeEach(() => {
         availableSuperiorityManeuvers: [],
     });
     resolveHit.mockResolvedValue(resolved());
-    checkAttackBlockers.mockReturnValue(false);
     handleSanctuarySave.mockResolvedValue(true);
 });
 
@@ -195,7 +199,48 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('createLogAndShow — veer→homing→graze seam wiring', () => {
-    it('threads a homing-converted miss→hit into the popup and disarms the graze lane', async () => {
+    // The three verdict shapes the seam can receive, and whether the REAL
+    // graze guard (attackPostProcessing.js: grazeDamage && !state.hit &&
+    // !state.isAutoMiss) engages for each. The guard reads `state`/`context`
+    // (finalHit/finalAutoMiss are destructured from state), so the pin lands
+    // on those carriers — not just the top-level args it never consults.
+    it.each([
+        {
+            label: 'a homing-converted miss→hit (disarms the graze lane)',
+            verdict: { hit: true, homingStrikesAttempted: true, homingStrikesUsed: true, homingStrikesBonus: 4 },
+            expect: { hit: true, isAutoMiss: false },
+        },
+        {
+            label: 'a genuine miss (engages the graze lane)',
+            verdict: { hit: false, isAutoMiss: false, homingStrikesAttempted: true },
+            expect: { hit: false, isAutoMiss: false },
+        },
+        {
+            label: 'a veer-decline auto-miss (keeps graze suppressed)',
+            // Declined veer leaves hit:false + isAutoMiss:true (asserted live
+            // in the living-legend-veer sibling) — the auto-miss half must
+            // reach the guard's finalAutoMiss read.
+            verdict: { hit: false, isAutoMiss: true },
+            expect: { hit: false, isAutoMiss: true },
+        },
+    ])('threads $label — guard sees state.hit/$expect.hit, state.isAutoMiss/$expect.isAutoMiss', async ({ verdict, expect: expected }) => {
+        resolveHit.mockResolvedValue(resolved(verdict));
+
+        await createLogAndShow(deps)('Longsword', 5, 'attack', grazeContext());
+
+        const postArgs = processAttackAfterResult.mock.calls[0][0];
+        // Full guard predicate: rollType + grazeDamage on context, the
+        // verdict on state, and the targetName the guard requires.
+        expect(postArgs.context).toMatchObject({
+            rollType: 'attack',
+            grazeDamage: true,
+            grazeAbilityMod: 3,
+        });
+        expect(postArgs.state).toMatchObject(expected);
+        expect(postArgs.targetName).toBe('Goblin');
+    });
+
+    it('surfaces a homing-converted hit on the popup and threads the graze context into resolveHit', async () => {
         resolveHit.mockResolvedValue(resolved({
             hit: true, homingStrikesAttempted: true,
             homingStrikesUsed: true, homingStrikesBonus: 4,
@@ -204,79 +249,39 @@ describe('createLogAndShow — veer→homing→graze seam wiring', () => {
         await createLogAndShow(deps)('Psychic Blade', 5, 'attack', grazeContext());
 
         // The graze context rides the ctx into resolveHit, where veer and
-        // homing strikes resolve.
+        // homing strikes resolve (verdict internals owned live by
+        // hitResolution.soul-blades / living-legend-veer).
         expect(resolveHit).toHaveBeenCalledWith(expect.objectContaining({
             context: expect.objectContaining({ grazeDamage: true, grazeAbilityMod: 3 }),
         }));
+        // Popup normalization: homingStrikesUsed === true, bonus || 0.
         expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'd20',
             hit: true,
             homingStrikesUsed: true,
             homingStrikesBonus: 4,
         }));
-        // Post-processing sees the converted hit → real graze guard (!hit) skips.
-        expect(processAttackAfterResult).toHaveBeenCalledWith(expect.objectContaining({
-            hit: true,
-            context: expect.objectContaining({ grazeDamage: true }),
-        }));
-        // Attack popup lands before any graze card can stack on top of it.
-        expect(deps.setPopupHtml.mock.invocationCallOrder[0])
-            .toBeLessThan(processAttackAfterResult.mock.invocationCallOrder[0]);
-    });
-
-    it('threads a genuine miss (hit:false, isAutoMiss:false) to engage the graze lane', async () => {
-        resolveHit.mockResolvedValue(resolved({ homingStrikesAttempted: true }));
-
-        await createLogAndShow(deps)('Longsword', 5, 'attack', grazeContext());
-
-        // This is the exact input set the real graze guard (attackPostProcessing
-        // line: grazeDamage && !finalHit && !finalAutoMiss) requires to fire.
-        expect(processAttackAfterResult).toHaveBeenCalledWith(expect.objectContaining({
-            hit: false,
-            isAutoMiss: false,
-            context: expect.objectContaining({ grazeDamage: true, grazeAbilityMod: 3 }),
-        }));
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            hit: false,
-            homingStrikesUsed: false,
-            homingStrikesBonus: 0,
-        }));
-    });
-
-    it('threads a veer-decline auto-miss (isAutoMiss:true) to keep graze suppressed', async () => {
-        // Declined veer leaves hit:false + isAutoMiss:true (asserted live in
-        // the living-legend-veer sibling) — the auto-miss half of that verdict
-        // must reach the graze guard's finalAutoMiss read.
-        resolveHit.mockResolvedValue(resolved({ hit: false, isAutoMiss: true }));
-
-        await createLogAndShow(deps)('Longsword', 5, 'attack', grazeContext());
-
-        expect(processAttackAfterResult).toHaveBeenCalledWith(expect.objectContaining({
-            hit: false,
-            isAutoMiss: true,
-            context: expect.objectContaining({ grazeDamage: true }),
-        }));
-        const postArgs = processAttackAfterResult.mock.calls[0][0];
-        expect(postArgs.state.hit).toBe(false);
-        expect(postArgs.state.isAutoMiss).toBe(true);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Pre-phase abort wiring (unique echo: blocked / sanctuary-refused rolls
-// must never reach resolveHit — resolution itself is owned by siblings)
+// Pre-phase abort wiring (sanctuary-refusal half — blocker aborts are owned
+// live by the blocked-attacks sibling; this echo pins that a refused
+// sanctuary save stops the roll BEFORE target resolution, the d20 compute,
+// resolveHit and every write)
 // ---------------------------------------------------------------------------
 
 describe('createLogAndShow — attack pre-phase abort wiring', () => {
-    it.each([
-        ['attack blocker', () => checkAttackBlockers.mockReturnValue(true)],
-        ['sanctuary save refusal', () => handleSanctuarySave.mockResolvedValue(false)],
-    ])('returns before any roll when the % declines the attack', async (_label, arm) => {
-        arm();
+    it('returns before any roll when the sanctuary save declines the attack', async () => {
+        handleSanctuarySave.mockResolvedValue(false);
 
         await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
+        expect(resolveTarget).not.toHaveBeenCalled();
+        expect(computeD20Roll).not.toHaveBeenCalled();
         expect(resolveHit).not.toHaveBeenCalled();
         expect(processAttackAfterResult).not.toHaveBeenCalled();
+        expect(deps.setPopupHtml).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalled();
     });
 });
@@ -286,11 +291,15 @@ describe('createLogAndShow — attack pre-phase abort wiring', () => {
 // ---------------------------------------------------------------------------
 
 describe('createLogAndShow — non-attack rolls', () => {
-    it.each(['check', 'save', 'initiative'])('never consults resolveHit for % rolls and normalizes homing popup flags', async (rollType) => {
-        await createLogAndShow(deps)('Athletics', 3, rollType, { attackerName: 'TestFighter' });
+    it('never consults resolveHit for non-attack rolls and normalizes homing popup flags to false/0', async () => {
+        // One representative: check/save/initiative all skip the
+        // rollType==='attack' resolveHit branch identically, and the
+        // normalization (=== true, || 0) is the same popup line.
+        await createLogAndShow(deps)('Athletics', 3, 'check', { attackerName: 'TestFighter' });
 
-        expect(resolveHit).not.toHaveBeenCalled();
+        expect(resolveHit).toHaveBeenCalledTimes(0);
         expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'd20',
             homingStrikesUsed: false,
             homingStrikesBonus: 0,
         }));
@@ -313,6 +322,8 @@ describe('createLogAndShow — non-attack rolls', () => {
     });
 
     it('threads bardic inspiration offense flags from playerStats into the popup', async () => {
+        // Attack-hook lane only — the damage-hook twin is owned by
+        // useLoggedDiceRollDamage.popup-data.
         hasBardicInspirationOffense.mockReturnValue(true);
         getBardicInspirationDieSize.mockReturnValue('d6');
 

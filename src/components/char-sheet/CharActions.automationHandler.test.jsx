@@ -1,10 +1,12 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // CharActions integration tests — the CLICK-WIRING seam only.
 // Branch logic of handleAutomationAction (cannotAct gate internals, featureChoice
 // modals, logEntries dispatch, onBuffsChange branches, null results) is covered
 // precisely at the hook seam in useCharActionsAutomation.test.*.js files.
-// CANONICAL OWNER: buildFeatureDetailHtml details-popup coverage lives here —
-// do not duplicate it in automation.test.jsx.
+// OWNED HERE: the feature-row CLICK WIRING (dispatch args, popup/log/buff routing,
+// cannotAct prop → reason popup, details-only row → buildFeatureDetailHtml output).
+// The real buildFeatureDetailHtml HTML generation is unit-tested in
+// src/hooks/combat/useActionPopup.test.js — this file mocks it and pins only the seam.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -220,6 +222,8 @@ describe('CharActions feature-row click wiring (integration)', () => {
       expect(addEntry).toHaveBeenCalledWith('test-campaign', logEntry);
       expect(onBuffsChange).toHaveBeenCalled();
     });
+    // Exactly one dispatch per click — no double-fire through the seam.
+    expect(executeHandler).toHaveBeenCalledTimes(1);
   });
 
   it('clicking an automation row while cannotAct blocks the effect but pops the reason — no handler or log (RB-1115)', async () => {
@@ -243,13 +247,16 @@ describe('CharActions feature-row click wiring (integration)', () => {
 
   it('clicking a details-only row opens the feature detail popup built by buildFeatureDetailHtml and runs no automation', async () => {
     const action = { name: 'Tactical Genius', description: 'A smart move', details: 'Tactical details' };
+    // Sentinel return decouples the assertion from the mock's html format:
+    // what matters is the row pipes buildFeatureDetailHtml's output straight to the popup.
+    buildFeatureDetailHtml.mockReturnValueOnce('DETAIL-POPUP-SENTINEL');
     const stats = { ...basePlayerStats, actions: [action] };
     renderCharActions(stats, setPopupHtml);
 
     await clickActionRow('Tactical Genius');
 
     expect(buildFeatureDetailHtml).toHaveBeenCalledWith(action);
-    expect(setPopupHtml).toHaveBeenCalledWith('<b>Tactical Genius</b><br/>A smart move<br/><br/>Tactical details');
+    expect(setPopupHtml).toHaveBeenCalledWith('DETAIL-POPUP-SENTINEL');
     expect(executeHandler).not.toHaveBeenCalled();
   });
 });

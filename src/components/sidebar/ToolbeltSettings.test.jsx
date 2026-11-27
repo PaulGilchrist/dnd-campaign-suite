@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 // Toolbelt dialog (Item 1): checkbox-per-view list seeded from the stored
 // hidden set; optimistic draft behind a benign 600ms network debounce (a
 // click burst coalesces to ONE save carrying the final set; unmount flushes,
@@ -70,6 +71,9 @@ describe('ToolbeltSettings — the checkbox list', () => {
     // The sidebar unmounts the dialog when the GM closes it — the unmount
     // cleanup is what must fire the stranded write.
     utils.unmount();
+    // Exactly once: the unmount flush fires the stranded write and never
+    // double-writes alongside a timer that already fired or was cleared.
+    expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith(['mapsManager']);
   });
 
@@ -95,14 +99,24 @@ describe('ToolbeltSettings — the checkbox list', () => {
 });
 
 describe('ToolbeltSettings — starting-point pills (batch-set, never a mode)', () => {
-  it('a pill click batch-sets every checkbox and saves the preset hidden set', async () => {
-    open({ hiddenViews: [] });
-    fireEvent.click(screen.getByRole('button', { name: 'Theater of the mind' }));
-    expect(checkbox('Maps')).not.toBeChecked();
-    expect(checkbox('Initiative')).toBeChecked();
-    await act(async () => { vi.advanceTimersByTime(PILL_CLICK_WAIT); });
-    expect(onSave).toHaveBeenCalledWith(preset('theater').hidden);
-  });
+  it.each([
+    ['Theater of the mind', [], 'theater'],
+    ['Everything', preset('full-digital').hidden, 'everything'],
+  ])(
+    'the "%s" pill batch-sets every checkbox from any starting state and saves the preset hidden set exactly once',
+    async (label, startingHidden, presetId) => {
+      open({ hiddenViews: startingHidden });
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      const hidden = preset(presetId).hidden;
+      for (const { view, label: boxLabel } of TOOLBELT_VIEWS) {
+        if (hidden.includes(view)) expect(checkbox(boxLabel)).not.toBeChecked();
+        else expect(checkbox(boxLabel)).toBeChecked();
+      }
+      await act(async () => { vi.advanceTimersByTime(PILL_CLICK_WAIT); });
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave).toHaveBeenCalledWith(hidden);
+    },
+  );
 
   it('presets are conveniences: after a pill, one checkbox move DERIVES Custom and keeps every box editable', async () => {
     open({ hiddenViews: [] });
@@ -126,15 +140,6 @@ describe('ToolbeltSettings — starting-point pills (batch-set, never a mode)', 
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('the "Everything" pill resets a hidden campaign back to all-visible', async () => {
-    open({ hiddenViews: preset('full-digital').hidden });
-    const everything = TOOLBELT_VIEWS.every(() => true); // list sanity
-    expect(everything).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Everything' }));
-    for (const { label } of TOOLBELT_VIEWS) expect(checkbox(label)).toBeChecked();
-    await act(async () => { vi.advanceTimersByTime(PILL_CLICK_WAIT); });
-    expect(onSave).toHaveBeenCalledWith([]);
-  });
 });
 
 describe('ToolbeltSettings — kit dialog behaviour', () => {

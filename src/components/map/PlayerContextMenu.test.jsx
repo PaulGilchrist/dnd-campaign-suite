@@ -1,7 +1,12 @@
-// @maintained-by-ai 2026-10-14: 2026-11-01 (AZ2 improve: the native window.confirm here
-// became the in-app named modal — the menu now only hands off + closes; the
-// `Remove "<name>" from the map?` dialog is owned by the parent lane, see
-// Map-handlers.test.jsx and DeleteFromMapModal.test.jsx.)
+// @maintained-by-ai 2026-11-26
+// OWNED here: player-menu content census + the Remove/✕ dispatch seam at unit
+// level. Cited to sibling lanes (do not re-cover here): open/anchor bytes and
+// canvas close wiring → Map-handlers.test.jsx; Light row cycle/labels →
+// PlayerContextMenu.light.test.jsx; section gating, cosmetics writes,
+// keyboard + Escape → PlayerContextMenu.cosmetics.test.jsx.
+// The removal confirm is no longer asked in the menu (nor natively): clicking
+// hands the id to handleRemovePlayer, which arms the shared named-modal at the
+// Map level (dialog copy: see DeleteFromMapModal.test.jsx).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerContextMenu from './PlayerContextMenu';
@@ -22,10 +27,7 @@ const defaultProps = (overrides = {}) => ({
 });
 
 describe('PlayerContextMenu', () => {
-    // The removal confirm is no longer asked HERE (nor natively): clicking
-    // hands the id to handleRemovePlayer, which arms the shared named-modal at
-    // the Map level. This spy proves the menu seam never falls back to a
-    // native dialog.
+    // Spy only to prove the menu seam never falls back to a native dialog.
     let confirmSpy;
     beforeEach(() => {
         confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -41,45 +43,35 @@ describe('PlayerContextMenu', () => {
         expect(container.innerHTML).toBe('');
     });
 
-    it('renders remove option and close button, positioned near the player', () => {
-        const { container } = render(<PlayerContextMenu {...defaultProps()} />);
+    it('offers the Remove row and the close button', () => {
+        render(<PlayerContextMenu {...defaultProps()} />);
         expect(screen.getByText('Remove from Map')).toBeInTheDocument();
         expect(screen.getByText('✕')).toBeInTheDocument();
-        const rect = container.querySelector('.item-context-menu rect');
-        expect(rect).toBeInTheDocument();
-        expect(rect.getAttribute('x')).toBe(String(gridCenterX(defaultPlayer.gridX) + 10));
-        expect(rect.getAttribute('y')).toBe(String(gridCenterY(defaultPlayer.gridY) + 10));
     });
 
-    it('hands the id to handleRemovePlayer and closes the menu — no native confirm', () => {
+    it('Remove press hands the id to handleRemovePlayer and closes — no native confirm, no light dispatch', () => {
         const handleRemovePlayer = vi.fn();
+        const handleCyclePlayerLight = vi.fn();
         const setSelectedPlayer = vi.fn();
-        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer, setSelectedPlayer })} />);
-        fireEvent.click(screen.getByText('Remove from Map'));
-        expect(handleRemovePlayer).toHaveBeenCalledWith('player-1');
-        expect(setSelectedPlayer).toHaveBeenCalledWith(null);
-        expect(confirmSpy).not.toHaveBeenCalled();
-    });
-
-    it('hands off the raw id even when the player has no name (dialog copy resolves it)', () => {
-        const handleRemovePlayer = vi.fn();
         render(
             <PlayerContextMenu
-                {...defaultProps({
-                    handleRemovePlayer,
-                    selectedPlayer: { id: 'player-9', gridX: 3, gridY: 4 },
-                })}
+                {...defaultProps({ handleRemovePlayer, handleCyclePlayerLight, setSelectedPlayer })}
             />
         );
         fireEvent.click(screen.getByText('Remove from Map'));
-        expect(handleRemovePlayer).toHaveBeenCalledWith('player-9');
+        expect(handleRemovePlayer).toHaveBeenCalledWith('player-1');
+        expect(setSelectedPlayer).toHaveBeenCalledWith(null);
+        expect(handleCyclePlayerLight).not.toHaveBeenCalled();
         expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('calls setSelectedPlayer with null when close (✕) is clicked', () => {
+    it('close (✕) press dismisses via setSelectedPlayer(null) with zero writes', () => {
+        const handleRemovePlayer = vi.fn();
         const setSelectedPlayer = vi.fn();
-        render(<PlayerContextMenu {...defaultProps({ setSelectedPlayer })} />);
+        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer, setSelectedPlayer })} />);
         fireEvent.click(screen.getByText('✕'));
         expect(setSelectedPlayer).toHaveBeenCalledWith(null);
+        expect(handleRemovePlayer).not.toHaveBeenCalled();
+        expect(confirmSpy).not.toHaveBeenCalled();
     });
 });

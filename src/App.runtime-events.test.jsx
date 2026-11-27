@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for SSE runtime events and the character lifecycle.
  *
@@ -17,25 +17,35 @@
  *       the active character to the next remaining one (or null when the
  *       roster empties) — mirroring the local-delete lane's fallback —
  *       while the API is never re-called.
- *     - `pipeline-<campaign>-<key>` (removed milestone lane 2026-11-18) is ignored:
- *       nothing mirrors into the runtime store and nothing re-POSTs.
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
- *       the campaign store; character-scoped keys adopt via
- *       replaceRuntimeObject (full-bucket REPLACE — ghost keys absent from the
- *       payload are evicted; memory-only, never re-POSTed). Null (cleared-key) echoes
- *       REMOVE the key from the campaign store (declared defaults win — never
- *       a raw null in the mirror); scalar echoes mirror into the campaign
- *       store. For character keys a null echo is an evicted-bucket REMOVE
- *       (replaceRuntimeObject(<key>, {})); a non-null scalar stays dropped
- *       (snapshot lane).
- *     - Malformed events (null key, foreign campaigns, non-null scalar data on
- *       character keys) are ignored.
+ *       the campaign store: SET on an object/array/scalar echo, key REMOVE
+ *       on a null cleared-key echo (declared defaults win — never a raw
+ *       null in the mirror), one notify('campaign') wake either way, never
+ *       a ghost store named after the key, never a re-POST. One
+ *       parameterized test per branch covers every key family that
+ *       historically mis-routed (registered exact-match keys, the dynamic
+ *       underscore-prefix lane, the travel family). For character keys a
+ *       non-null echo adopts via replaceRuntimeObject (full-bucket REPLACE;
+ *       eviction semantics owned by useRuntimeState.replaceRuntimeObject.test.js).
+ *     - `pipeline-<campaign>-<key>` (removed milestone lane 2026-11-18) and
+ *       malformed events (null key, foreign campaigns, non-null scalar data
+ *       on character keys) are ignored — one parameterized test.
+ *     - Character-key null cleared-bucket echoes and corrupt scalar noise
+ *       are NOT re-pinned here: App.bucket-null-echo.test.jsx owns that
+ *       lane against the real store (bystander/actor/404 legs).
  *  2. Character CRUD through the App shell: landing after campaign
- *     selection, wizard cancel-then-create lifecycle, edit-wizard seeding,
- *     and confirmed delete — asserted as observable UI outcomes (roster +
- *     active sheet), with campaignService stubbed at the network boundary.
+ *     selection, the trimmed plain-campaign no-auto-wizard pin (full
+ *     doctrine in App.no-auto-wizard.test.jsx), wizard cancel-then-create
+ *     lifecycle, edit-wizard seeding, and confirmed delete — asserted as
+ *     observable UI outcomes (roster + active sheet), with campaignService
+ *     stubbed at the network boundary.
  *
  * Deliberately NOT re-tested here:
+ *  - zero-character wizard doctrine → App.no-auto-wizard.test.jsx;
+ *    empty-state card wiring → App.empty-campaign-state.test.jsx
+ *  - character-bucket null-echo / scalar-noise self-heal →
+ *    App.bucket-null-echo.test.jsx
+ *  - combatSummary cache sync → App.combat-summary-cache.test.jsx
  *  - map-activate SSE auto-open → App.map-activate.test.jsx
  *  - Maps-click routing / back stack → App.map-navigation.test.jsx
  *  - waiting placeholder → App.map-unavailable.test.jsx
@@ -350,16 +360,16 @@ describe('App - Runtime Events & State Management', () => {
       });
     });
 
-    it('does NOT auto-open the creation wizard when the selected campaign has no characters', async () => {
-      // Owner doctrine 2026-11-23: zero-character entry lands on the normal
-      // first-run view (empty-state card), never an auto-mounted wizard.
+    it('a plain zero-character campaign never auto-opens the wizard or stamps the retired offer key', async () => {
+      // Trimmed plain-campaign variant of the owner doctrine (2026-11-23);
+      // the full no-auto-open surface (arena/starter/visitor lanes) is owned
+      // by App.no-auto-wizard.test.jsx. Here only: a normal (non-starter)
+      // campaign with zero characters mounts no wizard, and the retired pref
+      // facade never stamps an offer key.
       localStorage.removeItem('character-wizard-offered:test-campaign');
       await renderInCampaign([]);
 
       expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-      expect(document.querySelectorAll('[class*=wizard]').length).toBe(0);
-      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      // The retired pref facade stays retired: no offer key is ever stamped.
       expect(localStorage.getItem('character-wizard-offered:test-campaign')).toBeNull();
     });
   });
@@ -563,19 +573,6 @@ describe('App - Runtime Events & State Management', () => {
       expect(screen.getAllByTestId('char-btn-Stranger')).toHaveLength(1);
     });
 
-    it('pipeline-* SSE echoes (removed milestone lane) mirror nothing into the runtime store', async () => {
-      // 2026-11-18 dead-lane removal: the server never publishes pipeline-<campaign>-<key>
-      // events again (the POST lane they came from only ever produced a readerless
-      // `pipeline-event` ghost bucket). Should a stray echo ever arrive, it must be
-      // dropped — not mirrored as a runtime key.
-      const data = { total: 14, critical: false };
-
-      await dispatch({ key: 'pipeline-test-campaign-damage:rolled', data });
-
-      expect(writesFor('damage:rolled')).toHaveLength(0);
-      expect(replaceRuntimeObject).not.toHaveBeenCalled();
-    });
-
     // bug-changedata-key-removal-stale-on-mounted-tab: the server wildcard POST
     // stores every write as a REPLACE of the whole character bucket, so the echo
     // is complete server truth. Adoption must go through replaceRuntimeObject
@@ -591,263 +588,99 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('Aragorn')).toHaveLength(0);
     });
 
-    it('routes campaign-scoped change events into the campaign store and wakes its listeners', async () => {
-      const campaignStore = new Map();
-      getStore.mockImplementation(() => campaignStore);
-
-      const data = [{ target: 'Goblin', effect: 'bless' }];
-      await dispatch({ key: 'change-test-campaign-targetEffects', data });
-
-      expect(campaignStore.get('targetEffects')).toEqual(data);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('targetEffects')).toHaveLength(0);
-    });
-
-    // bug-victory-stamp-not-sse-adopted-missing-campaign-key: the victory
-    // banner's stamp is an OBJECT written and read at the campaign tier
-    // (characterKey='campaign'). Unregistered in CAMPAIGN_KEYS, this exact
-    // echo fell through to setRuntimeObject('lastCombatResult', …) — a ghost
-    // character store — so already-mounted clients silently never showed the
-    // banner (only a reload hydrated it). The banner's whole contract is
-    // "shown by every client at the combat-clear seam".
-    it('mirrors the victory-stamp object echo into the campaign store, never a ghost character store', async () => {
-      const stores = new Map();
-      getStore.mockImplementation((name) => {
-        if (!stores.has(name)) stores.set(name, new Map());
-        return stores.get(name);
-      });
-
-      const stamp = {
+    // The change-<campaign>-<key> adoption law, one row per key family that
+    // historically mis-routed to a ghost CHARACTER store (the registration
+    // fixes are pinned in campaignKeys.*.test.js; these rows pin the App-side
+    // mirror): registered exact-match keys (targetEffects; the victory stamp
+    // bug-victory-stamp-not-sse-adopted-missing-campaign-key; the OA markers
+    // bug-pending-oas-key-not-registered-echo-misroutes; lastAttack
+    // bug-lastattack-not-a-campaign-key-celebrates-clears-silently), the
+    // dynamic underscore-prefix automation-flag lane (_fleshToStone_*), and
+    // plain scalar value updates (travel-*). Every row must SET the key in
+    // the campaign store, wake its listeners, never touch or create a store
+    // named after the key, and never route through the character-bucket
+    // replace lane (memory-only skipSync law — an echo never re-POSTs).
+    it.each([
+      ['registered array echo', 'targetEffects', [{ target: 'Goblin', effect: 'bless' }]],
+      ['registered victory-stamp echo', 'lastCombatResult', {
         stamp: 1793657677511, rounds: 1, foes: 1, defeated: 1,
         survivors: 13, partySize: 13, wipe: false,
-      };
-      await dispatch({ key: 'change-test-campaign-lastCombatResult', data: stamp });
-
-      // Reader side: useRuntimeValue('campaign','lastCombatResult') now sees it.
-      expect(stores.get('campaign').get('lastCombatResult')).toEqual(stamp);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      // Ghost-store side: zero writes to a store named after the key.
-      expect(writesFor('lastCombatResult')).toHaveLength(0);
-      expect(stores.has('lastCombatResult')).toBe(false);
-    });
-
-    // The stamp is cleared/null-POSTed nowhere today, but the mirror law must
-    // hold if a clear lane is ever added: a null echo removes the key (declared
-    // default null ⇒ banner hidden), it never stores a raw null.
-    it('removes the victory stamp from the campaign store on a null cleared-key echo', async () => {
-      const campaignStore = new Map([['lastCombatResult', { stamp: 1, rounds: 1 }]]);
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-lastCombatResult', data: null });
-
-      expect(campaignStore.has('lastCombatResult')).toBe(false);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('lastCombatResult')).toHaveLength(0);
-    });
-
-    // Cross-tab staleness bug: cleared keys publish null and scalars are plain
-    // value updates — dropping them kept resolved prompts (travel EventDialog)
-    // open and actionable on every other client. A cleared-key echo mirrors as
-    // a key REMOVE (not a stored null) so useSyncedState consumers fall back
-    // to their DECLARED default (pendingEvent's is null → the dialog closes)
-    // and typed consumers never receive a raw null (arrival-echo blank-screen
-    // bug: storing null crashed the whole SPA on travel arrival).
-    it('mirrors a null cleared-key echo as a key REMOVE so stale prompts close without feeding null', async () => {
-      const campaignStore = new Map([[
-        'travel-pendingEvent', { title: 'Wolves on the Hunt', type: 'combat' },
-      ]]);
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-travel-pendingEvent', data: null });
-
-      expect(campaignStore.has('travel-pendingEvent')).toBe(false);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('travel-pendingEvent')).toHaveLength(0);
-    });
-
-    // bug-pending-oas-key-not-registered-echo-misroutes: the OA trigger seam
-    // arms markers campaign-level (pendingOpportunityAttacks.js PENDING_OA_KEY)
-    // and both readers (sheet Reactions lane, monster-card lane) subscribe
-    // campaign-level. Unregistered in CAMPAIGN_KEYS, this exact OBJECT echo
-    // fell through to replaceRuntimeObject('pendingOAs', …) — a ghost
-    // CHARACTER store — so a cross-client/curl marker write never live-updated
-    // a mounted tab (legacy free-press lane silently charged the reaction;
-    // the monster-card affordance only appeared after a reload hydrated via
-    // the unfiltered seed pass).
-    it('mirrors the pendingOAs marker-object echo into the campaign store, never a ghost character store', async () => {
-      const stores = new Map();
-      getStore.mockImplementation((name) => {
-        if (!stores.has(name)) stores.set(name, new Map());
-        return stores.get(name);
-      });
-
-      const markers = {
+      }],
+      ['registered OA-marker echo', 'pendingOAs', {
         Goblin: { defender: 'Goblin', mover: 'EvasiveFighter', promptId: 'probe-1' },
-      };
-      await dispatch({ key: 'change-test-campaign-pendingOAs', data: markers });
-
-      // Reader side: useRuntimeValue('campaign','pendingOAs') now sees it.
-      expect(stores.get('campaign').get('pendingOAs')).toEqual(markers);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      // Ghost-store side: zero writes to a store named after the key.
-      expect(writesFor('pendingOAs')).toHaveLength(0);
-      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('pendingOAs', markers);
-      expect(stores.has('pendingOAs')).toBe(false);
-    });
-
-    // Drain-to-evict companion (writePendingOas deletes the last row with a
-    // key DELETE, publishing null): the null echo must REMOVE the marker map
-    // from every mounted tab's campaign store — never a stored null — so a
-    // consumed marker can never linger on a settled tab until reload.
-    it('removes pendingOAs from the campaign store on the drain-to-evict null echo', async () => {
-      const campaignStore = new Map([[
-        'pendingOAs', { Goblin: { defender: 'Goblin', mover: 'EvasiveFighter', promptId: 'probe-1' } },
-      ]]);
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-pendingOAs', data: null });
-
-      expect(campaignStore.has('pendingOAs')).toBe(false);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('pendingOAs')).toHaveLength(0);
-    });
-
-    // bug-lastattack-not-a-campaign-key-celebrates-clears-silently: every
-    // attack/save/roll lane writes `lastAttack` campaign-level and the Clear
-    // seam banks it as the victory-celebration evidence
-    // (createCreatureHandlers.confirmClear → attackEvidence). Unregistered,
-    // this exact OBJECT echo fell through to a ghost CHARACTER store named
-    // "lastAttack", so a mounted non-attacking tab silently cleared with
-    // attackEvidence:null / celebrated:false and no banner anywhere
-    // (live-witnessed 2026-11-24; same family as the two pins above).
-    it('mirrors the lastAttack object echo into the campaign store, never a ghost character store', async () => {
-      const stores = new Map();
-      getStore.mockImplementation((name) => {
-        if (!stores.has(name)) stores.set(name, new Map());
-        return stores.get(name);
-      });
-
-      const attack = {
+      }],
+      ['registered last-attack echo', 'lastAttack', {
         attackerName: 'FixtureFighter5e', targetName: 'Goblin',
         hit: true, attackName: 'Longsword', total: 19,
-      };
-      await dispatch({ key: 'change-test-campaign-lastAttack', data: attack });
-
-      // Reader side: getRuntimeValue('campaign','lastAttack') now sees it.
-      expect(stores.get('campaign').get('lastAttack')).toEqual(attack);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      // Ghost-store side: zero writes to a store named after the key.
-      expect(writesFor('lastAttack')).toHaveLength(0);
-      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('lastAttack', attack);
-      expect(stores.has('lastAttack')).toBe(false);
-    });
-
-    // Companion null-echo eviction: an Admin clear-change-data sweep
-    // DELETEs the key and publishes null — the mounted tab's mirror must
-    // REMOVE it (never store a raw null) so a stale attack row can never
-    // re-celebrate after the docs are wiped.
-    it('removes lastAttack from the campaign store on a null cleared-key echo', async () => {
-      const campaignStore = new Map([['lastAttack', { attackerName: 'FixtureFighter5e', hit: true }]]);
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-lastAttack', data: null });
-
-      expect(campaignStore.has('lastAttack')).toBe(false);
-      expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('lastAttack')).toHaveLength(0);
-    });
-
-    // Audit-sweep companion (prefix family): a per-instance automation flag
-    // like the Flesh to Stone save tracking must adopt its OBJECT echo into
-    // the campaign store too — readers (CreatureCard badges, the
-    // concentration/clearAll store sweeps) all read it campaign-level.
-    it('mirrors per-instance underscore-family echoes via the isCampaignKey prefix rules', async () => {
+      }],
+      ['dynamic underscore-prefix flag echo', '_fleshToStone_Goblin', {
+        casterName: 'ElderPaladin', targetName: 'Goblin', dc: 14,
+      }],
+      ['scalar travel-message echo', 'travel-lastMessage', 'Party has arrived.'],
+    ])('mirrors a %s into the campaign store, never a ghost character store', async (_label, key, data) => {
       const stores = new Map();
       getStore.mockImplementation((name) => {
         if (!stores.has(name)) stores.set(name, new Map());
         return stores.get(name);
       });
 
-      const tracking = { casterName: 'ElderPaladin', targetName: 'Goblin', dc: 14 };
-      await dispatch({ key: 'change-test-campaign-_fleshToStone_Goblin', data: tracking });
-      await dispatch({ key: 'change-test-campaign-_cover_shot', data: { attacker: 'Goblin', target: 'HexWarlock', round: 2 } });
+      await dispatch({ key: `change-test-campaign-${key}`, data });
 
-      expect(stores.get('campaign').get('_fleshToStone_Goblin')).toEqual(tracking);
-      expect(stores.get('campaign').get('_cover_shot')).toEqual({ attacker: 'Goblin', target: 'HexWarlock', round: 2 });
-      expect(stores.has('_fleshToStone_Goblin')).toBe(false);
-      expect(stores.has('_cover_shot')).toBe(false);
-    });
-
-    // bug-hex-arrival-null-echo-blank-screen: arrival's per-key DELETEs echo
-    // null for the typed COMPLETED_TRIP_KEYS; raw null in the store crashed
-    // useTravelManagement's render (path.length). Mirror them as removals so
-    // the hook's declared defaults ([] / 0 / null) win instead.
-    it('removes typed travel keys on null cleared-key echoes (arrival cleanup never stores null)', async () => {
-      const campaignStore = new Map([
-        ['travel-destination', { q: 20, r: 10 }],
-        ['travel-path', [{ q: 21, r: 10 }, { q: 20, r: 10 }]],
-        ['travel-pathIndex', 1],
-      ]);
-      getStore.mockImplementation(() => campaignStore);
-
-      for (const key of ['travel-destination', 'travel-path', 'travel-pathIndex']) {
-        await dispatch({ key: `change-test-campaign-${key}`, data: null });
-      }
-
-      expect(campaignStore.size).toBe(0);
+      // Reader side: useRuntimeValue('campaign', <key>) now sees it, and the
+      // store wake lands (banner/reaction/celebration consumers re-render).
+      expect(stores.get('campaign').get(key)).toEqual(data);
       expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('travel-path')).toHaveLength(0);
+      // Ghost-store side: zero writes to, and no store created under, a name
+      // equal to the key; never the character-bucket replace lane.
+      expect(writesFor(key)).toHaveLength(0);
+      expect(replaceRuntimeObject.mock.calls.some((call) => call[0] === key)).toBe(false);
+      expect(stores.has(key)).toBe(false);
     });
 
-    it('mirrors scalar change echoes (string values) into the campaign store', async () => {
-      const campaignStore = new Map();
-      getStore.mockImplementation(() => campaignStore);
+    // Null cleared-key echoes (POST null / key DELETE both publish null from
+    // campaigns-changedata.js) mirror as a key REMOVE, never a stored raw
+    // null — declared defaults win and typed readers never crash
+    // (bug-hex-arrival-null-echo-blank-screen: a stored null blank-screened
+    // the SPA on travel arrival; resolved travel EventDialogs stayed open and
+    // actionable on every other client when the echo was dropped). Rows cover
+    // each eviction lane the law rescues: victory-stamp clears, the pendingOAs
+    // drain-to-evict (writePendingOas deletes the last row with a key DELETE),
+    // Admin clear-change-data sweeps (lastAttack), and travel arrival cleanup
+    // (resolved prompt + the typed COMPLETED_TRIP_KEYS). Character-key null
+    // bucket echoes are NOT re-pinned here — App.bucket-null-echo.test.jsx
+    // owns that lane against the real store.
+    it.each([
+      ['lastCombatResult', { stamp: 1, rounds: 1 }],
+      ['pendingOAs', { Goblin: { defender: 'Goblin', mover: 'EvasiveFighter', promptId: 'probe-1' } }],
+      ['lastAttack', { attackerName: 'FixtureFighter5e', hit: true }],
+      ['travel-pendingEvent', { title: 'Wolves on the Hunt', type: 'combat' }],
+      ['travel-destination', { q: 20, r: 10 }],
+      ['travel-path', [{ q: 21, r: 10 }, { q: 20, r: 10 }]],
+      ['travel-pathIndex', 1],
+    ])('removes %s from the campaign store on a null cleared-key echo', async (key, seed) => {
+      const stores = new Map([['campaign', new Map([[key, seed]])]]);
+      getStore.mockImplementation((name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      });
 
-      await dispatch({ key: 'change-test-campaign-travel-lastMessage', data: 'Party has arrived.' });
+      await dispatch({ key: `change-test-campaign-${key}`, data: null });
 
-      expect(campaignStore.get('travel-lastMessage')).toBe('Party has arrived.');
+      // Removed, never stored as null (has() is true on a set(key, null)
+      // regression) — declared defaults win for every consumer.
+      expect(stores.get('campaign').has(key)).toBe(false);
       expect(notify).toHaveBeenCalledWith('campaign');
-      expect(writesFor('travel-lastMessage')).toHaveLength(0);
-    });
-
-    // bug-character-bucket-delete-echo-never-self-heals: the wildcard DELETE
-    // evicts the whole character bucket server-side and publishes an
-    // unconditional null echo. Dropping it left phantom badges/rows on every
-    // mounted tab until a page reload. The echo must mirror as a bucket REMOVE
-    // — an empty-snapshot replace (full-eviction semantics pinned in
-    // useRuntimeState.replaceRuntimeObject.test.js), never a stored null, never
-    // a re-POST (memory-only skipSync law).
-    it('mirrors a character-key null cleared-bucket echo as an empty-snapshot bucket REMOVE', async () => {
-      const campaignStore = new Map();
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-Aragorn', data: null });
-
-      expect(replaceRuntimeObject).toHaveBeenCalledWith('Aragorn', {});
-      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('Aragorn', null);
-      expect(writesFor('Aragorn')).toHaveLength(0);
-      expect(campaignStore.size).toBe(0);
-      expect(notify).not.toHaveBeenCalledWith('campaign');
-    });
-
-    // Non-NULL scalars on character keys remain corrupt noise (bucket echoes
-    // are full objects): they must not evict anything.
-    it('keeps dropping non-null scalar echoes for character-scoped keys (full-snapshot lane)', async () => {
-      const campaignStore = new Map();
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({ key: 'change-test-campaign-Aragorn', data: 'corrupt' });
-
-      expect(replaceRuntimeObject).not.toHaveBeenCalled();
-      expect(writesFor('Aragorn')).toHaveLength(0);
-      expect(campaignStore.size).toBe(0);
-      expect(notify).not.toHaveBeenCalledWith('campaign');
+      expect(writesFor(key)).toHaveLength(0);
+      // Never routed to the character-bucket REMOVE lane either.
+      expect(replaceRuntimeObject.mock.calls.some((call) => call[0] === key)).toBe(false);
+      expect(stores.has(key)).toBe(false);
     });
 
     it.each([
       ['null key', { key: null, data: { hp: 1 } }],
       ['undefined data', { key: 'change-test-campaign-Aragorn', data: undefined }],
       ['non-object data', { key: 'change-test-campaign-Aragorn', data: 'corrupt' }],
+      ['own-campaign pipeline echo (milestone lane removed 2026-11-18)', { key: 'pipeline-test-campaign-damage:rolled', data: { total: 14, critical: false } }],
       ['another campaign pipeline key', { key: 'pipeline-other-campaign-damage:rolled', data: { total: 1 } }],
     ])('ignores runtime events with %s without crashing or touching state', async (_label, event) => {
       const campaignStore = new Map();

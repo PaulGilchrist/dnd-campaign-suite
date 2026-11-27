@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (per family delegation):
 //   - Class-based unarmored movement in the Speed row: Barbarian (fixture-driven
@@ -25,6 +25,18 @@
 //   - AC assertions scope to the Armor Class row (armorClassLine helper) and
 //     speed assertions pin the exact span text with an absent-bonus check on
 //     negative paths, so broken rendering fails loudly.
+//
+// 2026-11-26 audit vs. current CharSummary.jsx / charSummaryCalc.js: 12 tests
+// kept, none prunable — each verifies a distinct branch (class_levels[level-1]
+// index, Barbarian vs. Monk `!hasArmorOrShield` guards, the armor
+// equipment_category vs. Shield baseName branches of computeHasArmorOrShield,
+// both major/subclass identifier branches of computeCircleFormsACOverride,
+// large_form vs. shape_shift, missing-Wisdom ?? 0, and the class-name and
+// no-buff gate negatives). No sibling file exercises these lanes. Known open
+// source bug CharSummary.jsx:306 (stray ')' in the descriptor row when
+// class.subclass is null) does NOT intersect: every assertion here scopes to
+// the Armor Class row or the speed span — re-check intersection if assertions
+// ever widen to the summary-text row.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

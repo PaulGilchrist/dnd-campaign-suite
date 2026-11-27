@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Search/size filtering behavior only. Intentionally NOT duplicated here
 // (covered in sibling files):
 //   - search control aria names, keyboard handling, clear-search button, and
@@ -116,13 +116,20 @@ describe('Settlements - filtering (behavioral)', () => {
       settlementMockStore.items = TOWNS;
     });
 
-    it.each([
-      { action: 'toggles off and restores the full list', clicks: ['Village', 'Village'], visible: ['Fireport', 'Iceholm', 'Goldhaven'] },
-      { action: 'switches to a different size and shows only that size', clicks: ['Town', 'City'], visible: ['Goldhaven'], hidden: ['Fireport', 'Iceholm'] },
-    ])('size filter: $action', ({ clicks, visible, hidden }) => {
+    it('filters to one size, restores the list when toggled off, and replaces (never unions) when switching sizes', () => {
       renderSettlements();
-      clicks.forEach((size) => fireEvent.click(getSizeFilterButton(size)));
-      expectListItems(visible, hidden);
+
+      fireEvent.click(getSizeFilterButton('Village'));
+      expectListItems(['Iceholm'], ['Fireport', 'Goldhaven']);
+
+      fireEvent.click(getSizeFilterButton('Village'));
+      expectListItems(['Fireport', 'Iceholm', 'Goldhaven']);
+
+      fireEvent.click(getSizeFilterButton('Town'));
+      expectListItems(['Fireport'], ['Iceholm', 'Goldhaven']);
+
+      fireEvent.click(getSizeFilterButton('City'));
+      expectListItems(['Goldhaven'], ['Fireport', 'Iceholm']);
     });
 
     it.each([

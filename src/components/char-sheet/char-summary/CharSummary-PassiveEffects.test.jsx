@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation): automation/passive movement
 // effects of computeCharSummaryContext — the ONLY owner in the family of all four
@@ -20,9 +20,9 @@
 //   - no_armor_no_shield calc-lane gating + default +10 parse → CharSummary.test-mocks.test.jsx
 //     fixture-contract suite
 //
-// Trim pass (16 tests / 22 runs → 13 tests / 18 runs) — every production branch in
-// passiveSpeedContribution / applyMovementPassives stays pinned; removed runs were
-// second and third occurrences of the same branch:
+// Trim pass (16 tests / 22 runs → 13 tests / 18 runs → 10 tests / 18 runs):
+// every production branch in passiveSpeedContribution / applyMovementPassives
+// stays pinned; removed tests were second and third occurrences of the same branch:
 //   - Stacking test now runs on the ARMORED default fixture (speed_bonus no_heavy_armor
 //     +10 default parse + speed_increase +5 → 40), absorbing the separate "speed_increase
 //     unconditional" test and the unarmored single-effect grant test.
@@ -31,6 +31,9 @@
 //   - Malformed/missing bonusExpression folds into one it.each covering the NaN guard
 //     on both effects AND the missing-bonusExpression truthy guard on speed_increase.
 //   - Heavy-armor suppression and the armorClassFormula fallback share one it.each.
+//   - Consolidation pass: the acrobatic (loadout), elemental (which array carries the
+//     passive) and aquatic (buff pre-sets swim or not) positive/negative pairs each vary
+//     ONE parameter and now share one it.each per behavior — assertions unchanged.
 //   - Speed assertions scope to the Speed-row span (speedSpan helper, family convention)
 //     and pin the FULL span text; guard branches previously let broken code pass silently
 //     (the malformed-expression case exposed a real NaN defect, fixed in charSummaryCalc.js).
@@ -194,17 +197,15 @@ describe('passive speed bonus guards', () => {
 // acrobatic_movement passive — conditional suffix on the speed row
 // ---------------------------------------------------------------------------
 describe('acrobatic_movement passive', () => {
-    it('appends the acrobatic movement suffix while unarmored and unshielded', () => {
-        renderSummary(stats([{ effect: 'acrobatic_movement' }], unarmored));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\., acrobatic movement$/);
-    });
-
-    it('omits the suffix when armor is equipped', () => {
-        renderSummary(stats([{ effect: 'acrobatic_movement' }], {
+    it.each([
+        ['nothing protective equipped — suffix appears', unarmored, /^25 ft\., acrobatic movement$/],
+        ['armor equipped — suffix omitted', {
             inventory: { equipped: ['Scale Mail'] },
             equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
-        }));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+        }, /^25 ft\.$/],
+    ])('%s', (_label, overrides, expected) => {
+        renderSummary(stats([{ effect: 'acrobatic_movement' }], overrides));
+        expect(speedSpan()).toHaveTextContent(expected);
     });
 });
 
@@ -212,32 +213,34 @@ describe('acrobatic_movement passive', () => {
 // elemental_attunement_movement passive — top-level passives lane
 // ---------------------------------------------------------------------------
 describe('elemental_attunement_movement passive', () => {
-    it('grants fly and swim speeds mirroring walk speed', () => {
-        renderSummary({
+    it.each([
+        // Read ONLY from top-level passives: granting fly + swim mirroring walk speed.
+        // automation.passives carrying the same effect must grant nothing.
+        ['carried in top-level passives grants swim and fly mirroring walk', {
             ...mockPlayerStats,
             passives: [{ effect: 'elemental_attunement_movement' }],
-        });
-        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 25 ft\., fly 25 ft\.\s*$/);
-    });
-
-    it('is only read from top-level passives — automation.passives does not grant it', () => {
-        renderSummary(stats([{ effect: 'elemental_attunement_movement' }]));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+        }, /^25 ft\., swim 25 ft\., fly 25 ft\.\s*$/],
+        ['carried in automation.passives grants nothing', stats([{ effect: 'elemental_attunement_movement' }]), /^25 ft\.$/],
+    ])('%s', (_label, playerStats, expected) => {
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(expected);
     });
 });
 
 // ---------------------------------------------------------------------------
 // aquatic_affinity passive — swim speed grant
 // ---------------------------------------------------------------------------
-describe('aquatic_affinity passive', () => {
-    it('grants swim speed equal to walk speed when no swim speed exists', () => {
+// Passive < buff cell: the aquatic_affinity PASSIVE yields to a swim speed the
+// aquatic_adaptation BUFF already set (charSummaryCalc.js `acc.swimSpeed === null`
+// guard). Distinct from AdditionalCoverage's buff > playerStats.swimSpeed cell.
+describe('aquatic_affinity passive vs aquatic_adaptation buff', () => {
+    it.each([
+        ['no buff — the passive grants swim equal to walk speed', [], /^25 ft\., swim 25 ft\.$/],
+        ['aquatic_adaptation buff already set swim 50 — the passive does not override it',
+            [{ effect: 'aquatic_adaptation' }], /^25 ft\., swim 50 ft\.$/],
+    ])('%s', (_label, buffs, expected) => {
+        getActiveBuffs.mockReturnValue(buffs);
         renderSummary(stats([{ effect: 'aquatic_affinity' }]));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 25 ft\.$/);
-    });
-
-    it('does not override swim speed already set by the aquatic_adaptation buff', () => {
-        getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
-        renderSummary(stats([{ effect: 'aquatic_affinity' }]));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 50 ft\.$/);
+        expect(speedSpan()).toHaveTextContent(expected);
     });
 });

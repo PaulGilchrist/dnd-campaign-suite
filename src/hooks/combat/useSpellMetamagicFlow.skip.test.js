@@ -1,10 +1,18 @@
-// @maintained-by-ai 2026-10-15: 2026-11-15
+// @maintained-by-ai 2026-11-26
 //
 // SKIP AUTHORITY — metamagic gate lane.
-// Owns the gate → pending → skip contract for the gated spells below (simple-handlers.test.js
-// cites this file as owner of Web/Revivify skip + general skip semantics).
-// Upcast-level REFUND bytes (CLA-086) live on the PAID lane, pinned by
-// useConfirmableFlow.skip-paid-gate.test.js and the cla086 lane.
+// Owns the gate → pending (UNPAID) → skip contract for the gated spells below
+// (simple-handlers.test.js cites this file as owner of Web/Revivify skip +
+// general gate-lane skip semantics).
+// Owned elsewhere — do not duplicate here:
+//  - the 3 two-stage handlers (Enhance Ability / Protection from Energy /
+//    Resistance) are EXCLUDED from the table below; their gate-armed unpaid-skip
+//    zero-write dismissal is pinned by useSpellMetamagicFlow.gate-two-stage.test.js;
+//  - skip WITHOUT pending (misfire guard, every handler incl. this table's 18 +
+//    Animal Shapes): the handler-guards.test.js guard sweep;
+//  - upcast-level REFUND bytes (CLA-086) on the PAID lane: unit pairs in
+//    useConfirmableFlow.skip-paid-gate.test.js, gate-armed integration in
+//    useSpellMetamagicFlow.cla086-upcast-slot.test.js.
 //
 // 2026-11-15 INVERSION (bug-revivify-chooser-skip-rollback-inflates-unspent-slot):
 // the old 'refund'/'free' lanes (createSkipHandler logs + rolls back / credits the
@@ -16,7 +24,13 @@
 // law, EVERY pay-at-confirm chooser skip in this table now clears pending with NO log
 // and NO refund — the pay-at-confirm 'clear' semantics that already governed Magic
 // Missile / Pass Without Trace / Barkskin / True Polymorph is now the whole lane.
-// Every row also asserts the no-pending face: skip before any gate is a zero-side-effect no-op.
+// 2026-11-26 audit: the byte-empty write census was re-verified against
+// useConfirmableFlow.createSkipHandler — unpaid pending (pending.slotConsumed
+// unset) early-returns BEFORE addEntry/rollbackSpellSlot, and rollbackSpellSlot's
+// only write channels are setRuntimeValue (slot ledger) and
+// incrementFreeCastResource (free-cast), so these three spies are exhaustive.
+// The no-pending face was dropped from every row (duplicate of the
+// handler-guards.test.js guard sweep, which owns no-pending coverage).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -256,19 +270,14 @@ describe('useSpellMetamagicFlow — skip lane authority', () => {
       const { result } = renderFlow();
       const spell = { name: tc.spell, level: tc.level, casting_time: tc.time, range: tc.range };
 
-      // Face 1: skip with nothing armed is a zero-side-effect no-op.
-      act(() => { result.current[tc.handler](); });
-      expect(result.current[tc.pending]).toBeNull();
-      expect(addEntry).not.toHaveBeenCalled();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(incrementFreeCastResource).not.toHaveBeenCalled();
-
       // Gate arms pending for the sorcerer — UNPAID (makePending spends nothing).
+      // Non-vacuity: without this the skip census below could pass on never-armed
+      // pending (that face is owned by the handler-guards sweep, not this row).
       await act(async () => { await result.current.gateMetamagic(spell); });
       expect(result.current[tc.pending]).not.toBeNull();
 
-      // Face 2: skip dismisses with a byte-empty write census — nothing was paid,
-      // so nothing is refunded and no cast row is stamped.
+      // Armed unpaid skip dismisses with a byte-empty write census — nothing was
+      // paid, so nothing is refunded and no cast row is stamped.
       act(() => { result.current[tc.handler](); });
       expect(result.current[tc.pending]).toBeNull();
       expect(addEntry).not.toHaveBeenCalled();
@@ -277,15 +286,15 @@ describe('useSpellMetamagicFlow — skip lane authority', () => {
     });
   }
 
-  it('Animal Shapes never arms without beast targets — skip stays a no-op', async () => {
+  // The flow-level skip census above cannot cover Animal Shapes: its gate filters
+  // by creature TYPE and the combat fixture carries only goblins (the mocked
+  // monsterUtils resolves no beast type), so the gate never arms. This pins that
+  // never-arm face; the un-armed skip no-op is the handler-guards sweep's.
+  it('Animal Shapes never arms without beast targets', async () => {
     const { result } = renderFlow();
 
     await act(async () => { await result.current.gateMetamagic({ name: 'Animal Shapes', level: 8, casting_time: '1 Action', range: '30 ft.' }); });
     // Goblin-only summary: the beast gate resolves zero targets, so nothing is armed.
     expect(result.current.pendingAnimalShapes).toBeNull();
-
-    act(() => { result.current.handleAnimalShapesSkip(); });
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });

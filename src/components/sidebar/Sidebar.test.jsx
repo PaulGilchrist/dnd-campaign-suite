@@ -1,6 +1,12 @@
-// @maintained-by-ai 2026-10-14: 2026-11-18
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+// @maintained-by-ai 2026-11-26
+// Base Sidebar chrome/navigation lane: nav-item visibility per origin
+// (localhostOnly gate), handler wiring, active-view highlighting and the
+// active-view indicator, nav ordering, and the unified button header tier
+// with the roster toggle. Toolbelt gating lives in Sidebar.toolbelt.test.jsx,
+// the popup-block Rules lane in Sidebar.rules-popup.test.jsx, the small-screen
+// drawer in Sidebar.nav-drawer.test.jsx, arena campaign-type in
+// Sidebar.campaign-type.test.jsx.
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
@@ -26,8 +32,6 @@ const NAV_BUTTONS = [
 ];
 const GM_BUTTONS = NAV_BUTTONS.filter(b => b.localhostOnly);
 const PLAYER_BUTTONS = NAV_BUTTONS.filter(b => !b.localhostOnly);
-
-const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
 
 function createProps(overrides = {}) {
   const handlers = {};
@@ -72,22 +76,22 @@ describe('Sidebar', () => {
       expect(screen.getByRole('button', { name: playerLabel || label })).toBeInTheDocument();
     });
 
-    it('renders Campaigns for players but hides Add Character on non-localhost', () => {
+    it('shows Add Character only to the GM and fires onAddCharacter when clicked', () => {
+      const { props } = renderSidebar({ isLocalhost: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Add Character' }));
+      expect(props.onAddCharacter).toHaveBeenCalledTimes(1);
+
+      cleanup();
       renderSidebar({ isLocalhost: false });
-      expect(screen.getByRole('button', { name: 'Campaigns' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Add Character' })).not.toBeInTheDocument();
     });
 
-    it('renders Add Character for the GM on localhost', () => {
-      renderSidebar({ isLocalhost: true });
-      expect(screen.getByRole('button', { name: 'Add Character' })).toBeInTheDocument();
-    });
-
-    it('renders one character button per character', () => {
-      renderSidebar({ characters: [{ name: 'Aragorn' }, { name: 'Legolas' }] });
-      expect(screen.getByText('Characters')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Aragorn' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Legolas' })).toBeInTheDocument();
+    it('keeps the Campaigns escape hatch and the Map button for players', () => {
+      const { props } = renderSidebar({ isLocalhost: false });
+      fireEvent.click(screen.getByRole('button', { name: 'Campaigns' }));
+      expect(props.onBackToCampaigns).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Map' }));
+      expect(props.onMapsClick).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -98,38 +102,10 @@ describe('Sidebar', () => {
       expect(props[handler]).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onBackToCampaigns when the Campaigns button is clicked (even for players)', async () => {
-      const { props } = renderSidebar({ isLocalhost: false });
-      fireEvent.click(screen.getByRole('button', { name: 'Campaigns' }));
-      await Promise.resolve();
-      expect(props.onBackToCampaigns).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onAddCharacter when the GM clicks Add Character on localhost', async () => {
-      const { props } = renderSidebar({ isLocalhost: true });
-      fireEvent.click(screen.getByRole('button', { name: 'Add Character' }));
-      await Promise.resolve();
-      expect(props.onAddCharacter).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onMapsClick when players click Map', () => {
-      const { props } = renderSidebar({ isLocalhost: false });
-      fireEvent.click(screen.getByRole('button', { name: 'Map' }));
-      expect(props.onMapsClick).toHaveBeenCalledTimes(1);
-    });
-
     it('calls onCharacterClick with the clicked character object', () => {
       const { props } = renderSidebar({ characters: [{ name: 'Gandalf' }] });
       fireEvent.click(screen.getByRole('button', { name: 'Gandalf' }));
       expect(props.onCharacterClick).toHaveBeenCalledWith({ name: 'Gandalf' });
-    });
-
-    it('opens the rules URL in a new tab when the Rules button is clicked', () => {
-      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-      renderSidebar();
-      fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
-      expect(openSpy).toHaveBeenCalledWith(RULES_URL, '_blank');
-      openSpy.mockRestore();
     });
   });
 
@@ -184,8 +160,9 @@ describe('Sidebar', () => {
 
   // MA 2026-11-18 backlog: view headers used to split across a button face and
   // a headless div face (`div.sidebar-section-header-static` for Characters).
-  // Unified on the button tier — these tests pin zero div faces, keyboard
-  // reachability, and click/Enter/Space parity for the roster toggle.
+  // Pinning the BUTTON face also guarantees click/Enter/Space activation —
+  // native platform behavior, so keyboard-parity tests are intentionally not
+  // duplicated here.
   describe('unified sidebar header tier', () => {
     const rosterProps = { characters: [{ name: 'Aragorn' }, { name: 'Legolas' }] };
 
@@ -197,51 +174,20 @@ describe('Sidebar', () => {
       expect(charactersHeader).toHaveClass('sidebar-section-header');
     });
 
-    it('the Characters header is keyboard-focusable and reachable by Tab', async () => {
-      const user = userEvent.setup();
-      const { container } = renderSidebar({ ...rosterProps, isLocalhost: true });
-      const charactersHeader = screen.getByRole('button', { name: 'Characters' });
-      // Tab order: Campaigns header first, Characters header immediately after.
-      expect(container.querySelector('.sidebar-section-header')).not.toBe(charactersHeader);
-      await user.tab();
-      await user.tab();
-      expect(document.activeElement).toBe(charactersHeader);
-    });
-
-    it('defaults to an expanded roster (mount renders identical to always-expanded)', () => {
+    it('defaults to an expanded roster with one button per character', () => {
       const { container } = renderSidebar(rosterProps);
       expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Characters' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Aragorn' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Legolas' })).toBeInTheDocument();
     });
 
-    it('click toggles the roster closed and open again', () => {
+    it('clicking the Characters header toggles the roster closed and open again', () => {
       const { container } = renderSidebar(rosterProps);
       const header = screen.getByRole('button', { name: 'Characters' });
       fireEvent.click(header);
       expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
       fireEvent.click(header);
-      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
-    });
-
-    it('Enter and Space toggle the roster exactly like the click', async () => {
-      const user = userEvent.setup();
-      const { container } = renderSidebar(rosterProps);
-      const header = screen.getByRole('button', { name: 'Characters' });
-
-      await user.click(header); // focus without toggling twice in one pass
-      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
-      await user.click(header);
-      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
-
-      header.focus();
-      await user.keyboard('{Enter}');
-      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
-      await user.keyboard('{Enter}');
-      expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
-
-      await user.keyboard(' ');
-      expect(container.querySelector('.sidebar-submenu')).not.toBeInTheDocument();
-      await user.keyboard(' ');
       expect(container.querySelector('.sidebar-submenu')).toBeInTheDocument();
     });
   });

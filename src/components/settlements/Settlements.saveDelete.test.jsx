@@ -1,4 +1,16 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Generic save/delete flows from the settlement editor: rename target on edit
+// saves, create-save reload/close, the in-flight Save/Delete locks, and the
+// generic error-recovery lanes (button re-enabled, modal + draft survive).
+// Intentionally NOT duplicated here (sibling lanes):
+//   - row-affordance delete (aria chip, no editor open, Escape, one delete)
+//       -> Settlements.row-delete.test.jsx
+//   - dialog mechanics (focus trap, backdrop, Cancel/Confirm routing)
+//       -> common/DeleteConfirmModal.test.jsx; arm/disarm semantics
+//       -> common/useDeleteRequest.test.js
+//   - duplicate-name and 409-conflict error copy -> duplicate-name.test.jsx /
+//     conflict-reload.test.jsx; prefill/dirty-gate -> generate.test.jsx;
+//     loading/empty/new-modal/generate-face -> modalActions.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -68,13 +80,16 @@ const openNewForm = (name = 'My Settlement') => {
   fireEvent.change(screen.getByRole('textbox', { name: /name\s?\*/i }), { target: { value: name } });
 };
 
-// Render one settlement, open its edit modal.
+// Render one settlement, open its edit modal. The window.confirm spy proves the
+// retired native-confirm tier stays unused (the shared dialog must arm instead).
 const openEditForm = (name) => {
   vi.spyOn(globalThis.window, 'confirm').mockReturnValue(true);
   settlementMockStore.items = [makeSettlement(name)];
   render(<Settlements campaignName="test" />);
   fireEvent.click(screen.getByRole('button', { name: /edit settlement/i }));
 };
+
+const dialog = () => screen.getByRole('dialog');
 
 describe('Settlements - save and delete behavior', () => {
   beforeEach(() => {
@@ -129,7 +144,7 @@ describe('Settlements - save and delete behavior', () => {
       });
     });
 
-    it('disables Save and Cancel with a "Saving…" label while a save is in flight, then closes', async () => {
+    it('locks Save and Cancel with a "Saving…" label while a save is in flight, then closes on success', async () => {
       let resolveSave;
       mockSaveSettlement.mockImplementation(() => new Promise((resolve) => {
         resolveSave = resolve;
@@ -150,7 +165,7 @@ describe('Settlements - save and delete behavior', () => {
       });
     });
 
-    it('re-enables Save and keeps the modal open with data intact when a save fails', async () => {
+    it('on a rejected save, re-enables Save and keeps the modal open with the draft intact', async () => {
       mockSaveSettlement.mockRejectedValue(new Error('Save failed'));
 
       openNewForm();
@@ -168,26 +183,7 @@ describe('Settlements - save and delete behavior', () => {
   });
 
   describe('Delete', () => {
-    const dialog = () => screen.getByRole('dialog');
-    const dialogCancel = () => within(dialog()).getByRole('button', { name: 'Cancel' });
-    const dialogConfirm = () => within(dialog()).getByRole('button', { name: 'Yes, Delete Permanently' });
-
-    it('arms the shared role=dialog confirm naming the settlement — no native confirm; Cancel writes nothing', () => {
-      openEditForm('Keep Me');
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-
-      // Native `Delete Settlement "X"?` tier retired (backlog 2026-11-16 XD).
-      expect(globalThis.window.confirm).not.toHaveBeenCalled();
-      expect(screen.getByRole('heading', { name: 'Delete Settlement' })).toBeInTheDocument();
-      expect(dialog()).toHaveTextContent('Keep Me');
-
-      fireEvent.click(dialogCancel());
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(settlementMockStore.deleteItem).not.toHaveBeenCalled();
-      expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
-    });
-
-    it('deletes the settlement when confirmed, shows "Deleting…" in flight, then closes', async () => {
+    it('in-form Delete arms the shared dialog naming the settlement (no native confirm); Cancel is inert, Confirm deletes once with a "Deleting…" lock and closes', async () => {
       let resolveDelete;
       settlementMockStore.deleteItem.mockImplementation(() => new Promise((resolve) => {
         resolveDelete = resolve;
@@ -196,8 +192,23 @@ describe('Settlements - save and delete behavior', () => {
       openEditForm('Delete Me');
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
-      fireEvent.click(dialogConfirm());
 
+      // Native `Delete Settlement "X"?` tier retired (backlog 2026-11-16 XD).
+      expect(globalThis.window.confirm).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: 'Delete Settlement' })).toBeInTheDocument();
+      expect(dialog()).toHaveTextContent('Delete Me');
+
+      // Cancel: fully inert — no write, dialog gone, editor survives.
+      fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(settlementMockStore.deleteItem).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
+
+      // Re-arm and confirm: exactly one delete by name, locked while in flight.
+      fireEvent.click(deleteBtn);
+      fireEvent.click(within(dialog()).getByRole('button', { name: 'Yes, Delete Permanently' }));
+
+      expect(settlementMockStore.deleteItem).toHaveBeenCalledTimes(1);
       expect(settlementMockStore.deleteItem).toHaveBeenCalledWith('Delete Me');
       expect(deleteBtn).toBeDisabled();
       expect(screen.getByText('Deleting…')).toBeInTheDocument();
@@ -209,13 +220,13 @@ describe('Settlements - save and delete behavior', () => {
       });
     });
 
-    it('re-enables Delete and keeps the modal open when a delete fails', async () => {
+    it('re-enables Delete and keeps the editor open when a delete fails', async () => {
       settlementMockStore.deleteItem.mockRejectedValue(new Error('Delete failed'));
 
       openEditForm('Keep Me');
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
-      fireEvent.click(dialogConfirm());
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Yes, Delete Permanently' }));
 
       await waitFor(() => {
         expect(deleteBtn).not.toBeDisabled();

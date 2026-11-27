@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Regression tests for CLA-188 + the IJ 2026-11-18 decline-latch alignment:
 // closing the Cunning Strike rider modal in CharActionModals must resume the
 // paused attack damage pipeline, and a Cancel with no option applied must
@@ -10,15 +10,18 @@
 // - Charger + skip-flag latch → CharActionModals.charger-resume.test.jsx
 // - Stalker's Flurry + skip-flag latch → CharActionModals.stalkersFlurry-resume.test.jsx
 // - Shield Bash resume → CharActionModals.shieldBash-resume.test.jsx
-// - Generic close/unmount + event dispatch → CharActionModals.modal-closes.test.jsx
+// - Generic (non-pausing) rider close, event dispatch, no resume → CharActionModals.modal-closes.test.jsx
+// - isCunningStrikeFeatureName name list → cunningStrikeUtils.test.js
 // - Pipeline resume/damage math → useAttackDamageResolution.cunningStrikeResume.test.js
 // - Rider-step suppression/clear → steps/attackRollRiders.test.js
 //
-// This lane: the Cunning Strike variants resume the pipeline exactly once and
-// roll no damage themselves (the pipeline owns damage); Cancel latches the
-// skip, while an Apply (which stamped `_CunningStrike_usedRound` for the
-// current round via markOncePerTurn) never stacks a skip. The un-mocked
-// combatData cache is empty in tests, so getCurrentCombatRound pins round 1.
+// This lane: the handler WIRING for the Cunning Strike family — every authored
+// variant routes through closeCunningStrikeRider, which resumes the pipeline
+// exactly once and rolls no damage itself (the pipeline owns damage). Cancel
+// latches the skip unless `_CunningStrike_usedRound` proves an Apply this
+// round (markOncePerTurn stamp); a stale stamp from an earlier round counts
+// as unused. The un-mocked combatData cache is empty in tests, so
+// getCurrentCombatRound pins round 1.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
@@ -26,7 +29,9 @@ import { createBaseProps } from './CharActionModals.test-utils.jsx';
 
 // Minimal mock set — mirrors CharActionModals.modal-closes.test.jsx: only the
 // modules this lane touches, plus ones with load-time side effects. Unopened
-// modals render nothing and load safely unmocked.
+// modals render nothing and load safely unmocked. isCunningStrikeFeatureName
+// and resolveRoundStamp (cunningStrikeUtils) stay REAL — this lane tests the
+// handler's use of them.
 vi.mock('./modals/shared/AttackRiderModal.jsx', () => ({
   default: function TestModal({ onClose }) {
     return <div data-testid="attack-rider-modal"><button data-testid="attack-rider-close" onClick={onClose}>Done</button></div>;
@@ -76,13 +81,15 @@ function renderAndCloseRiderModal(actionName, targetName, runtimeOptions = {}) {
   return props;
 }
 
-describe('CharActionModals — Cunning Strike rider close resumes pipeline (CLA-188)', () => {
+describe('CharActionModals — Cunning Strike rider close (CLA-188 + decline latch)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].forEach((featureName) => {
-    it(`closes the ${featureName} modal and resumes the pipeline exactly once`, async () => {
+    it(`declined ${featureName} close clears the modal, resumes the pipeline exactly once, and latches the round skip`, async () => {
+      // No `_CunningStrike_usedRound` stamp → the Apply path never ran, so
+      // the Cancel must mirror the Charger/Stalker's Flurry decline latch.
       const props = renderAndCloseRiderModal(featureName, 'Animated Rug of Smothering 1');
 
       await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
@@ -90,15 +97,6 @@ describe('CharActionModals — Cunning Strike rider close resumes pipeline (CLA-
       // The close handler must not short-circuit the pipeline by rolling
       // damage itself — proceedToDamage runs downstream via resume.
       expect(props.rollDamage).not.toHaveBeenCalled();
-    });
-
-    it(`declined (no option applied) ${featureName} close latches the round skip flag`, async () => {
-      // No `_CunningStrike_usedRound` stamp for the current round (round 1
-      // from the empty combatData cache) → the Apply path never ran → the
-      // Cancel must mirror the Charger/Stalker's Flurry decline latch.
-      const props = renderAndCloseRiderModal(featureName, 'Animated Rug of Smothering 1');
-
-      await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
       expect(setSkipFlag).toHaveBeenCalledTimes(1);
       expect(setSkipFlag).toHaveBeenCalledWith(
         '_cunningStrikeSkippedRound',
@@ -106,26 +104,33 @@ describe('CharActionModals — Cunning Strike rider close resumes pipeline (CLA-
         'test-campaign',
       );
     });
-
-    it(`applied ${featureName} close (usedRound stamped this round) never stacks a skip`, async () => {
-      // applyRiderOption's markOncePerTurn stamp (setSkipFlag sibling shape)
-      // proves an option was applied — the used-latch owns that lane.
-      const props = renderAndCloseRiderModal(featureName, 'Animated Rug of Smothering 1', {
-        '_CunningStrike_usedRound': { round: 1, activeCreature: featureName },
-      });
-
-      await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
-      expect(setSkipFlag).not.toHaveBeenCalled();
-    });
   });
 
-  it('closes a manual (non-pausing) rider modal without touching the pipeline', () => {
-    // 'Hamstring' is opened via the manual attack_rider row flow, not by a
-    // featureRiders pipeline pause — closing it must not resume anything.
-    const props = renderAndCloseRiderModal('Hamstring', 'Goblin');
+  it('applied close (usedRound stamped this round) resumes but never stacks a skip', async () => {
+    // applyRiderOption's markOncePerTurn stamp (setSkipFlag sibling shape)
+    // proves an option was applied — the used-latch owns that lane. The
+    // round comparison is name-independent, so one variant suffices.
+    const props = renderAndCloseRiderModal('Cunning Strike', 'Animated Rug of Smothering 1', {
+      '_CunningStrike_usedRound': { round: 1, activeCreature: 'Cunning Strike' },
+    });
 
-    expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
-    expect(props.resumeAttackPipeline).not.toHaveBeenCalled();
+    await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
     expect(setSkipFlag).not.toHaveBeenCalled();
+  });
+
+  it('stale usedRound stamp (earlier round) counts as unused — Cancel still latches the skip', async () => {
+    // Latches persist across combats; a round-3 stamp while the current
+    // round is 1 must NOT suppress this round's decline latch.
+    const props = renderAndCloseRiderModal('Cunning Strike', 'Animated Rug of Smothering 1', {
+      '_CunningStrike_usedRound': { round: 3, activeCreature: 'Cunning Strike' },
+    });
+
+    await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
+    expect(setSkipFlag).toHaveBeenCalledTimes(1);
+    expect(setSkipFlag).toHaveBeenCalledWith(
+      '_cunningStrikeSkippedRound',
+      props.playerStats,
+      'test-campaign',
+    );
   });
 });

@@ -1,8 +1,10 @@
+// @maintained-by-ai 2026-11-26
 /**
- * Deferred plan C — lighting math: torch radii (20+20 ft = 4+4 cells at the
+ * Deferred plan C — lighting math: torch radii (20+20 ft = 4+8 cells at the
  * 5 ft grid; 'dim' halves), the absent-key bright default, Chebyshev square
  * radii, wall/closed-door shadowing via the shared ray model, multi-source
- * union with bright-beats-dim, and the off/no-sources empty shape.
+ * union with bright-beats-dim, the emits-nothing shapes ('none', no sources,
+ * malformed tokens, zero grid), and board-edge clipping.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -28,12 +30,16 @@ describe('lighting settings (plan C)', () => {
         expect(lightRadii('none')).toBeNull();
     });
 
-    it('sources = every PC token plus creature props (doors/barrels never emit)', () => {
-        const src = lightSources(
-            [{ name: 'A', gridX: 1, gridY: 1 }],
-            [{ type: 'npc', gridX: 2, gridY: 2 }, { type: 'monster', gridX: 3, gridY: 3 }, { type: 'door', gridX: 4, gridY: 4 }, { type: 'barrel', gridX: 5, gridY: 5 }],
-        );
-        expect(src).toHaveLength(3);
+    it('sources = every PC token plus npc/monster props; doors/barrels never emit', () => {
+        const pcs = [{ name: 'A', gridX: 1, gridY: 1 }];
+        const items = [
+            { type: 'npc', gridX: 2, gridY: 2 },
+            { type: 'monster', gridX: 3, gridY: 3 },
+            { type: 'door', gridX: 4, gridY: 4 },
+            { type: 'barrel', gridX: 5, gridY: 5 },
+        ];
+        expect(lightSources(pcs, items)).toEqual([pcs[0], items[0], items[1]]);
+        expect(lightSources(null, null)).toEqual([]);
     });
 });
 
@@ -41,23 +47,27 @@ const open = new Set();
 const noDoors = new Set();
 
 describe('computeLighting (plan C)', () => {
-    it('open room: full square bright/dim bands; the far corners belong to neither', () => {
-        const { bright, dim } = computeLighting([{ gridX: 10, gridY: 10, light: 'bright' }], open, noDoors, 30);
-        expect(bright.size).toBe(9 * 9); // 4+4+1 cells square
-        expect(dim.size).toBe(17 * 17 - 9 * 9);
-        expect(bright.has('10,10')).toBe(true);
-        expect(bright.has('14,10')).toBe(true);
-        expect(dim.has('15,10')).toBe(true);
-        expect(dim.has('18,10')).toBe(true); // d=8 is the dim edge (4 bright + 4 extension)
-        expect(dim.has('19,10')).toBe(false); // beyond: unlit
+    it.each([
+        ['bright', 4, 8],
+        ['dim', 2, 4],
+    ])('%s torch at (10,10): full square bright band r=%d, dim ring to r=%d, unlit beyond', (setting, brightR, dimR) => {
+        const { bright, dim } = computeLighting([{ gridX: 10, gridY: 10, light: setting }], open, noDoors, 30);
+        expect(bright.size).toBe((2 * brightR + 1) ** 2);
+        expect(dim.size).toBe((2 * dimR + 1) ** 2 - (2 * brightR + 1) ** 2);
+        expect(bright.has(`${10 + brightR},10`)).toBe(true); // bright edge
+        expect(dim.has(`${10 + dimR},10`)).toBe(true);       // dim edge
+        expect(dim.has(`${10 + dimR + 1},10`)).toBe(false);  // beyond: unlit tier
         expect(bright.has('0,0')).toBe(false);
     });
 
-    it('a wall strips its shadow column from both bands', () => {
+    it('a wall strips its shadow cell from both bands; light still spills sideways', () => {
         const walls = new Set(['10,9']); // wall directly north of the torch
         const { bright, dim } = computeLighting([{ gridX: 10, gridY: 10 }], walls, noDoors, 30);
-        expect(bright.has('10,8')).toBe(false); // behind the wall — no light
-        expect(bright.has('10,10')).toBe(true); // the source cell itself stays lit
+        expect(bright.has('10,10')).toBe(true);  // the source cell itself stays lit
+        expect(bright.has('9,10')).toBe(true);   // lateral ray is unblocked
+        expect(bright.has('10,8')).toBe(false);  // d=2 behind the wall — no light
+        expect(dim.has('10,8')).toBe(false);
+        expect(bright.has('10,6')).toBe(false);  // inside the bright radius, still shadowed
         expect(dim.has('10,6')).toBe(false);
     });
 
@@ -67,15 +77,6 @@ describe('computeLighting (plan C)', () => {
         expect(blocked.bright.has('10,8')).toBe(false);
         const opened = computeLighting([{ gridX: 10, gridY: 10 }], open, noDoors, 30);
         expect(opened.bright.has('10,8')).toBe(true);
-    });
-
-    it("'none' emits nothing; 'dim' lights the half band", () => {
-        const none = computeLighting([{ gridX: 10, gridY: 10, light: 'none' }], open, noDoors, 30);
-        expect(none.bright.size).toBe(0);
-        expect(none.dim.size).toBe(0);
-        const dim = computeLighting([{ gridX: 10, gridY: 10, light: 'dim' }], open, noDoors, 30);
-        expect(dim.bright.size).toBe(5 * 5);
-        expect(dim.dim.size).toBe(9 * 9 - 5 * 5);
     });
 
     it('multi-source union: one torch\'s bright beats another\'s dim ring', () => {
@@ -90,18 +91,29 @@ describe('computeLighting (plan C)', () => {
         overlap.forEach(k => expect(two.dim.has(k)).toBe(false)); // promoted out of dim
     });
 
-    it('degrades clean: zero grid, no sources, malformed tokens', () => {
-        expect(computeLighting([{ gridX: 1, gridY: 1 }], open, noDoors, 0).bright.size).toBe(0);
-        expect(computeLighting(null, open, noDoors, 30).bright.size).toBe(0);
-        expect(computeLighting([{ gridX: null, gridY: 2 }], open, noDoors, 30).bright.size).toBe(0);
+    it('emits nothing: \'none\' setting, no sources, malformed token, zero grid', () => {
+        const empties = [
+            [[{ gridX: 10, gridY: 10, light: 'none' }], open, noDoors, 30],
+            [null, open, noDoors, 30],
+            [[{ gridX: null, gridY: 2 }], open, noDoors, 30],
+            [[{ gridX: 1, gridY: 1 }], open, noDoors, 0],
+        ];
+        for (const [sources, walls, doors, size] of empties) {
+            const { bright, dim } = computeLighting(sources, walls, doors, size);
+            expect(bright.size).toBe(0);
+            expect(dim.size).toBe(0);
+        }
     });
 
-    it('clips at the board edge (never emits off-grid keys)', () => {
-        const { bright, dim } = computeLighting([{ gridX: 0, gridY: 0 }], open, noDoors, 30);
-        [...bright, ...dim].forEach(k => {
+    it.each([0, 29])('clips at the board edge from corner (%d,%d): never emits off-grid keys', (corner) => {
+        const { bright, dim } = computeLighting([{ gridX: corner, gridY: corner }], open, noDoors, 30);
+        expect(bright.size + dim.size).toBeGreaterThan(0);
+        for (const k of [...bright, ...dim]) {
             const [x, y] = k.split(',').map(Number);
             expect(x).toBeGreaterThanOrEqual(0);
+            expect(x).toBeLessThan(30);
             expect(y).toBeGreaterThanOrEqual(0);
-        });
+            expect(y).toBeLessThan(30);
+        }
     });
 });

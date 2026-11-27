@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 // Campaign-meta hook (Item 1): loads the type + toolbelt on campaign enter,
 // converges LIVE by re-reading on the existing campaigns-list 'updated' SSE
 // event (no new lane), keeps the all-visible default on a failed FIRST load
@@ -39,16 +40,12 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('useCampaignMeta — load + defaults', () => {
-  it('defaults ALL views visible while the meta read is in flight and when no meta is stored', async () => {
-    const { result } = renderHook(() => useCampaignMeta('test-campaign'));
-    expect(result.current).toMatchObject({ campaignType: 'standard', hiddenViews: [] });
-    await waitFor(() => expect(loadMeta).toHaveBeenCalledWith('test-campaign'));
-    expect(result.current.hiddenViews).toEqual([]);
-  });
-
-  it('adopts the stored hidden set once the lane answers', async () => {
+  it('starts ALL-visible while the first read is in flight, then adopts the stored set', async () => {
     loadMeta.mockResolvedValue({ type: 'starter', hiddenViews: ['music', 'initiative'] });
     const { result } = renderHook(() => useCampaignMeta('test-campaign'));
+    // In flight: the nav must show every view (never a blank/blocked sidebar).
+    expect(result.current).toMatchObject({ campaignType: 'standard', hiddenViews: [] });
+    await waitFor(() => expect(loadMeta).toHaveBeenCalledWith('test-campaign'));
     await waitFor(() => expect(result.current.hiddenViews).toEqual(['music', 'initiative']));
     expect(result.current.campaignType).toBe('starter');
   });
@@ -60,11 +57,13 @@ describe('useCampaignMeta — load + defaults', () => {
     expect(result.current).toMatchObject({ campaignType: 'standard', hiddenViews: [] });
   });
 
-  it('resets to the default with no campaign open and subscribes to SSE only for a campaign', async () => {
+  it('with no campaign open: all-visible default, no reads, no SSE, and a save refuses', async () => {
     const { result } = renderHook(() => useCampaignMeta(null));
-    expect(result.current.hiddenViews).toEqual([]);
+    expect(result.current).toMatchObject({ campaignType: 'standard', hiddenViews: [] });
     expect(loadMeta).not.toHaveBeenCalled();
     expect(sseHandlers.size).toBe(0);
+    await expect(result.current.saveHiddenViews(['music'])).rejects.toThrow('No campaign is open');
+    expect(saveToolbelt).not.toHaveBeenCalled();
   });
 });
 
@@ -105,12 +104,24 @@ describe('useCampaignMeta — live convergence via the campaigns-list event', ()
     expect(result.current.hiddenViews).toEqual(['music']);
   });
 
-  it('unsubscribes on campaign switch', async () => {
-    const { rerender } = renderHook(({ name }) => useCampaignMeta(name), { initialProps: { name: 'a' } });
+  it('on campaign switch: unsubscribes the old lane and a late response from the campaign you LEFT never paints over the new one', async () => {
+    let resolveA;
+    loadMeta.mockImplementation((name) => name === 'a'
+      ? new Promise((resolve) => { resolveA = resolve; })
+      : Promise.resolve({ type: 'standard', hiddenViews: ['maps'] }));
+    const { result, rerender } = renderHook(
+      ({ name }) => useCampaignMeta(name),
+      { initialProps: { name: 'a' } },
+    );
     await waitFor(() => expect(sseHandlers.has('a')).toBe(true));
     rerender({ name: 'b' });
     await waitFor(() => expect(sseHandlers.has('a')).toBe(false));
     expect(sseHandlers.has('b')).toBe(true);
+    await waitFor(() => expect(result.current.hiddenViews).toEqual(['maps']));
+
+    // Campaign 'a''s first read resolves late — it must not overwrite 'b'.
+    await act(async () => { resolveA({ type: 'starter', hiddenViews: ['music'] }); });
+    expect(result.current).toMatchObject({ campaignType: 'standard', hiddenViews: ['maps'] });
   });
 });
 

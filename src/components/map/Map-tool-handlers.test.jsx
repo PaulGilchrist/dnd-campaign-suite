@@ -123,9 +123,16 @@ class MockEventSource {
     constructor() {
         this.onmessage = null;
         this.onerror = null;
+        // Named SSE listeners (the shared sseClient registers its 'client-id'
+        // event via addEventListener). Handlers are stored so the fake matches
+        // the real DOM contract; they stay inert unless a test fires them.
+        this.namedListeners = {};
         MockEventSource.instances.push(this);
     }
     close() {}
+    addEventListener(type, fn) {
+        (this.namedListeners[type] = this.namedListeners[type] || []).push(fn);
+    }
 }
 globalThis.EventSource = MockEventSource;
 

@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 // Regression for bug-visitor-edit-wizard-unguarded-character-file-put: the
 // sheet header's authoring button group rendered `Edit "<Name>"` /
 // `Delete "<Name>"` / Upload on EVERY client — a LAN visitor could open the
@@ -120,23 +121,19 @@ afterEach(() => {
 });
 
 describe('CharSummary header buttons — origin faces (bug-visitor-edit-wizard-unguarded-character-file-put)', () => {
-    it('GM origin (localhost): the full authoring group renders (Edit/Delete/Upload + Download)', () => {
-        setHostname('localhost');
-        renderSummary();
-
+    function expectGmAuthoringFace() {
         expect(screen.getByRole('button', { name: `Edit "${mockPlayerStats.name}"` })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` })).toBeInTheDocument();
         expect(screen.getByTitle('Upload Character')).toBeInTheDocument();
         expect(screen.getByTitle('Download Character')).toBeInTheDocument();
-    });
+    }
 
-    it('127.0.0.1 loopback origin: GM face unchanged (mirrors the server isLocalhost pair)', () => {
-        setHostname('127.0.0.1');
+    // Both loopback spellings must open the GM face: dropping either half of
+    // the `localhost || 127.0.0.1` pair would lock the GM out of authoring.
+    it.each(['localhost', '127.0.0.1'])('GM origin (%s): full authoring group renders (Edit/Delete/Upload + Download)', hostname => {
+        setHostname(hostname);
         renderSummary();
-
-        expect(screen.getByRole('button', { name: `Edit "${mockPlayerStats.name}"` })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` })).toBeInTheDocument();
-        expect(screen.getByTitle('Upload Character')).toBeInTheDocument();
+        expectGmAuthoringFace();
     });
 
     it('visitor origin (LAN IP): NO Edit/Delete/Upload door; Download and the rest buttons stay', () => {
@@ -146,9 +143,11 @@ describe('CharSummary header buttons — origin faces (bug-visitor-edit-wizard-u
         expect(screen.queryByRole('button', { name: `Edit "${mockPlayerStats.name}"` })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: `Delete "${mockPlayerStats.name}"` })).not.toBeInTheDocument();
         expect(screen.queryByTitle('Upload Character')).not.toBeInTheDocument();
-        // Read-side affordances stay: exporting the already-open read view is
-        // harmless (GET is open to all), and rest rides the runtime store.
+        // Read-side affordances stay for every client: exporting the
+        // already-open read view is harmless (GET is open to all), and the
+        // rest buttons ride the runtime store, not the authoring lanes.
         expect(screen.getByTitle('Download Character')).toBeInTheDocument();
         expect(screen.getByTestId('long-rest-btn')).toBeInTheDocument();
+        expect(screen.getByTitle(/Short Rest/)).toBeInTheDocument();
     });
 });

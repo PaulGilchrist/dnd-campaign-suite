@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Dedicated owner of the Wild Shape (shape_shift) lane in buffHandler.
 // Pins the stable handler contract: CLA-391 uses-gate (ON leg gated, OFF leg
 // always allowed to end the form), the zero-write ON leg — the row click only
@@ -10,6 +10,10 @@
 // CLA-013 5e lv20 Archdruid unlimited exemption / free-revert log token.
 // hasUnlimitedWildShape input truth is pinned in archdruidWildShapeService.test.js —
 // this suite only pins the handler wiring around it, one test per branch.
+// Badge display lives in the CharSummary Wild Shape badge lane; the dead
+// 'half_druid_level_hours' duration-display branch in buildBuffTogglePopup is
+// unreachable for shape_shift (both legs return inside handleShapeShift) and
+// is intentionally NOT pinned (no-legacy policy).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -72,6 +76,7 @@ import * as buffToggle from '../../common/buffToggle.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as wildShapeCreatureBuilder from '../class-druid/wildShapeCreatureBuilder.js';
+import * as tempHpService from './tempHpService.js';
 
 const campaignName = 'test-campaign';
 
@@ -124,37 +129,56 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
     logService.addEntry.mockResolvedValue(undefined);
   });
 
-  it('OFF leg is ungated — toggles OFF at 0 uses, cleans up, logs deactivation, no revert token', async () => {
+  it('OFF leg is ungated — toggles OFF at 0 uses, cleans up the form, logs deactivation, refunds/stamps no uses write, no revert token', async () => {
     mockRuntime({
       activeBuffs: [{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }],
       wildShapeUses: 0,
     });
-    buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
 
     const result = await handle(makeAction(), makeDruidStats(), campaignName, null);
 
-    expect(buffToggle.toggleBuff).toHaveBeenCalled();
+    expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+      'Wild_Sage_Druid',
+      'Wild Shape',
+      expect.objectContaining({ effect: 'shape_shift' }),
+      campaignName,
+      'Wild_Sage_Druid'
+    );
     expect(wildShapeCreatureBuilder.cleanupWildShape).toHaveBeenCalledWith('Wild_Sage_Druid', campaignName);
     expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
     expect(result.payload.description).toBe('Wild Shape toggled OFF');
-    expect(result.payload.description).not.toContain('No Wild Shape uses remaining');
+    // Toggling OFF never touches the uses counter (no refund, no spend).
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     const entries = loggedEntries();
     expect(entries.find(e => e.type === 'ability_use').description).toContain('deactivated Wild Shape');
     expect(entries.find(e => e.automationType === 'shape_shift_reverted')).toBeUndefined();
   });
 
-  it('refuses the ON leg at 0 uses with popup and wild_shape_refused log, no toggle, no cleanup', async () => {
-    mockRuntime({ activeBuffs: [], wildShapeUses: 0 });
+  it.each([
+    ['runtime counter exhausted with class-data max above it', { wildShapeUses: 0 }, {}],
+    ['counter unset and the class-data fallback max is 0', { wildShapeUses: undefined }, {
+      level: 7,
+      class: { major: { name: 'Druid' }, class_levels: [{ level: 7, wild_shape: 0 }] },
+    }],
+  ])('ON leg refuses at 0 uses when %s — refusal popup and wild_shape_refused log, no toggle, no cleanup, zero writes', async (_label, runtime, statsOverrides) => {
+    mockRuntime({ activeBuffs: [], ...runtime });
 
-    const result = await handle(makeAction(), makeDruidStats(), campaignName, null);
+    const result = await handle(makeAction(), makeDruidStats(statsOverrides), campaignName, null);
 
     expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     expect(wildShapeCreatureBuilder.cleanupWildShape).not.toHaveBeenCalled();
+    expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No Wild Shape uses remaining');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toBe('Wild Shape: No Wild Shape uses remaining.');
     const refusal = loggedEntries().find(e => e.automationType === 'wild_shape_refused');
-    expect(refusal).toBeDefined();
-    expect(refusal.description).toContain('No Wild Shape uses remaining');
+    expect(refusal).toMatchObject({
+      type: 'automation',
+      characterName: 'Wild_Sage_Druid',
+      description: 'Wild Shape: No Wild Shape uses remaining.',
+    });
   });
 
   it('activates with uses available — wild_shape_select chooser echoes action, playerStats and campaignName by reference, zero writes, zero logs', async () => {
@@ -168,6 +192,7 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
     // then leave a ghost buff (blocksSpellcasting) with no form, no spend, no log.
     expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('wild_shape_select');
@@ -217,16 +242,17 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
         activeBuffs: [{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }],
         wildShapeUses: 0,
       });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
 
       await handle(makeAction(), makeUnlimitedDruidStats(), campaignName, null);
 
       const entries = loggedEntries();
       const revert = entries.find(e => e.automationType === 'shape_shift_reverted');
-      expect(revert).toBeDefined();
-      expect(revert.type).toBe('automation');
-      expect(revert.characterName).toBe('Wild_Sage_Druid');
-      expect(revert.description).toContain('free');
+      expect(revert).toMatchObject({
+        type: 'automation',
+        automationDetail: 'archdruid_free_revert',
+        characterName: 'Wild_Sage_Druid',
+      });
+      expect(revert.description).toContain('reverts to normal form for free');
       expect(entries.find(e => e.type === 'ability_use').description).toContain('deactivated Wild Shape');
     });
   });

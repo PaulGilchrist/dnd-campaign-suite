@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Behavior tests for the "Delete Campaign" flow (handleDeleteConfirm).
  *
@@ -9,9 +9,13 @@
  * 2026-11-11 — flipped from the old enabled-until-click gate; match is
  * trimmed + case-insensitive per backlog 2026-11-16 XC), and failure
  * copy is inline (role="alert") — never a native prompt/confirm/alert.
- * OWNED here: arm → type → disabled-gate → DELETE semantics;
- * the dialog chrome/focus trap itself stays pinned by
- * common/DeleteConfirmModal.test.jsx.
+ * OWNED here: arm → type → disabled-gate → DELETE semantics.
+ * The dialog chrome itself (aria-modal, focus trap, Escape/backdrop
+ * dismiss routing) stays pinned by common/DeleteConfirmModal.test.jsx —
+ * only this host's Cancel lane (dialog closes, zero writes) is pinned here.
+ * The campaign-lock disclosure note is pinned by the sibling
+ * CampaignAdmin.delete-lock.test.jsx; the data-wipe trio is a separate
+ * lane owned by CampaignAdmin.data-management.test.jsx.
  *
  * Safety: fetch is stubbed in beforeEach and restored in afterEach, so no
  * DELETE can ever reach a live server. Only test-campaign (and a display-only
@@ -79,23 +83,26 @@ describe('CampaignAdmin - Delete Campaign', () => {
     const renderCampaignAdmin = (props = {}) =>
         render(<CampaignAdmin {...createDefaultProps(props)} />);
 
-    const clickDeleteCampaign = () =>
-        fireEvent.click(screen.getByRole('button', { name: 'Delete Campaign' }));
-
     const openDeleteModal = (props = {}) => {
         renderCampaignAdmin(props);
-        clickDeleteCampaign();
+        fireEvent.click(screen.getByRole('button', { name: 'Delete Campaign' }));
         return screen.getByRole('dialog', { name: 'Delete Campaign' });
     };
 
     const typedInput = () =>
         screen.getByLabelText(/Type the exact campaign name/i);
 
-    const clickConfirm = () =>
-        fireEvent.click(screen.getByRole('button', { name: `Delete "${CAMPAIGN}"` }));
+    const confirmButton = (name = CAMPAIGN) =>
+        screen.getByRole('button', { name: `Delete "${name}"` });
+
+    const type = (typed) =>
+        fireEvent.change(typedInput(), { target: { value: typed } });
+
+    const clickConfirm = (name = CAMPAIGN) =>
+        fireEvent.click(confirmButton(name));
 
     const typeAndConfirm = (typed) => {
-        fireEvent.change(typedInput(), { target: { value: typed } });
+        type(typed);
         clickConfirm();
     };
 
@@ -121,6 +128,13 @@ describe('CampaignAdmin - Delete Campaign', () => {
         expect(window.alert).not.toHaveBeenCalled();
     };
 
+    const expectZeroWrites = () => {
+        expect(deleteRequests()).toHaveLength(0);
+        expect(window.location.reload).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
+        expectNoNativeDialogs();
+    };
+
     const waitForDeletion = async (expectedUrl = `/api/campaigns/${CAMPAIGN}`, expectedNotice = CAMPAIGN) => {
         await waitFor(() => {
             expect(deleteRequests()).toHaveLength(1);
@@ -141,10 +155,8 @@ describe('CampaignAdmin - Delete Campaign', () => {
     };
 
     describe('role=dialog modal', () => {
-        it('opens a labelled dialog with the typed-name input and exactly one destructive confirm', () => {
-            openDeleteModal();
-            const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
-            expect(dialog).toHaveAttribute('aria-modal', 'true');
+        it('opens a host dialog naming the full loss, with the typed-name input and exactly one destructive confirm', () => {
+            const dialog = openDeleteModal();
             expect(dialog).toHaveTextContent(
                 `This will permanently delete the entire campaign '${CAMPAIGN}'`
             );
@@ -153,9 +165,10 @@ describe('CampaignAdmin - Delete Campaign', () => {
             // campaign-delete host now echoes the exact token into the
             // placeholder (gate + label-derived accessible name unchanged).
             expect(typedInput()).toHaveAttribute('placeholder', CAMPAIGN);
-            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             // ONE destructive confirm inside the dialog (the trigger button
-            // behind the backdrop is not part of the dialog).
+            // behind the backdrop is not part of the dialog). aria-modal /
+            // dismiss routing are the shared tier's contract, pinned in
+            // common/DeleteConfirmModal.test.jsx.
             expect(
                 within(dialog).getAllByRole('button').map((b) => b.textContent.trim())
             ).toEqual(['Cancel', `Delete "${CAMPAIGN}"`]);
@@ -169,18 +182,13 @@ describe('CampaignAdmin - Delete Campaign', () => {
         // 2026-11-16 XC: the match is trimmed + case-insensitive (the confirm
         // label already displays the true name verbatim, so a caps-lock slip
         // must not silently disable the one affordance); empty/whitespace-only
-        // input and names differing by more than case stay disabled. The
-        // handler guard stays as a fallback that a real click can no longer
-        // reach.
-        const confirmButton = (name = CAMPAIGN) =>
-            screen.getByRole('button', { name: `Delete "${name}"` });
-
-        const type = (typed) =>
-            fireEvent.change(typedInput(), { target: { value: typed } });
-
+        // input and names differing by more than case/whitespace stay
+        // disabled, even when clicked. The handler guard stays as a fallback
+        // that a real click can no longer reach.
         it('renders the confirm disabled on open (empty input)', () => {
             openDeleteModal();
             expect(confirmButton()).toBeDisabled();
+            expectZeroWrites();
         });
 
         it.each([
@@ -189,63 +197,39 @@ describe('CampaignAdmin - Delete Campaign', () => {
             { typed: 'wrong-name', label: 'a different name' },
             { typed: CAMPAIGN.slice(0, -1), label: 'missing the final character' },
             { typed: `${CAMPAIGN}x`, label: 'carrying an extra character' },
-        ])('keeps the confirm disabled while the name is $label', ({ typed }) => {
+        ])('keeps the confirm disabled and inert to clicks while the name is $label', ({ typed }) => {
             openDeleteModal();
             type(typed);
             expect(confirmButton()).toBeDisabled();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-            expectNoNativeDialogs();
-        });
-
-        it.each([CAMPAIGN, CAMPAIGN.toUpperCase(), 'Test-Campaign', `  ${CAMPAIGN}  `])(
-            'enables the confirm for "%s" and fires the DELETE against the TRUE name',
-            async (typed) => {
-                openDeleteModal();
-                type(typed);
-                // Label shows the true campaign name verbatim regardless of
-                // what was typed (criterion for the case-insensitive fix).
-                expect(confirmButton()).toBeEnabled();
-                clickConfirm();
-                await waitForDeletion();
-            }
-        );
-
-        it('enables on a case-flipped or padded match and re-disables on an edit back to a mismatch', () => {
-            openDeleteModal();
-            type(CAMPAIGN.toUpperCase());
-            expect(confirmButton()).toBeEnabled();
-            type('wrong-name');
-            expect(confirmButton()).toBeDisabled();
-            type(`  ${CAMPAIGN}  `);
-            expect(confirmButton()).toBeEnabled();
-            type('   ');
-            expect(confirmButton()).toBeDisabled();
-            type('');
-            expect(confirmButton()).toBeDisabled();
-        });
-
-        it('ignores confirm clicks attempted while disabled: no DELETE, no reload, no notice', () => {
-            openDeleteModal();
-            type('wrong-name');
             clickConfirm(); // React suppresses onClick on a disabled button
-            expect(confirmButton()).toBeDisabled();
-            expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-            expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
-            expectNoNativeDialogs();
+            expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
+            expectZeroWrites();
         });
 
-        it('recovers: an enabled confirm fires after a mismatch is corrected to the exact name', async () => {
+        it('enables for a case-flipped AND padded match, keeps the label on the TRUE name, and deletes the TRUE name', async () => {
+            // One variant exercising both match sub-branches (trim +
+            // case-insensitive, backlog 2026-11-16 XC): the confirm label
+            // displays the true campaign name verbatim regardless of what was
+            // typed, and the DELETE + notice carry the TRUE name.
             openDeleteModal();
-            type('wrong-name');
-            expect(confirmButton()).toBeDisabled();
-
-            type(CAMPAIGN);
+            type(`  ${CAMPAIGN.toUpperCase()}  `);
             expect(confirmButton()).toBeEnabled();
             clickConfirm();
             await waitForDeletion();
+        });
+
+        it('re-disables on an edit back to a mismatch (both whitespace and text)', () => {
+            // Pins that the gate tracks every keystroke — a once-enabled
+            // confirm must not latch open.
+            openDeleteModal();
+            type(`  ${CAMPAIGN}  `);
+            expect(confirmButton()).toBeEnabled();
+            type('wrong-name');
+            expect(confirmButton()).toBeDisabled();
+            type(CAMPAIGN);
+            expect(confirmButton()).toBeEnabled();
+            type('   ');
+            expect(confirmButton()).toBeDisabled();
         });
     });
 
@@ -255,10 +239,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
             expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).not.toBeInTheDocument();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-            expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
-            expectNoNativeDialogs();
+            expectZeroWrites();
         });
     });
 
@@ -272,8 +253,8 @@ describe('CampaignAdmin - Delete Campaign', () => {
         it('URL-encodes campaign names with reserved characters', async () => {
             const name = 'test campaign/1';
             openDeleteModal({ campaignName: name });
-            fireEvent.change(typedInput(), { target: { value: name } });
-            fireEvent.click(screen.getByRole('button', { name: `Delete "${name}"` }));
+            type(name);
+            clickConfirm(name);
             await waitForDeletion('/api/campaigns/test%20campaign%2F1', name);
         });
     });
@@ -293,6 +274,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
                     `Failed to delete campaign: ${message}`
                 );
             }, WAIT_OPTIONS);
+            // The dialog stays open for a retry; nothing else fires.
             expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(1);
             expect(window.location.reload).not.toHaveBeenCalled();

@@ -1,11 +1,15 @@
+// @maintained-by-ai 2026-11-26
 // Pins for the mount auto-fit seam (XF backlog 2026-11-16): the fit math must
 // keep a named ~40 px inset between the board extent and every viewport edge,
 // show the WHOLE board (inset shrinks the usable viewport, never crops the
 // board), and the pan clamp must CENTER — not saturate — when the whole grid
-// span fits inside the viewport at the fit zoom.
+// span fits inside the viewport at the fit zoom. The saturating branch of
+// clampHexPan at interactive zooms is pinned by the sibling lane test
+// (src/components/hex-map/hooks/useZoomPan.test.js 'clampPan'), which runs
+// this exact function through the hook — not duplicated here.
 import { describe, it, expect } from 'vitest';
 import {
-    HEX_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, MAX_ZOOM,
+    MIN_ZOOM, MAX_ZOOM, GRID_COLS_MULTIPLIER,
 } from '../../config/outdoorConfig.js';
 import {
     hexGridPixelBounds, clampHexPan, centerHexView, fitHexView, resolveHexResetView,
@@ -31,20 +35,17 @@ function toScreenPx(svgX, svgY, { zoom, panX, panY }, elW, elH) {
     };
 }
 
-describe('HEX_FIT_INSET_PX', () => {
-    it('is the deliberate 40 px per-edge inset the mount fit reserves', () => {
-        expect(HEX_FIT_INSET_PX).toBe(40);
-    });
-});
-
-describe('HEX_FIT_VERSION', () => {
-    // The stamp is the ONE branch of the mount-fit law (YG backlog 2026-11-16):
-    // doc.fitVersion === HEX_FIT_VERSION → mount verbatim; anything else
-    // (absent reads as stale-by-shape) → one mount fit + restamp. Bumping this
-    // constant re-runs the stamping pass for every doc — the disk fixture
+describe('golden fit constants', () => {
+    // HEX_FIT_INSET_PX: the deliberate 40 px per-edge inset the mount fit
+    // reserves (clears the 36 SVG-unit POI hit-rect plus label).
+    // HEX_FIT_VERSION: the stamp the ONE branch of the mount-fit law reads
+    // (YG backlog 2026-11-16): doc.fitVersion === HEX_FIT_VERSION → mount
+    // verbatim; anything else → one mount fit + restamp. Bumping this constant
+    // re-runs the stamping pass for every doc — the disk fixture
     // (public/campaigns/test-campaign/maps/poi-showcase.json) and the settled
     // hook fixtures must migrate in the same change.
-    it('is the version stamped into outdoor map docs by the mount-fit pass', () => {
+    it('pins the 40 px inset and fit-stamp version the mount-fit law and disk fixtures rely on', () => {
+        expect(HEX_FIT_INSET_PX).toBe(40);
         expect(HEX_FIT_VERSION).toBe(1);
     });
 });
@@ -60,41 +61,40 @@ describe('fitHexView', () => {
         // At zoom 1 the board spans exactly elW here (width-limited meet), so
         // z = usable/width-at-zoom-1 = (elW − 2·inset) / elW.
         expect(fit.zoom).toBeCloseTo((EL_W - 2 * HEX_FIT_INSET_PX) / EL_W, 10);
-        expect(fit.zoom).toBeLessThan(1); // a MIN_ZOOM of 2 could never fit — hence the floor drop
+        expect(fit.zoom).toBeLessThan(1); // a MIN_ZOOM of 1 could never fit — hence the floor drop
     });
 
-    it('lands every board corner (and thus every POI) inside viewport minus inset', () => {
-        const fit = fitHexView(HEX_COLS, GRID_SIZE, EL_W, EL_H);
+    it('lands every board corner (and thus every POI) inside viewport minus inset, on both constrained axes', () => {
         const b = hexGridPixelBounds(HEX_COLS, GRID_SIZE);
-        for (const [sx, sy] of [
-            [b.offsetX, b.offsetY], [b.offsetX + b.width, b.offsetY],
-            [b.offsetX, b.offsetY + b.height], [b.offsetX + b.width, b.offsetY + b.height],
-        ]) {
-            const p = toScreenPx(sx, sy, fit, EL_W, EL_H);
-            expect(p.x).toBeGreaterThanOrEqual(HEX_FIT_INSET_PX - 1e-6);
-            expect(p.x).toBeLessThanOrEqual(EL_W - HEX_FIT_INSET_PX + 1e-6);
-            expect(p.y).toBeGreaterThanOrEqual(HEX_FIT_INSET_PX - 1e-6);
-            expect(p.y).toBeLessThanOrEqual(EL_H - HEX_FIT_INSET_PX + 1e-6);
+        // Width-constrained (1.73) and height-constrained (4.8, so the fit
+        // lands on usable height and the board letterboxes horizontally).
+        // Corner containment also proves the board is never cropped.
+        for (const [elW, elH] of [[EL_W, EL_H], [2400, 500]]) {
+            const fit = fitHexView(HEX_COLS, GRID_SIZE, elW, elH);
+            for (const [sx, sy] of [
+                [b.offsetX, b.offsetY], [b.offsetX + b.width, b.offsetY],
+                [b.offsetX, b.offsetY + b.height], [b.offsetX + b.width, b.offsetY + b.height],
+            ]) {
+                const p = toScreenPx(sx, sy, fit, elW, elH);
+                expect(p.x).toBeGreaterThanOrEqual(HEX_FIT_INSET_PX - 1e-6);
+                expect(p.x).toBeLessThanOrEqual(elW - HEX_FIT_INSET_PX + 1e-6);
+                expect(p.y).toBeGreaterThanOrEqual(HEX_FIT_INSET_PX - 1e-6);
+                expect(p.y).toBeLessThanOrEqual(elH - HEX_FIT_INSET_PX + 1e-6);
+            }
         }
     });
 
-    it('never crops the board on taller viewports either (extents all on-screen)', () => {
-        // Height-constrained element (aspect wider than the board): fit on height.
-        const elW = 2400, elH = 500;
-        const fit = fitHexView(HEX_COLS, GRID_SIZE, elW, elH);
-        const b = hexGridPixelBounds(HEX_COLS, GRID_SIZE);
-        const s = fit.zoom * Math.min(elW / b.width, elH / b.height);
-        const spanW = b.width * s, spanH = b.height * s;
-        expect(spanW).toBeLessThanOrEqual(elW - 2 * HEX_FIT_INSET_PX + 1e-6);
-        expect(spanH).toBeLessThanOrEqual(elH - 2 * HEX_FIT_INSET_PX + 1e-6);
-    });
-
-    it('clamps into [MIN_ZOOM, MAX_ZOOM] for degenerate viewports', () => {
-        const tiny = fitHexView(HEX_COLS, GRID_SIZE, 60, 60);
-        expect(tiny.zoom).toBeGreaterThanOrEqual(MIN_ZOOM);
-        expect(tiny.zoom).toBeLessThanOrEqual(MAX_ZOOM);
-        const huge = fitHexView(HEX_COLS, GRID_SIZE, 100000, 90000);
-        expect(huge.zoom).toBeLessThanOrEqual(MAX_ZOOM);
+    it('clamps at MIN_ZOOM when the viewport swallows the inset, and still reserves the inset on a giant viewport', () => {
+        // 60×60 leaves usable = max(1, 60 − 2·inset) = 1 → raw fit far below
+        // MIN_ZOOM; the clamp floor must answer exactly.
+        expect(fitHexView(HEX_COLS, GRID_SIZE, 60, 60).zoom).toBe(MIN_ZOOM);
+        // Giant viewport is width-constrained: fit still lands on usable
+        // width — never above it, nowhere near MAX_ZOOM.
+        const hugeW = 100000;
+        expect(fitHexView(HEX_COLS, GRID_SIZE, hugeW, 90000).zoom)
+            .toBeCloseTo((hugeW - 2 * HEX_FIT_INSET_PX) / hugeW, 10);
+        // In-band sanity for the ceiling constant itself at these extremes.
+        expect(fitHexView(HEX_COLS, GRID_SIZE, 60, 60).zoom).toBeLessThanOrEqual(MAX_ZOOM);
     });
 
     it('pans via the same centered expression as centerHexView (bit-identical bytes)', () => {
@@ -112,28 +112,12 @@ describe('clampHexPan inverted bracket (whole span fits the viewport)', () => {
         // Any off-center pan request (leftmost top-row POI lane included) is
         // answered with the CENTERED board — the old min-of-max stuck the view
         // at the right edge and parked left/top POIs off-screen.
-        const clamped = clampHexPan(b, GRID_SIZE, fit.zoom, -100000, -100000);
         const centered = centerHexView(HEX_COLS, GRID_SIZE, fit.zoom);
-        expect(clamped.x).toBe(centered.x);
-        expect(clamped.y).toBe(centered.y);
-        const other = clampHexPan(b, GRID_SIZE, fit.zoom, 100000, 100000);
-        expect(other.x).toBe(centered.x);
-        expect(other.y).toBe(centered.y);
-    });
-
-    it('keeps the legacy saturating clamp untouched at interactive zooms', () => {
-        const b = hexGridPixelBounds(HEX_COLS, GRID_SIZE);
-        // VIEW_RESET_ZOOM (2) on this grid: bracket is non-inverted per axis?
-        // Assert the pure min/max law on each axis wherever it is legal.
-        const px = 400, py = 120;
-        const clamped = clampHexPan(b, GRID_SIZE, VIEW_RESET_ZOOM, px, py);
-        const viewW = b.width / VIEW_RESET_ZOOM, viewH = b.height / VIEW_RESET_ZOOM;
-        const minPanX = b.offsetX + ((GRID_SIZE - 1) / 2 || 0.5) * Math.sqrt(3) * HEX_SIZE;
-        const minPanY = b.offsetY + (GRID_SIZE / 4 - 1 || 0.5) * 1.5 * HEX_SIZE;
-        const maxPanX = b.offsetX + b.width - ((GRID_SIZE - 1) / 2 || 0.5) * Math.sqrt(3) * HEX_SIZE - viewW;
-        const maxPanY = b.offsetY + b.height - (GRID_SIZE / 4 - 1 || 0.5) * 1.5 * HEX_SIZE - viewH;
-        expect(clamped.x).toBe(maxPanX < minPanX ? b.centerX - viewW / 2 : Math.min(maxPanX, Math.max(minPanX, px)));
-        expect(clamped.y).toBe(maxPanY < minPanY ? b.centerY - viewH / 2 : Math.min(maxPanY, Math.max(minPanY, py)));
+        for (const [px, py] of [[-100000, -100000], [100000, 100000]]) {
+            const clamped = clampHexPan(b, GRID_SIZE, fit.zoom, px, py);
+            expect(clamped.x).toBe(centered.x);
+            expect(clamped.y).toBe(centered.y);
+        }
     });
 });
 
@@ -143,12 +127,9 @@ describe('clampHexPan inverted bracket (whole span fits the viewport)', () => {
 describe('isHexPanClampPinned', () => {
     const b = hexGridPixelBounds(HEX_COLS, GRID_SIZE);
 
-    it('pinned at fit-regime zoom (whole board fits the viewport)', () => {
+    it('pinned in the fit regime, mobile after zooming in past it', () => {
         const fit = fitHexView(HEX_COLS, GRID_SIZE, 1548, 895);
         expect(isHexPanClampPinned(b, GRID_SIZE, fit.zoom)).toBe(true);
-    });
-
-    it('mobile after zooming in past the fit regime (VIEW_RESET_ZOOM)', () => {
         expect(isHexPanClampPinned(b, GRID_SIZE, VIEW_RESET_ZOOM)).toBe(false);
     });
 
@@ -174,19 +155,17 @@ describe('isHexPanClampPinned', () => {
 // the no-stored-view fallback (fresh create / rejected render, before the
 // needsResetViewRef settle claims any view).
 describe('resolveHexResetView (R = restore the stored view)', () => {
-    it('stored view present → those exact bytes win, verbatim', () => {
-        // poi-showcase's real stored (mount-fit adopted) bytes.
-        const stored = { zoom: 0.9483204134366925, panX: -53.589746375870845, panY: -40.21798365122615 };
-        expect(resolveHexResetView(stored, HEX_COLS, GRID_SIZE)).toEqual(stored);
-    });
-
-    it('stored view present → never the VIEW_RESET_ZOOM-centered geometry', () => {
-        const legacy = { zoom: VIEW_RESET_ZOOM, ...centerHexView(HEX_COLS, GRID_SIZE, VIEW_RESET_ZOOM) };
-        const stored = { zoom: 3.5, panX: 210.25, panY: 44.125 };
-        const target = resolveHexResetView(stored, HEX_COLS, GRID_SIZE);
-        expect(target).toEqual(stored);
-        expect(target).not.toEqual(legacy);
-        expect(target.zoom).not.toBe(VIEW_RESET_ZOOM);
+    it('stored view present → those exact bytes win, verbatim (never legacy geometry)', () => {
+        // poi-showcase's real stored (mount-fit adopted) bytes, plus an
+        // arbitrary non-legacy view: whichever is stored is what R restores.
+        // Both differ from the VIEW_RESET_ZOOM-centered geometry, so verbatim
+        // equality also proves the legacy jump is retired.
+        for (const stored of [
+            { zoom: 0.9483204134366925, panX: -53.589746375870845, panY: -40.21798365122615 },
+            { zoom: 3.5, panX: 210.25, panY: 44.125 },
+        ]) {
+            expect(resolveHexResetView(stored, HEX_COLS, GRID_SIZE)).toEqual(stored);
+        }
     });
 
     it('no stored view (fresh doc) → the legacy centered VIEW_RESET_ZOOM fallback', () => {

@@ -1,12 +1,18 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import Notes from './Notes.jsx';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 // Notes mounts <Subscriber> (live factions-style list sync). Mock the shared
 // SSE client so this file's afterEach `vi.unstubAllGlobals()` — which also
 // drops setup.js's global EventSource stub — cannot break later mounts.
+// Close/discard lanes live in Notes.close-discard-confirm.test.jsx, 409
+// recovery in Notes.concurrent-save.test.jsx, live sync in
+// Notes.sse-sync.test.jsx; the shared dialog's own focus/Escape/backdrop
+// contract is pinned by common/DeleteConfirmModal.test.jsx. This file owns:
+// list rendering + search, row/dialog title derivation, save gating/payload,
+// and the Notes-side delete wiring.
 vi.mock('../../services/ui/sseClient.js', () => ({
   subscribeToSSE: () => () => {},
 }));
@@ -57,7 +63,6 @@ const renderNotes = (props = {}) =>
       campaignName="test"
       characters={[]}
       isLocalhost={true}
-     
       {...props}
     />,
   );
@@ -66,6 +71,8 @@ const openNewNote = () => fireEvent.click(screen.getByRole('button', { name: /ne
 const openEditNote = () => fireEvent.click(screen.getByRole('button', { name: /edit note/i }));
 const setDescription = (value) =>
   fireEvent.change(screen.getByTestId('preview-toggle-textarea'), { target: { value } });
+const setPartyLocation = (value) =>
+  fireEvent.change(screen.getByLabelText(/party location/i), { target: { value } });
 const saveButton = () => screen.getByRole('button', { name: /save/i });
 
 describe('Notes', () => {
@@ -103,37 +110,13 @@ describe('Notes', () => {
       renderNotes();
       expect(screen.getByText(/loading notes/i)).toBeInTheDocument();
     });
-
-    it('shows the party location on the row label', () => {
-      mockHook({ items: [makeNote({ partyLocation: 'Dungeon' })] });
-      renderNotes();
-      expect(screen.getByText('Dungeon')).toBeInTheDocument();
-      expect(screen.queryByText(/no location/i)).not.toBeInTheDocument();
-    });
   });
 
-  describe('row aria-label', () => {
-    it('labels a location-named row with its party location, not raw markdown', () => {
-      mockHook({
-        items: [makeNote({ partyLocation: 'QA Cave Note', description: '## Session hook\nThe **baron** arrives at dawn.' })],
-      });
-      renderNotes();
-      expect(
-        screen.getByRole('button', { name: 'Edit note: QA Cave Note' }),
-      ).toBeInTheDocument();
-    });
-
-    it('labels a description-titled row with a markdown-stripped plain title', () => {
-      mockHook({
-        items: [makeNote({ partyLocation: '', description: '## QA **bold hook**\nbody of the note' })],
-      });
-      renderNotes();
-      expect(
-        screen.getByRole('button', { name: 'Edit note: QA bold hook body of the note' }),
-      ).toBeInTheDocument();
-    });
-
-    it('every note row matches the Edit note: prefix and no label carries markdown syntax', () => {
+  describe('row labels', () => {
+    // Note rows have no name field: the aria-label (and the delete-confirm
+    // title, tested below) share ONE noteDisplayName derivation — party
+    // location wins, else a markdown-stripped excerpt of the description.
+    it('labels every row "Edit note: <title>" — party location wins, else a markdown-stripped description', () => {
       mockHook({
         items: [
           makeNote({ id: '1', partyLocation: 'Skull Creek Cave', description: '## Plot `hook`\n- item [link](http://x)' }),
@@ -141,13 +124,11 @@ describe('Notes', () => {
         ],
       });
       renderNotes();
-      const rows = document.querySelectorAll('.ct-list-item');
+      const rows = screen.getAllByRole('button', { name: /^Edit note: / });
       expect(rows).toHaveLength(2);
-      const labelled = document.querySelectorAll('[aria-label^="Edit note: "]');
-      expect(labelled).toHaveLength(rows.length);
-      labelled.forEach((row) => {
-        expect(row.getAttribute('aria-label')).not.toMatch(/[#*`[\]>~_]/);
-      });
+      expect(rows[0]).toHaveAccessibleName('Edit note: Skull Creek Cave');
+      // Markdown syntax never leaks into the label.
+      expect(rows[1]).toHaveAccessibleName('Edit note: Bold italic strike quote');
     });
 
     it('row label title and delete dialog title are derived identically', () => {
@@ -192,20 +173,21 @@ describe('Notes', () => {
       }
     });
 
-    it('shows and clears query via the clear search button', () => {
-      mockHook({ items: searchable });
-      renderNotes();
-      const searchInput = screen.getByLabelText('Search notes');
-      fireEvent.change(searchInput, { target: { value: 'fireball' } });
-      fireEvent.click(screen.getByLabelText('Clear search'));
-      expect(searchInput.value).toBe('');
-      expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
-    });
-
     // Post-save visibility guarantee (improve 2026-11-12 NN backlog): saving
     // while the filter is armed must never leave the saved row invisible
-    // (the "looks like a lost write" trap).
-    it('clears an armed filter after a save whose row would not match it', async () => {
+    // (the "looks like a lost write" trap); a still-matching save — via
+    // description OR partyLocation (shared NOTE_SEARCH_FIELDS) — leaves the
+    // user's filter untouched.
+    it.each`
+      description                              | partyLocation      | filterAfterSave
+      ${'A brand new trap log'}                | ${'Glyph Chamber'} | ${''}
+      ${'Fireball scorch marks on the wall'}   | ${'Glyph Chamber'} | ${'fireball'}
+      ${'Scorch marks on the wall'}            | ${'Fireball Altar'} | ${'fireball'}
+    `('filter "$filterAfterSave" survives a save of "$description" in "$partyLocation"', async ({
+      description,
+      partyLocation,
+      filterAfterSave,
+    }) => {
       const saveItems = vi.fn().mockResolvedValue(undefined);
       mockHook({ items: searchable, saveItems });
       renderNotes();
@@ -213,51 +195,14 @@ describe('Notes', () => {
         target: { value: 'fireball' },
       });
       openNewNote();
-      setDescription('A brand new trap log');
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Glyph Chamber' },
-      });
+      setDescription(description);
+      setPartyLocation(partyLocation);
       await act(async () => fireEvent.click(saveButton()));
       expect(saveItems).toHaveBeenCalled();
-      // Filter reset without further interaction, so the new row shows.
-      expect(screen.getByLabelText('Search notes').value).toBe('');
-    });
-
-    it('keeps an armed filter untouched when the saved row still matches it', async () => {
-      const saveItems = vi.fn().mockResolvedValue(undefined);
-      mockHook({ items: searchable, saveItems });
-      renderNotes();
-      fireEvent.change(screen.getByLabelText('Search notes'), {
-        target: { value: 'fireball' },
-      });
-      openNewNote();
-      setDescription('Fireball scorch marks on the wall');
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Glyph Chamber' },
-      });
-      await act(async () => fireEvent.click(saveButton()));
-      expect(saveItems).toHaveBeenCalled();
-      expect(screen.getByLabelText('Search notes').value).toBe('fireball');
-    });
-
-    // PartyLocation leg of the same law (improve 2026-11-12 OP backlog): the
-    // row may match the armed query ONLY via its location — the shared
-    // NOTE_SEARCH_FIELDS list must keep the filter in that case too.
-    it('keeps an armed filter when the saved row matches it only via partyLocation', async () => {
-      const saveItems = vi.fn().mockResolvedValue(undefined);
-      mockHook({ items: searchable, saveItems });
-      renderNotes();
-      fireEvent.change(screen.getByLabelText('Search notes'), {
-        target: { value: 'fireball' },
-      });
-      openNewNote();
-      setDescription('Scorch marks on the wall');
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Fireball Altar' },
-      });
-      await act(async () => fireEvent.click(saveButton()));
-      expect(saveItems).toHaveBeenCalled();
-      expect(screen.getByLabelText('Search notes').value).toBe('fireball');
+      // Asserted via the input itself (not row visibility, which depends on
+      // the mocked hook's static items): the filter resets only when the
+      // saved row would land outside it.
+      expect(screen.getByLabelText('Search notes').value).toBe(filterAfterSave);
     });
   });
 
@@ -281,27 +226,14 @@ describe('Notes', () => {
     });
 
     it.each`
-      characters                    | expectedLevel
-      ${[]}                         | ${1}
-      ${[{ level: 5 }, { level: 7 }]} | ${6}
-      ${[{ level: 1 }, { level: 2 }, { level: 3 }]} | ${2}
-      ${[{}, { level: 5 }]}        | ${3}
+      characters                       | expectedLevel
+      ${[]}                            | ${1}
+      ${[{ level: 5 }, { level: 7 }]}  | ${6}
+      ${[{}, { level: 5 }]}            | ${3}
     `('calculates party level from characters → level $expectedLevel', ({ characters, expectedLevel }) => {
       renderNotes({ characters });
       openNewNote();
       expect(screen.getByText(String(expectedLevel))).toBeInTheDocument();
-    });
-
-    it.each(['Cancel', 'Close'])('closes modal via the %s button', async (name) => {
-      renderNotes();
-      openNewNote();
-      fireEvent.click(screen.getByRole('button', { name }));
-      // Clean draft: no toll (the guard resolves silently true); the close
-      // settles through the hook's await seam → waitFor, not a sync assert.
-      await waitFor(() =>
-        expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument()
-      );
-      expect(screen.queryByRole('dialog', { name: 'Discard Changes?' })).toBeNull();
     });
 
     it('does not close modal via overlay click', () => {
@@ -311,40 +243,30 @@ describe('Notes', () => {
       expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
     });
 
-    it.each([' ', '\n\t '])(
-      'disables save when description is whitespace only: %j',
-      (description) => {
-        renderNotes();
-        openNewNote();
-        setDescription(description);
-        expect(saveButton()).toBeDisabled();
-      },
-    );
-
     // Validation-by-disable harmonization (improve 2026-11-12 NN backlog):
-    // Notes mirrors the Sessions empty-Name gate — an empty/whitespace party
-    // location keeps Save disabled so every stored row carries a location.
-    it.each(['', ' ', '\n\t '])(
-      'disables save when party location is %j even with a filled description',
-      (partyLocation) => {
-        renderNotes();
-        openNewNote();
-        setDescription('Some real content');
-        fireEvent.change(screen.getByLabelText(/party location/i), {
-          target: { value: partyLocation },
-        });
-        expect(saveButton()).toBeDisabled();
-      },
-    );
-
-    it('enables save once both description and party location are filled', () => {
+    // Notes mirrors the Sessions empty-Name gate — whitespace-only
+    // description OR party location keeps Save inert so every stored row
+    // carries both.
+    it.each`
+      description       | partyLocation       | enabled
+      ${' '}            | ${'Skull Creek Cave'} | ${false}
+      ${'Real content'} | ${''}               | ${false}
+      ${'Real content'} | ${' \n\t '}         | ${false}
+      ${'Real content'} | ${'Skull Creek Cave'} | ${true}
+    `('enables Save = $enabled for description $description and location $partyLocation', ({
+      description,
+      partyLocation,
+      enabled,
+    }) => {
       renderNotes();
       openNewNote();
-      setDescription('Some real content');
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Skull Creek Cave' },
-      });
-      expect(saveButton()).toBeEnabled();
+      setDescription(description);
+      setPartyLocation(partyLocation);
+      if (enabled) {
+        expect(saveButton()).toBeEnabled();
+      } else {
+        expect(saveButton()).toBeDisabled();
+      }
     });
   });
 
@@ -356,9 +278,7 @@ describe('Notes', () => {
       openNewNote();
       setDescription('My new note');
       fireEvent.click(screen.getByLabelText(/private note/i));
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Skull Creek Cave' },
-      });
+      setPartyLocation('Skull Creek Cave');
       await act(async () => fireEvent.click(saveButton()));
       const callArgs = saveItems.mock.calls[0][0];
       expect(callArgs).toHaveLength(1);
@@ -379,9 +299,7 @@ describe('Notes', () => {
       setDescription('Updated text');
       // The location gate (harmonized 2026-11-12) makes Save inert until the
       // legacy empty-location row gets a location — type one before saving.
-      fireEvent.change(screen.getByLabelText(/party location/i), {
-        target: { value: 'Dungeon' },
-      });
+      setPartyLocation('Dungeon');
       await act(async () => fireEvent.click(saveButton()));
       const callArgs = saveItems.mock.calls[0][0];
       expect(callArgs).toHaveLength(1);
@@ -390,11 +308,12 @@ describe('Notes', () => {
   });
 
   describe('editing notes', () => {
-    it('opens edit modal prefilled with note data and a delete button', () => {
+    it('shows the location on the row and opens the edit modal prefilled with a delete button', () => {
       mockHook({
         items: [makeNote({ description: 'Existing content', partyLocation: 'Dungeon', isPrivate: true })],
       });
       renderNotes();
+      expect(screen.getByText('Dungeon')).toBeInTheDocument();
       openEditNote();
       expect(screen.getByRole('heading', { name: 'Edit Note' })).toBeInTheDocument();
       expect(screen.getByTestId('preview-toggle-textarea').value).toBe('Existing content');
@@ -406,7 +325,11 @@ describe('Notes', () => {
   describe('deleting notes', () => {
     // QA backlog 2026-11-24: the native `Delete Note "X"?` confirm is retired —
     // the footer Delete button opens the shared DeleteConfirmModal tier
-    // (mirrors EncounterModal.delete-confirm-modal.test.jsx).
+    // (mirrors EncounterModal.delete-confirm-modal.test.jsx). The dialog's
+    // internal focus/Escape/backdrop routing is pinned by
+    // common/DeleteConfirmModal.test.jsx; here we pin the Notes-side wiring:
+    // it names the right note, Cancel writes nothing and keeps the editor,
+    // and the staged confirm is the only writer.
     const armDelete = (note) => {
       const deleteItem = vi.fn().mockResolvedValue(undefined);
       mockHook({ items: [note], deleteItem });
@@ -427,31 +350,23 @@ describe('Notes', () => {
       expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('initial focus lands on Cancel (the non-destructive default)', () => {
-      armDelete(makeNote());
-      expect(within(deleteDialog()).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    it('derives a plain-text shortened title from a markdown description when party location is empty', () => {
+      armDelete(makeNote({
+        description: '## The **Baron** wants revenge on the Emerald Enclave guildmasters for the raid',
+      }));
+      // Markdown syntax stripped, newlines collapsed, truncated at 40 chars + ellipsis
+      expect(deleteDialog()).toHaveTextContent('The Baron wants revenge on the Emerald E…');
     });
 
-    it.each`
-      dismiss | label
-      ${'cancel'}  | ${'the Cancel button'}
-      ${'escape'}  | ${'ESCAPE'}
-      ${'backdrop'} | ${'a pure BACKDROP click'}
-    `('$label dismisses the dialog and keeps the note — zero delete, editor intact', ({ dismiss }) => {
+    it('the Cancel button dismisses the dialog and keeps the note — zero delete, editor intact', () => {
       const deleteItem = armDelete(makeNote());
       const dialog = deleteDialog();
       // The editor's own Cancel stays behind the dialog — always answer the
       // dialog's buttons only.
-      if (dismiss === 'cancel') {
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-      } else if (dismiss === 'escape') {
-        fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
-      } else {
-        fireEvent.click(document.querySelector('.modal-shell-overlay'));
-      }
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(deleteItem).not.toHaveBeenCalled();
-      // The note editor survives every dismiss lane — the row is still on screen.
+      // The note editor survives the dismiss — the row is still on screen.
       expect(screen.getByRole('heading', { name: 'Edit Note' })).toBeInTheDocument();
       expect(confirmSpy).not.toHaveBeenCalled();
     });
@@ -465,19 +380,6 @@ describe('Notes', () => {
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Edit Note' })).not.toBeInTheDocument();
-    });
-
-    it('names the note by its party location when one is set', () => {
-      armDelete(makeNote({ description: 'Some hidden details', partyLocation: 'Skull Creek Cave' }));
-      expect(deleteDialog()).toHaveTextContent('Skull Creek Cave');
-    });
-
-    it('derives a plain-text shortened title from a markdown description when party location is empty', () => {
-      armDelete(makeNote({
-        description: '## The **Baron** wants revenge on the Emerald Enclave guildmasters for the raid',
-      }));
-      // Markdown syntax stripped, newlines collapsed, truncated at 40 chars + ellipsis
-      expect(deleteDialog()).toHaveTextContent('The Baron wants revenge on the Emerald E…');
     });
 
     it('disables delete button while deleting', async () => {

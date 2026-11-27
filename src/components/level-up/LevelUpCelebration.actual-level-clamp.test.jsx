@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 // Regression pin — the XP-lane celebration floors at the character's ACTUAL
 // roster level (bug-xp-lane-celebration-ignores-actual-level-fake-award).
 //
@@ -10,9 +11,9 @@
 // that EXCEEDS max(implied-from, roster level), and the banner's starting
 // level must be the roster truth, never a fabricated Level-1 origin.
 //
-// Same two-lane rig as LevelUpCelebration.test.jsx: real runtime-state
-// module, setRuntimeValue = writing client, replaceRuntimeObject = the
-// `change-<campaign>-<char>` full-bucket SSE echo other clients adopt.
+// Lane mechanics (writer notify vs SSE full-bucket echo) are pinned by
+// LevelUpCelebration.test.jsx; this file only exercises the roster floor on
+// both lanes.
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LevelUpCelebration from './LevelUpCelebration.jsx';
@@ -54,57 +55,48 @@ beforeEach(() => {
 });
 
 describe('XP-lane awards are clamped to the character\'s actual roster level', () => {
-    it('level-8 milestone char, untick Milestone + first award 26,500 XP (implies 7) → zero celebration', () => {
+    it('writing client: untick Milestone, award 26,500 (implies 7) then 34,000 (implies 8) — catch-up never celebrates', () => {
         setup([warCleric()]);
-        // The modal's Milestone toggle: setRuntimeValue(name, 'xpMode',
-        // 'experience') — the writing-client notify lane. The mode flip itself
-        // must not celebrate either.
+        // The modal's Milestone toggle: mode flips must not celebrate.
         act(() => { setRuntimeValue('War_Cleric', 'xpMode', 'experience', CAMPAIGN); });
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
-        // Apply 26,500 XP on the awarding tab.
+        // Implied level BELOW the real 8: silent adopt.
         act(() => { setRuntimeValue('War_Cleric', 'xp', 26500, CAMPAIGN); });
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        // Implied level EQUAL to the real 8: parity is not a level-up.
+        act(() => { setRuntimeValue('War_Cleric', 'xp', 34000, CAMPAIGN); });
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
-    it('the same award as an SSE full-bucket echo on another client → zero celebration', () => {
+    it('SSE-echo client: the same below-parity and parity awards are adopted silently', () => {
         setup([warCleric()]);
-        // Echo tab adopts the toggle, then the award, exactly like App's
+        // Echo tab adopts the toggle + awards exactly like App's
         // replaceRuntimeObject lane for `change-<campaign>-<char>`.
-        act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience' }); });
         act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp: 26500 }); });
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    });
-
-    it('XP merely CATCHING UP to the roster level never celebrates (sync import adopts silently)', () => {
-        setup([warCleric()]);
         act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp: 34000 }); });
-        // 34,000 implies exactly level 8 — parity with reality is not a level-up.
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
-    it('a genuine award above the actual level celebrates from the ROSTER level, never Level 1', () => {
+    it.each([
+        // 48,000 implies level 9 — one ABOVE the real 8.
+        [48000, 'Level 8 → 9'],
+        // 95,000 implies level 11: an honest multi-level jump from the roster,
+        // never a fabricated "1 → 11" origin.
+        [95000, 'Level 8 → 11'],
+    ])('a genuine award implying %i XP celebrates from the ROSTER level: %s', (xp, range) => {
         setup([warCleric()]);
         act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience' }); });
-        // 48,000 implies level 9 — one ABOVE the real 8.
-        act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp: 48000 }); });
+        act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp }); });
         const banner = screen.getByRole('status');
         expect(banner).toHaveTextContent('LEVEL UP!');
         expect(banner).toHaveTextContent('War_Cleric');
-        expect(banner).toHaveTextContent('Level 8 → 9');
-        expect(banner.textContent).not.toMatch(/Level 1 →/);
+        expect(banner).toHaveTextContent(range);
     });
 
-    it('a multi-level award above the actual level spans from the roster level', () => {
-        setup([warCleric()]);
-        act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience' }); });
-        // 95,000 implies level 11: an honest "Level 8 → 11" jump, not "1 → 11".
-        act(() => { replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp: 95000 }); });
-        expect(screen.getByRole('status')).toHaveTextContent('Level 8 → 11');
-    });
-
-    it('a true XP-lane crossing above the roster floor still floors the banner at the implied level when it is higher', () => {
-        // Runtime XP already implies 9 (roster still says 8 — wizard handoff
-        // pending); an award implying 10 must read "Level 9 → 10".
+    it('when runtime XP already implies a level ABOVE the roster, the floor is that implied level', () => {
+        // Roster still says 8 (wizard handoff pending) but stored XP implies 9;
+        // an award implying 10 must read "Level 9 → 10", not "8 → 10".
         replaceRuntimeObject('War_Cleric', { xpMode: 'experience', xp: 48000 });
         setup([warCleric()]);
         act(() => { setRuntimeValue('War_Cleric', 'xp', 64000, CAMPAIGN); });

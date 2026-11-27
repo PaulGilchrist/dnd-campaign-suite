@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Monk lane of the CharClassFeatures registry entry point
  * (class name 'Monk' → MonkFeatures). Owns display of monk-specific
  * values and runtime badges; registry dispatch itself is pinned by
- * CharClassFeatures.test.jsx — do not duplicate it here.
+ * CharClassFeatures.test.jsx — do not duplicate it here. The component's
+ * local monkExtraAttacks() does NOT route through services/character/
+ * extraAttacks.js, so the table below is component-owned, not a service
+ * derivation duplicate.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -107,12 +110,11 @@ describe('MonkFeatures', () => {
   describe('extra attacks', () => {
     // fix bug-5e-fighter-extra-attacks-second-wind-zeroed (census leg): the
     // 5e monk table carries no extra_attacks column — 5e grants a single
-    // Extra Attack at level 5. The 2024 branch reads class_levels[level - 1]
-    // exactly — never searches other entries.
+    // Extra Attack at level 5 (same branch at 5 and 20). The 2024 branch
+    // reads class_levels[level - 1] exactly — never searches other entries.
     it.each([
       ['5e below level 5', '5e', 4, [{ level: 4 }], 0],
       ['5e at level 5', '5e', 5, [{ level: 5 }], 1],
-      ['5e at level 20 (still one Extra Attack)', '5e', 20, [{ level: 20 }], 1],
       ['2024 reads class_levels[level - 1].extra_attacks', '2024', 5, [null, null, null, null, { level: 5, extra_attacks: 2 }], 2],
       ['2024 row without the column', '2024', 5, [null, null, null, null, { level: 5 }], 0],
       ['2024 never searches other entries', '2024', 10, [null, { level: 2, extra_attacks: 1 }], 0],
@@ -126,16 +128,15 @@ describe('MonkFeatures', () => {
     });
   });
 
-  it('tracks Focus Points with the max from class features, falling back to 0', () => {
-    mockMonkFeatures({ maxFocusPoints: 7 });
+  // The mock renders getMax() output, so this pins the resourceKey wiring and
+  // the `maxFocusPoints || 0` fallback in one render per case.
+  it.each([
+    ['the max from class features', 7, 'Focus Points: 7/7'],
+    ['0 when class features omit it', undefined, 'Focus Points: 0/0'],
+  ])('tracks Focus Points with %s', (_label, maxFocusPoints, expected) => {
+    mockMonkFeatures({ maxFocusPoints });
     renderMonk(monkStats(2));
-    expect(screen.getByTestId('tracked-resource-focusPoints'))
-      .toHaveTextContent('Focus Points: 7/7');
-
-    mockMonkFeatures({ maxFocusPoints: undefined });
-    render(<CharClassFeatures playerStats={monkStats(2)} campaignName={CAMPAIGN} />);
-    expect(screen.getAllByTestId('tracked-resource-focusPoints').at(-1))
-      .toHaveTextContent('Focus Points: 0/0');
+    expect(screen.getByTestId('tracked-resource-focusPoints')).toHaveTextContent(expected);
   });
 
   describe('focus save DC', () => {
@@ -167,45 +168,50 @@ describe('MonkFeatures', () => {
     });
   });
 
-  it('renders martial arts die and unarmored movement from class features', () => {
-    mockMonkFeatures({ martialArtsDie: 8, unarmoredMovementIncrease: 15 });
+  // Positive values and the `|| 0` fallbacks for the die/movement line.
+  it.each([
+    ['class-feature values', { martialArtsDie: 8, unarmoredMovementIncrease: 15 }, 'd8', '+15 ft.'],
+    ['omitted values fall back to zero', { martialArtsDie: undefined, unarmoredMovementIncrease: undefined }, 'd0', '+0 ft.'],
+  ])('renders martial arts die and unarmored movement from %s', (_label, features, expectedDie, expectedMove) => {
+    mockMonkFeatures(features);
     const section = renderMonk(monkStats(2));
-    expect(section.textContent).toContain('Martial Arts Die: d8');
-    expect(section.textContent).toContain('Unarmored Movement: +15 ft.');
+    expect(section.textContent).toContain(`Martial Arts Die: ${expectedDie}`);
+    expect(section.textContent).toContain(`Unarmored Movement: ${expectedMove}`);
   });
 
-  it('shows zero fallbacks when class features omit die and movement values', () => {
-    mockMonkFeatures({ martialArtsDie: undefined, unarmoredMovementIncrease: undefined });
+  it.each([
+    ['renders for the cloak_of_shadows effect', [{ effect: 'cloak_of_shadows' }], true],
+    ['omits for unrelated buffs', [{ effect: 'some_other_effect' }], false],
+  ])('cloak of shadows badge %s', (_label, buffs, shouldShow) => {
+    mockRuntime({ buffs });
     const section = renderMonk(monkStats(2));
-    expect(section.textContent).toContain('Martial Arts Die: d0');
-    expect(section.textContent).toContain('Unarmored Movement: +0 ft.');
-  });
-
-  describe('cloak of shadows', () => {
-    it('renders the badge when the cloak_of_shadows effect is active', () => {
-      mockRuntime({ buffs: [{ effect: 'cloak_of_shadows' }] });
-      const section = renderMonk(monkStats(2));
+    if (shouldShow) {
       expect(section.textContent).toContain('Cloak of Shadows');
-    });
-
-    it('omits the badge for unrelated buffs', () => {
-      mockRuntime({ buffs: [{ effect: 'some_other_effect' }] });
-      const section = renderMonk(monkStats(2));
+    } else {
       expect(section.textContent).not.toContain('Cloak of Shadows');
-    });
+    }
   });
 
-  describe('elemental attunement', () => {
-    it('renders the badge with the attuned element when active', () => {
-      mockRuntime({ attunementActive: true, attunementElement: 'Fire' });
+  // One gating matrix for the flag-driven badges in MonkElementalBadges:
+  // each badge shows only when its own active flag is truthy, and the
+  // epitome line names its stored type (or the "not chosen" fallback).
+  describe('runtime badge gating', () => {
+    it.each([
+      ['attunement renders the element', { attunementActive: true, attunementElement: 'Fire' }, 'toContain', 'Elemental Attunement: Fire'],
+      ['attunement flag falsy even with element stored', { attunementElement: 'Fire' }, 'not.toContain', 'Elemental Attunement'],
+      ['epitome renders its chosen type', { epitomeActive: true, epitomeType: 'Fire' }, 'toContain', 'Elemental Epitome: Resistance to Fire'],
+      ['epitome shows "not chosen" when type empty', { epitomeActive: true, epitomeType: '' }, 'toContain', 'Elemental Epitome: Resistance to not chosen'],
+      ['epitome flag falsy even with type stored', { epitomeType: 'Fire' }, 'not.toContain', 'Elemental Epitome'],
+      ['destructive stride renders its speed bonus', { destructiveActive: true }, 'toContain', 'Destructive Stride: +20 Speed'],
+      ['destructive stride flag falsy', { destructiveActive: undefined }, 'not.toContain', 'Destructive Stride'],
+    ])('%s', (_label, runtime, assertion, text) => {
+      mockRuntime(runtime);
       const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain('Elemental Attunement: Fire');
-    });
-
-    it('omits the badge when the flag is falsy even with an element stored', () => {
-      mockRuntime({ attunementActive: undefined, attunementElement: 'Fire' });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).not.toContain('Elemental Attunement');
+      if (assertion === 'toContain') {
+        expect(section.textContent).toContain(text);
+      } else {
+        expect(section.textContent).not.toContain(text);
+      }
     });
   });
 
@@ -226,40 +232,6 @@ describe('MonkFeatures', () => {
       mockRuntime({ buffs: [{ name: 'Something Else', effect: 'ice_walk' }] });
       const section = renderMonk(monkStats(2));
       expect(section.textContent).not.toContain('Stride');
-    });
-  });
-
-  describe('elemental epitome', () => {
-    it('renders the resistance with its chosen type when active', () => {
-      mockRuntime({ epitomeActive: true, epitomeType: 'Fire' });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain('Elemental Epitome: Resistance to Fire');
-    });
-
-    it('shows the "not chosen" fallback when the resistance type is empty', () => {
-      mockRuntime({ epitomeActive: true, epitomeType: '' });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain('Elemental Epitome: Resistance to not chosen');
-    });
-
-    it('omits the badge when the flag is falsy even with a resistance type stored', () => {
-      mockRuntime({ epitomeActive: undefined, epitomeType: 'Fire' });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).not.toContain('Elemental Epitome');
-    });
-  });
-
-  describe('destructive stride', () => {
-    it('renders the badge with its speed bonus when active', () => {
-      mockRuntime({ destructiveActive: true });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain('Destructive Stride: +20 Speed');
-    });
-
-    it('omits the badge when the flag is falsy', () => {
-      mockRuntime({ destructiveActive: undefined });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).not.toContain('Destructive Stride');
     });
   });
 

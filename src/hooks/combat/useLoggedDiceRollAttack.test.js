@@ -1,11 +1,12 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // BASE lane: core attack orchestration through createLogAndShow — roll → hit/miss
 // boundary → target resolution → damage/auto-damage transport → log + popup
 // essentials, plus roll-type tails (initiative/save), Indomitable Might logging,
 // and Compelled Duel / Taunting Step source gating (targetResolution.js).
 // Feature lanes are owned by siblings: blockers/sanctuary (blocked-attacks),
-// majesty trigger (target-effects-majesty*), graze, potent-cantrip, veer,
-// shield/shield-of-faith/cover AC forwarding (shield-of-faith), warding-bond.
+// majesty trigger (target-effects-majesty*), graze, ledger dice shape (§82 law,
+// ledger-dice), potent-cantrip, veer, shield/shield-of-faith/cover AC
+// forwarding (shield-of-faith), warding-bond.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -200,6 +201,9 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
                 // pre-rolled second die stays out of the ledger row.
                 rolls: [15],
                 mode: 'normal',
+                bonus: 5,
+                targetName: 'Goblin',
+                targetAc: 12,
             }));
             // Popup keeps the full pool so the GM adv/dis toggle can resolve.
             expect(popupOf(0).rolls).toEqual([15, 15]);
@@ -210,7 +214,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
             }));
         });
 
-        it('marks hit at total >= folded AC and miss below it', async () => {
+        it('marks hit at total >= folded AC, miss below it, and hit undefined with no target', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 17 });
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
             expect(popupOf(0).hit).toBe(true);
@@ -218,12 +222,10 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 21 });
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
             expect(popupOf(1).hit).toBe(false);
-        });
 
-        it('leaves hit undefined when no target is resolved', async () => {
             getTargetFromAttacker.mockReturnValue(null);
             await fn('Longsword', 5, 'attack', {});
-            expect(popupOf().hit).toBeUndefined();
+            expect(popupOf(2).hit).toBeUndefined();
         });
 
         it('transports context.extraAttackSwing onto the popup, absent when unchained', async () => {
@@ -276,26 +278,25 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
     });
 
     describe('critical range', () => {
-        it('marks isCrit when the roll falls inside an extended critical range', async () => {
-            rollD20.mockReturnValueOnce(19);
+        it('crits inside an extended range (hit or miss) and never outside it', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 10 });
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', criticalRange: '19-20' });
-            const popup = popupOf();
-            expect(popup.hit).toBe(true);
-            expect(popup.isCrit).toBe(true);
-        });
-
-        it('keeps the crit inside the range even when the total would miss, and never crits outside it', async () => {
             rollD20.mockReturnValueOnce(19);
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', criticalRange: '19-20' });
+            const insideHit = popupOf(0);
+            expect(insideHit.hit).toBe(true);
+            expect(insideHit.isCrit).toBe(true);
+
+            // the natural die crits even when the total would otherwise miss
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 30 });
+            rollD20.mockReturnValueOnce(19);
             await fn('Longsword', 0, 'attack', { targetName: 'Goblin', criticalRange: '19-20' });
-            const critMiss = popupOf();
+            const critMiss = popupOf(1);
             expect(critMiss.hit).toBe(false);
             expect(critMiss.isCrit).toBe(true);
 
             rollD20.mockReturnValueOnce(18);
             await fn('Longsword', 0, 'attack', { targetName: 'Goblin', criticalRange: '19-20' });
-            const outside = popupOf(1);
+            const outside = popupOf(2);
             expect(outside.isCrit).toBe(false);
         });
     });
@@ -376,8 +377,9 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
     describe('Indomitable Might', () => {
         const mightLogs = () => addEntry.mock.calls.filter(([, e]) => e.abilityName === 'Indomitable Might');
 
-        it('logs the STR replacement on ability checks and saving throws', async () => {
+        it('logs the STR replacement when the total falls below strScore, and stays silent otherwise', async () => {
             getTargetFromAttacker.mockReturnValue(null);
+            // applied: totals below the STR score on checks and saves
             rollD20.mockReturnValueOnce(3).mockReturnValueOnce(8);
             await fn('Athletics', 1, 'check', { strCheckReplace: true, strScore: 18 });
             rollD20.mockReturnValueOnce(2).mockReturnValueOnce(5);
@@ -392,10 +394,9 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
                     description: expect.stringContaining('Indomitable Might'),
                 }));
             }
-        });
 
-        it('does not log when the total beats strScore or no replace flag is set', async () => {
-            getTargetFromAttacker.mockReturnValue(null);
+            // not applied: total already beats strScore, or no replace flag
+            vi.clearAllMocks();
             rollD20.mockReturnValueOnce(18).mockReturnValueOnce(20);
             await fn('Athletics', 5, 'check', { strCheckReplace: true, strScore: 14 });
             rollD20.mockReturnValueOnce(3).mockReturnValueOnce(8);
@@ -425,23 +426,22 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
             }
         });
 
-        it('leaves the roll normal when attacking the source or when the effect is elsewhere', async () => {
+        it('leaves the roll normal when attacking the source, when the effect is elsewhere, or when cancelling an existing advantage', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Elarielle', ac: 12 });
             mockTargetEffects([{ target: defaultCharacterName, effect: 'compelled_duel', source: 'Elarielle' }]);
             await fn('Longsword', 5, 'attack', { targetName: 'Elarielle' });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ mode: 'normal' }));
+            expect(deps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({ mode: 'normal' }));
 
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
             mockTargetEffects([{ target: 'SomebodyElse', effect: 'compelled_duel', source: 'Elarielle' }]);
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ mode: 'normal' }));
-        });
+            expect(deps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({ mode: 'normal' }));
 
-        it('cancels an existing advantage when attacking a creature other than the source', async () => {
+            // advantage against a non-source is cancelled down to normal
             mockTargetEffects([{ target: defaultCharacterName, effect: 'compelled_duel', source: 'Elarielle' }]);
             rollD20.mockReturnValueOnce(9).mockReturnValueOnce(3);
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'advantage' });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            expect(deps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
                 mode: 'normal',
                 total: 9,
             }));

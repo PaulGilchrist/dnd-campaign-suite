@@ -1,14 +1,16 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
-// SP-125 attack-lane AC-fold authority: createLogAndShow reads the wardee's
-// warding_bond acBonus (+1 AC per public/data/spells.json) via the mocked
-// getWardingBondAcBonus getter, stamps ctx._wardingBondAcBonus, and
-// hitResolution folds it into effectiveAc (useLoggedDiceRollAttack.js:512 →
-// hitResolution.js computeEffectiveAc). The folded AC + wardingBondAcBonus
-// must reach BOTH the popup and log payloads so computedHit can never flip a
-// resolved MISS into a damage-applying HIT (mirrors the SP-105 Shield of
-// Faith forwarding pattern). Getter internals: loggedDiceRollUtils.warding-
-// bond.test.js. Casting/slot gates: spellGates.wardingBond.test.js — do not
-// re-test either here.
+// @maintained-by-ai 2026-11-26
+// SP-125 attack-lane AC-fold authority: createLogAndShow queries the ward by
+// DEFENDER name + campaign via the mocked getWardingBondAcBonus (wardee's
+// warding_bond acBonus, +1 AC per public/data/spells.json), stamps
+// ctx._wardingBondAcBonus, and hitResolution folds it into effectiveAc
+// (useLoggedDiceRollAttack.js:559 → hitResolution.js:290 computeEffectiveAc).
+// The folded AC + wardingBondAcBonus must reach BOTH the popup and log
+// payloads so computedHit can never flip a resolved MISS into a damage-
+// applying HIT (mirrors the SP-105 Shield of Faith forwarding pattern; the
+// verdict flows via ctx/state, no top-level seam args are pinned). AC-badge
+// DISPLAY: CharSummary-BuffEffects. Stacking: BadgesAndAC. Getter internals:
+// loggedDiceRollUtils.warding-bond.test.js. Casting/slot gates:
+// spellGates.wardingBond.test.js — none of those are re-tested here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -210,28 +212,27 @@ describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
         getWardingBondAcBonus.mockReturnValue(0); // reset boundary-stamp leakage between tests
     });
 
-    it('control: no ward → effectiveAc is base AC 10 and total 12 hits', async () => {
+    it('queries the ward by defender, folds +1 AC across the hit boundary both ways, forwards to popup and log', async () => {
+        // Control: no ward → channel reads 0, effectiveAc stays at base 10.
         await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
+        // Defender-scoped lookup: ward is the wardee's buff, never the attacker's.
+        expect(getWardingBondAcBonus).toHaveBeenCalledWith('EvasiveFighter', 'test-campaign');
+        const control = deps.setPopupHtml.mock.calls[0][0];
+        expect(control.targetAc).toBe(10);
+        expect(control.effectiveAc).toBe(10);
+        expect(control.wardingBondAcBonus).toBe(0);
+        expect(control.hit).toBe(true);
 
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.targetAc).toBe(10);
-        expect(popup.effectiveAc).toBe(10);
-        expect(popup.wardingBondAcBonus).toBe(0);
-        expect(popup.hit).toBe(true);
-    });
-
-    it('folds warding_bond acBonus into effectiveAc (AC 11) and flips boundary total 11 to HIT', async () => {
+        // Ward live: total 8 + 3 = 11 meets folded AC 11 — exact-boundary HIT.
         getWardingBondAcBonus.mockReturnValue(1);
-        rollD20.mockReturnValue(8); // 8 + 3 = 11 — MISS vs AC 10 control would hit; vs AC 11 exact boundary
+        rollD20.mockReturnValue(8);
         await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.targetAc).toBe(10);
-        expect(popup.effectiveAc).toBe(11);
-        expect(popup.wardingBondAcBonus).toBe(1);
-        expect(popup.hit).toBe(true);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        const hit = deps.setPopupHtml.mock.calls[1][0];
+        expect(hit.targetAc).toBe(10);
+        expect(hit.effectiveAc).toBe(11);
+        expect(hit.wardingBondAcBonus).toBe(1);
+        expect(hit.hit).toBe(true);
+        expect(deps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
             type: 'roll',
             rollType: 'attack',
             targetAc: 10,
@@ -239,15 +240,18 @@ describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
             wardingBondAcBonus: 1,
             hit: true,
         }));
-    });
 
-    it('refuses at AC 11 boundary: total 10 now misses', async () => {
-        getWardingBondAcBonus.mockReturnValue(1);
-        rollD20.mockReturnValue(7); // 7 + 3 = 10 < 11
+        // Refusal: total 7 + 3 = 10 < folded AC 11 — the SAME total would
+        // HIT base AC 10, so a miss proves the comparison uses the folded AC.
+        rollD20.mockReturnValue(7);
         await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
+        const miss = deps.setPopupHtml.mock.calls[2][0];
+        expect(miss.effectiveAc).toBe(11);
+        expect(miss.wardingBondAcBonus).toBe(1);
+        expect(miss.hit).toBe(false);
 
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(11);
-        expect(popup.hit).toBe(false);
+        // Census: one ward lookup and one log row per roll, no doubles.
+        expect(getWardingBondAcBonus).toHaveBeenCalledTimes(3);
+        expect(deps.logEntry).toHaveBeenCalledTimes(3);
     });
 });

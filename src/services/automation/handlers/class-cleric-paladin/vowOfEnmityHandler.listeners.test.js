@@ -1,12 +1,15 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic: mocks the runtime-state, combat-context, and log seams at
 // module boundaries; vi.resetModules per test isolates the un-removable
-// window listener that setupVowTransferListener registers. Pins the stable
-// listener contract (vowOfEnmityTarget/vowOfEnmityCostPaid/activeBuffs clears
-// consumed by restRules, useInitiativeEffects, ConditionEffectBadges) plus the
-// level/maxCharges/HP field-shape fallbacks shared by handle and
-// applyTargetChoice. Sibling lanes: vowOfEnmityHandler.test.js owns handle()
-// entry; vowOfEnmityHandler.applyTargetChoice.test.js owns applyTargetChoice.
+// window listener that setupVowTransferListener registers (SOURCE NOTE: the
+// source adds a listener per activation with NO removal handle — the listener
+// lane here pins the subscribe contract, one write-set per dispatch, and the
+// persisted re-fire; a teardown fix must re-seam these censuses). Listener
+// assertions use full-shape ordered mock.calls censuses so any double-dispatch
+// or extra write fails. Also pins the level/maxCharges/HP field-shape
+// fallbacks shared by handle() and applyTargetChoice(). Sibling lanes:
+// vowOfEnmityHandler.test.js owns handle() entry;
+// vowOfEnmityHandler.applyTargetChoice.test.js owns applyTargetChoice.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -18,6 +21,14 @@ const campaignName = 'test-campaign';
 const vowBuff = { name: 'Vow of Enmity', effect: 'vow_of_enmity', duration: '1_minute', source: 'Paladin1' };
 const blessBuff = { name: 'Bless', effect: 'bless', source: 'Cleric1' };
 const markedBuff = { name: "Hunter's Mark", effect: 'hunters_mark', source: 'Ranger1' };
+
+// The exact buff object activateVowOfEnmity() appends to the target store.
+const activationBuff = {
+    name: 'Vow of Enmity',
+    effect: 'vow_of_enmity',
+    duration: '1_minute',
+    source: 'Paladin1',
+};
 
 // Imported fresh per test (see beforeEach) so spies attach to the same
 // module instances the reloaded handler resolves.
@@ -90,6 +101,7 @@ beforeEach(async () => {
     damageUtils = await import('../../../rules/combat/damageUtils.js');
     ({ addEntry } = await import('../../../ui/logService.js'));
     addEntry.mockResolvedValue({});
+    addEntry.mockClear();
 });
 
 afterEach(() => {
@@ -101,22 +113,34 @@ afterEach(() => {
 describe('vowOfEnmityHandler fallbacks', () => {
 
     it('handle: level undefined with empty class_levels falls back to level 1 and default maxCharges 2', async () => {
-        setupRuntime(); // no stored charges → currentCharges = maxCharges
+        setupRuntime(); // no stored charges → currentCharges = maxCharges = 2
         mockCombat({ creatures: [{ name: 'Goblin' }] }, { name: 'Goblin' });
 
         const ps = { name: 'Paladin1', level: undefined, class: { class_levels: [] } };
         const result = await handle(makeAction(), ps, campaignName);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('activated against Goblin');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'channelDivinityCharges', 1, campaignName,
-        );
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Vow of Enmity',
+                automationType: 'vow_of_enmity',
+                description: 'Vow of Enmity activated against Goblin. (1 Channel Divinity charge remaining).',
+                automation: { type: 'vow_of_enmity' },
+            },
+        });
+        // Full activation write census: default-2 consumption plus every
+        // target/cost/buff write in source order.
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['Paladin1', 'channelDivinityCharges', 1, campaignName],
+            ['Paladin1', 'vowOfEnmityTarget', 'Goblin', campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', true, campaignName],
+            ['Goblin', 'activeBuffs', [activationBuff], campaignName],
+        ]);
     });
 
-    it('applyTargetChoice: channel_divinity maxCharges used when stored charges are null', async () => {
+    it('applyTargetChoice: stored charges null → maxCharges from channel_divinity', async () => {
         setupRuntime();
-        mockCombat({ creatures: [{ name: 'Orc' }] });
 
         const ps = makePlayerStats({
             level: 3,
@@ -125,62 +149,68 @@ describe('vowOfEnmityHandler fallbacks', () => {
         const result = await applyTargetChoice(makeAction(), ps, campaignName, 'Orc');
 
         expect(result.type).toBe('popup');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'channelDivinityCharges', 2, campaignName,
+        expect(result.payload.description).toBe(
+            'Vow of Enmity activated against Orc. (2 Channel Divinity charges remaining).',
         );
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['Paladin1', 'channelDivinityCharges', 2, campaignName],
+            ['Paladin1', 'vowOfEnmityTarget', 'Orc', campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', true, campaignName],
+            ['Orc', 'activeBuffs', [activationBuff], campaignName],
+        ]);
     });
 
-    it('free reactivation when previous target at 0 HP via hit_points.current format', async () => {
+    it('free reactivation for every defeated-HP shape with ZERO charge writes', async () => {
+        // Branches of `currentHp ?? hit_points?.current ?? 0` in
+        // resolveVowReactivation plus the same-target-name description arm.
         setupRuntime({ vowOfEnmityTarget: 'Goblin', vowOfEnmityCostPaid: true, activeBuffs: [] });
-        mockCombat({ creatures: [{ name: 'Goblin', hit_points: { current: 0 } }, { name: 'Orc', currentHp: 10 }] }, { name: 'Orc' });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('reactivated against Orc');
-        expect(result.payload.description).toContain('Previous target defeated');
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-            'Paladin1', 'channelDivinityCharges', expect.any(Number), campaignName,
+        mockCombat(
+            { creatures: [{ name: 'Goblin', hit_points: { current: 0 } }, { name: 'Orc', currentHp: 10 }] },
+            { name: 'Orc' },
         );
-    });
+        const viaHitPoints = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(viaHitPoints.payload.description).toBe(
+            'Vow of Enmity reactivated against Orc. Transferred from Goblin. Previous target defeated — no Channel Divinity cost.',
+        );
 
-    it('free reactivation when previous target has neither HP field (fallback 0 = defeated)', async () => {
         setupRuntime({ vowOfEnmityTarget: 'Goblin', vowOfEnmityCostPaid: true, activeBuffs: [] });
-        mockCombat({ creatures: [{ name: 'Goblin' }, { name: 'Orc', currentHp: 10 }] }, { name: 'Orc' });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('reactivated against Orc');
-        expect(result.payload.description).toContain('Previous target defeated');
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-            'Paladin1', 'channelDivinityCharges', expect.any(Number), campaignName,
+        mockCombat(
+            { creatures: [{ name: 'Goblin' }, { name: 'Orc', currentHp: 10 }] },
+            { name: 'Orc' },
         );
-    });
+        const viaFallback = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(viaFallback.payload.description).toBe(
+            'Vow of Enmity reactivated against Orc. Transferred from Goblin. Previous target defeated — no Channel Divinity cost.',
+        );
 
-    it('free reactivation against the same target name does not mention transfer', async () => {
+        // Same target name: no "Transferred" clause at all.
         setupRuntime({ vowOfEnmityTarget: 'Goblin', vowOfEnmityCostPaid: true, activeBuffs: [] });
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] }, { name: 'Goblin' });
+        const sameTarget = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(sameTarget.payload.description).toBe(
+            'Vow of Enmity reactivated against Goblin. Previous target defeated — no Channel Divinity cost.',
+        );
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('reactivated against Goblin');
-        expect(result.payload.description).toContain('Previous target defeated');
-        expect(result.payload.description).not.toContain('Transferred');
+        // Zero-write census across all three free reactivations.
+        expect(runtimeState.setRuntimeValue.mock.calls.every(c => c[1] !== 'channelDivinityCharges')).toBe(true);
     });
 
-    it('cost message pluralizes charges and reports depletion', async () => {
-        setupRuntime({ channelDivinityCharges: 2, activeBuffs: [] });
+    it('cost message: plural, singular, and depleted charge counts', async () => {
+        setupRuntime({ channelDivinityCharges: 3, activeBuffs: [] });
         mockCombat({ creatures: [{ name: 'Goblin' }] }, { name: 'Goblin' });
+        const plural = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(plural.payload.description).toBe(
+            'Vow of Enmity activated against Goblin. (2 Channel Divinity charges remaining).',
+        );
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe(
+        setupRuntime({ channelDivinityCharges: 2, activeBuffs: [] });
+        const singular = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(singular.payload.description).toBe(
             'Vow of Enmity activated against Goblin. (1 Channel Divinity charge remaining).',
         );
 
         setupRuntime({ channelDivinityCharges: 1, activeBuffs: [] });
-
         const depleted = await handle(makeAction(), makePlayerStats(), campaignName);
-
         expect(depleted.payload.description).toBe(
             'Vow of Enmity activated against Goblin. (Channel Divinity depleted).',
         );
@@ -189,12 +219,14 @@ describe('vowOfEnmityHandler fallbacks', () => {
     it('logs error to console when addEntry rejects (activation still succeeds)', async () => {
         setupRuntime({ channelDivinityCharges: 2, activeBuffs: [] });
         mockCombat({ creatures: [{ name: 'Goblin' }] }, { name: 'Goblin' });
-        addEntry.mockRejectedValueOnce(new Error('log failed'));
+        addEntry.mockRejectedValue(new Error('log failed'));
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(result.type).toBe('popup');
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
         expect(consoleSpy).toHaveBeenCalledWith(
             '[vowOfEnmity] Error logging:',
             expect.any(Error),
@@ -207,7 +239,8 @@ describe('vowOfEnmityHandler fallbacks', () => {
 describe('vowOfEnmityHandler setupVowTransferListener', () => {
 
     // Activate a vow against Goblin so the listener is registered, then wipe
-    // the activation writes so post-dispatch assertions see only the listener.
+    // the activation writes so post-dispatch census assertions see only the
+    // listener's writes.
     async function registerVow(initial = {}) {
         const state = setupRuntime({ channelDivinityCharges: 1, ...initial });
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 5 }] }, { name: 'Goblin' });
@@ -217,8 +250,23 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
         return state;
     }
 
+    it('activation subscribes exactly one combat-summary-updated window listener', async () => {
+        // Subscribe contract: registerVow-style activation adds one listener.
+        // SOURCE NOTE: there is no removal lane — repeat activations stack
+        // additional listeners (reported defect; not pinned as desired behavior).
+        setupRuntime({ channelDivinityCharges: 2, activeBuffs: [] });
+        mockCombat({ creatures: [{ name: 'Goblin', currentHp: 5 }] }, { name: 'Goblin' });
+        const addSpy = vi.spyOn(window, 'addEventListener');
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(addSpy).toHaveBeenCalledTimes(1);
+        expect(addSpy).toHaveBeenCalledWith('combat-summary-updated', expect.any(Function));
+    });
+
     it('clears vow and filters vow_of_enmity from attacker and target buffs, preserving unrelated buffs', async () => {
-        // fix#354(b) sites 3+4 valid-arms: validate-first keeps filter+write VERBATIM.
+        // fix#354(b) sites 3+4 valid-arms: validate-first keeps filter+write
+        // VERBATIM. Full ordered census — one write-set per dispatch.
         await registerVow({
             'Paladin1:activeBuffs:test-campaign': [vowBuff, blessBuff],
             'Goblin:activeBuffs:test-campaign': [markedBuff],
@@ -227,40 +275,34 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] });
         await dispatchSummaryUpdate();
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'vowOfEnmityTarget', null, campaignName,
-        );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'vowOfEnmityCostPaid', null, campaignName,
-        );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'activeBuffs', [blessBuff], campaignName,
-        );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Goblin', 'activeBuffs', [markedBuff], campaignName,
-        );
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['Paladin1', 'vowOfEnmityTarget', null, campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', null, campaignName],
+            ['Paladin1', 'activeBuffs', [blessBuff], campaignName],
+            ['Goblin', 'activeBuffs', [markedBuff], campaignName],
+        ]);
     });
 
-    it('clears vow using hit_points.current format', async () => {
-        await registerVow();
+    it('listener persists after clearing: re-fires once per dispatch for hit_points.current then missing-HP shapes', async () => {
+        // Pins the listener's `currentHp ?? hit_points?.current ?? 0` fallback
+        // chain and its no-teardown persistence: with no removal handle, each
+        // later dispatch re-writes exactly one clear set (never two).
+        await registerVow({ 'Paladin1:activeBuffs:test-campaign': [vowBuff] });
+        const expectedWrites = [
+            ['Paladin1', 'vowOfEnmityTarget', null, campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', null, campaignName],
+            ['Paladin1', 'activeBuffs', [], campaignName],
+            ['Goblin', 'activeBuffs', [], campaignName],
+        ];
 
         mockCombat({ creatures: [{ name: 'Goblin', hit_points: { current: 0 } }] });
         await dispatchSummaryUpdate();
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual(expectedWrites);
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'vowOfEnmityTarget', null, campaignName,
-        );
-    });
-
-    it('clears vow using fallback 0 when both HP fields are missing', async () => {
-        await registerVow();
-
+        runtimeState.setRuntimeValue.mockClear();
         mockCombat({ creatures: [{ name: 'Goblin' }] });
         await dispatchSummaryUpdate();
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'vowOfEnmityTarget', null, campaignName,
-        );
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual(expectedWrites);
     });
 
     it('FLIPPED #1348 (fix#354(b) sites 3+4/4): missing activeBuffs stores are LOUD-refused with ZERO writes — no more tolerant-clobber []', async () => {
@@ -280,6 +322,7 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] });
         await dispatchSummaryUpdate();
 
+        expect(consoleSpy).toHaveBeenCalledTimes(2);
         expect(consoleSpy).toHaveBeenCalledWith(
             '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
             'Paladin1', null,
@@ -288,17 +331,12 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
             '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
             'Goblin', null,
         );
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-            'Paladin1', 'activeBuffs', expect.anything(), campaignName,
-        );
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-            'Goblin', 'activeBuffs', expect.anything(), campaignName,
-        );
-        // Vow-completes-on-death latch clears are unrelated keys: still land.
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'vowOfEnmityTarget', null, campaignName,
-        );
-        consoleSpy.mockRestore();
+        // Full census: only the vow-completes-on-death latch clears land; both
+        // activeBuffs legs wrote nothing.
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['Paladin1', 'vowOfEnmityTarget', null, campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', null, campaignName],
+        ]);
     });
 
     it('non-array truthy attacker store never blocks the valid target clear (per-leg independent guards, fix#354(b))', async () => {
@@ -311,18 +349,18 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] });
         await dispatchSummaryUpdate();
 
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
         expect(consoleSpy).toHaveBeenCalledWith(
             '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
             'Paladin1', 'corrupt',
         );
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-            'Paladin1', 'activeBuffs', expect.anything(), campaignName,
-        );
-        // Valid leg rewrites verbatim: vow markers stripped, foreign buff kept.
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Goblin', 'activeBuffs', [markedBuff], campaignName,
-        );
-        consoleSpy.mockRestore();
+        // Full census: refused attacker leg absent, valid leg rewrites verbatim
+        // (vow markers stripped, foreign buff kept) in source order.
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['Paladin1', 'vowOfEnmityTarget', null, campaignName],
+            ['Paladin1', 'vowOfEnmityCostPaid', null, campaignName],
+            ['Goblin', 'activeBuffs', [markedBuff], campaignName],
+        ]);
     });
 
     it('does nothing when combat context is null', async () => {

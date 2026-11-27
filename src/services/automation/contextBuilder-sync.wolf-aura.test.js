@@ -1,15 +1,26 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // CLA-283 lane: async aura utils MUST be awaited at gridless sync consumers —
 // non-awaited reads of .advantage/.disadvantage off a Promise were always
 // undefined, so Wolf/Lion aura mode never reached forcedMode. Canonical home
-// for the resolveWolfAura/resolveLionAura sync lane. forcedMode passthrough/
-// preservation lives in contextBuilder-sync.test.js, the WM-008 roll-only vex
-// consume contract in contextBuilder-sync.wm008-vex-consume.test.js, duplicity
-// in contextBuilder-sync.improved-duplicity.test.js, chain-wide WHO-WINS
-// priority in contextBuilder-sync.advantage-priority.test.js.
+// for the resolveWolfAura/resolveLionAura sync lane: one it.each table pins
+// both auras × both faces (gridless lenient skipRangeCheck:true with the
+// honest "proximity unmeasured (gridless) — GM-enforced" reason, and active-
+// map measured skipRangeCheck:false with the "within 5 ft" reason — plus the
+// bug-wolf-aura-unmeasured-on-pc-roller-lane gate census proving ALL three
+// sync aura resolvers (wolf/duplicity/lion) drop leniency when '__map__' is
+// active and refusals leave mode normal. Corona attack-lane absence is owned
+// by contextBuilder-sync.corona-attack-lane.test.js (stronger, 4 faces).
+// forcedMode passthrough/preservation lives in contextBuilder-sync.test.js,
+// the WM-008 roll-only vex consume contract in
+// contextBuilder-sync.wm008-vex-consume.test.js, duplicity in
+// contextBuilder-sync.improved-duplicity.test.js, chain-wide WHO-WINS priority
+// in contextBuilder-sync.advantage-priority.test.js.
 // Resolver order: resolveWolfAura sits above the WM-008 one-shot consume rows in
 // resolveAttackModeResolvers, so a live Wolf aura short-circuits the loop first
 // and must leave the freshly-stamped vex te untouched (roll-only consumption).
+// Honesty precedent (bug-adv-chip-borrows-range-reason / bug-wolf-gridless-
+// chip-claims-within-5ft-unmeasured / lion twin 2cd75b9de / 3db9da635): the
+// gridless face must NOT claim "within 5 ft" — proximity was never measured.
 // Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
@@ -56,7 +67,6 @@ const { getInnateSorceryBonus } = await import('../combat/buffs/buffService.js')
 const { getWolfAdvantageAgainst } = await import('../combat/auras/wolfAuraUtils.js');
 const { getDuplicityAdvantageAgainst } = await import('../combat/auras/duplicityAuraUtils.js');
 const { getLionDisadvantageAgainst } = await import('../combat/auras/lionAuraUtils.js');
-const { getCoronaSaveDisadvantage } = await import('../combat/auras/coronaAuraUtils.js');
 const { isActive: isAvengingAngelActive, isAuraTarget } = await import('./handlers/class-cleric-paladin/avengingAngelHandler.js');
 
 const attack = { name: 'Eldritch Blast', damage: '1d10', damageType: 'Force', hitBonus: 8, weaponType: 'ranged' };
@@ -80,35 +90,76 @@ function setup() {
   getWolfAdvantageAgainst.mockResolvedValue({ advantage: false });
   getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: false });
   getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: false });
-  getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: false });
   isAvengingAngelActive.mockReturnValue(false);
   isAuraTarget.mockReturnValue(false);
 }
 
-describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () => {
+// '__map__' mirrors what MapContextSync stamps when a map is activated; every
+// other runtime read stays undefined (no buffs/tes) exactly like setup().
+function activeMap(name = 'battle-arena') {
+  getRuntimeValue.mockImplementation((entity, key) => (
+    entity === '__map__' && key === 'activeMapName' ? name : undefined
+  ));
+}
+
+// Each arm() MUST use mockResolvedValue: the utils are async (CLA-283 — a
+// non-awaited read of .advantage off a Promise is always undefined).
+const auraFaces = [
+  {
+    face: 'wolf aura, gridless lenient face',
+    hasMap: false,
+    util: getWolfAdvantageAgainst,
+    arm: () => getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' }),
+    expectedArgs: { attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: 'test-campaign', skipRangeCheck: true },
+    expectedMode: 'advantage',
+    expectedReason: 'Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced',
+  },
+  {
+    face: 'lion aura, gridless lenient face',
+    hasMap: false,
+    util: getLionDisadvantageAgainst,
+    arm: () => getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'DraconicDragon' }),
+    expectedArgs: { attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: 'test-campaign', skipRangeCheck: true },
+    expectedMode: 'disadvantage',
+    expectedReason: 'Lion rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced',
+  },
+  {
+    face: 'wolf aura, active-map measured face',
+    hasMap: true,
+    util: getWolfAdvantageAgainst,
+    arm: () => getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' }),
+    expectedArgs: { attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: 'test-campaign', skipRangeCheck: false },
+    expectedMode: 'advantage',
+    expectedReason: 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft',
+  },
+  {
+    face: 'lion aura, active-map measured face',
+    hasMap: true,
+    util: getLionDisadvantageAgainst,
+    arm: () => getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' }),
+    expectedArgs: { attackerName: 'HexWarlock', targetName: 'Thug 1', campaignName: 'test-campaign', skipRangeCheck: false },
+    expectedMode: 'disadvantage',
+    expectedReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
+  },
+];
+
+describe('contextBuilder-sync - Wolf/Lion aura awaited at both faces (CLA-283)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('awaits getWolfAdvantageAgainst and sets forcedMode advantage when a Wolf ally is live', async () => {
-    setup();
-    getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' });
+  it.each(auraFaces)(
+    '$face awaits the util, stamps $expectedMode and threads the honest reason',
+    async ({ hasMap, util, arm, expectedArgs, expectedMode, expectedReason }) => {
+      setup();
+      if (hasMap) activeMap();
+      arm();
 
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
+      const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
-    expect(getWolfAdvantageAgainst).toHaveBeenCalledWith({
-      attackerName: 'HexWarlock',
-      targetName: 'Thug 1',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result.forcedMode).toBe('advantage');
-    // bug-adv-chip-borrows-range-reason: the sync wolf resolver must thread a
-    // reason (monster-card-lane buildLionAuraReason parity) so the popup's
-    // Adv chip prints the aura instead of borrowing a rangeReason.
-    // bug-wolf-gridless-chip-claims-within-5ft-unmeasured: gridless lenient
-    // face must NOT claim "within 5 ft" — proximity was never measured (lion
-    // twin 2cd75b9de / 3db9da635 honesty precedent).
-    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
-  });
+      expect(util).toHaveBeenCalledWith(expectedArgs);
+      expect(result.forcedMode).toBe(expectedMode);
+      expect(result.advantageReason).toBe(expectedReason);
+    }
+  );
 
   it('leaves one-shot vex te untouched when Wolf aura wins above the WM-008 consume rows', async () => {
     setup();
@@ -125,24 +176,6 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     expect(teWrite()).toBeUndefined();
     expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'test-campaign');
   });
-
-  it('awaits getLionDisadvantageAgainst and sets forcedMode disadvantage when a Lion ally is live', async () => {
-    setup();
-    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'DraconicDragon' });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(getLionDisadvantageAgainst).toHaveBeenCalledWith({
-      attackerName: 'HexWarlock',
-      targetName: 'Thug 1',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result.forcedMode).toBe('disadvantage');
-    // Attribution parity (2026-11-03 QA backlog): gridless lenient face must
-    // NOT claim "within 5 ft" — proximity was never measured (3db9da635 tail).
-    expect(result.advantageReason).toBe('Lion rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
-  });
 });
 
 // bug-wolf-aura-unmeasured-on-pc-roller-lane: with an ACTIVE map the sync lane
@@ -150,99 +183,36 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
 // lenient stamp pre-empted the measured aura pass in contextBuilder-map.js
 // (accumulateAuraCounts is guarded by base.forcedMode === undefined), so a Wolf
 // bearer anywhere on a positioned map granted advantage at 15/25 ft distances.
-// The gridless faces above (getRuntimeValue → undefined, no '__map__') pin that
-// skipRangeCheck:true leniency stays the no-map fallback.
-describe('contextBuilder-sync - active map MEASURES the aura axes (skipRangeCheck gate)', () => {
+// The table's gridless rows above pin that skipRangeCheck:true leniency stays
+// the no-map fallback.
+describe('contextBuilder-sync - active map MEASURES every aura axis (skipRangeCheck gate)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  // '__map__' mirrors what MapContextSync stamps when a map is activated; every
-  // other runtime read stays undefined (no buffs/tes) exactly like setup().
-  function activeMap(name = 'battle-arena') {
-    getRuntimeValue.mockImplementation((entity, key) => (
-      entity === '__map__' && key === 'activeMapName' ? name : undefined
-    ));
-  }
-
-  it('far-face: active map → wolf consulted measured; a refused measurement leaves mode normal', async () => {
+  it('active map → wolf/duplicity/lion all consulted measured (never lenient) and refusals leave mode normal', async () => {
     setup();
     activeMap();
-    getWolfAdvantageAgainst.mockResolvedValue({ advantage: false });
 
     const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
-    expect(getWolfAdvantageAgainst).toHaveBeenCalledWith({
+    // Duplicity takes no targetName (attacker-only illusion adjacency).
+    expect(getDuplicityAdvantageAgainst).toHaveBeenCalledWith({
       attackerName: 'HexWarlock',
-      targetName: 'Thug 1',
       campaignName: 'test-campaign',
       skipRangeCheck: false,
     });
-    expect(result.forcedMode).toBeUndefined();
-  });
-
-  it('near-face: active map + measured wolf advantage still stamps forcedMode advantage', async () => {
-    setup();
-    activeMap();
-    getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
-    expect(result.forcedMode).toBe('advantage');
-    // Measured face keeps the honest "within 5 ft" prose byte-identical
-    // (isWithinRange compared bearer↔target) — mirrors the lion twin pin below.
-    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
-  });
-
-  it('lion twin: active map + refused measurement no longer stamps a lenient disadvantage', async () => {
-    setup();
-    activeMap();
-    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: false });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(getLionDisadvantageAgainst).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
-    expect(result.forcedMode).toBeUndefined();
-  });
-
-  it('lion twin: active map + MEASURED disadvantage threads the accurate within-5-ft reason', async () => {
-    setup();
-    activeMap();
-    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(result.forcedMode).toBe('disadvantage');
-    // Measured face keeps the honest "within 5 ft" prose (isWithinRange compared
-    // bearer↔attacker coordinates) — mirrors the monster lane buildLionAuraReason.
-    expect(result.advantageReason).toBe('Lion rage aura — enemy of raging ElderPaladin within 5 ft');
-  });
-
-  it('corona is NEVER consulted on the attack lane (save-only effect — bug file)', async () => {
-    setup();
-    activeMap();
-    // Corona of Light is "Disadvantage on saving throws against Fire/Radiant
-    // SPELLS" (2024 classes.json Light Domain lv17) — a SAVE-lane effect. Even
-    // a util that reports disadvantage must not touch the attack roll.
-    getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
-    expect(result.forcedMode).toBeUndefined();
-    expect(result.advantageReason).toBeUndefined();
-  });
-
-  it('all three sync aura resolvers (wolf/duplicity/lion) drop skipRangeCheck when a map is active', async () => {
-    setup();
-    activeMap();
-
-    await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
+    for (const util of [getWolfAdvantageAgainst, getLionDisadvantageAgainst]) {
+      expect(util).toHaveBeenCalledWith({
+        attackerName: 'HexWarlock',
+        targetName: 'Thug 1',
+        campaignName: 'test-campaign',
+        skipRangeCheck: false,
+      });
+    }
     for (const util of [getWolfAdvantageAgainst, getDuplicityAdvantageAgainst, getLionDisadvantageAgainst]) {
-      expect(util).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
       expect(util).not.toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: true }));
     }
-    // Corona no longer rides this lane at all (gridless OR measured).
-    expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
+    // Refused measurements stamp nothing (the regression that motivated the gate).
+    expect(result.forcedMode).toBeUndefined();
+    expect(result.advantageReason).toBeUndefined();
   });
 });

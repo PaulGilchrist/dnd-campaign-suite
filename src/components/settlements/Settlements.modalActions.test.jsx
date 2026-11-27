@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Modal action mechanics only: loading/empty states, modal open/close,
 // delete-button visibility, and generate button state. Intentionally NOT
 // duplicated here (covered in sibling files):
@@ -116,10 +116,9 @@ describe('Settlements - modal actions', () => {
       expect(screen.getByRole('textbox', { name: /name\s?\*/i })).toHaveValue('Old Town');
       expect(screen.getByRole('combobox', { name: /size/i })).toHaveValue('town');
       expect(screen.getByLabelText('Population')).toHaveValue('2,500 souls');
-      // Form-footer Delete (exact name) plus the row-level chip (backlog
-      // 2026-11-16 XD) are distinct accessible names on this screen.
+      // The modal-footer Delete (exact name) appears only in edit mode; the
+      // row-level chip's presence is owned by Settlements.row-delete.test.jsx.
       expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Delete "Old Town"' })).toBeInTheDocument();
     });
   });
 

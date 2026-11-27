@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -39,7 +39,7 @@ const EXPECTED_STEPS = [
 /**
  * The only steps whose getProps renames a context key to a different
  * component prop name (prop → context key). Everything else must pass
- * through unchanged — the introspection test below enforces that split.
+ * through unchanged — the introspection matrix below enforces that split.
  */
 const RENAMES = {
   9: {
@@ -68,11 +68,8 @@ const readProps = (step) => {
 };
 
 describe('steps-config', () => {
-  it('declares the canonical steps, numbered contiguously from 1 with matching titles', () => {
+  it('declares the canonical steps, numbered contiguously from 1, each with a unique renderable component', () => {
     expect(WIZARD_STEPS.map((step) => `${step.step}: ${step.title}`)).toEqual(EXPECTED_STEPS);
-  });
-
-  it('assigns a distinct renderable component to every step', () => {
     const components = WIZARD_STEPS.map((step) => step.component);
     for (const component of components) {
       expect(typeof component === 'function' || typeof component?.type === 'function').toBe(true);
@@ -104,7 +101,8 @@ describe('steps-config', () => {
     // _languageWarnings and omitted it from the supplied context, so step 12's `warnings`
     // prop was always undefined and WizardStepLanguages never rendered the limit warnings
     // that useWizardLanguages computes. Fix: `languageWarnings` is now forwarded in the
-    // renderer's getProps({...}) call.
+    // renderer's getProps({...}) call. No component-level test catches this class of
+    // dropped wiring — the step components only render what they are handed.
     it('renderer supplies every context key each step reads (no dropped wiring)', () => {
       const src = readFileSync(
         join(process.cwd(), 'src/components/character-creation/CharacterCreationWizard.jsx'),
@@ -138,13 +136,15 @@ describe('steps-config', () => {
     }
   });
 
-  // Full 5e/2024/editing numbering is covered in WizardStepNumbering.test.jsx;
-  // here: default args and the getDisplayNumber ↔ getVisibleSteps derivation.
-  it('getVisibleSteps defaults to the 5e create flow and getDisplayNumber derives from it', () => {
+  // The exhaustive per-flow numbering (exact step/display pairs, consecutive
+  // numbering, hidden steps for all four flows) is OWNED by
+  // WizardStepNumbering.test.jsx; here only the no-arg default: it must
+  // behave as the 5e create flow (Background skipped).
+  it('getVisibleSteps/getDisplayNumber default to the 5e create flow', () => {
     const steps = getVisibleSteps();
-    expect(steps).toHaveLength(getTotalSteps() - 1); // Background (5) skipped
+    expect(steps).toEqual(getVisibleSteps({ ruleset: '5e' }));
     expect(steps.map((step) => step.step)).not.toContain(5);
-    expect(steps.map((step) => step.displayNumber)).toEqual(steps.map((_, i) => i + 1));
+    expect(steps).toHaveLength(getTotalSteps() - 1);
     for (const step of steps) {
       expect(getDisplayNumber(step.step)).toBe(step.displayNumber);
     }
@@ -152,63 +152,41 @@ describe('steps-config', () => {
   });
 
   // Shared cause sentence for EVERY ladder-disabled wizard control (sidebar
-  // tabs, sidebar ✓ Save, edit-mode footer Save Changes).
-  describe('getLadderCauseTitle', () => {
-    it('names the blocking step using the CURRENT ruleset flow', () => {
-      expect(getLadderCauseTitle(4, { ruleset: '5e' })).toBe('Complete "Subrace" first');
-      expect(getLadderCauseTitle(5, { ruleset: '2024' })).toBe('Complete "Background" first');
-    });
-
-    it('stays silent when nothing blocks the ladder (null firstInvalidStep)', () => {
-      expect(getLadderCauseTitle(null, { ruleset: '5e' })).toBeUndefined();
-      expect(getLadderCauseTitle(undefined)).toBeUndefined();
-    });
-
-    it('omits the cause when the blocking step is outside the visible flow', () => {
-      // 5e flow has no Background step: a stale mid-switch 5 must name nothing.
-      expect(getLadderCauseTitle(5, { ruleset: '5e' })).toBeUndefined();
-    });
-
-    it('ignores out-of-range step numbers', () => {
-      expect(getLadderCauseTitle(99, { ruleset: '2024' })).toBeUndefined();
-    });
+  // tabs, sidebar ✓ Save, edit-mode footer Save Changes). Consumption of the
+  // produced titles is covered in WizardSidebar/WizardFooter tests.
+  it('getLadderCauseTitle names the blocking step via the CURRENT ruleset flow, silent otherwise', () => {
+    expect(getLadderCauseTitle(4, { ruleset: '5e' })).toBe('Complete "Subrace" first');
+    expect(getLadderCauseTitle(5, { ruleset: '2024' })).toBe('Complete "Background" first');
+    // Nothing blocks the ladder (caps-only disablement owns its own messaging).
+    expect(getLadderCauseTitle(null, { ruleset: '5e' })).toBeUndefined();
+    expect(getLadderCauseTitle(undefined)).toBeUndefined();
+    // Blocking step outside the visible flow (stale mid-switch 5 in the 5e
+    // flow, which has no Background step) or outside the wizard range.
+    expect(getLadderCauseTitle(5, { ruleset: '5e' })).toBeUndefined();
+    expect(getLadderCauseTitle(99, { ruleset: '2024' })).toBeUndefined();
   });
 
   // Combined disabled-Save sentence feeding BOTH save controls (sidebar
   // ✓ Save + edit-mode footer Save Changes) — the ladder idiom extended to
   // cover the caps belt so a disabled Save is never silent (run AZ backlog).
-  describe('getSaveCauseTitle', () => {
-    it('names the ladder step first — a ladder break wins over any caps break', () => {
-      expect(getSaveCauseTitle({
-        firstInvalidStep: 5,
-        ruleset: '2024',
-        abilityCapBroken: true,
-        selectionCapBroken: true,
-      })).toBe('Complete "Background" first');
-    });
+  it('getSaveCauseTitle lets a ladder break win over any caps break', () => {
+    expect(getSaveCauseTitle({
+      firstInvalidStep: 5,
+      ruleset: '2024',
+      abilityCapBroken: true,
+      selectionCapBroken: true,
+    })).toBe('Complete "Background" first');
+  });
 
-    it('names the feats/skills lanes when only the selection caps are broken', () => {
-      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e', selectionCapBroken: true }))
-        .toBe('Feats/skills exceed the rules limit — fix highlighted steps');
-    });
-
-    it('names the ability lane when only the ability totals are over cap', () => {
-      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e', abilityCapBroken: true }))
-        .toBe('Ability totals exceed the rules limit — fix highlighted steps');
-    });
-
-    it('names both lanes on a combined caps break', () => {
-      expect(getSaveCauseTitle({
-        firstInvalidStep: null,
-        ruleset: '2024',
-        abilityCapBroken: true,
-        selectionCapBroken: true,
-      })).toBe('Ability totals and feats/skills exceed the rules limit — fix highlighted steps');
-    });
-
-    it('stays undefined when nothing blocks Save', () => {
-      expect(getSaveCauseTitle({ firstInvalidStep: null, ruleset: '5e' })).toBeUndefined();
-      expect(getSaveCauseTitle()).toBeUndefined();
-    });
+  it('getSaveCauseTitle names exactly the broken caps lanes, silent when nothing blocks Save', () => {
+    const base = { firstInvalidStep: null, ruleset: '5e' };
+    expect(getSaveCauseTitle({ ...base, selectionCapBroken: true }))
+      .toBe('Feats/skills exceed the rules limit — fix highlighted steps');
+    expect(getSaveCauseTitle({ ...base, ruleset: '2024', abilityCapBroken: true }))
+      .toBe('Ability totals exceed the rules limit — fix highlighted steps');
+    expect(getSaveCauseTitle({ ...base, ruleset: '2024', abilityCapBroken: true, selectionCapBroken: true }))
+      .toBe('Ability totals and feats/skills exceed the rules limit — fix highlighted steps');
+    expect(getSaveCauseTitle(base)).toBeUndefined();
+    expect(getSaveCauseTitle()).toBeUndefined();
   });
 });

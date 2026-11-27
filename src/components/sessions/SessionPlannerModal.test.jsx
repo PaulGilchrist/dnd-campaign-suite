@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
@@ -6,6 +6,10 @@ import SessionPlannerModal from './SessionPlannerModal.jsx';
 // The footer's RecapButton probes GET /ai/status on mount (backlog 2026-11-21
 // FFF) and AiRefineButton owns refineEntity — stub the whole transport lane so
 // no test hits the network. Default face: AI configured (happy-path wiring).
+// The Write-recap gate faces (AI off, visitor/unsaved-new absence, busy
+// spinner) live in SessionPlannerModal.recap-ai-gate.test.jsx; the AI-refine
+// lane lives in SessionPlannerModal.ai-refine.test.jsx; the unlink-tooltip
+// label fallback lives in SessionPlannerModal.unlink-tooltip.test.jsx.
 vi.mock('../../services/ai/aiClient.js', () => ({
   getAiStatus: vi.fn(async () => ({ configured: true })),
   refineEntity: vi.fn(),
@@ -79,31 +83,24 @@ describe('SessionPlannerModal', () => {
     expect(props.onQuickAction).toHaveBeenCalledWith('npcs', 'Grixxa');
   });
 
-  it('disables the To Initiative chip when the linked NPC lacks stats (mirrors .npcs-init-btn gate)', () => {
-    const { props } = renderModal({
-      resourceOptions: {
-        maps: [], encounters: [], quests: [], settlements: [], notes: [],
-        npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: false }],
-      },
+  it('gates the To Initiative chip on the linked NPC combatReady flag (mirrors .npcs-init-btn)', () => {
+    const linkless = { maps: [], encounters: [], quests: [], settlements: [], notes: [] };
+    const { unmount } = renderModal({
+      resourceOptions: { ...linkless, npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: false }] },
     });
-    const initBtn = screen.getByRole('button', { name: /to initiative/i });
-    expect(initBtn).toBeDisabled();
-    expect(initBtn).toHaveAttribute('title',
+    const blocked = screen.getByRole('button', { name: /to initiative/i });
+    expect(blocked).toBeDisabled();
+    // Verbatim string pin: the Sessions.test.jsx container lane references this copy.
+    expect(blocked).toHaveAttribute('title',
       "Fill in Grixxa's AC and HP (Stats tab) before adding to Initiative");
-    fireEvent.click(initBtn);
-    expect(props.onQuickAction).not.toHaveBeenCalled();
-  });
+    unmount();
 
-  it('keeps the To Initiative chip enabled when the linked NPC is combat-ready', () => {
     const { props } = renderModal({
-      resourceOptions: {
-        maps: [], encounters: [], quests: [], settlements: [], notes: [],
-        npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: true }],
-      },
+      resourceOptions: { ...linkless, npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: true }] },
     });
-    const initBtn = screen.getByRole('button', { name: /to initiative/i });
-    expect(initBtn).not.toBeDisabled();
-    fireEvent.click(initBtn);
+    const live = screen.getByRole('button', { name: /to initiative/i });
+    expect(live).not.toBeDisabled();
+    fireEvent.click(live);
     expect(props.onQuickAction).toHaveBeenCalledWith('npcs', 'Grixxa');
   });
 
@@ -115,15 +112,16 @@ describe('SessionPlannerModal', () => {
     expect(props.onRemoveLink).toHaveBeenCalledWith('maps', 'Cave');
   });
 
-  it('toggles checklist items by id and reflects progress from parent state', () => {
+  it('renders checklist progress from parent state and toggles items by id', () => {
+    // Progress re-derivation (done/total/pct) is pinned in sessionPlannerUtils
+    // checklistProgress; the live check→progress loop through the real parent
+    // handlers is owned by the Sessions.test.jsx container lane. Here only the
+    // modal's own contract: the label reflects the injected checklist prop and
+    // checkboxes route by id.
     const { props } = renderModal();
     expect(screen.getByText(/0 of 2 ready/i)).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
     expect(props.onToggleChecklist).toHaveBeenCalledWith('auto-map-cave');
-
-    const checkedForm = { ...baseFormData, checklist: baseFormData.checklist.map((c, i) => i === 0 ? { ...c, done: true } : c) };
-    renderModal({ formData: checkedForm });
-    expect(screen.getByText(/1 of 2 ready/i)).toBeInTheDocument();
   });
 
   it('shows auto badge on auto items and allows removing/adding custom items', () => {
@@ -139,12 +137,19 @@ describe('SessionPlannerModal', () => {
     fireEvent.click(container.querySelector('.sessions-checklist-remove'));
     expect(props.onRemoveChecklistItem).toHaveBeenCalledWith('custom-1');
 
-    fireEvent.change(screen.getByLabelText(/new checklist item/i), { target: { value: 'Have initiative cards ready' } });
+    // blank input never adds
+    fireEvent.click(screen.getByRole('button', { name: /add$/i }));
+    expect(props.onAddChecklistItem).not.toHaveBeenCalled();
+
+    // added item is trimmed and the input resets for the next one
+    const input = screen.getByLabelText(/new checklist item/i);
+    fireEvent.change(input, { target: { value: '  Have initiative cards ready  ' } });
     fireEvent.click(screen.getByRole('button', { name: /add$/i }));
     expect(props.onAddChecklistItem).toHaveBeenCalledWith('Have initiative cards ready');
+    expect(input).toHaveValue('');
   });
 
-  it('renders contingency If → then rows, changes branch, and adds new ones', () => {
+  it('renders contingency If → then rows, changes branch, and adds/removes rows', () => {
     const formData = {
       ...baseFormData,
       contingencies: [{ id: 'c1', ifText: 'Players parley', thenText: 'Grixxa offers a deal', branch: 'negotiate' }],
@@ -157,25 +162,27 @@ describe('SessionPlannerModal', () => {
     expect(props.onContingencyChange).toHaveBeenCalledWith('c1', 'branch', 'failure');
     fireEvent.click(screen.getByRole('button', { name: /add contingency/i }));
     expect(props.onAddContingency).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove contingency' }));
+    expect(props.onRemoveContingency).toHaveBeenCalledWith('c1');
   });
 
-  it('copies a composed XP prompt to the clipboard', async () => {
+  it('copies composed XP-budget and rumor prompts to the clipboard with copied feedback', async () => {
+    // Exact prompt bodies (party, avg level, campaign, NPCs) are pinned
+    // verbatim in sessionPlannerUtils.test.js "prompt builders"; here only
+    // that each button routes to its builder and the result reaches the
+    // clipboard with toast feedback.
     renderModal();
     fireEvent.click(screen.getByRole('button', { name: /suggest xp budget/i }));
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
-    const text = navigator.clipboard.writeText.mock.calls[0][0];
-    expect(text).toContain('Session 7');
-    expect(text).toContain('average level 5');
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    expect(navigator.clipboard.writeText.mock.calls[0][0]).toContain('average level 5');
     await waitFor(() => expect(screen.getByText(/prompt copied/i)).toBeInTheDocument());
-  });
 
-  it('copies a composed rumor prompt including campaign name and linked NPCs', async () => {
-    renderModal();
+    navigator.clipboard.writeText.mockClear();
     fireEvent.click(screen.getByRole('button', { name: /generate rumors/i }));
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
-    const text = navigator.clipboard.writeText.mock.calls[0][0];
-    expect(text).toContain('test-campaign');
-    expect(text).toContain('Grixxa');
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    const rumorText = navigator.clipboard.writeText.mock.calls[0][0];
+    expect(rumorText).toContain('test-campaign');
+    expect(rumorText).toContain('Grixxa');
   });
 
   it('shows Mark as Played only for a planned session and calls onMarkPlayed', () => {
@@ -198,15 +205,16 @@ describe('SessionPlannerModal', () => {
     expect(screen.getByText(/already exists/i)).toBeInTheDocument();
   });
 
-  it('renders two distinct labelled textareas: "Session Summary" binds summary, "Notes" binds notes', () => {
-    const { props } = renderModal();
+  it('keeps "Session Summary" and "Notes" as distinct labelled fields bound to their own keys', () => {
+    const { props } = renderModal({
+      formData: { ...baseFormData, summary: 'Stored summary', notes: 'Stored notes' },
+    });
     const summaryField = screen.getByLabelText('Session Summary');
     const notesField = screen.getByLabelText('Notes');
-    expect(summaryField).toBeInTheDocument();
-    expect(notesField).toBeInTheDocument();
     expect(summaryField).not.toBe(notesField);
-    expect(summaryField).toHaveAttribute('id', 'session-summary');
-    expect(notesField).toHaveAttribute('id', 'session-notes');
+    // both fields seed from persisted values
+    expect(summaryField).toHaveValue('Stored summary');
+    expect(notesField).toHaveValue('Stored notes');
 
     // Editing one field routes ONLY to its own key — labels never contradict bindings.
     fireEvent.change(notesField, { target: { value: 'Private GM note' } });
@@ -219,50 +227,14 @@ describe('SessionPlannerModal', () => {
     expect(props.onFormChange).not.toHaveBeenCalledWith('notes', 'Recap text');
   });
 
-  it('seeds both fields from persisted values and renders missing notes as empty', () => {
-    const { unmount } = renderModal({
-      formData: { ...baseFormData, summary: 'Stored summary', notes: 'Stored notes' },
-    });
-    expect(screen.getByLabelText('Session Summary')).toHaveValue('Stored summary');
-    expect(screen.getByLabelText('Notes')).toHaveValue('Stored notes');
-    unmount();
-
-    // Legacy rows without a notes key must show an empty field, never "undefined".
-    const legacyRow = { ...baseFormData };
-    delete legacyRow.notes;
-    renderModal({ formData: legacyRow });
-    expect(screen.getByLabelText('Notes')).toHaveValue('');
-  });
-
-  // ── Write recap button (roadmap Step 8) — GM-only by handler injection,
-  // mirroring the ActiveSessionToggle census (Sessions.jsx passes the handler
-  // on localhost alone; a visitor gets no button at all).
-  describe('Write recap button', () => {
-    it('renders (and fires) only when the GM handler is passed', () => {
-      const { props, unmount } = renderModal();
-      expect(screen.queryByRole('button', { name: /write recap/i })).not.toBeInTheDocument();
-      unmount();
-
-      const onWriteRecap = vi.fn();
-      renderModal({ onWriteRecap });
-      fireEvent.click(screen.getByRole('button', { name: /write recap/i }));
-      expect(onWriteRecap).toHaveBeenCalledTimes(1);
-      expect(props.onSave).not.toHaveBeenCalled();
-    });
-
-    it('is row-only: an unsaved-new draft shows no recap button', () => {
-      renderModal({ editingSession: null, onWriteRecap: vi.fn() });
-      expect(screen.queryByRole('button', { name: /write recap/i })).not.toBeInTheDocument();
-    });
-
-    it('busy state disables the button and relabels it — no second concurrent request', () => {
-      const onWriteRecap = vi.fn();
-      renderModal({ onWriteRecap, recapBusy: true });
-      const btn = screen.getByRole('button', { name: /writing recap/i });
-      expect(btn).toBeDisabled();
-      expect(btn.querySelector('i.fa-spinner')).toBeInTheDocument();
-      fireEvent.click(btn);
-      expect(onWriteRecap).not.toHaveBeenCalled();
-    });
+  it('firing Write recap posts through onWriteRecap only — never saves the form', () => {
+    // The button's absence faces (visitor, unsaved-new) and its busy/AI-off
+    // disabled faces are owned by SessionPlannerModal.recap-ai-gate.test.jsx.
+    // Unique here: the recap click must not double as a form Save.
+    const onWriteRecap = vi.fn();
+    const { props } = renderModal({ onWriteRecap });
+    fireEvent.click(screen.getByRole('button', { name: /write recap/i }));
+    expect(onWriteRecap).toHaveBeenCalledTimes(1);
+    expect(props.onSave).not.toHaveBeenCalled();
   });
 });

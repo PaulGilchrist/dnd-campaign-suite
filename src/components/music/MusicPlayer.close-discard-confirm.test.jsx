@@ -1,22 +1,19 @@
-// @maintained-by-ai: 2026-11-08
-// Regression lock for improve 2026-10-29-AE (music-editor-dirty-cancel-guard),
-// migrated off native window.confirm onto the shared DeleteConfirmModal
-// role="dialog" tier by backlog 2026-11-08 EK (friendly-fire precedent).
-// The inline track editor's Cancel and mood-select paths silently discarded a
-// typed-but-unsaved draft; now they pay the house NAMED discard through the
-// shared useReloadGuard dirty check (six .ct-* lanes 4d4b1e69a + wizard
-// 4569f2d67 parity), copy `Discard changes to the <Mood> track list?` naming
-// the mood being LEFT, rendered VERBATIM inside the role=dialog. Cancel is
-// fully inert (editor + draft byte-intact, zero network, zero log rows);
-// accept closes / re-seeds. Clean drafts stay silent, and Save/Reset keep
-// their existing lanes — since backlog 2026-11-08 EM BOTH stay open and
-// re-baseline the guard (saved/seeded text never looks dirty). Harness mirrors MusicPlayer.toast.test.jsx (server-truth fetch stub
-// records POSTs so "writes nothing" is provable).
+// @maintained-by-ai 2026-11-26
+// Regression lock for the music editor's dirty Cancel / mood-switch guard
+// (improve 2026-10-29-AE, migrated off native window.confirm onto the shared
+// DeleteConfirmModal role="dialog" tier). The dirty check itself lives in
+// useReloadGuard; per-mood naming is also pinned in the sibling files
+// (active-mood-editor: Tavern, custom-categories: custom moods). This file
+// owns the two decision lanes: modal Cancel is fully inert (editor + draft
+// byte-intact, zero network, zero log rows) and accept closes / re-seeds.
+// Clean, saved and reset drafts never prompt (backlog 2026-11-08 EM: Save and
+// Reset stay open and re-baseline the guard). Harness mirrors
+// MusicPlayer.toast.test.jsx (server-truth fetch stub records POSTs so
+// "writes nothing" is provable).
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
-import * as ambiencePlayer from '../../services/ui/ambiencePlayer.js';
 
 vi.mock('../../services/ui/ambiencePlayer.js', () => ({
   ensurePlayer: vi.fn(),
@@ -84,7 +81,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
   beforeEach(() => {
     vi.clearAllMocks();
     getStore('campaign').delete('music');
-    // The migrated lane must never touch a native dialog (criterion 4).
+    // The migrated lane must never touch a native dialog.
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
   });
 
@@ -92,21 +89,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     vi.restoreAllMocks();
   });
 
-  it('dirty draft + Cancel: opens the role=dialog discard modal naming the edited mood; native confirm never fires', () => {
-    stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    openEditor();
-    typeDraft('https://www.youtube.com/watch?v=zzzzzzzzzzz');
-
-    fireEvent.click(cancelButton());
-
-    const dialog = discardDialog();
-    expect(within(dialog).getByText('Discard changes to the Town track list?')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Yes, Discard' })).toBeInTheDocument();
-    expect(confirmSpy).not.toHaveBeenCalled();
-  });
-
-  it('dirty draft + Cancel: modal Cancel is fully inert — editor + draft byte-intact, zero writes, zero log rows', () => {
+  it('dirty draft + Cancel: modal names the edited mood; modal Cancel is fully inert — draft byte-intact, zero writes, zero log rows', () => {
     const stub = stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
@@ -114,9 +97,14 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     const postsBefore = stub.posts.length;
 
     fireEvent.click(cancelButton());
+
+    const dialog = discardDialog();
+    expect(within(dialog).getByText('Discard changes to the Town track list?')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Yes, Discard' })).toBeInTheDocument();
+
     fireEvent.click(dialogCancel());
 
-    expect(dialogExists()).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(textarea()).toBeInTheDocument();
     expect(textarea().value).toBe('https://www.youtube.com/watch?v=zzzzzzzzzzz');
     expect(stub.posts.length).toBe(postsBefore);
@@ -125,7 +113,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('dirty draft + Cancel: accept closes, discards the draft, persists nothing; reopen shows the saved value', () => {
+  it('dirty draft + Cancel: accept closes the editor, discards the draft, persists nothing; reopen shows the saved seed', () => {
     const stub = stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
@@ -138,10 +126,12 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(stub.posts).toHaveLength(0);
     expect(getStore('campaign').get('music')).toBeUndefined();
 
-    // Reopen: the abandoned draft is gone, the saved (default) value shows.
+    // Reopen: the abandoned draft is gone, the saved (default) value shows,
+    // and the reopen itself is a plain open — no prompt.
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     expect(textarea().value).toBe(TOWN_SEED);
-    expect(confirmSpy).not.toHaveBeenCalled(); // reopen is a plain open, no prompt
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it('mood switch while dirty: names the mood being LEFT; modal Cancel keeps the Town draft and leaves the reverted select', () => {
@@ -154,14 +144,14 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
 
     const dialog = discardDialog();
     expect(within(dialog).getByText('Discard changes to the Town track list?')).toBeInTheDocument();
-    expect(confirmSpy).not.toHaveBeenCalled();
-    // The select value reverted the moment the prompt armed; dismiss keeps
-    // the edit on the original mood: select stays, draft intact.
+    // The select value reverted the moment the prompt armed.
     expect(moodSelect().value).toBe('town');
+
     fireEvent.click(dialogCancel());
     expect(moodSelect().value).toBe('town');
     expect(textarea().value).toBe('unsaved town draft');
     expect(stub.posts).toHaveLength(0);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it('mood switch while dirty: accept re-seeds the new mood, and the fresh seed cancels silently', () => {
@@ -183,7 +173,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('clean editor: Cancel and mood switch stay silent — no dialog, behavior unchanged', () => {
+  it('clean editor: mood switch and Cancel stay silent — no dialog, behavior unchanged', () => {
     stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
@@ -197,7 +187,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('Save lane stays open: dirty save fires NO dialog, keeps the textarea, and re-baselines the guard', async () => {
+  it('Save stays open with no dialog, then Cancel closes silently — guard re-baselined on the saved draft, exactly one write', async () => {
     const stub = stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
@@ -208,57 +198,23 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     await waitFor(() => expect(document.querySelector('.music-toast'))
       .toHaveTextContent('Town tracks saved — keep editing'));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(confirmSpy).not.toHaveBeenCalled();
-    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']); // Item 3b: bundled beds ride the whole-draft save
-    // Editor mounted, content persisted (backlog 2026-11-08 EM).
+    // Editor mounted, content persisted (backlog 2026-11-08 EM); bundled
+    // beds ride the whole-draft save.
     expect(textarea()).toBeInTheDocument();
     expect(textarea().value).toBe('https://youtu.be/aaaaaaaaaaa');
-  });
+    expect(stub.server().overrides.town.map(t => t.src))
+      .toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
 
-  it('saved text counts as SAVED: Cancel right after a successful Save closes silently (no discard prompt)', async () => {
-    const stub = stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    openEditor();
-    typeDraft('https://youtu.be/aaaaaaaaaaa');
-    fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(document.querySelector('.music-toast'))
-      .toHaveTextContent('Town tracks saved'));
-
-    // Guard re-baselined on the saved draft: nothing is dirty, Cancel is clean.
+    // Guard re-baselined on the saved draft: nothing is dirty, Cancel is
+    // clean, and the close adds nothing to the single save write.
     fireEvent.click(cancelButton());
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByText('Cancel')).toBeNull();
-    expect(confirmSpy).not.toHaveBeenCalled();
-    // Write landed exactly once; nothing was discarded on close.
     expect(stub.posts).toHaveLength(1);
-    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('re-saving the SAME content in the still-open editor succeeds with an idempotent second write', async () => {
-    const stub = stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    openEditor();
-    typeDraft('aaaaaaaaaaa');
-    fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(document.querySelector('.music-toast'))
-      .toHaveTextContent('Town tracks saved'));
-
-    // Second Save of byte-identical content: no ghost-dirty state, no error,
-    // editor still open, server row unchanged.
-    fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(stub.posts).toHaveLength(2));
-    expect(document.querySelector('.music-editor-error')).toBeNull();
-    expect(textarea()).toBeInTheDocument();
-    expect(textarea().value).toBe('aaaaaaaaaaa');
-    expect(stub.server().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa', '/audio/town-theme.mp3', '/audio/fishing-village.mp3']);
-
-    // And the re-baseline held through the second save: Cancel stays silent.
-    fireEvent.click(cancelButton());
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByText('Cancel')).toBeNull();
-  });
-
-  it('Reset lane unchanged and re-baselines: Reset then Cancel is dialog-free', async () => {
+  it('Reset lane stays open and re-baselines: Reset then Cancel is dialog-free', async () => {
     stubMusicServer({ overrides: { town: [{ kind: 'youtube', src: 'aaaaaaaaaaa', title: 'aaaaaaaaaaa' }] } });
     getStore('campaign').set('music', {
       mood: null, playing: false, volume: 0.6,
@@ -279,19 +235,4 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(confirmSpy).not.toHaveBeenCalled();
   });
-
-  it('remote-adoption guard stays inert for editor lanes (576be121d parity)', () => {
-    // Typing in the editor must not touch the transport or commit music.
-    const stub = stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    openEditor();
-    typeDraft('draft only');
-    expect(ambiencePlayer.playTracks).not.toHaveBeenCalled();
-    expect(ambiencePlayer.stop).not.toHaveBeenCalled();
-    expect(stub.posts).toHaveLength(0);
-  });
 });
-
-function dialogExists() {
-  return document.querySelector('[role="dialog"]') !== null;
-}

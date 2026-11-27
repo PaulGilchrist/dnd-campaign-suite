@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // This lane owns the service/NPC/rumor row-linking contract in the settlement
-// modal: rows add with their type-specific defaults, every field edit binds to
-// the correct row by index, removal targets the clicked row, and re-added rows
-// start blank. Plain top-level fields, save payloads, and draft discard live in
-// sibling lanes (formChanges, saveDelete, crudOperations).
+// modal: rows add blank, every field edit binds to the correct row by index,
+// removal targets the clicked row, and re-added rows start blank. The only
+// type-specific default (service type "tavern") is pinned here too. Plain
+// top-level fields, save payloads, and draft discard live in sibling lanes
+// (formChanges, saveDelete, crudOperations); generate's dirty-gate only
+// clicks the add buttons to arm the draft — it asserts none of the binding
+// semantics below.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -90,6 +93,7 @@ describe('Settlements - service, NPC, and rumor rows', () => {
       const remove = (i) => fireEvent.click(screen.getAllByTitle(removeTitle)[i]);
 
       add();
+      expect(rows()).toHaveLength(1); // a new modal starts with no rows
       fireEvent.change(rows()[0], { target: { value: 'First' } });
 
       add();
@@ -112,17 +116,23 @@ describe('Settlements - service, NPC, and rumor rows', () => {
     fireEvent.click(screen.getByRole('button', { name: /add service/i }));
     fireEvent.click(screen.getByRole('button', { name: /add npc/i }));
 
+    // The type select is the modal's only field without an accessible name or
+    // placeholder (size/threat selects are labelled elsewhere), so its scoped
+    // class is the only handle; every other field is queried by user-visible
+    // attributes. Both descriptions share the placeholder "Description…" and
+    // appear in service-then-NPC DOM order.
     const svcType = container.querySelector('.settlements-svc-type');
-    const svcDesc = container.querySelector('.settlements-svc-desc');
-    const npcRole = container.querySelector('.settlements-npc-role');
-    const npcDesc = container.querySelector('.settlements-npc-desc');
-    expect(svcType).toHaveValue('tavern'); // default service type
+    const [svcDesc, npcDesc] = screen.getAllByPlaceholderText('Description…');
+    const npcRole = screen.getByPlaceholderText('Role (e.g., Innkeeper)');
+    expect(svcType).toHaveValue('tavern'); // service type default
 
     fireEvent.change(svcType, { target: { value: 'magic_shop' } });
     fireEvent.change(svcDesc, { target: { value: 'Rare potions' } });
     fireEvent.change(npcRole, { target: { value: 'Innkeeper' } });
     fireEvent.change(npcDesc, { target: { value: 'Knows every gossip' } });
 
+    // Each field round-trips its own edit, proving no handler cross-writes:
+    // a field-name mix-up would surface as a mismatched pair below.
     expect(svcType).toHaveValue('magic_shop');
     expect(svcDesc).toHaveValue('Rare potions');
     expect(npcRole).toHaveValue('Innkeeper');

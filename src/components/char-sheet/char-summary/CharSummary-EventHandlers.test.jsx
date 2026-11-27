@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // CharSummary window event handlers + XP prop-sync effect.
 //
@@ -187,10 +187,11 @@ describe('CharSummary - Initiative Rolled Event', () => {
         unmount();
 
         act(() => {
-            window.dispatchEvent(new Event('initiative-rolled'));
+            // Own-name roll: the exact dispatch that clears the surge while
+            // mounted — a leaked listener would still record the synced write.
+            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: 'Thorin', roll: 12 } }));
         });
 
-        // A leaked listener would record a synced write after unmount.
         expect(harness.syncedCalls).toHaveLength(0);
     });
 });

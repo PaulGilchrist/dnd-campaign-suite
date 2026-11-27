@@ -1,24 +1,33 @@
-// @maintained-by-ai 2026-10-15: 2026-11-15
+// @maintained-by-ai 2026-11-26
 // Special-path skip lanes for useSpellMetamagicFlow — branches no sibling suite pins:
-// - Foresight / Protection from Evil and Good skip: UNPAID dismisses — zero writes,
-//   zero log (2026-11-15 pay-state gate, bug-revivify-chooser-skip-rollback-
-//   inflates-unspent-slot inverted the byte-exact phantom-cast-row pins this file
-//   carried; the allTargets default and the skipTargets override in
-//   useSimpleSpellHandlers.js stay in place for genuinely paid pendings).
-// - True Polymorph skip AFTER path-select: the multi-stage machine clears unpaid.
+// - Foresight / Protection from Evil and Good gate-armed unpaid skip: these two
+//   choosers sit OUTSIDE skip.test.js's 18-row authority table; skip dismisses
+//   with the exhaustive zero-write census (no log, no slot/free-cast write, no
+//   apply, no execute). 2026-11-15 pay-state gate
+//   (bug-revivify-chooser-skip-rollback-inflates-unspent-slot) inverted the
+//   byte-exact phantom-cast-row pins this file used to carry.
+// - True Polymorph skip AFTER path-select (mid-machine): skip.test.js owns the
+//   pre-select row; the path-persisted seam is unique here.
 // Owned elsewhere and removed as duplicates: Animal Shapes target-confirm popup +
-// lv8 CR gate (complex-handlers.spells.test.js), beast-picker stage-2→3 handoff
+// lv8 CR gate (confirm-payloads.test.js), beast-picker stage-2→3 handoff
 // and concentration stamps (multi-stage.test.js), skip-before-select for all 18
 // table spells incl. True Polymorph and the never-arm no-op (skip.test.js),
 // Shield of Faith no-gate routing (gate.test.js) and its un-armed handler guards
 // (generic useConfirmableFlow pending guard, exercised in skip/rollback lanes).
-// Spell levels/casting times verified against public/data/spells.json 2026-10-15.
+// Spell levels/casting times verified against public/data/spells.json.
+// 2026-11-26 audit: the two chooser-skip rows consolidated into an it.each table;
+// postCastRiderService mock gained the triggerPostCastRiderSaves/
+// triggerBewitchingMagic exports useConfirmableFlow imports.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { incrementFreeCastResource } from '../../services/rules/spells/spellPreparationService.js';
 import { applyTruePolymorph } from '../../services/automation/handlers/spells/truePolymorphService.js';
+import { triggerForesight } from '../../services/rules/features/foresightService.js';
+import { applyProtectionFromEvilAndGood } from '../../services/automation/index.js';
 
 
 vi.mock('./useMetamagic.js', () => ({
@@ -34,6 +43,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -218,43 +229,57 @@ async function gateSpell(result, spell) {
   });
 }
 
+// Gate-armed chooser skips OUTSIDE skip.test.js's 18-row authority table.
+// The unpaid census (addEntry/setRuntimeValue/incrementFreeCastResource) mirrors
+// skip.test.js's exhaustive write channels: an unpaid dismiss must move no money
+// and stamp no cast row. Handler spies prove the skip never applies the effect.
+const unpaidSkipCases = [
+  // spells.json: lv9, 1 minute, Touch. 2026-11-15 pay-state gate
+  // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot) killed the byte-exact
+  // phantom allTargets cast row this lane used to enshrine.
+  {
+    spell: { name: 'Foresight', level: 9, casting_time: '1 minute', range: 'Touch' },
+    pending: 'pendingForesight',
+    skip: 'handleForesightSkip',
+    applySpy: triggerForesight,
+  },
+  // spells.json: lv1, 1 action, Touch. The skipTargets override in
+  // useSimpleSpellHandlers.js has nothing to stamp here — it survives only on a
+  // paid pending.
+  {
+    spell: { name: 'Protection from Evil and Good', level: 1, casting_time: '1 action', range: 'Touch' },
+    pending: 'pendingProtectionFromEvilAndGood',
+    skip: 'handleProtectionFromEvilAndGoodSkip',
+    applySpy: applyProtectionFromEvilAndGood,
+  },
+];
+
 describe('useSpellMetamagicFlow — unpaid skip lanes dismiss with zero writes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('Foresight skip: UNPAID dismiss — zero writes, no cast row, pending cleared', async () => {
-    const { result } = renderFlow();
-    // spells.json: lv9, 1 minute, Touch. 2026-11-15 pay-state gate
-    // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the gate armed
-    // this chooser UNPAID, so skip logs NOTHING — the byte-exact phantom
-    // allTargets cast row this pin used to enshrine is dead.
-    await gateSpell(result, { name: 'Foresight', level: 9, casting_time: '1 minute', range: 'Touch' });
-    expect(result.current.pendingForesight).not.toBeNull();
+  it.each(unpaidSkipCases)(
+    '$spell.name skip: UNPAID dismiss — pending cleared, zero writes, effect never applied',
+    async ({ spell, pending, skip, applySpy }) => {
+      const { result, onExecute } = renderFlow();
 
-    act(() => {
-      result.current.handleForesightSkip();
-    });
+      // Non-vacuity: the gate must arm the chooser UNPAID before skipping.
+      await gateSpell(result, spell);
+      expect(result.current[pending]).not.toBeNull();
 
-    expect(result.current.pendingForesight).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
+      act(() => {
+        result.current[skip]();
+      });
 
-  it('Protection from Evil and Good skip: UNPAID dismiss — zero writes, pending cleared', async () => {
-    const { result } = renderFlow();
-    // spells.json: lv1, 1 action, Touch. Same pay-state gate as the Foresight
-    // row: an unpaid skip logs nothing, so the skipTargets override has nothing
-    // to stamp (its caster-only byte-shape survives only on a paid pending).
-    await gateSpell(result, { name: 'Protection from Evil and Good', level: 1, casting_time: '1 action', range: 'Touch' });
-    expect(result.current.pendingProtectionFromEvilAndGood).not.toBeNull();
-
-    act(() => {
-      result.current.handleProtectionFromEvilAndGoodSkip();
-    });
-
-    expect(result.current.pendingProtectionFromEvilAndGood).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
+      expect(result.current[pending]).toBeNull();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(incrementFreeCastResource).not.toHaveBeenCalled();
+      expect(applySpy).not.toHaveBeenCalled();
+      expect(onExecute).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('useSpellMetamagicFlow — True Polymorph skip after path-select', () => {
@@ -264,8 +289,9 @@ describe('useSpellMetamagicFlow — True Polymorph skip after path-select', () =
 
   it('skip mid-machine (path persisted, nothing paid) clears without log, refund, or apply', async () => {
     const { result, onExecute } = renderFlow();
-    // spells.json: lv9, 1 action, 30 feet. creature_to_creature pays at target-confirm,
-    // so skipping after path-select must leave no money movement (clear lane).
+    // spells.json: lv9, 1 action, 30 feet. creature_to_creature pays only at
+    // target-confirm, so skipping after path-select must leave no money movement.
+    // skip.test.js owns the PRE-select row; the mid-machine seam is unique here.
     await gateSpell(result, { name: 'True Polymorph', level: 9, casting_time: '1 action', range: '30 feet' });
 
     act(() => {
@@ -278,8 +304,11 @@ describe('useSpellMetamagicFlow — True Polymorph skip after path-select', () =
       result.current.handleTruePolymorphSkip();
     });
 
+    // The persisted path disappears with the whole machine.
     expect(result.current.pendingTruePolymorph).toBeNull();
     expect(addEntry).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(incrementFreeCastResource).not.toHaveBeenCalled();
     expect(onExecute).not.toHaveBeenCalled();
     expect(applyTruePolymorph).not.toHaveBeenCalled();
   });

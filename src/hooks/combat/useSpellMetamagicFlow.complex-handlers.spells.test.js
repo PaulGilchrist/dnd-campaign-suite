@@ -1,14 +1,17 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Complex-spell routing table for the sheet-confirm metamagic flow.
-// Owns: per-spell execute payloads for the area lane (Globe / Antimagic Field),
-// the save-DC lane (Stinking Cloud / Confusion), the single-target heal transport
-// (Cure Wounds lv1 payload pin — cited by complex-handlers.charm-heal), the
-// trigger/apply payload shape for Hold Monster / Polymorph / True Polymorph
-// (SP-124) and the Animal Shapes target-selection popup routing.
+// Owns: per-spell execute payloads for the area lane (Globe / Antimagic Field —
+// useAreaEffectHandlers), the save-DC lane (Stinking Cloud / Confusion runners
+// runStinkingCloud/runConfusion in useSimpleSpellHandlers), the single-target
+// heal transport (Cure Wounds lv1 payload pin — cited by
+// complex-handlers.charm-heal), the trigger/apply payload shape for Hold
+// Monster / Polymorph, and the True Polymorph apply-payload halves of SP-124
+// (the popup-mount halves live in confirm-payloads.test.js).
 // Not owned here (covered by siblings): skip clearing (skip.test.js), popup-html
-// payloads (confirm-payloads.test.js), simple-lane no-pending guards
-// (handler-guards.test.js), upcast slot stamps (cla086-upcast-slot.test.js),
-// two-stage path storage (multi-stage.test.js), animal-shapes beast stage
+// payloads incl. the Animal Shapes beast-picker routing (confirm-payloads),
+// ALL no-pending confirm guards incl. Globe/AntimagicField (handler-guards
+// GUARDED_KEYS), upcast slot stamps (cla086-upcast-slot.test.js), two-stage
+// path storage (multi-stage.test.js), animal-shapes beast stage
 // (special-paths.animal-polymorph.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -17,7 +20,6 @@ import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
-import { getAllyList } from '../useAllySelection.js';
 
 // ─── Mocks (only what the tested lanes actually touch) ────────────────────────
 
@@ -196,7 +198,8 @@ async function renderGated(spell, { onExecute = vi.fn(), setPopupHtml = vi.fn(),
 // ─── Area lane: manual cast log + executeHandler payload ──────────────────────
 // Globe / Antimagic Field confirm (useAreaEffectHandlers): the handler logs the
 // cast itself (no createConfirmHandler wrapper) and stamps automation.range from
-// the gated spell row.
+// the gated spell row. The no-pending guard leg is owned by handler-guards
+// (GUARDED_KEYS 'Globe'/'AntimagicField').
 
 const AREA_LOGGED_ROWS = [
   { spell: 'Globe of Invulnerability', pending: 'pendingGlobe', handler: 'handleGlobeConfirm', automationType: 'globe_of_invulnerability' },
@@ -240,17 +243,6 @@ describe('useSpellMetamagicFlow — area confirm lane', () => {
       );
 
       expect(result.current[row.pending]).toBeNull();
-    });
-
-    it(`${row.spell}: confirm without pending is a no-op`, async () => {
-      const { result } = await renderGated(SPELL_ROWS['Fireball']);
-
-      await act(async () => {
-        await result.current[row.handler](['Goblin A']);
-      });
-
-      expect(addEntry).not.toHaveBeenCalled();
-      expect(executeHandler).not.toHaveBeenCalled();
     });
   }
 
@@ -391,47 +383,38 @@ describe('useSpellMetamagicFlow — Cure Wounds confirm', () => {
   });
 });
 
-// ─── Hold Monster: trigger payload + single-target normalization ──────────────
+// ─── Hold Monster: trigger payload + target normalization ─────────────────────
 
 describe('useSpellMetamagicFlow — Hold Monster confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('threads array targets to triggerHoldMonster and clears pending', async () => {
-    const { triggerHoldMonster } = await import('../../services/rules/features/holdMonsterService.js');
-    const { result } = await renderGated(SPELL_ROWS['Hold Monster']);
+  // Array passthrough and string→array normalization are the same runner
+  // assertion (triggerSpell spec { holdMonsterTargets: toArray(r) }).
+  const TARGET_CASES = [
+    { arg: ['Goblin A', 'Goblin B'], expected: ['Goblin A', 'Goblin B'] },
+    { arg: 'Goblin A', expected: ['Goblin A'] },
+  ];
+  for (const tc of TARGET_CASES) {
+    it(`threads targets ${JSON.stringify(tc.arg)} to triggerHoldMonster and clears pending`, async () => {
+      const { triggerHoldMonster } = await import('../../services/rules/features/holdMonsterService.js');
+      const { result } = await renderGated(SPELL_ROWS['Hold Monster']);
 
-    await act(async () => {
-      await result.current.handleHoldMonsterConfirm(['Goblin A', 'Goblin B']);
+      await act(async () => {
+        await result.current.handleHoldMonsterConfirm(tc.arg);
+      });
+
+      expect(triggerHoldMonster).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Hold Monster' }),
+        { holdMonsterTargets: tc.expected },
+        expect.any(Object),
+        CAMPAIGN,
+        null,
+      );
+      expect(result.current.pendingHoldMonster).toBeNull();
     });
-
-    expect(triggerHoldMonster).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Hold Monster' }),
-      { holdMonsterTargets: ['Goblin A', 'Goblin B'] },
-      expect.any(Object),
-      CAMPAIGN,
-      null,
-    );
-    expect(result.current.pendingHoldMonster).toBeNull();
-  });
-
-  it('normalizes a single string target to an array', async () => {
-    const { triggerHoldMonster } = await import('../../services/rules/features/holdMonsterService.js');
-    const { result } = await renderGated(SPELL_ROWS['Hold Monster']);
-
-    await act(async () => {
-      await result.current.handleHoldMonsterConfirm('Goblin A');
-    });
-
-    expect(triggerHoldMonster).toHaveBeenCalledWith(
-      expect.any(Object),
-      { holdMonsterTargets: ['Goblin A'] },
-      expect.any(Object),
-      CAMPAIGN,
-      null,
-    );
-  });
+  }
 });
 
 // ─── Polymorph: apply payload + empty-target guard ────────────────────────────
@@ -531,33 +514,6 @@ describe('useSpellMetamagicFlow — True Polymorph', () => {
   });
 });
 
-// ─── Animal Shapes: target stage hands the chooser popup, then clears pending ──
-
-describe('useSpellMetamagicFlow — Animal Shapes target confirm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('opens the beast-selection popup for the selected allies with the lv8 gate CR', async () => {
-    // Gate filters combatants by ally list — arm the picker with the goblins.
-    getAllyList.mockReturnValueOnce(['Goblin A', 'Goblin B']);
-    const setPopupHtml = vi.fn();
-    const { result } = await renderGated(SPELL_ROWS['Animal Shapes'], { setPopupHtml });
-    expect(result.current.pendingAnimalShapes).not.toBeNull();
-
-    await act(async () => {
-      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
-    });
-
-    expect(setPopupHtml).toHaveBeenCalledWith({
-      type: 'animal_shapes_target_selection',
-      targets: ['Goblin A'],
-      casterName: 'TestSorcerer',
-      campaignName: CAMPAIGN,
-      spell: expect.any(Object),
-      spellLevel: SPELL_ROWS['Animal Shapes'].level,
-      maxCR: 4,
-    });
-    expect(result.current.pendingAnimalShapes).toBeNull();
-  });
-});
+// Animal Shapes target-confirm popup routing lives in
+// useSpellMetamagicFlow/confirm-payloads.test.js (same gate → confirm →
+// payload → pending-clear chain; that file owns the popup-payload lane).

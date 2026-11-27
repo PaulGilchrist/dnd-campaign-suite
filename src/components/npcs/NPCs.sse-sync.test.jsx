@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Live-sync contract for the NPCs manager: every npcs-list-<campaign> SSE
 // event (per server/routes/npcs.js: created/updated/deleted/replaced) must
 // re-fetch and re-render the list, events for other keys are ignored, and
@@ -136,11 +136,11 @@ describe('NPCs live SSE sync', () => {
 
     // Closing consumes the skipped broadcast immediately — the list must never
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
-    // The draft is dirty, so ×/Cancel first NAMES the discard (improve
-    // 2026-10-29-V): accept it to exercise the close path.
+    // The draft is dirty, so Cancel routes through the shared keep/discard
+    // toll (copy covered in useReloadGuard tests); accepting it must still
+    // apply the missed broadcast — the flag survives the async gate.
     fireEvent.click(screen.getByText('Cancel'));
     const toll = await screen.findByRole('dialog', { name: 'Discard Changes?' });
-    expect(toll).toHaveTextContent('Discard changes to "Draft Name Mid-Edit"?');
     fireEvent.click(within(toll).getByRole('button', { name: 'Yes, Discard' }));
     await screen.findByLabelText('Edit NPC: QA Sync NPC A');
     expect(loadCallCount).toBe(2);

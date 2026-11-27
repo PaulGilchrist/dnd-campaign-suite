@@ -1,7 +1,11 @@
-// @maintained-by-ai 2026-10-15
-// Unit tests for resourceCheck.js — three small pure/logic-light functions over
-// stable contracts (runtime-store key construction, fallback precedence, arithmetic).
-// Deterministic with mocked module boundaries; no churn expected as the app changes.
+// @maintained-by-ai 2026-11-26
+// Unit tests for resourceCheck.js — automation-side resource gating over three
+// small pure/logic-light functions. Pins the observable contracts only: the
+// focusPoints level-table precedence lane, the server-first store → _trackedResources
+// pool precedence, and the exact read/write seam through the runtime store.
+// Key *casing* is pinned once in src/services/shared/usesKey.test.js; here we only
+// pin that getResourceAmount ROUTES through that derivation. spendResource/
+// checkResourceRemaining take the caller-supplied canonical key verbatim.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -9,7 +13,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
-    clearRuntimeState: vi.fn(),
 }));
 
 vi.mock('../../character/classFeatures.js', () => ({
@@ -27,7 +30,6 @@ import * as classFeatures from '../../character/classFeatures.js';
 beforeEach(() => {
     vi.clearAllMocks();
     runtimeState.getRuntimeValue.mockReturnValue(null);
-    runtimeState.setRuntimeValue.mockReturnValue(undefined);
     classFeatures.getClassFeatures.mockReturnValue(null);
 });
 
@@ -39,141 +41,105 @@ function createPlayerStats(name, level, classLevels) {
     return stats;
 }
 
-// ── getResourceAmount ──────────────────────────────────────────
+// ── getResourceAmount: focusPoints lane ────────────────────────
 
-describe('getResourceAmount', () => {
-    describe('focusPoints resource', () => {
-        it('returns focus_points from the matching classLevel entry without consulting getClassFeatures', () => {
-            const playerStats = createPlayerStats('Cleric', 5, [
-                { level: 1, focus_points: 1 },
-                { level: 5, focus_points: 3 },
-                { level: 17, focus_points: 4 },
-            ]);
+describe('getResourceAmount — focusPoints lane', () => {
+    it('the class_levels row matching the current level wins over every other source', () => {
+        // Conflicting values from every other lane so precedence is observable
+        // by value, not call order.
+        classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 9 });
+        runtimeState.getRuntimeValue.mockReturnValue(9);
+        const playerStats = createPlayerStats('Cleric', 5, [
+            { level: 1, focus_points: 1 },
+            { level: 5, focus_points: 3 },
+            { level: 17, focus_points: 4 },
+        ]);
 
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(3);
-            expect(classFeatures.getClassFeatures).not.toHaveBeenCalled();
-        });
-
-        it('falls back to getClassFeatures maxFocusPoints when classLevel.focus_points is falsy', () => {
-            const playerStats = createPlayerStats('Monk', 3, [{ level: 3, focus_points: undefined }]);
-            classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 2 });
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(2);
-        });
-
-        it('returns 0 when no class_level entry matches and getClassFeatures offers no cap', () => {
-            expect(getResourceAmount(createPlayerStats('Fighter', 1, []), 'focusPoints')).toBe(0);
-            expect(getResourceAmount(createPlayerStats('Fighter', 1), 'focusPoints')).toBe(0);
-            expect(getResourceAmount({ name: 'NPC', level: 1 }, 'focusPoints')).toBe(0);
-            expect(getResourceAmount(createPlayerStats('Wizard', 10, [{ level: 1 }, { level: 4 }]), 'focusPoints')).toBe(0);
-        });
+        expect(getResourceAmount(playerStats, 'focusPoints')).toBe(3);
+        // Pin the special-cased lane: focus points come from the level table even
+        // though trackedResources also seeds a `focusPoints` runtime row.
+        expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
     });
 
-    describe('tracked resources', () => {
-        it('builds the runtime key by lowercasing and stripping whitespace, returning the stored value as a number', () => {
-            runtimeState.getRuntimeValue.mockReturnValue('3');
+    it.each([undefined, 0])(
+        'a falsy focus_points (%s) on the matching row falls back to the features cap',
+        (focusPoints) => {
+            const playerStats = createPlayerStats('Monk', 3, [{ level: 3, focus_points: focusPoints }]);
+            classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 2 });
 
-            const result = getResourceAmount({ name: 'Monk' }, '  Flurry  ');
+            expect(getResourceAmount(playerStats, 'focusPoints')).toBe(2);
+        },
+    );
 
-            expect(result).toBe(3);
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Monk', 'flurryUses');
-        });
+    it('returns 0 when no row matches exactly and the features table offers no cap', () => {
+        // No class object at all.
+        expect(getResourceAmount({ name: 'NPC', level: 1 }, 'focusPoints')).toBe(0);
+        // Rows exist but none matches the level (exact match, not nearest).
+        expect(getResourceAmount(createPlayerStats('Wizard', 10, [{ level: 1 }, { level: 4 }]), 'focusPoints')).toBe(0);
+    });
+});
 
-        it('falls back to _trackedResources current when the stored value is null', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
+// ── getResourceAmount: tracked-resource lane ───────────────────
 
-            const playerStats = {
-                name: 'Warlock',
-                _trackedResources: { pactWordUses: { current: 2 } },
-            };
+describe('getResourceAmount — tracked-resource lane', () => {
+    it('routes through the shared uses-key derivation and coerces the stored value to a number', () => {
+        runtimeState.getRuntimeValue.mockReturnValue('3');
 
-            const result = getResourceAmount(playerStats, 'Pact Word');
+        // Casing rules are pinned in usesKey.test.js; this pins the ROUTE:
+        // name → getRuntimeUsesKey → two-arg runtime read (no campaign here).
+        expect(getResourceAmount({ name: 'Monk' }, '  Flurry  ')).toBe(3);
+        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Monk', 'flurryUses');
+    });
 
-            expect(result).toBe(2);
-        });
+    it.each([
+        ['server-first: the runtime store wins over _trackedResources', 7, { rageUses: { current: 99 } }, 7],
+        ['a stored 0 is a real value, not a fallback trigger', 0, { rageUses: { current: 5 } }, 0],
+        ['null store falls back to _trackedResources.current', null, { rageUses: { current: 2 } }, 2],
+        ['a tracked entry without current falls through to 0', null, { rageUses: {} }, 0],
+        ['absent everywhere is 0', null, undefined, 0],
+    ])('%s', (_label, stored, trackedResources, expected) => {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
+        const playerStats = {
+            name: 'Hero',
+            ...(trackedResources ? { _trackedResources: trackedResources } : {}),
+        };
 
-        it('prefers the stored value over _trackedResources when both are present', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(7);
-
-            const playerStats = {
-                name: 'Barbarian',
-                _trackedResources: { rageUses: { current: 99 } },
-            };
-
-            const result = getResourceAmount(playerStats, 'Rage');
-
-            expect(result).toBe(7);
-        });
-
-        it('returns 0 when no stored value and the tracked-resources fallback is absent', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            expect(getResourceAmount({ name: 'Wizard' }, 'Arcane Recovery')).toBe(0);
-            expect(getResourceAmount({ name: 'Monk', _trackedResources: { kiPointsUses: {} } }, 'Ki Points')).toBe(0);
-        });
+        expect(getResourceAmount(playerStats, 'Rage')).toBe(expected);
     });
 });
 
 // ── spendResource ──────────────────────────────────────────────
 
 describe('spendResource', () => {
-    it('subtracts the amount from the stored value and writes the result back through the runtime store', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(5);
+    it.each([
+        ['subtracts the amount from the stored value', 5, 1, 4],
+        ['treats a null store as 0 before subtracting', null, 1, -1],
+        ['never clamps: overspending goes negative', 2, 5, -3],
+        ['a negative amount adds the resource back', 3, -2, 5],
+    ])('%s', (_label, stored, amount, expected) => {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
 
-        const result = spendResource('Fighter', 'Rage', 1, 'TestCampaign');
-
-        expect(result).toBe(4);
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', 'Rage', 'TestCampaign');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter', 'Rage', 4, 'TestCampaign');
-    });
-
-    it('treats a null stored value as 0 before subtracting', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = spendResource('Wizard', 'Arcane', 1, 'TestCampaign');
-
-        expect(result).toBe(-1);
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Wizard', 'Arcane', -1, 'TestCampaign');
-    });
-
-    it('never clamps: overspending goes negative and a negative amount adds back', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(2);
-        expect(spendResource('Rogue', 'Sneak', 5, 'TestCampaign')).toBe(-3);
-
-        runtimeState.getRuntimeValue.mockReturnValue(3);
-        expect(spendResource('Fighter', 'Rage', -2, 'TestCampaign')).toBe(5);
+        // Canonical camelCase key passed verbatim — pins that spendResource does
+        // NOT re-derive via getRuntimeUsesKey.
+        expect(spendResource('Fighter', 'rageUses', amount, 'TestCampaign')).toBe(expected);
+        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', 'rageUses', 'TestCampaign');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter', 'rageUses', expected, 'TestCampaign');
     });
 });
 
 // ── checkResourceRemaining ─────────────────────────────────────
 
 describe('checkResourceRemaining', () => {
-    it('returns the stored value as remaining and reports canUse', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(3);
+    it.each([
+        ['the stored value is the remaining count', 3, 4, { remaining: 3, canUse: true }],
+        ['a null store defaults remaining to maxUses', null, 2, { remaining: 2, canUse: true }],
+        ['an exhausted pool blocks use', 0, 4, { remaining: 0, canUse: false }],
+        ['a negative store (overspent latch) blocks use', -1, 4, { remaining: -1, canUse: false }],
+        ['a null store with maxUses 0 blocks use', null, 0, { remaining: 0, canUse: false }],
+    ])('%s', (_label, stored, maxUses, expected) => {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
 
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 3, canUse: true });
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', 'Rage', 'TestCampaign');
-    });
-
-    it('defaults remaining to maxUses when the stored value is null', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = checkResourceRemaining('Rage', 2, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 2, canUse: true });
-    });
-
-    it('reports canUse false when remaining is 0', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(0);
-
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 0, canUse: false });
+        expect(checkResourceRemaining('rageUses', maxUses, 'Fighter', 'TestCampaign')).toEqual(expected);
+        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', 'rageUses', 'TestCampaign');
     });
 });

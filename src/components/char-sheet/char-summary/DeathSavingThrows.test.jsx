@@ -1,10 +1,13 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState, useEffect, useRef } from 'react';
 
 // Minimal in-memory stand-in for the runtime store so tests can seed state
-// and observe writes without a server or SSE connection.
+// and observe writes without a server or SSE connection. The wire shape
+// (one whole-bucket POST per lane) is pinned against the REAL store module in
+// DeathSavingThrows.roll-single-write.test.jsx / .clear-single-write.test.jsx;
+// here we assert the component-level contract only.
 const runtimeStore = new Map();
 const runtimeListeners = new Set();
 
@@ -62,7 +65,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 import DeathSavingThrows from './DeathSavingThrows.jsx';
-import { setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
 import * as conditionEffects from '../../../services/combat/conditions/conditionEffects.js';
@@ -145,25 +148,28 @@ describe('DeathSavingThrows', () => {
     expect(tracks.failure).toHaveTextContent('Failures: ⬤◯◯');
   });
 
-  it('shows "Stable" and hides the roll button once the rules report stability', () => {
-    runtimeStore.set(`${CHARACTER}:deathSaves`, [true, true, true]);
-    deathSaveRules.isStable.mockReturnValue(true);
+  it.each([
+    {
+      rule: 'isStable', shown: 'Stable', hidden: 'Dead',
+      track: 'deathSaves', filled: [true, true, true],
+      successText: 'Successes: ⬤⬤⬤', failureText: 'Failures: ◯◯◯',
+    },
+    {
+      rule: 'isDead', shown: 'Dead', hidden: 'Stable',
+      track: 'deathFailures', filled: [true, true, true],
+      successText: 'Successes: ◯◯◯', failureText: 'Failures: ⬤⬤⬤',
+    },
+  ])('locks the roll button and shows "$shown" once the rules report $rule, keeping the track history visible', (tc) => {
+    runtimeStore.set(`${CHARACTER}:${tc.track}`, tc.filled);
+    deathSaveRules[tc.rule].mockReturnValue(true);
     const { container } = renderComponent();
 
-    expect(screen.getByText('Stable')).toBeInTheDocument();
+    expect(screen.getByText(tc.shown)).toBeInTheDocument();
+    expect(screen.queryByText(tc.hidden)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
-    // Tracks stay visible so the stable state shows its full history.
-    expect(getTracks(container).success).toHaveTextContent('Successes: ⬤⬤⬤');
-  });
-
-  it('shows "Dead" and hides the roll button once the rules report death', () => {
-    runtimeStore.set(`${CHARACTER}:deathFailures`, [true, true, true]);
-    deathSaveRules.isDead.mockReturnValue(true);
-    renderComponent();
-
-    expect(screen.getByText('Dead')).toBeInTheDocument();
-    expect(screen.queryByText('Stable')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
+    const tracks = getTracks(container);
+    expect(tracks.success).toHaveTextContent(tc.successText);
+    expect(tracks.failure).toHaveTextContent(tc.failureText);
   });
 
   describe('DEAD badge (tracked isDead resource)', () => {
@@ -191,81 +197,74 @@ describe('DeathSavingThrows', () => {
 
   describe('rolling a death save', () => {
     it.each([
-      ['success', rollResult({ roll: 14, newSaves: [true, false, false] }), 'Success', 'Successes: ⬤◯◯', 'Failures: ◯◯◯', true, 1, 0],
-      ['failure', rollResult({ roll: 5, result: 'failure', newSaves: EMPTY_TRACK, newFailures: [true, false, false] }), 'Failure', 'Successes: ◯◯◯', 'Failures: ⬤◯◯', false, 0, 1],
-    ])('rolls a %s: reports feedback, updates the tracks, persists state, and logs it without touching HP', (_label, result, _expectedLabel, expectedSuccess, expectedFailure, expectedSuccessFlag, totalSuccesses, totalFailures) => {
-      deathSaveRules.rollDeathSave.mockReturnValue(result);
+      {
+        label: 'success',
+        result: rollResult({ roll: 14, newSaves: [true, false, false] }),
+        report: { roll: 14, success: true, isNat20: false, isNat1: false },
+        successText: 'Successes: ⬤◯◯', failureText: 'Failures: ◯◯◯',
+        writes: { deathSaves: [true, false, false], deathFailures: EMPTY_TRACK },
+        log: expect.objectContaining({
+          type: 'death_save', characterName: CHARACTER, roll: 14,
+          success: true, hasAdvantage: false, isNatural20: false, isNatural1: false,
+          totalSuccesses: 1, totalFailures: 0,
+        }),
+      },
+      {
+        label: 'failure',
+        result: rollResult({ roll: 5, result: 'failure', newSaves: EMPTY_TRACK, newFailures: [true, false, false] }),
+        report: { roll: 5, success: false, isNat20: false, isNat1: false },
+        successText: 'Successes: ◯◯◯', failureText: 'Failures: ⬤◯◯',
+        writes: { deathSaves: EMPTY_TRACK, deathFailures: [true, false, false] },
+        log: expect.objectContaining({
+          type: 'death_save', characterName: CHARACTER, roll: 5,
+          success: false, hasAdvantage: false, isNatural20: false, isNatural1: false,
+          totalSuccesses: 0, totalFailures: 1,
+        }),
+      },
+      {
+        label: 'natural 1 (double failure)',
+        result: rollResult({ roll: 1, result: 'failure', isNat1: true, newSaves: EMPTY_TRACK, newFailures: [true, true, false] }),
+        report: { roll: 1, success: false, isNat20: false, isNat1: true },
+        successText: 'Successes: ◯◯◯', failureText: 'Failures: ⬤⬤◯',
+        writes: { deathSaves: EMPTY_TRACK, deathFailures: [true, true, false] },
+        log: expect.objectContaining({
+          type: 'death_save', characterName: CHARACTER, roll: 1,
+          success: false, hasAdvantage: false, isNatural20: false, isNatural1: true,
+          totalSuccesses: 0, totalFailures: 2,
+        }),
+      },
+      {
+        label: 'natural 20 (restores 1 HP)',
+        result: rollResult({ roll: 20, result: 'nat20', isNat20: true, newSaves: EMPTY_TRACK, restoredToHp: 1 }),
+        report: { roll: 20, success: true, isNat20: true, isNat1: false },
+        successText: 'Successes: ◯◯◯', failureText: 'Failures: ◯◯◯',
+        // Restored HP AND both reset tracks ride in ONE batch — a split
+        // (HP first, tracks later) is exactly what could interleave into a
+        // standing creature still carrying pre-roll failures.
+        writes: { deathSaves: EMPTY_TRACK, deathFailures: EMPTY_TRACK, currentHitPoints: 1 },
+        log: expect.objectContaining({
+          type: 'death_save', characterName: CHARACTER, roll: 20,
+          success: true, hasAdvantage: false, isNatural20: true, isNatural1: false,
+          totalSuccesses: 0, totalFailures: 0,
+        }),
+      },
+    ])('rolls a $label: reports feedback, updates the tracks, persists one merged write, and logs it', (tc) => {
+      deathSaveRules.rollDeathSave.mockReturnValue(tc.result);
       const { container } = renderComponent();
       clickRollButton();
 
-      expect(onRollResult).toHaveBeenCalledWith({ roll: result.roll, success: expectedSuccessFlag, isNat20: false, isNat1: false });
+      expect(onRollResult).toHaveBeenCalledWith(tc.report);
       const tracks = getTracks(container);
-      expect(tracks.success).toHaveTextContent(expectedSuccess);
-      expect(tracks.failure).toHaveTextContent(expectedFailure);
+      expect(tracks.success).toHaveTextContent(tc.successText);
+      expect(tracks.failure).toHaveTextContent(tc.failureText);
 
-      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
-        deathSaves: result.newSaves,
-        deathFailures: result.newFailures,
-      }, CAMPAIGN);
+      // Exactly ONE write carrying the full post-roll shape (no extra HP key on
+      // non-restore rolls — exact-match + call count precludes any second body).
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, tc.writes, CAMPAIGN);
       expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, CHARACTER);
-      expect(setRuntimeBatch).not.toHaveBeenCalledWith(CHARACTER,
-        expect.objectContaining({ currentHitPoints: expect.anything() }), CAMPAIGN);
-      // Single merged write (roll-lane race fix): no sequential per-key POSTs
-      // survive on the roll path — each would be a whole-bucket snapshot a
-      // stale body could land last (see DeathSavingThrows.roll-single-write).
-      expect(setRuntimeValue).not.toHaveBeenCalled();
 
-      expect(loggedEntries()).toContainEqual(expect.objectContaining({
-        type: 'death_save',
-        characterName: CHARACTER,
-        roll: result.roll,
-        success: expectedSuccessFlag,
-        hasAdvantage: false,
-        totalSuccesses,
-        totalFailures,
-      }));
-    });
-
-    it('restores 1 HP and reports the NAT 20 result on a natural 20', () => {
-      deathSaveRules.rollDeathSave.mockReturnValue(rollResult({
-        roll: 20,
-        result: 'nat20',
-        isNat20: true,
-        newSaves: EMPTY_TRACK,
-        restoredToHp: 1,
-      }));
-      renderComponent();
-      clickRollButton();
-
-      expect(onRollResult).toHaveBeenCalledWith({ roll: 20, success: true, isNat20: true, isNat1: false });
-      // One merged POST: restored HP AND both reset tracks in the same body —
-      // a split (HP first, tracks later) is exactly what could interleave into
-      // a standing creature still carrying pre-roll failures.
-      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
-        deathSaves: EMPTY_TRACK,
-        deathFailures: EMPTY_TRACK,
-        currentHitPoints: 1,
-      }, CAMPAIGN);
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('reports the NAT 1 result and applies a double failure on a natural 1', () => {
-      deathSaveRules.rollDeathSave.mockReturnValue(rollResult({
-        roll: 1,
-        result: 'failure',
-        isNat1: true,
-        newSaves: EMPTY_TRACK,
-        newFailures: [true, true, false],
-      }));
-      const { container } = renderComponent();
-      clickRollButton();
-
-      expect(onRollResult).toHaveBeenCalledWith({ roll: 1, success: false, isNat20: false, isNat1: true });
-      expect(getTracks(container).failure).toHaveTextContent('Failures: ⬤⬤◯');
-      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
-        deathSaves: EMPTY_TRACK,
-        deathFailures: [true, true, false],
-      }, CAMPAIGN);
+      expect(loggedEntries()).toContainEqual(tc.log);
     });
 
     it('leaves HP at 0 (RAW stabilization) and logs the stable summary row', () => {
@@ -281,11 +280,11 @@ describe('DeathSavingThrows', () => {
       // Owner decision 2026-10-29: stabilization leaves the creature at 0 HP —
       // the old HP=1 write is removed (modal lane never wrote it). Row stays
       // synchronous — never deferred behind a timer.
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
       expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
         deathSaves: [true, true, true],
         deathFailures: [true, false, false],
       }, CAMPAIGN);
-      expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'stable',
@@ -307,17 +306,15 @@ describe('DeathSavingThrows', () => {
       // The fatal roll reports its face before (and independent of) the isDead
       // write that swaps the panel to the DEAD badge.
       expect(onRollResult).toHaveBeenCalledWith({ roll: 5, success: false, isNat20: false, isNat1: false });
-      // ONE merged POST carries isDead together with both final tracks — no
-      // intermediate body on the wire can pair DEAD with a stale 2/3 track.
+      // ONE merged write carries isDead together with both final tracks — no
+      // intermediate can pair DEAD with a stale 2/3 track. A dead outcome
+      // never writes HP (unchanged contract): exact payload + count pins both.
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
       expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
         deathSaves: EMPTY_TRACK,
         deathFailures: [true, true, true],
         isDead: 1,
       }, CAMPAIGN);
-      // A dead outcome never writes HP (unchanged contract).
-      expect(setRuntimeBatch).not.toHaveBeenCalledWith(CHARACTER,
-        expect.objectContaining({ currentHitPoints: expect.anything() }), CAMPAIGN);
-      expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'dead',
@@ -362,38 +359,25 @@ describe('DeathSavingThrows', () => {
   });
 
   describe('ADVANTAGE chip tooltip attribution', () => {
-    it('names a save-modifier source in the tooltip', () => {
-      conditionEffects.hasSaveModifier.mockReturnValue(true);
-      renderComponent({
-        playerStats: {
-          saveModifiers: [
-            { source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' },
-          ],
-        },
-      });
-      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
-        'title',
-        'Advantage from: Bardic Inspiration'
-      );
-    });
-
-    it('names the Beacon of Hope caster from the target effect', () => {
-      vi.mocked(getActiveTargetEffect).mockReturnValue({
-        target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric',
-      });
-      renderComponent();
-      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
-        'title',
-        'Advantage from: Beacon of Hope (Cleric)'
-      );
-    });
-
-    it('enumerates every contributing source when several stack', () => {
-      conditionEffects.hasSaveModifier.mockReturnValue(true);
-      vi.mocked(getActiveTargetEffect).mockReturnValue({
-        target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric',
-      });
-      renderComponent({
+    it.each([
+      {
+        name: 'a save-modifier source',
+        modifier: true,
+        beacon: null,
+        playerStats: { saveModifiers: [{ source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' }] },
+        title: 'Advantage from: Bardic Inspiration',
+      },
+      {
+        name: 'the Beacon of Hope caster',
+        modifier: false,
+        beacon: { target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric' },
+        playerStats: {},
+        title: 'Advantage from: Beacon of Hope (Cleric)',
+      },
+      {
+        name: 'every stacked source, deduped and filtered to death-save advantage',
+        modifier: true,
+        beacon: { target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric' },
         playerStats: {
           saveModifiers: [
             { source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' },
@@ -403,35 +387,32 @@ describe('DeathSavingThrows', () => {
             { source: 'Not That', target: 'death_saving_throws', effect: 'reroll' },
           ],
         },
-      });
-      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
-        'title',
-        'Advantage from: Bardic Inspiration, Aura, Beacon of Hope (Cleric)'
-      );
-    });
-
-    it('marks unattributable advantage distinctly instead of naming a phantom source', () => {
-      conditionEffects.hasSaveModifier.mockReturnValue(true);
-      renderComponent({
+        title: 'Advantage from: Bardic Inspiration, Aura, Beacon of Hope (Cleric)',
+      },
+      {
+        name: 'unattributable advantage distinctly instead of a phantom source',
+        modifier: true,
+        beacon: null,
+        // Bare DM-flag mod with no source field, plus an ability-scoped mod
+        // that hasSaveModifier-without-abilityName would never credit.
         playerStats: {
-          // Bare DM-flag mod with no source field, plus an ability-scoped mod
-          // that hasSaveModifier-without-abilityName would never credit.
           saveModifiers: [
             { target: 'death_saving_throws', effect: 'advantage' },
             { source: 'Wrong Scope', target: 'death_saving_throws', effect: 'advantage', abilities: ['CON'] },
           ],
         },
-      });
-      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
-        'title',
-        'Advantage — no source recorded'
-      );
+        title: 'Advantage — no source recorded',
+      },
+    ])('names $name in the tooltip', (tc) => {
+      conditionEffects.hasSaveModifier.mockReturnValue(tc.modifier);
+      vi.mocked(getActiveTargetEffect).mockReturnValue(tc.beacon);
+      renderComponent({ playerStats: tc.playerStats });
+      expect(screen.getByText('ADVANTAGE')).toHaveAttribute('title', tc.title);
     });
 
-    it('shows no chip and no tooltip on a plain dying track', () => {
+    it('shows no chip on a plain dying track', () => {
       renderComponent();
       expect(screen.queryByText('ADVANTAGE')).not.toBeInTheDocument();
-      expect(document.querySelector('.death-saves-advantage')).toBeNull();
     });
   });
 
@@ -457,9 +438,6 @@ describe('DeathSavingThrows', () => {
         deathSaves: EMPTY_TRACK,
         deathFailures: EMPTY_TRACK,
       }, CAMPAIGN);
-      // Zero sequential per-key writes remain on this path — each would be its
-      // own whole-bucket snapshot POST that a stale body could resurrect.
-      expect(setRuntimeValue).not.toHaveBeenCalled();
 
       expect(screen.queryByText(/DEAD/)).not.toBeInTheDocument();
       expect(screen.getByText('Death Saves')).toBeInTheDocument();

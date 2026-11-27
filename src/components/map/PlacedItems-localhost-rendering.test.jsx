@@ -1,36 +1,32 @@
-//@maintained-by-ai 2026-10-19
-// PlacedItems localhost-gating render lane: the isLocalhost true/false pair for
-// NPCs — token bytes survive identically for network clients, while GM-only
-// affordances (transparent grab hit rect, drag highlight) render on localhost
-// only, per the app's localhost-only GM features rule. Also pins the avatar
-// source consumed here: per-token item.imagePath (campaign-prefixed, plan D) >
-// npcImages cache > emoji > initial letter
-// (the cache map itself is built in hooks/useNpcImageCache.test.js, #909).
+// @maintained-by-ai 2026-11-26
+// PlacedItems NPC-token lane: the isLocalhost true/false pair for NPCs — token
+// bytes survive identically for network clients, while GM-only affordances
+// (transparent grab hit rect, drag highlight) render on localhost only, per the
+// app's localhost-only GM features rule. Also pins the avatar source the NPC
+// renderer consumes: per-token item.imagePath (campaign-prefixed, plan D) >
+// npcImages cache > emoji > initial letter, and a mixed NPC/prop board proving
+// each item keeps its own anchored group (the cache map itself is built in
+// hooks/useNpcImageCache.test.js, #909).
 //
 //   Element                localhost            network
 //   g.npc-group circle+name exact bytes         same bytes (survivors)
-//   grab hit rect 40×40    exact bytes+cursor  absent
+//   grab hit rect 40×40    exact bytes+cursor   absent
 //   drag highlight         circle r=24, once    absent even mid-drag
 //
 // Owned elsewhere (PlacedItems family — not repeated here):
-//   - PlacedItems.test.jsx — decor type dispatch, GM hit area + drag-shape
-//     census (DRAG_SHAPES), door panes, rotation, grid anchors, empty list
+//   - PlacedItems.test.jsx — per-type prop dispatch, positive DRAG_SHAPES
+//     census (GM hit area + highlight geometry), door panes, rotation, grid
+//     anchors (single-item renders), empty list
 //   - PlacedItems-fog.test.jsx — fog hiding and invisible-item opacity pair
 //   - PlacedItems-event-handlers.test.jsx (#929) — hit-area event wiring and
 //     exact callback payloads (render-level gating above is distinct: it
 //     asserts the affordance DOM is absent for network clients, not that
 //     events transport bytes on localhost)
-//   - PlacedItems-localhost-rendering-2.test.jsx — remote hiding + GM-only
-//     secretDoor for the 22 <use>-decor types (npc excluded there — owned here)
+//   - PlacedItems-localhost-rendering-2.test.jsx — visitor-board chrome
+//     absence + GM non-vacuity control for the shared prop/door renderers and
+//     the secretDoor GM-only rule (npc excluded there — owned here)
+//   - PlacedItems.tokens.test.jsx — monster-row marker leg (☠ glyph, ring)
 //   - drop payload consumption: #906 (drop-level npc gate); hook mutations #909
-//
-// Old (11 tests) → new (3 blocks / 6 cases):
-//   npc-group class, circle cx/cy/r, name text, highlight circle-not-rect,
-//   highlight r=24                                   → T1 (localhost/network pair)
-//   npc-initial text, clipPath id, image clip-ref, image dims
-//                                                  → T2 (+ new: cache priority,
-//                                                    mutual-exclusion of image/initial)
-//   own-group census, mixed-types census         → T3 (one mixed render)
 
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -85,36 +81,29 @@ describe('PlacedItems - NPC localhost gating', () => {
     }
   });
 
+  // Precedence chain from the source: imagePath > npcImages cache > emoji >
+  // initial. imagePath-with-populated-cache dominates the imagePath-with-empty-
+  // cache leg (same ternary branch), so only the distinguishing rows run.
   it.each([
-    ['item.imagePath beats the npcImages cache', { npcImages: { Goblin: '/cached.png' }, item: npc({ imagePath: 'images/gob.png' }) }, 'campaigns/test-campaign/images/gob.png'],
-    ['npcImages cache used when the row carries no art', { npcImages: { Goblin: '/cached.png' }, item: npc() }, '/cached.png'],
-    ['item.imagePath used when cache has no entry', { npcImages: {}, item: npc({ imagePath: 'images/gob.png' }) }, 'campaigns/test-campaign/images/gob.png'],
-    ['initial letter when no image at all', { npcImages: {}, item: npc() }, null],
-  ])('avatar source: %s', (_label, { npcImages, item }, expectedHref) => {
+    ['item.imagePath beats the npcImages cache', { npcImages: { Goblin: '/cached.png' }, item: npc({ imagePath: 'images/gob.png' }) }, 'campaigns/test-campaign/images/gob.png', null],
+    ['npcImages cache used when the row carries no art', { npcImages: { Goblin: '/cached.png' }, item: npc() }, '/cached.png', null],
+    ['initial letter when no image at all', { npcImages: {}, item: npc() }, null, 'G'],
+    ['emoji rides the initial slot (plan D)', { npcImages: {}, item: npc({ emoji: '🧙' }) }, null, '🧙'],
+  ])('avatar source: %s', (_label, { npcImages, item }, expectedHref, expectedMark) => {
     const { container } = renderNpc({ isLocalhost: true, items: [item], npcImages, campaignName: 'test-campaign' });
     const image = container.querySelector('image.creature-image');
+    const mark = container.querySelector('text.npc-initial');
     if (expectedHref) {
       expect(image).toHaveAttribute('xlink:href', expectedHref);
       expect(image).toHaveAttribute('width', '36');
       expect(image).toHaveAttribute('height', '36');
       expect(image).toHaveAttribute('clip-path', 'url(#npc-clip-npc-1)');
       expect(container.querySelector('clipPath#npc-clip-npc-1 circle')).toHaveAttribute('r', '20');
-      expect(container.querySelector('text.npc-initial')).toBeNull();
+      expect(mark).toBeNull();
     } else {
       expect(image).toBeNull();
-      expect(container.querySelector('text.npc-initial')).toHaveTextContent('G');
+      expect(mark).toHaveTextContent(expectedMark);
     }
-  });
-
-  it('emoji fallback rides the initial slot (plan D) — no image, no cache', () => {
-    const { container } = renderNpc({
-      isLocalhost: true,
-      items: [npc({ emoji: '🧙' })],
-      npcImages: {},
-      campaignName: 'test-campaign',
-    });
-    expect(container.querySelector('image.creature-image')).toBeNull();
-    expect(container.querySelector('text.npc-initial')).toHaveTextContent('🧙');
   });
 
   it('census: same-type items keep separate positioned groups; NPCs never join placed-item groups', () => {
@@ -126,12 +115,16 @@ describe('PlacedItems - NPC localhost gating', () => {
         npc({ gridX: 2 }),
       ],
     });
+    // Each barrel anchors from its OWN gridX (7 = 25−18, 57 = 75−18) — the
+    // single-item grid-anchor tests in PlacedItems.test.jsx cannot prove this.
     const barrels = container.querySelectorAll('g.placed-item');
     expect(barrels).toHaveLength(2);
     expect(barrels[0].querySelector('image')).toHaveAttribute('href', '/images/items/barrel.png');
     expect(barrels[0].querySelector('image')).toHaveAttribute('x', '7');
     expect(barrels[1].querySelector('image')).toHaveAttribute('href', '/images/items/barrel.png');
     expect(barrels[1].querySelector('image')).toHaveAttribute('x', '57');
+    // Mixed board: the NPC lane stays partitioned from the prop groups.
     expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
+    expect(container.querySelector('g.npc-group image[href*="barrel"]')).toBeNull();
   });
 });

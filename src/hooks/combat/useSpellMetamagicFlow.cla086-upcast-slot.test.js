@@ -1,15 +1,26 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
+// @maintained-by-ai 2026-11-26
 // CLA-086: the gated confirm lane pays the upcast slot but the heal seams (runCureWounds /
-// runHealingWord) historically resolved at the base makePending spellLevel. This file pins
-// ONLY the upcast seam: the canonical stampPaidSlotLevel backfill (and its cantrip / base /
-// pre-set guards), the upcast-level heal metaCtx reaching onExecute / triggerHealingWord,
-// the upcast cast-log spellLevel stamp, and skip refunding the level actually consumed.
-// Base-level (lv1) confirm payloads, pending clears, and gate opens are covered by the
-// sibling lanes (complex-handlers.spells, skip, gate). Spell fixtures mirror spells.json.
+// runHealingWord in useSimpleSpellHandlers.js SIMPLE_SPELL_SPECS) historically resolved at
+// the base makePending spellLevel. This file pins ONLY the upcast seam: the canonical
+// stampPaidSlotLevel backfill (useConfirmableFlow.js, with its cantrip / base / pre-set
+// guards), the upcast-level heal metaCtx reaching onExecute / triggerHealingWord via the
+// live healSlotLevel reader, the upcast cast-log spellLevel stamp, and a gate-armed upcast
+// pending whose paid skip refunds the level actually consumed (lv3, not lv1).
+// Owned elsewhere: base lv1 confirm payloads / pending clears / gate opens
+// (complex-handlers.spells, gate), unpaid-skip zero-write (skip), the byte-identical paid
+// refund pairs at unit level incl. the base lv1 refund and the slotConsumed producer
+// (useConfirmableFlow.skip-paid-gate). NOTE: the raw handleHealingWordConfirm/
+// handleCureWoundsConfirm factories in useComplexSpellHandlers.js:31-66 are dead shadowed
+// code (already filed) — these pins exercise the live SIMPLE_SPELL_SPECS lane.
+// Spell fixtures mirror spells.json.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { stampPaidSlotLevel } from './useConfirmableFlow.js';
+import { addEntry } from '../../services/ui/logService.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
+import { triggerHealingWord } from '../../services/rules/features/healingWordService.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -26,6 +37,9 @@ vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
   // CLA-033: fired by the gated confirm lane's rider seam in useConfirmableFlow.
   triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  // CLA-037 twin on the same confirm-lane seam — unmocked it throws a
+  // swallowed TypeError inside fireConfirmLaneRider (console.error noise).
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -189,88 +203,58 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     vi.clearAllMocks();
   });
 
-  it('Cure Wounds upcast lv3: metaCtx.slotLevel reaches onExecute at 3 and the cast log stamps 3', async () => {
-    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
-    const { addEntry } = await import('../../services/ui/logService.js');
+  it.each([
+    { label: 'Cure Wounds', spell: CURE_WOUNDS, confirm: 'handleCureWoundsConfirm', spellName: 'Cure Wounds', viaOnExecute: true },
+    { label: 'Healing Word', spell: HEALING_WORD, confirm: 'handleHealingWordConfirm', spellName: 'Healing Word', viaOnExecute: false },
+  ])('$label upcast lv3: runner metaCtx and cast log resolve at the paid slot', async ({ spell, confirm, spellName, viaOnExecute }) => {
     const onExecute = vi.fn();
     const { result } = renderFlow(onExecute);
 
     await act(async () => {
-      await result.current.gateMetamagic({ ...CURE_WOUNDS, isUpcast: true, upcastLevel: 3 });
+      await result.current.gateMetamagic({ ...spell, isUpcast: true, upcastLevel: 3 });
     });
-    expect(result.current.pendingCureWounds).not.toBeNull();
-
     await act(async () => {
-      await result.current.handleCureWoundsConfirm({ targetName: 'Ally One' });
+      await result.current[confirm]({ targetName: 'Ally One' });
     });
 
     // Slot payment stays at the upcast level...
+    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     const prepOpts = prepareSpellCast.mock.calls[0][2];
     expect(prepOpts.upcastLevel).toBe(3);
     expect(prepOpts.isUpcast).toBe(true);
-    // ...and the heal metaCtx now carries it (was lv1 pre-fix).
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Ally One', slotLevel: 3 });
+    // ...and the heal metaCtx now carries it (was lv1 pre-fix). Runner called
+    // exactly once also proves the gate armed the pending it consumed.
+    const runner = viaOnExecute ? onExecute : triggerHealingWord;
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(runner.mock.calls[0][1]).toEqual({ targetName: 'Ally One', slotLevel: 3 });
+    // Cast row stamps the paid level, not the base makePending level.
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       type: 'spell',
-      spellName: 'Cure Wounds',
+      spellName,
       spellLevel: 3,
     }));
   });
 
-  it('Healing Word upcast lv3: triggerHealingWord metaCtx resolves at slot 3', async () => {
-    const { triggerHealingWord } = await import('../../services/rules/features/healingWordService.js');
-    const { addEntry } = await import('../../services/ui/logService.js');
-    const { result } = renderFlow(vi.fn());
-
-    await act(async () => {
-      await result.current.gateMetamagic({ ...HEALING_WORD, isUpcast: true, upcastLevel: 3 });
-    });
-    expect(result.current.pendingHealingWord).not.toBeNull();
-
-    await act(async () => {
-      await result.current.handleHealingWordConfirm({ targetName: 'Ally One' });
-    });
-
-    expect(triggerHealingWord).toHaveBeenCalledTimes(1);
-    expect(triggerHealingWord.mock.calls[0][1]).toEqual({ targetName: 'Ally One', slotLevel: 3 });
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      type: 'spell',
-      spellName: 'Healing Word',
-      spellLevel: 3,
-    }));
-  });
-
-  it('skip refunds the slot level actually consumed — lv3 upcast back to lv3, base lv1 back to lv1', async () => {
-    const { setRuntimeValue, getRuntimeValue } = await import('../runtime/useRuntimeState.js');
+  it('skip of a gate-armed paid lv3 upcast refunds the level actually consumed (lv3, not lv1)', async () => {
     const { result } = renderFlow(vi.fn());
 
     await act(async () => {
       await result.current.gateMetamagic({ ...CURE_WOUNDS, isUpcast: true, upcastLevel: 3 });
     });
-    // 2026-11-15 pay-state gate (bug-revivify-chooser-skip-rollback-inflates-
-    // unspent-slot): gates arm UNPAID — this refund pair is the PAID lane's
-    // bytes, so the rig stamps the money-state flag the confirm pay seam
-    // produces (pending.slotConsumed) before skipping. The refund bytes are
-    // unchanged.
+    // Integration half skip-paid-gate.test.js cannot see: the REAL gateMetamagic
+    // pending must carry spell.upcastLevel into the refund lane (that file
+    // hand-builds its pending). Money-state: gates arm UNPAID (2026-11-15
+    // pay-state gate) and confirm both pays and clears the pending, so a paid
+    // skip is only reachable by stamping the flag the pay seam produces.
     result.current.pendingCureWounds.slotConsumed = true;
     act(() => {
       result.current.handleCureWoundsSkip();
     });
 
     // lv3 read back and refunded at lv3 (2 → 3); lv1 ledger untouched by the upcast skip.
+    // The base lv1 refund pair is owned by skip-paid-gate.test.js.
     expect(getRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_3');
     expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_3', 3, 'TestCampaign');
     expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'spell_slots_level_1')).toHaveLength(0);
-
-    // Base-level skip keeps the legacy byte-identical lv1 refund (4 → 5).
-    await act(async () => {
-      await result.current.gateMetamagic(CURE_WOUNDS);
-    });
-    result.current.pendingCureWounds.slotConsumed = true;
-    act(() => {
-      result.current.handleCureWoundsSkip();
-    });
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_1', 5, 'TestCampaign');
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import Sessions from './Sessions.jsx';
@@ -82,7 +82,6 @@ function renderSessions(overrides = {}) {
       campaignName="test-campaign"
       characters={[]}
       isLocalhost={true}
-     
       onViewInitiative={onViewInitiative}
       {...overrides}
     />
@@ -192,26 +191,21 @@ describe('Sessions — linked-resource automations', () => {
     await waitFor(() => expect(toastText()).toBe('Grixxa added to initiative'));
   });
 
-  it('disables the To Initiative chip for a statless NPC without touching the service', async () => {
+  it('gates the To Initiative chip on the loaded NPC stats: statless → disabled, service untouched', async () => {
+    // The container maps loadNPCs rows through npcHasStatBlock to build the
+    // picker's combatReady flag (the modal-side disabled/title contract is
+    // pinned in SessionPlannerModal.test.jsx).
     loadNPCs.mockResolvedValue({ npcs: [{ name: 'Grixxa' }] }); // no AC, no HP
     sessionMockStore.items = [makeSession('Session 7', {
       links: { ...emptyLinks(), npcs: ['Grixxa'] },
     })];
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderSessions();
     openEditor('Session 7');
 
     const initBtn = screen.getByRole('button', { name: /to initiative/i });
     // chip starts enabled while the picker loads, becomes disabled once Grixxa's stats resolve
     await waitFor(() => expect(initBtn).toBeDisabled());
-    expect(initBtn).toHaveAttribute('title',
-      "Fill in Grixxa's AC and HP (Stats tab) before adding to Initiative");
-    fireEvent.click(initBtn);
-    await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
     expect(addNPCToInitiative).not.toHaveBeenCalled();
-    expect(document.querySelector('.sessions-form-error')).toBeNull();
-    expect(consoleSpy).not.toHaveBeenCalled();
-    consoleSpy.mockRestore();
   });
 
   it('toasts a friendly message when a stale enabled chip hits a statless NPC (no throw, no form error)', async () => {
@@ -296,8 +290,11 @@ describe('Sessions — linked-resource automations', () => {
 
   // QA backlog 2026-11-24: the native `Delete Session Plan "X"?` confirm is
   // retired — the planner footer Delete opens the shared DeleteConfirmModal
-  // tier (mirrors EncounterModal.delete-confirm-modal.test.jsx). A native
-  // confirm firing anywhere on these lanes throws.
+  // tier. The dialog's own Escape/backdrop/focus contract is pinned in
+  // components/common/DeleteConfirmModal.test.jsx and the staged-confirm-only
+  // writer rule in useDeleteRequest.test.js; here we prove the Sessions wiring:
+  // the dialog names the edited session, a dismissal is zero-write with the
+  // planner intact, and Confirm deletes exactly once and closes everything.
   const forbidNativeDialogs = () => {
     const spy = vi.spyOn(window, 'confirm').mockImplementation(() => {
       throw new Error('native window.confirm fired on the sessions delete path');
@@ -308,49 +305,37 @@ describe('Sessions — linked-resource automations', () => {
     return { spy, promptSpy };
   };
 
-  const openDeleteDialog = () => {
-    renderSessions();
+  const armDeleteDialog = () => {
     openEditor('Session 7');
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
     return screen.getByRole('dialog', { name: 'Delete Session Plan' });
   };
 
-  it('deletes the edited session through the shared in-app confirm dialog', async () => {
+  it('deletes the edited session through the shared in-app confirm dialog (dismiss is zero-write)', async () => {
     const { spy, promptSpy } = forbidNativeDialogs();
     sessionMockStore.items = [makeSession('Session 7')];
-    const dialog = openDeleteDialog();
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveTextContent('Session 7');
-    expect(within(dialog).getByRole('button', { name: 'Cancel', exact: true })).toHaveFocus();
-    await waitFor(() => expect(sessionMockStore.deleteItem).not.toHaveBeenCalled());
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
-    });
-    expect(sessionMockStore.deleteItem).toHaveBeenCalledWith('Session 7');
-    expect(spy).not.toHaveBeenCalled();
-    expect(promptSpy).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
+    renderSessions();
 
-  it.each`
-    dismiss | label
-    ${'cancel'}   | ${'the Cancel button'}
-    ${'escape'}   | ${'ESCAPE'}
-    ${'backdrop'} | ${'a pure BACKDROP click'}
-  `('$label dismisses the delete dialog zero-write (planner intact, no native confirm)', ({ dismiss }) => {
-    const { spy, promptSpy } = forbidNativeDialogs();
-    sessionMockStore.items = [makeSession('Session 7')];
-    const dialog = openDeleteDialog();
-    if (dismiss === 'cancel') {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel', exact: true }));
-    } else if (dismiss === 'escape') {
-      fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Cancel', exact: true }), { key: 'Escape' });
-    } else {
-      fireEvent.click(document.querySelector('.modal-shell-overlay'));
-    }
+    const dialog = armDeleteDialog();
+    expect(dialog).toHaveTextContent('Session 7');
+    // Dismiss: the staged confirm is the only writer — nothing fires, the
+    // planner stays open with the draft intact.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel', exact: true }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(sessionMockStore.deleteItem).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: /plan session/i })).toBeInTheDocument();
+
+    // Re-arm and Confirm: the named session is deleted once and both the
+    // dialog and the planner close.
+    armDeleteDialog();
+    expect(sessionMockStore.deleteItem).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+    });
+    expect(sessionMockStore.deleteItem).toHaveBeenCalledTimes(1);
+    expect(sessionMockStore.deleteItem).toHaveBeenCalledWith('Session 7');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /plan session/i })).not.toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
     expect(promptSpy).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // CharSummary test lane: ally-modal data source + confirm happy path, and
 // click-to-roll initiative (advantage ternary + exhaustion penalty).
@@ -174,7 +174,7 @@ describe('CharSummary - Ally Modal data source', () => {
                 type: 'ability_use',
                 characterName: mockPlayerStats.name,
                 abilityName: 'Ally Selection',
-                description: 'Thorin selected allies: Ally1, Ally2',
+                description: `${mockPlayerStats.name} selected allies: Ally1, Ally2`,
             })
         );
         // Modal closes immediately on confirm.
@@ -194,10 +194,12 @@ describe('CharSummary - Initiative', () => {
         vi.clearAllMocks();
     });
 
+    // Two cases cover the whole matrix: the advantage case pins the '+2'
+    // display and the forcedMode option; the exhaustion case pins the penalty
+    // formula, the '-1' display, and the no-advantage `undefined` option.
     it.each([
-        { label: 'no advantage', initiative: 2, initiativeAdvantage: false, exhaustionLevel: 0, displayText: '+2', expectedMod: 2, expectedOpts: undefined },
         { label: 'forced advantage', initiative: 2, initiativeAdvantage: true, exhaustionLevel: 0, displayText: '+2', expectedMod: 2, expectedOpts: { forcedMode: 'advantage' } },
-        { label: 'exhaustion penalty producing a negative modifier', initiative: 1, initiativeAdvantage: false, exhaustionLevel: 1, displayText: '-1', expectedMod: -1, expectedOpts: undefined },
+        { label: 'exhaustion penalty producing a negative modifier with no advantage', initiative: 1, initiativeAdvantage: false, exhaustionLevel: 1, displayText: '-1', expectedMod: -1, expectedOpts: undefined },
     ])('clicking Initiative rolls $expectedMod with $label', ({ initiative, initiativeAdvantage, exhaustionLevel, displayText, expectedMod, expectedOpts }) => {
         renderSummary({
             playerStats: { ...mockPlayerStats, initiative, initiativeAdvantage },

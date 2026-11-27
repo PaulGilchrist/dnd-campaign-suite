@@ -1,7 +1,8 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // SEARING VENGEANCE HEAL SEAM (quad file 1/4). Canonical home of:
 // - getRealMaxHp runtime-truth: combatSummary player entries are 1/1 placeholders,
-//   runtime hitPoints is max-HP truth; healAmount = floor(maxHp/2); targetMaxHp payload pin.
+//   runtime hitPoints is max-HP truth; healAmount = floor(maxHp/2); targetMaxHp payload pin,
+//   plus confirm-time re-derivation of that math when the payload omits both fields.
 // - confirm-time heal through the REAL applyHealingToTarget chokepoint (both sibling
 //   suites mock it): modifyHitPoints runtime write, canonical 0→positive revive folded
 //   into ONE merged setRuntimeBatch (HP + deathSaves/deathFailures/isDead, CLA-092),
@@ -9,9 +10,9 @@
 // - burst gate centered on the healed target, not the caster (source-keyed isWithinRange
 //   mock — Handler.test.js 'filters creatures by ally range and attack range' keys by
 //   target name only and cannot catch a caster-centred regression).
-// Also carries the quad's only full-args applyDamageToTarget pin (folded into the
-// confirm heal test below) — ConfirmPath lane may adopt it in
-// 'handles multiple targets by applying damage to each', then drop it here.
+// The burst-damage full-args pin was ADOPTED by the ConfirmPath lane
+// ('handles multiple targets by applying damage to each', quad-canonical) and is
+// dropped here — damage fanout is not this seam's claim.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -56,7 +57,7 @@ import { handle, confirmSearingVengeance } from './searingVengeanceHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
-import * as applyDamage from '../../../rules/combat/applyDamage.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'test-campaign';
@@ -94,6 +95,10 @@ function makePlayerStats(overrides = {}) {
 describe('searingVengeance CLA-304 heal math', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps factory implementations, but the burst-gate test
+    // overwrites isWithinRange source-keyed — re-install the default so tests
+    // stay order-independent.
+    rangeCheck.isWithinRange.mockImplementation(async () => true);
   });
 
   it('heals from runtime real maxHp when combatSummary player entry is a 1/1 placeholder', async () => {
@@ -132,7 +137,6 @@ describe('searingVengeance CLA-304 heal math', () => {
         { name: 'FarThug', type: 'npc', currentHp: 32, maxHp: 32 },
       ],
     });
-    const rangeCheck = await import('../../../rules/combat/rangeCheck.js');
     // source-keyed mock: within-range is true only from the HEALED ally, never from the caster
     rangeCheck.isWithinRange.mockImplementation(async (source, target) => {
       if (source === 'HexWarlock') return true;
@@ -209,8 +213,54 @@ describe('searingVengeance CLA-304 heal math', () => {
       maxHp: 12,
       isHealing: true,
     }));
-    // quad's only full-args burst-damage pin (borrowed from the CHA test, whose own
-    // rollExpression pin lives in ConfirmPath 'resolves CHA modifier from abilities bonus')
-    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 18, ['Radiant'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'HexWarlock' });
+  });
+
+  it('re-derives the heal at confirm from runtime max HP when the payload omits healAmount/targetMaxHp', async () => {
+    // Odd 13 HP proves the floor: floor(13/2) = 6, sourced from runtime
+    // hitPoints, never the 1/1 combatSummary placeholder.
+    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
+      if (key === 'searingVengeanceUses') return 1;
+      if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
+      if (subject === 'LightfootHalfling' && key === 'hitPoints') return 13;
+      return null;
+    });
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'LightfootHalfling', type: 'player', currentHp: 1, maxHp: 1 },
+        { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32 },
+      ],
+    });
+    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [5, 5] });
+
+    const result = await confirmSearingVengeance({
+      automation: makeAction().automation,
+      playerStats: makePlayerStats(),
+      campaignName,
+      mapName: null,
+      characters: [],
+      payload: { name: 'Searing Vengeance', targetName: 'LightfootHalfling', selectedTargets: ['Thug 1'] },
+    });
+
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'LightfootHalfling',
+      {
+        currentHitPoints: 6,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+      },
+      campaignName
+    );
+    expect(result.payload.description).toContain('regains 6 HP');
+    // heal log carries the runtime max-HP truth, not the placeholder 1
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'hp_change',
+      targetName: 'LightfootHalfling',
+      delta: 6,
+      currentHp: 6,
+      maxHp: 13,
+      isHealing: true,
+    }));
   });
 });

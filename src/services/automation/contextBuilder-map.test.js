@@ -1,15 +1,14 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // ── contextBuilder MAP lane: buildAttackContext with a mapName ─────────
 // Owns the whole map lane of contextBuilder-map.js: sync delegation,
 // map/NPC loading, target-position resolution, range + improved-illusion
-// range, melee proximity, aura accumulation, and the FULL cover lane
-// (computeCover → Sharpshooter ignore → half-cover grants → Defensive
+// effective range, melee proximity, aura accumulation, and the FULL cover
+// lane (computeCover → Sharpshooter ignore → half-cover grants → Defensive
 // Duelist → bait-and-switch → finalizeCover).
 //
 // Absorbs the former contextBuilder-cover.test.js bait-and-switch tests
-// (that file is now redundant — recommend deletion to the orchestrator).
-// Fully mocked and deterministic; only a rename/removal of a mocked
-// collaborator in contextBuilder-map.js forces a mechanical update here.
+// (that file is a redundant duplicate — recommend deletion to the
+// orchestrator). Assertion-identical pairs ride it.each tables.
 //
 // Lane notes (do not confuse these cover implementations):
 // - common/damageRoll.js computeMapAwareContext is a separate, simpler
@@ -19,8 +18,16 @@
 // envelope { npcs: [...] } (server GET /api/campaigns/:campaign/npcs,
 // jsonEntityCrud.js:49 responseWrapper) — a bare-array mock hid the
 // envelope-vs-array TypeError at contextBuilder-map.js applyMeleeProximity.
+// The melee-proximity table test behavior-gates on the filtered threats, so
+// the crash regresses as a missing forcedMode, not a mock-call failure.
 // Teardown hygiene (#1181): this lane stubs NO global fetch (all transport
 // is vi.mock'd above) — no afterEach vi.unstubAllGlobals pairing needed.
+//
+// Mock-call assertions survive ONLY where the argument IS the observable
+// contract (position fed to computeCover, opts mode fed to aura utils,
+// effective range fed to computeRangeEffect). Everything else asserts the
+// final context; guards like "cover skipped on auto-miss" prove themselves
+// by a live computeCover return that never reaches the context.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContext } from './contextBuilder.js';
@@ -97,6 +104,8 @@ function setupDefaults() {
   isHostileNPC.mockReturnValue(false);
 }
 
+// Full-lane fixture: attacker Fighter1 (1,1) on the map, target resolved via
+// combat context + nearest placed item at (gridX, gridY).
 function setupMapPathWithTarget(targetName, gridX, gridY) {
   loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
   getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', targetName, gridX, gridY));
@@ -105,18 +114,26 @@ function setupMapPathWithTarget(targetName, gridX, gridY) {
   getDistanceFeet.mockReturnValue(50);
 }
 
-// Helper to create NPC map data with placed items
-function makeMapDataWithNPCs(players, npcs) {
-  return makeMapData(
-    players || [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-    npcs || []
-  );
+// The standard cover/aura/range stage: Fighter1 (1,1) firing at a placed
+// Orc (10,10) so range, cover and proximity lanes all run.
+function setupTargetOnMap(npc = { name: 'Orc', gridX: 10, gridY: 10 }) {
+  setupMapPathWithTarget(npc.name, npc.gridX, npc.gridY);
+  loadMapData.mockResolvedValue(makeMapData(
+    [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+    [npc],
+  ));
 }
 
 // Route runtime lookups by "entity:key" (getRuntimeValue(entity, key, campaign)).
 function mockRuntimeKeys(map) {
   getRuntimeValue.mockImplementation((entity, key) => map[`${entity}:${key}`]);
 }
+
+function statsWith(passives) {
+  return { ...mockStats, automation: { passives } };
+}
+
+const SHARPSHOOTER = [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }];
 
 function buildAttack(attack = mockRangedAttack, playerStats = mockStats, featRangeEffects = {}) {
   return buildAttackContext({ attack, playerStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects });
@@ -129,22 +146,19 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
   });
 
   describe('no map name — delegates to sync path', () => {
-    it('returns base attack context when mapName is null or undefined', async () => {
-      let result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: null, conditionAttackMode: 'normal', featRangeEffects: {} });
-      expect(result.targetName).toBe('Orc');
-      expect(result.attackerName).toBe('Fighter1');
-      expect(result.damageType).toBe('Piercing');
-      expect(result.isMelee).toBe(false);
-      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: undefined, conditionAttackMode: 'normal', featRangeEffects: {} });
-      expect(result.targetName).toBe('Orc');
+    it('returns the sync context untouched and loads no map data', async () => {
+      for (const mapName of [null, undefined]) {
+        const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName, conditionAttackMode: 'normal', featRangeEffects: {} });
+        expect(result.targetName).toBe('Orc');
+      }
       expect(loadMapData).not.toHaveBeenCalled();
     });
   });
 
   describe('map data loading', () => {
-    it('loads map data and NPC data when mapName is provided', async () => {
+    it('fetches map and NPC data for the campaign when mapName is provided', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      await buildAttack('Longbow');
+      await buildAttack();
       expect(loadMapData).toHaveBeenCalledWith('camp', 'test-map');
       expect(loadNPCs).toHaveBeenCalledWith('camp');
     });
@@ -156,32 +170,25 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(computeCover).not.toHaveBeenCalled();
     });
 
-    it('returns base context when map data is null or has no players array', async () => {
-      let result = await buildAttack(); // loadMapData defaults to null
-      expect(result.targetName).toBe('Orc');
+    it('returns base context for degraded map and combat inputs', async () => {
+      // null map data, players-less map data, and a rejected map load all
+      // resolve to the sync base context; so does a rejected combat context
+      // (the outer .catch(() => basePromise) of buildAttackContext).
+      loadMapData.mockResolvedValue(null);
+      expect((await buildAttack()).targetName).toBe('Orc');
       loadMapData.mockResolvedValue({});
-      result = await buildAttack();
-      expect(result.targetName).toBe('Orc');
-    });
-
-    it('handles map loading rejection gracefully', async () => {
+      expect((await buildAttack()).targetName).toBe('Orc');
       loadMapData.mockRejectedValue(new Error('map load failed'));
-      const result = await buildAttack();
-      expect(result.targetName).toBe('Orc');
-    });
-
-    it('handles getCombatContext rejection gracefully', async () => {
+      expect((await buildAttack()).targetName).toBe('Orc');
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockRejectedValue(new Error('combat context failed'));
-      const result = await buildAttack();
-      expect(result.targetName).toBe('Orc');
+      expect((await buildAttack()).targetName).toBe('Orc');
     });
   });
 
   describe('range effects', () => {
     it('marks attack as auto miss when range effect returns miss', async () => {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
+      setupTargetOnMap();
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
       const result = await buildAttack();
       expect(result.isAutoMiss).toBe(true);
@@ -190,8 +197,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
 
     it('sets disadvantage when range effect returns disadvantage', async () => {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
+      setupTargetOnMap();
       computeRangeEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Long range' });
       const result = await buildAttack();
       expect(result.forcedMode).toBe('disadvantage');
@@ -199,58 +205,66 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
   });
 
-  describe('cover calculations', () => {
-    // Puts attacker (1,1) and a placed-NPC target Orc (10,10) on the map so
-    // the full cover lane (applyCoverModifiers) runs.
-    function setupCoverTest() {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
-    }
+  describe('effective range fed to computeRangeEffect', () => {
+    const ILLUSIONS = [{ type: 'improved_illusions' }];
 
+    it.each([
+      ['Illusion spell with range 10+ feet gets +60', { ...mockRangedAttack, damage: '1d4', damageType: 'Force', range: 120, school: 'Illusion' }, ILLUSIONS, {}, 180],
+      ['non-Illusion spell gets no illusion bonus', { ...mockRangedAttack, school: 'Evocation' }, ILLUSIONS, {}, 150],
+      ['Illusion spell under 10 feet gets no bonus', { ...mockRangedAttack, range: 5, school: 'Illusion' }, ILLUSIONS, {}, 5],
+      ['feat spellRangeBonus stacks on improved illusions', { ...mockRangedAttack, damage: '1d4', damageType: 'Force', range: 120, school: 'Illusion' }, ILLUSIONS, { spellRangeBonus: 30 }, 210],
+      ['spellRangeBonus applies to plain weapon attacks too', mockRangedAttack, [], { rangeMultiplier: 1, spellRangeBonus: 10 }, 160],
+    ])('%s', async (_label, attack, passives, featRangeEffects, expectedRange) => {
+      setupTargetOnMap();
+      await buildAttack(attack, statsWith(passives), featRangeEffects);
+      expect(computeRangeEffect).toHaveBeenCalledWith(expectedRange, expect.any(Number), expect.any(Object));
+    });
+
+    it('resolves missing featRangeEffects to defaults without crashing', async () => {
+      setupTargetOnMap();
+      for (const featRangeEffects of [undefined, null]) {
+        await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects });
+        expect(computeRangeEffect).toHaveBeenCalledWith(150, expect.any(Number), expect.any(Object));
+      }
+    });
+  });
+
+  describe('cover calculations', () => {
     // ── Sharpshooter: ranged WEAPON attacks ignore half/three-quarters only ──
 
-    it('ignores half cover for ranged weapon attacks with ignore_cover_ranged passive', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttack(mockRangedAttack, stats);
-      expect(result.coverAcBonus).toBeUndefined();
-      expect(result.isAutoMiss).toBeUndefined();
-      expect(result.coverReason).toBe('Sharpshooter');
-    });
-
-    it('ignores three-quarter cover for ranged weapon attacks with ignore_cover_ranged passive', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttack(mockRangedAttack, stats);
-      expect(result.coverAcBonus).toBeUndefined();
-      expect(result.isAutoMiss).toBeUndefined();
-      expect(result.coverReason).toBe('Sharpshooter');
-    });
+    it.each(['half', 'threeQuarter'])(
+      'ignores %s cover for ranged weapon attacks with ignore_cover_ranged passive',
+      async (level) => {
+        setupTargetOnMap();
+        computeCover.mockReturnValue({ level, acBonus: level === 'half' ? 2 : 5 });
+        const result = await buildAttack(mockRangedAttack, statsWith(SHARPSHOOTER));
+        expect(result.coverAcBonus).toBeUndefined();
+        expect(result.isAutoMiss).toBeUndefined();
+        expect(result.coverReason).toBe('Sharpshooter');
+      },
+    );
 
     it('does not ignore full cover for ranged weapon attacks with ignore_cover_ranged passive', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'full', acBonus: null });
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttack(mockRangedAttack, stats);
+      const result = await buildAttack(mockRangedAttack, statsWith(SHARPSHOOTER));
       expect(result.isAutoMiss).toBe(true);
       expect(result.coverReason).toBe('Target has full cover');
     });
 
     it('respects coverTypes metadata on the ignore_cover_ranged passive', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged', coverTypes: ['Half'] }] } };
+      const stats = statsWith([{ type: 'passive_rule', effect: 'ignore_cover_ranged', coverTypes: ['Half'] }]);
       const result = await buildAttack(mockRangedAttack, stats);
       expect(result.coverAcBonus).toBe(5);
       expect(result.coverLevel).toBe('threeQuarter');
     });
 
-    // ── Baseline application and auto-miss guard ──
+    // ── Baseline application and auto-miss / unresolved-position guards ──
 
     it('applies cover AC bonus when cover is not none and not full', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const result = await buildAttack();
       expect(result.coverAcBonus).toBe(2);
@@ -258,95 +272,60 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
 
     it('does not apply cover when attack is auto miss from range', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const result = await buildAttack();
       expect(result.isAutoMiss).toBe(true);
+      // A live half-cover return that never reaches the context proves the
+      // cover lane was skipped (no mock-call assertion needed).
       expect(result.coverAcBonus).toBeUndefined();
-      expect(computeCover).not.toHaveBeenCalled();
     });
 
     it('does not apply cover when target position cannot be resolved', async () => {
+      setupTargetOnMap();
+      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       // Branch 1: no combat context at all.
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(null);
-      await buildAttack();
-      expect(computeCover).not.toHaveBeenCalled();
+      expect((await buildAttack()).coverAcBonus).toBeUndefined();
       // Branch 2: combat context exists but no target from attacker.
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue(null);
-      await buildAttack();
-      expect(computeCover).not.toHaveBeenCalled();
+      expect((await buildAttack()).coverAcBonus).toBeUndefined();
     });
 
-    // ── Melee attacks always keep cover (Sharpshooter is ranged-only) ──
+    // ── Sharpshooter is ranged-WEAPON only: other attack shapes keep cover ──
 
-    it('applies cover for melee attacks even when ignore_cover_ranged passive exists', async () => {
-      setupCoverTest();
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const meleeWeapon = { ...mockRangedAttack, weaponType: 'melee', range: 5 };
-      const meleeSpell = { name: 'Inflict Wounds', damage: '3d10', damageType: 'Necrotic', hitBonus: 7, weaponType: 'melee', range: 5, school: 'Necromancy' };
-
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      let result = await buildAttack(meleeWeapon, stats);
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-
-      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
-      result = await buildAttack(meleeSpell, stats);
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('threeQuarter');
-    });
-
-    it('applies cover for ranged spell attacks even when ignore_cover_ranged passive exists', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      const rangedSpellAttack = { name: 'Fire Bolt', damage: '4d10', damageType: 'Fire', hitBonus: 9, range: 120, school: 'Evocation' };
-      const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttack(rangedSpellAttack, stats);
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
+    it.each([
+      ['melee weapon', { ...mockRangedAttack, weaponType: 'melee', range: 5 }, 'half', 2],
+      ['melee spell', { name: 'Inflict Wounds', damage: '3d10', damageType: 'Necrotic', hitBonus: 7, weaponType: 'melee', range: 5, school: 'Necromancy' }, 'threeQuarter', 5],
+      ['ranged spell', { name: 'Fire Bolt', damage: '4d10', damageType: 'Fire', hitBonus: 9, range: 120, school: 'Evocation' }, 'half', 2],
+    ])('applies cover for %s attacks even when ignore_cover_ranged passive exists', async (_label, attack, level, acBonus) => {
+      setupTargetOnMap();
+      computeCover.mockReturnValue({ level, acBonus });
+      const result = await buildAttack(attack, statsWith(SHARPSHOOTER));
+      expect(result.coverAcBonus).toBe(acBonus);
+      expect(result.coverLevel).toBe(level);
     });
 
     // ── Half-cover grants: Nature's Sanctuary / Bulwark of Force / Smite of Protection ──
 
-    it("Nature's Sanctuary grants half cover to listed creatures", async () => {
-      setupCoverTest();
+    it.each([
+      ["Nature's Sanctuary", 'half cover to listed creatures', () => mockRuntimeKeys({ 'Fighter1:naturesSanctuaryCreatures': ['Orc'] })],
+      ['Bulwark of Force', 'half cover to its marked targets', () => mockRuntimeKeys({ 'Fighter1:bulwarkOfForceActive': true, 'Fighter1:bulwarkOfForceTargets': ['Orc'] })],
+      ['Smite of Protection', 'half cover while attacker aura covers the target', () => { hasAuraOfProtection.mockReturnValue(true); mockRuntimeKeys({ 'Fighter1:smiteOfProtectionActive': true }); }],
+    ])('%s grants %s', async (reason, _blurb, arrange) => {
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      mockRuntimeKeys({ 'Fighter1:naturesSanctuaryCreatures': ['Orc'] });
+      arrange();
       const result = await buildAttack();
       expect(result.coverAcBonus).toBe(2);
       expect(result.coverLevel).toBe('half');
-      expect(result.coverReason).toBe("Nature's Sanctuary");
-    });
-
-    it('Bulwark of Force grants half cover to its marked targets', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      mockRuntimeKeys({
-        'Fighter1:bulwarkOfForceActive': true,
-        'Fighter1:bulwarkOfForceTargets': ['Orc'],
-      });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-      expect(result.coverReason).toBe('Bulwark of Force');
-    });
-
-    it('Smite of Protection grants half cover while attacker aura covers the target', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      hasAuraOfProtection.mockReturnValue(true);
-      mockRuntimeKeys({ 'Fighter1:smiteOfProtectionActive': true });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-      expect(result.coverReason).toBe('Smite of Protection');
+      expect(result.coverReason).toBe(reason);
     });
 
     it('does not override real cover with a half-cover grant', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       mockRuntimeKeys({ 'Fighter1:naturesSanctuaryCreatures': ['Orc'] });
       const result = await buildAttack();
@@ -356,7 +335,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
 
     it('does not grant cover when the runtime keys do not match the target', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
       mockRuntimeKeys({
         'Fighter1:naturesSanctuaryCreatures': ['Troll'],
@@ -373,103 +352,64 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     // (rules/combat/coverService.js pins the label law); finalizeCover rides
     // it into coverReason so a barrel row is distinguishable from a grant row.
 
-    it('names the covering furniture item in coverReason for half cover', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2, sourceLabel: 'Barrel' });
+    it.each([
+      [{ level: 'half', acBonus: 2, sourceLabel: 'Barrel' }],
+      [{ level: 'threeQuarter', acBonus: 5, sourceLabel: 'Altar' }],
+    ])('names the covering furniture item in coverReason', async (cover) => {
+      setupTargetOnMap();
+      computeCover.mockReturnValue(cover);
       const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-      expect(result.coverReason).toBe('Barrel');
-    });
-
-    it('names the covering furniture item in coverReason for three-quarter cover', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5, sourceLabel: 'Altar' });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('threeQuarter');
-      expect(result.coverReason).toBe('Altar');
+      expect(result.coverAcBonus).toBe(cover.acBonus);
+      expect(result.coverLevel).toBe(cover.level);
+      expect(result.coverReason).toBe(cover.sourceLabel);
     });
 
     it('keeps the furniture source label when bait-and-switch raises the AC bonus', async () => {
-      setupCoverTest();
+      setupTargetOnMap();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2, sourceLabel: 'Barrel' });
       mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
       const result = await buildAttack();
       expect(result.coverAcBonus).toBe(5);
       expect(result.coverReason).toBe('Barrel');
-    });
-
-    it('keeps coverReason null for furniture-less bonus faces (bait-and-switch on none)', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('none');
-      expect(result.coverReason).toBeUndefined();
     });
 
     // ── Defensive Duelist (2024): proficiency floor on AC bonus ──
 
-    it('applies Defensive Duelist proficiency bonus when it exceeds computed cover', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+    it.each([
+      [{ level: 'none', acBonus: 0 }, mockStats.proficiency, 'none'],
+      [{ level: 'threeQuarter', acBonus: 5 }, 5, 'threeQuarter'],
+    ])('Defensive Duelist raises to the proficiency floor but never lowers computed cover', async (cover, expectedBonus, expectedLevel) => {
+      setupTargetOnMap();
+      computeCover.mockReturnValue(cover);
       mockRuntimeKeys({ 'Orc:activeBuffs': [{ effect: 'defensive_duelist' }] });
       const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(mockStats.proficiency);
-      expect(result.coverLevel).toBe('none');
-    });
-
-    it('does not lower cover when Defensive Duelist proficiency is below it', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
-      mockRuntimeKeys({ 'Orc:activeBuffs': [{ effect: 'defensive_duelist' }] });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('threeQuarter');
+      expect(result.coverAcBonus).toBe(expectedBonus);
+      expect(result.coverLevel).toBe(expectedLevel);
     });
 
     // ── Bait and Switch (2024): raises AC bonus, never lowers it ──
     // (consolidated from the retired contextBuilder-cover.test.js)
 
-    it('raises cover AC bonus when baitAndSwitchBonus exceeds computed cover', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
+    it.each([
+      ['half', { level: 'half', acBonus: 2 }, 5, 5, 'half'],
+      ['threeQuarter', { level: 'threeQuarter', acBonus: 5 }, 2, 5, 'threeQuarter'],
+      ['none', { level: 'none', acBonus: 0 }, 5, 5, 'none'],
+    ])('bait-and-switch raises AC bonus over %s cover (never lowers)', async (_level, cover, storedBonus, expectedBonus, expectedLevel) => {
+      setupTargetOnMap();
+      computeCover.mockReturnValue(cover);
+      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': storedBonus });
       const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('half');
-    });
-
-    it('keeps computed cover when baitAndSwitchBonus is below it', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
-      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 2 });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('threeQuarter');
-    });
-
-    it('applies bait-and-switch bonus even when computed cover is none', async () => {
-      setupCoverTest();
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      mockRuntimeKeys({ 'Orc:baitAndSwitchActive': true, 'Orc:baitAndSwitchBonus': 5 });
-      const result = await buildAttack();
-      expect(result.coverAcBonus).toBe(5);
-      expect(result.coverLevel).toBe('none');
+      expect(result.coverAcBonus).toBe(expectedBonus);
+      expect(result.coverLevel).toBe(expectedLevel);
+      // Furniture-less bonus faces carry no coverReason.
+      expect(result.coverReason).toBeUndefined();
     });
   });
 
   describe('melee proximity disadvantage', () => {
     // type:'npc' is required to reach the npcs lookup inside applyMeleeProximity (#1181).
-    function setupMeleeProxTest() {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ type: 'npc', name: 'Orc', gridX: 10, gridY: 10 }]));
-    }
-
     it('sets disadvantage when firing in melee range of hostile NPC', async () => {
-      setupMeleeProxTest();
+      setupTargetOnMap({ type: 'npc', name: 'Orc', gridX: 10, gridY: 10 });
       isHostileNPC.mockReturnValue(true);
       computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Firing in melee' });
       const result = await buildAttack();
@@ -478,27 +418,29 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
 
     it('skips melee proximity check when attack is auto miss', async () => {
-      setupMeleeProxTest();
+      setupTargetOnMap({ type: 'npc', name: 'Orc', gridX: 10, gridY: 10 });
       isHostileNPC.mockReturnValue(true);
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
       computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Firing in melee' });
       const result = await buildAttack();
       expect(result.isAutoMiss).toBe(true);
+      // Had the proximity check run, _meleeDis would tip resolveMapMode to
+      // disadvantage — forcedMode staying empty proves the skip.
       expect(result.forcedMode).toBeUndefined();
-      expect(computeMeleeProximityEffect).not.toHaveBeenCalled();
     });
 
-    it('passes filtered hostile NPCs to proximity check', async () => {
+    it('enriches placed NPCs from the npcs envelope and passes only hostile threats to the proximity check', async () => {
       loadMapData.mockResolvedValue(makeMapData(
         [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
         [
-          { type: 'npc', name: 'Friendly', gridX: 2, gridY: 2, attitude: 'friendly' },
-          { type: 'npc', name: 'Hostile', gridX: 3, gridY: 3, attitude: 'negative' },
-        ]
+          { type: 'npc', name: 'Friendly', gridX: 2, gridY: 2 },
+          { type: 'npc', name: 'Hostile', gridX: 3, gridY: 3 },
+        ],
       ));
       // ENVELOPE-FIXTURE pin (#1181): GET /api/campaigns/:campaign/npcs resolves
       // { npcs:[...] } (jsonEntityCrud.js:49) — the old bare-array mock hid the
-      // npcs?.find TypeError in applyMeleeProximity (contextBuilder-map.js).
+      // npcs?.find TypeError in applyMeleeProximity (contextBuilder-map.js),
+      // which now regresses as a missing forcedMode.
       loadNPCs.mockResolvedValue({
         npcs: [
           { name: 'Friendly', attitude: 'friendly' },
@@ -506,20 +448,21 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
         ],
       });
       isHostileNPC.mockImplementation((npc) => npc.attitude === 'negative');
-      await buildAttack();
-      expect(isHostileNPC).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Hostile', attitude: 'negative' }),
-      );
-      expect(computeMeleeProximityEffect).toHaveBeenCalledWith(
-        true,
-        expect.objectContaining({ name: 'Fighter1' }),
-        [{ gridX: 3, gridY: 3, name: 'Hostile' }],
-        expect.any(Object),
-      );
+      // Behavior gate: disadvantage only when the threat list holds exactly
+      // the hostile NPC at its map coordinates.
+      computeMeleeProximityEffect.mockImplementation((_flag, _attacker, threats) =>
+        threats.length === 1 && threats[0].name === 'Hostile' && threats[0].gridX === 3 && threats[0].gridY === 3
+          ? { mode: 'disadvantage', reason: 'Firing in melee' }
+          : { mode: 'ok' });
+      const result = await buildAttack();
+      expect(result.forcedMode).toBe('disadvantage');
+      expect(result.rangeReason).toBe('Firing in melee');
     });
   });
 
   describe('target position resolution', () => {
+    // Position precedence is only observable through the coordinates fed to
+    // computeCover — that argument IS the seam contract here.
     it('resolves player target position from map players (not placed items)', async () => {
       loadMapData.mockResolvedValue(makeMapData(
         [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 12, gridY: 12 }],
@@ -529,6 +472,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       const result = await buildAttack();
       expect(result.targetName).toBe('Orc');
       expect(getNearestPlacedItem).not.toHaveBeenCalled();
+      // Cover rides the map-player coords (12,12), not the combat-context coords.
       expect(computeCover).toHaveBeenCalledWith(
         { gridX: 1, gridY: 1 }, { gridX: 12, gridY: 12 }, expect.any(Set), [],
       );
@@ -554,68 +498,10 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
   });
 
-  describe('improved illusions', () => {
-    function setupIllusionTest() {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
-    }
-
-    it('applies range bonus for illusion spells with range 10+ feet', async () => {
-      setupIllusionTest();
-      const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
-      const illusionAttack = { ...mockRangedAttack, damage: '1d4', damageType: 'Force', range: 120, school: 'Illusion' };
-      await buildAttack(illusionAttack, stats);
-      expect(computeRangeEffect).toHaveBeenCalledWith(180, expect.any(Number), expect.any(Object));
-    });
-
-    it('does not apply range bonus for non-illusion spells', async () => {
-      setupIllusionTest();
-      const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
-      const fireAttack = { ...mockRangedAttack, school: 'Evocation' };
-      await buildAttack(fireAttack, stats);
-      expect(computeRangeEffect).toHaveBeenCalledWith(150, expect.any(Number), expect.any(Object));
-    });
-
-    it('does not apply range bonus when spell range is less than 10 feet', async () => {
-      setupIllusionTest();
-      const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
-      const illusionAttack = { ...mockRangedAttack, range: 5, school: 'Illusion' };
-      await buildAttack(illusionAttack, stats);
-      expect(computeRangeEffect).toHaveBeenCalledWith(5, expect.any(Number), expect.any(Object));
-    });
-
-    it('applies feat spell range bonus on top of improved illusions', async () => {
-      setupIllusionTest();
-      const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
-      const illusionAttack = { ...mockRangedAttack, range: 120, school: 'Illusion' };
-      await buildAttack(illusionAttack, stats, { spellRangeBonus: 30 });
-      expect(computeRangeEffect).toHaveBeenCalledWith(210, expect.any(Number), expect.any(Object));
-    });
-  });
-
-  describe('feat range effects', () => {
-    it('handles undefined/null featRangeEffects and applies spellRangeBonus', async () => {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
-      let result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: undefined });
-      expect(result).toBeDefined();
-      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: null });
-      expect(result).toBeDefined();
-      result = await buildAttack(mockRangedAttack, mockStats, { ignoresMeleeDisadvantage: true, ignoresLongRangeDisadvantage: true, rangeMultiplier: 1, spellRangeBonus: 10 });
-      expect(result).toBeDefined();
-      expect(computeRangeEffect).toHaveBeenCalledWith(160, expect.any(Number), expect.objectContaining({ spellRangeBonus: 10 }));
-    });
-  });
-
   describe('aura effects with map data — target position resolved', () => {
-    function setupAuraTest() {
-      setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
-    }
-
-    it('applies wolf aura advantage when target position is resolved', async () => {
-      setupAuraTest();
-      getWolfAdvantageAgainst.mockImplementation((opts) => opts.targetPos ? { advantage: true } : { advantage: false });
+    it('threads the resolved targetPos and mapData into the wolf aura check', async () => {
+      setupTargetOnMap();
+      getWolfAdvantageAgainst.mockImplementation((opts) => (opts.targetPos ? { advantage: true } : { advantage: false }));
       const result = await buildAttack();
       expect(result.forcedMode).toBe('advantage');
       expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(
@@ -623,40 +509,24 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       );
     });
 
-    it('applies duplicity aura advantage when wolf does not', async () => {
-      setupAuraTest();
-      getDuplicityAdvantageAgainst.mockReturnValue({ advantage: true });
+    it.each([
+      ['duplicity aura advantage', () => getDuplicityAdvantageAgainst.mockReturnValue({ advantage: true }), 'advantage'],
+      ['lion aura disadvantage', () => getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true }), 'disadvantage'],
+      ['protection target effect on the target', () => getRuntimeValue.mockImplementation((entity, key) =>
+        key === 'targetEffects' ? [{ effect: 'protection', target: 'Orc', source: 'Paladin' }] : undefined), 'disadvantage'],
+      ['advantage outweighs disadvantage when wolf and lion both apply', () => {
+        getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
+        getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
+      }, 'advantage'],
+    ])('map auras: %s sets forcedMode', async (_label, arrange, expected) => {
+      setupTargetOnMap();
+      arrange();
       const result = await buildAttack();
-      expect(result.forcedMode).toBe('advantage');
-    });
-
-    it('applies lion aura disadvantage when no advantage auras apply', async () => {
-      setupAuraTest();
-      getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
-      const result = await buildAttack();
-      expect(result.forcedMode).toBe('disadvantage');
-    });
-
-    it('applies protection buff disadvantage when target has it', async () => {
-      setupAuraTest();
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (prop === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
-        return undefined;
-      });
-      const result = await buildAttack();
-      expect(result.forcedMode).toBe('disadvantage');
-    });
-
-    it('prefers advantage over disadvantage when multiple auras apply', async () => {
-      setupAuraTest();
-      getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
-      getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
-      const result = await buildAttack();
-      expect(result.forcedMode).toBe('advantage');
+      expect(result.forcedMode).toBe(expected);
     });
 
     it('corona is NEVER counted into mapDis on the attack lane (save-only effect)', async () => {
-      setupAuraTest();
+      setupTargetOnMap();
       // bug-corona-save-disadv-applied-to-attack-roll: accumulateAuraCounts used
       // to tax the ATTACK roll when the weapon's own damageType matched the
       // corona buff's enemiesDisadvantageSaves. Corona rides the SAVE lane only

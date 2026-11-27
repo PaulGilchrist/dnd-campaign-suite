@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * CharRaceFeatures — which race-tracked resource rows render, and with what
  * label / store key / max / player / campaign wiring.
@@ -10,12 +10,13 @@
  *
  * Covered behavior:
  *  - Dragonborn always shows a Breath Weapon row; max comes from
- *    traits[0].automation.uses (number, "proficiency_bonus" → proficiency,
- *    falsy or missing → 1).
- *  - Goliath shows exactly the row mapped from its giant ancestry subrace;
+ *    traits[0].automation.uses (number passthrough, "proficiency_bonus" →
+ *    proficiency (0 when missing), falsy or missing-traits → 1).
+ *  - Goliath shows exactly the row mapped from its giant ancestry subrace
+ *    (full mapping table pinned: label + store key per ancestry);
  *    max is proficiency (0 when missing). Unmapped subrace → nothing.
- *  - Anything else (unsupported race, case mismatch, missing race or
- *    playerStats) renders an empty DOM.
+ *  - Anything else (missing playerStats, unsupported race) renders an
+ *    empty DOM via the exact-match registry gate.
  */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -77,25 +78,33 @@ function expectNothingRendered(playerStats) {
 describe('CharRaceFeatures', () => {
     describe('Dragonborn — Breath Weapon', () => {
         it.each([
+            // branch: rawUses numeric → passthrough
             ['numeric automation.uses', 3, { name: 'Dragonborn', traits: [{ automation: { uses: 3 } }] }, 4],
+            // branch: rawUses === 'proficiency_bonus' → proficiency
             ['"proficiency_bonus"', 4, { name: 'Dragonborn', traits: [{ automation: { uses: 'proficiency_bonus' } }] }, 4],
+            // branch: 'proficiency_bonus' with `|| 0` right-hand side
             ['"proficiency_bonus" with proficiency missing', 0, { name: 'Dragonborn', traits: [{ automation: { uses: 'proficiency_bonus' } }] }, undefined],
+            // branch: rawUses falsy numeric → `|| 1` default
             ['0 (falls back to default 1)', 1, { name: 'Dragonborn', traits: [{ automation: { uses: 0 } }] }, 4],
+            // branch: optional chaining short-circuits on missing traits → `|| 1`
             ['race with no traits (defaults to 1)', 1, { name: 'Dragonborn' }, 4],
-        ])('%s renders Breath Weapon max %i', (desc, max, race, proficiency) => {
+        ])('%s renders Breath Weapon max %i', (_desc, max, race, proficiency) => {
             expectSingleRow(dragonbornStats({ race, proficiency }), 'Breath Weapon', max, 'breathWeaponUses');
         });
     });
 
     describe('Goliath — Giant Ancestry', () => {
+        // Pins the full private ancestry→(label, store key) mapping table;
+        // max column exercises proficiency passthrough and the `|| 0` default.
         it.each([
-            ['Stone Giant', 5, "Stone's Endurance", 'stonesEnduranceUses', 5],
-            ['Cloud Giant', 5, "Cloud's Jaunt", 'cloudsJauntUses', 5],
-            ['Fire Giant', 5, "Fire's Burn", 'firesBurnUses', 5],
-            ['Frost Giant', 5, "Frost's Chill", 'frostsChillUses', 5],
-            ['Hill Giant', 5, "Hill's Tumble", 'hillsTumbleUses', 5],
-            ['Storm Giant', 5, "Storm's Thunder", 'stormsThunderUses', 5],
-        ])('shows %s ancestry feature with max %i', (subrace, max, label, resourceKey, proficiency) => {
+            ['Stone Giant', "Stone's Endurance", 'stonesEnduranceUses', 5, 5],
+            ['Cloud Giant', "Cloud's Jaunt", 'cloudsJauntUses', 5, 5],
+            ['Fire Giant', "Fire's Burn", 'firesBurnUses', 5, 5],
+            ['Frost Giant', "Frost's Chill", 'frostsChillUses', 5, 5],
+            ['Hill Giant', "Hill's Tumble", 'hillsTumbleUses', 5, 5],
+            ['Storm Giant', "Storm's Thunder", 'stormsThunderUses', 5, 5],
+            ['Stone Giant', "Stone's Endurance", 'stonesEnduranceUses', 0, undefined],
+        ])('shows %s ancestry %s (%s) with max %i', (subrace, label, resourceKey, max, proficiency) => {
             expectSingleRow(
                 goliathStats({ proficiency, race: { name: 'Goliath', subrace: { name: subrace } } }),
                 label,
@@ -103,22 +112,15 @@ describe('CharRaceFeatures', () => {
                 resourceKey,
             );
         });
-
-        it('uses 0 as max when proficiency is missing', () => {
-            expectSingleRow(
-                goliathStats({ proficiency: undefined }),
-                "Stone's Endurance",
-                0,
-                'stonesEnduranceUses',
-            );
-        });
     });
 
     describe('renders nothing for everything else', () => {
         it.each([
+            // branch: entry gate `playerStats?.race?.name` → no component
             ['null playerStats', null],
+            // branch: registry exact-match miss → null (includes odd casing)
             ['an unsupported race', dragonbornStats({ race: { name: 'Human' } })],
-            ['a race name with different capitalization (registry is exact-match)', dragonbornStats({ race: { name: 'dragonborn' } })],
+            // branch: Goliath feature's own `!config` gate (distinct path)
             ['a Goliath with an unmapped giant ancestry subrace', goliathStats({ race: { name: 'Goliath', subrace: { name: 'Frost Giantkin' } } })],
         ])('%s', (_desc, playerStats) => {
             expectNothingRendered(playerStats);

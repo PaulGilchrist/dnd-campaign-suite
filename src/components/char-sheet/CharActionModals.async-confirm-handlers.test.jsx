@@ -1,9 +1,10 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Async confirm-handler wiring in CharActionModals (host 1) and
-// CharActionModals.SecondaryModals: modal confirm click → handler called with
-// the documented args → setPopupHtml/setModalState with the handler result.
-// Modal rendering is covered by CharActionModals.rendering.test.jsx; modal
-// state clearing by CharActionModals.handler-callbacks.test.jsx; the host 2
+// CharActionModals.SecondaryModals: modal confirm click → source modal
+// cleared → handler awaited with the documented args → setPopupHtml/
+// setModalState with the handler result. Starry Chalice confirm (full heal +
+// popup contract) lives in CharActionModals.handler-callbacks.test.jsx;
+// modal rendering by CharActionModals.rendering.test.jsx; the host 2
 // (CharSpecialActions) twin of the Destructive Stride wiring by
 // CharSpecialActions.combatHandlers.test.jsx — not duplicated here.
 
@@ -539,8 +540,9 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
     ];
 
     for (const { name, modalKey, confirmTestId, handlerPath, mockResult, modalPayload, selection } of handlers) {
-      it(`${name} confirm forwards the modal selection to confirm${name} and shows the result popup`, async () => {
+      it(`${name} confirm closes the modal, forwards the modal selection to confirm${name}, and shows the result popup`, async () => {
         const setPopupHtml = vi.fn();
+        const setModalState = vi.fn();
         const handlerModule = await import(handlerPath);
         const confirmHandler = handlerModule[`confirm${name}`];
         confirmHandler.mockResolvedValue(mockResult);
@@ -548,12 +550,13 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
         render(<CharActionModals
           {...createBaseProps({ setPopupHtml })}
           modalState={{ [modalKey]: modalPayload }}
-          setModalState={vi.fn()}
+          setModalState={setModalState}
         />);
 
         fireEvent.click(screen.getByTestId(confirmTestId));
 
         await waitFor(() => {
+          expect(setModalState).toHaveBeenCalledWith({ [modalKey]: null });
           expect(confirmHandler).toHaveBeenCalledWith(
             modalPayload.action,
             modalPayload.playerStats,
@@ -566,43 +569,12 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
     }
   });
 
-  // ── handleStarryChaliceConfirm ──
-
-  describe('handleStarryChaliceConfirm', () => {
-    it('sets popupHtml with full heal result when applyStarryChaliceHeal returns data', async () => {
-      const setPopupHtml = vi.fn();
-      const { applyStarryChaliceHeal } = await import('../../services/rules/spells/postCastHealService.js');
-      const mockResult = { targetName: 'Ally1', actualHeal: 5 };
-      applyStarryChaliceHeal.mockResolvedValue(mockResult);
-
-      render(<CharActionModals
-        {...createBaseProps({ setPopupHtml, campaignName: 'test-campaign' })}
-        modalState={{ starryChaliceHealModal: { targetNames: ['Ally1'], amount: 10 } }}
-        setModalState={vi.fn()}
-      />);
-
-      fireEvent.click(screen.getByTestId('secondary-confirm'));
-
-      await waitFor(() => {
-        expect(applyStarryChaliceHeal).toHaveBeenCalledWith('Ally1', 'test-campaign');
-        expect(setPopupHtml).toHaveBeenCalledWith({
-          type: 'heal',
-          name: 'Starry Form: Chalice',
-          formula: '10 HP',
-          rolls: [],
-          total: 10,
-          targetName: 'Ally1',
-          finalHeal: 5,
-        });
-      });
-    });
-  });
-
   // ── handleEpitomeConfirm ──
 
   describe('handleEpitomeConfirm', () => {
-    it('applies the chosen resistance and shows the returned payload', async () => {
+    it('closes the modal, applies the chosen resistance, and shows the returned payload', async () => {
       const setPopupHtml = vi.fn();
+      const setModalState = vi.fn();
       const { applyResistanceChoice } = await import('../../services/automation/handlers/combat/elementalEpitomeHandler.js');
       applyResistanceChoice.mockResolvedValue({ payload: 'Resistance applied' });
 
@@ -610,12 +582,13 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
       render(<CharActionModals
         {...createBaseProps({ setPopupHtml })}
         modalState={{ epitomeModal: epitomePayload }}
-        setModalState={vi.fn()}
+        setModalState={setModalState}
       />);
 
       fireEvent.click(screen.getByTestId('epitome-confirm'));
 
       await waitFor(() => {
+        expect(setModalState).toHaveBeenCalledWith({ epitomeModal: null });
         // Modal emits 'fire'; host forwards action + component playerStats/campaignName
         expect(applyResistanceChoice).toHaveBeenCalledWith(
           epitomePayload.action,
@@ -655,7 +628,7 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
   // (double-apply with the result object as chosenType → null → picker never
   // mounted). It mounts result.payload straight onto the host slot.
   describe('handleDestructiveStrideConfirm (CLA-113 result-object contract)', () => {
-    it('mounts the target picker from the self-applied result — no double applyDamageTypeChoice call', async () => {
+    it('mounts the target picker from the self-applied result and closes the source modal — no double applyDamageTypeChoice call', async () => {
       const setModalState = vi.fn();
       const { applyDamageTypeChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
 
@@ -668,6 +641,7 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
       fireEvent.click(screen.getByTestId('stride-confirm'));
 
       await waitFor(() => {
+        expect(setModalState).toHaveBeenCalledWith({ destructiveStrideModal: null });
         expect(setModalState).toHaveBeenCalledWith({
           destructiveStrideTargetModal: { action: {}, chosenType: 'Fire', martialArtsDie: 12, targets: [] },
         });
@@ -697,20 +671,23 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
   // stays positional. Both surface the handler payload as a popup.
 
   describe('handleDestructiveStrideTargetConfirm', () => {
-    it('confirms the selected target with the CLA-113 object signature and shows the payload popup', async () => {
+    it('confirms the selected target with the CLA-113 object signature, closes the picker, and shows the payload popup', async () => {
       const setPopupHtml = vi.fn();
+      const setModalState = vi.fn();
       const { applyTargetChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
       applyTargetChoice.mockResolvedValue({ payload: 'Target damage applied' });
 
       render(<CharActionModals
         {...createBaseProps({ setPopupHtml })}
         modalState={{ destructiveStrideTargetModal: { targets: [{ name: 'Goblin' }], action: {}, chosenType: 'fire', martialArtsDie: 4 } }}
-        setModalState={vi.fn()}
+        setModalState={setModalState}
       />);
 
       fireEvent.click(screen.getByTestId('secondary-confirm'));
 
       await waitFor(() => {
+        expect(setModalState).toHaveBeenCalledWith({ destructiveStrideTargetModal: null });
+        // Single-object argument (toHaveBeenCalledWith pins the exact arity):
         expect(applyTargetChoice).toHaveBeenCalledWith({
           action: {},
           playerStats: { name: 'Test Character' },
@@ -719,7 +696,6 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
           chosenType: 'fire',
           martialArtsDie: 4,
         });
-        expect(applyTargetChoice.mock.calls[0].length).toBe(1);
         expect(setPopupHtml).toHaveBeenCalledWith('Target damage applied');
       });
     });
@@ -728,20 +704,23 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
   // ── handleDestructiveStrideTargetSkip ──
 
   describe('handleDestructiveStrideTargetSkip', () => {
-    it('skips target selection and shows the skip popup', async () => {
+    it('skips target selection, closes the picker, and shows the skip popup', async () => {
       const setPopupHtml = vi.fn();
+      const setModalState = vi.fn();
       const { skipTargetChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
       skipTargetChoice.mockResolvedValue({ payload: 'Skipped' });
 
       render(<CharActionModals
         {...createBaseProps({ setPopupHtml })}
         modalState={{ destructiveStrideTargetModal: { targets: [{ name: 'Goblin' }], action: {}, chosenType: 'fire', martialArtsDie: 4 } }}
-        setModalState={vi.fn()}
+        setModalState={setModalState}
       />);
 
       fireEvent.click(screen.getByTestId('secondary-skip'));
 
       await waitFor(() => {
+        expect(setModalState).toHaveBeenCalledWith({ destructiveStrideTargetModal: null });
+        // skipTargetChoice keeps the positional signature (CLA-113 parity note)
         expect(skipTargetChoice).toHaveBeenCalledWith({}, { name: 'Test Character' }, 'test-campaign');
         expect(setPopupHtml).toHaveBeenCalledWith('Skipped');
       });

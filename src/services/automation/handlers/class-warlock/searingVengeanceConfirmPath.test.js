@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // SEARING VENGEANCE CONFIRM LANE (quad file 2/4). Canonical home of:
 // - confirm-path guards: selectedTargets guard table (null/undefined/empty array),
 //   no-combat-at-confirm popup (Handler.test.js covers the handle() twin only),
@@ -7,10 +7,10 @@
 //   '2d8+0' missing-abilities fallback) — the quad's rollExpression pins point here.
 // - blinded dedupe + storedConditions coercion table (skip-if-present incl.
 //   case-insensitive, append-preserving, null/non-array → ['blinded']).
-// - multi-target fanout: ONE shared roll, full-args applyDamageToTarget pins on each
-//   creature (adopted from heal lane's borrowed copy — droppable there now), per-target
-//   blinded writes + expirations, healed-target pending-condition clear (line 191 of
-//   the handler, pinned nowhere else in the quad), full-string popup composition
+// - multi-target fanout: ONE shared roll, quad-canonical full-args applyDamageToTarget
+//   pins on each creature, the fan-out pinned as an ORDERED setRuntimeValue census
+//   (uses 1→0 → healed-target pending clear at handler :191 → per-target blinded),
+//   expiration counts, per-target roll logs, and full-string popup composition
 //   including the '(r1, r2)' rollDisplay.
 // - log-failure resilience: every addEntry call is .catch-guarded.
 // applyHealingToTarget is MOCKED here ({actualHeal:25} stub) by design — the real
@@ -128,6 +128,9 @@ describe('confirmSearingVengeance - confirm path', () => {
     // this lane's MOCKED heal contract — real path is heal-lane canonical
     applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 25, oldHp: 0, newHp: 25, maxHp: 50 });
     diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [5, 5] });
+    // re-install: the log-failure test's mockRejectedValue setImplementation
+    // survives clearAllMocks — re-install keeps tests order-independent
+    addEntry.mockResolvedValue(undefined);
   });
 
   describe('early returns for invalid targets', () => {
@@ -138,8 +141,15 @@ describe('confirmSearingVengeance - confirm path', () => {
     ])('returns popup when selectedTargets is $label', async ({ selectedTargets }) => {
       const result = await runConfirm({ payload: { selectedTargets } });
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('Searing Vengeance used — no creatures selected for damage.');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Searing Vengeance',
+          description: 'Searing Vengeance used — no creatures selected for damage.',
+          automation: DEFAULT_AUTOMATION,
+        },
+      });
       // guard short-circuits before any side effects
       expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
@@ -153,8 +163,15 @@ describe('confirmSearingVengeance - confirm path', () => {
 
       const result = await runConfirm();
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No combat active.');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Searing Vengeance',
+          description: 'No combat active.',
+          automation: DEFAULT_AUTOMATION,
+        },
+      });
       // nothing consumed, nothing touched
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
@@ -188,30 +205,39 @@ describe('confirmSearingVengeance - confirm path', () => {
     });
   });
 
-  it('handles creature not found in combat context for hp_change log', async () => {
+  it('logs 0/0 hp_change when a selected creature is missing from the combat context', async () => {
     mockCombatCreatures([]);
 
-    await runConfirm();
+    const result = await runConfirm();
 
-    expect(addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'hp_change',
-        targetName: 'Goblin',
-        currentHp: 0,
-        maxHp: 0,
-      })
-    );
+    // full-shape pin: the ?? 0 fallbacks at handler :296-297 on a creature lookup miss
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'hp_change',
+      characterName: 'TestWarlock',
+      targetName: 'Goblin',
+      delta: -10,
+      currentHp: 0,
+      maxHp: 0,
+      isHealing: false,
+    });
+    // the flow does not abort on the miss — damage/blinded/popup still land
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(goblinConditionWrites()).toEqual([
+      ['Goblin', 'activeConditions', ['blinded'], campaignName],
+    ]);
+    expect(result.type).toBe('popup');
   });
 
   describe('damage roll composition', () => {
-    it('handles rollExpression returning zero damage', async () => {
+    it('handles rollExpression returning zero damage with an empty rollDisplay', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [] });
 
       const result = await runConfirm();
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('0 radiant damage');
+      // rolls: [] omits the parenthesised display entirely (handler :257)
+      expect(result.payload.description).not.toContain('(');
     });
 
     it('uses default damageType when automation.damageType is not set', async () => {
@@ -251,7 +277,7 @@ describe('confirmSearingVengeance - confirm path', () => {
     // damage rolled ONCE and shared across the burst
     expect(diceRoller.rollExpression).toHaveBeenCalledTimes(1);
 
-    // full-args damage pin on each target (quad-canonical, adopted from heal lane)
+    // full-args damage pin on each target (quad-canonical)
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(2);
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
       cs, 'Goblin', 10, ['Radiant'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'TestWarlock' }
@@ -260,19 +286,17 @@ describe('confirmSearingVengeance - confirm path', () => {
       cs, 'Orc', 10, ['Radiant'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'TestWarlock' }
     );
 
-    // blinded condition + expiration fan out to every selected creature
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin', 'activeConditions', ['blinded'], campaignName
-    );
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Orc', 'activeConditions', ['blinded'], campaignName
-    );
+    // ordered full-write census: use consumption → healed-target pending-condition
+    // clear (handler :191, pinned nowhere else in the quad) → per-target blinded
+    // fanout, in exactly this sequence
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      ['TestWarlock', 'searingVengeanceUses', 0, campaignName],
+      ['Ally', 'activeConditions', [], campaignName],
+      ['Goblin', 'activeConditions', ['blinded'], campaignName],
+      ['Orc', 'activeConditions', ['blinded'], campaignName],
+    ]);
+    // one blinded expiration per selected creature
     expect(expirations.addExpiration).toHaveBeenCalledTimes(2);
-
-    // healed ally's pending conditions are cleared (ends the Pending condition)
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Ally', 'activeConditions', [], campaignName
-    );
 
     // per-creature damage roll logs
     expect(addEntry).toHaveBeenCalledWith(

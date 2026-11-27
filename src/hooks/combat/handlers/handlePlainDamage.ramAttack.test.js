@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Ram-attack lane ONLY: context.ramActive (Power of the Wilds buff scan) +
 // isMelee + resolved applyResult → Prone via maybeApplyRamProne in
 // handlePlainDamage.js. Size gate: Large-or-smaller (MA-0553 ladder).
@@ -147,8 +147,8 @@ describe('plain damage ram lane (ramActive → Prone)', () => {
         await createLogDamageAndShow(deps)({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext(contextExtra) });
     }
 
-    const wroteProne = () => setRuntimeValue.mock.calls.some(([key, prop, value]) =>
-        key === 'Goblin' && prop === 'activeConditions' && Array.isArray(value) && value.includes('Prone'));
+    const wroteProne = () => setRuntimeValue.mock.calls.some(([, prop, value]) =>
+        prop === 'activeConditions' && Array.isArray(value) && value.includes('Prone'));
 
     // Positive gates: ramActive + isMelee + landed damage + size gate → exactly
     // one Prone write (exact array: proves add, provenance-preserving adds, and
@@ -169,24 +169,26 @@ describe('plain damage ram lane (ramActive → Prone)', () => {
         }));
     });
 
-    // Negative gates: each row kills one maybeApplyRamProne precondition.
+    // Negative gates: each row kills one maybeApplyRamProne precondition
+    // (ramActive, isMelee, size gate, landed damage, target in summary). The
+    // already-Prone rows live in the regression lock below — it runs those
+    // same scenarios and additionally proves the log and badge dispatch stay
+    // silent, so no duplicate write-check here.
     it.each([
         { title: 'ramActive is false', context: { ramActive: false } },
         { title: 'isMelee is false', context: { isMelee: false } },
-        { title: 'target is Huge (size gate)', size: 'Huge' },
-        { title: 'target is already Prone (idempotent)', prevConditions: ['Prone'] },
-        { title: 'target has lowercase prone (case-insensitive dedupe)', prevConditions: ['prone'] },
+        { title: 'target is Huge (size gate)', summaryCreatures: [goblin({ size: 'Huge' })] },
         { title: 'applyResult is null (damage did not land)', applyResult: null },
-    ])('does not write Prone when $title', async ({ context, size, prevConditions, applyResult }) => {
-        await runRam(context, { summaryCreatures: size ? [goblin({ size })] : undefined, prevConditions, applyResult });
+        { title: 'target is not in the combat summary', summaryCreatures: [goblin({ name: 'Orc' })] },
+    ])('does not write Prone or log it when $title', async ({ context, summaryCreatures, applyResult }) => {
+        await runRam(context, { summaryCreatures, applyResult });
 
         expect(wroteProne()).toBe(false);
-    });
-
-    it('writes nothing when the target is not in the combat summary', async () => {
-        await runRam({}, { summaryCreatures: [{ name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 }] });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.anything(), CAMPAIGN);
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            condition: 'Prone',
+            reason: 'Power of the Wilds (Ram)',
+        }));
     });
 
     // Regression lock (bug-ram-prone-log-fires-when-already-prone): the

@@ -1,8 +1,14 @@
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
-import { clearRuntimeState, seedTrackedResources, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
+import { clearRuntimeState, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { GM_COPILOT_KEY } from '../../hooks/management/useGmCopilot.js';
 import TryNextSection from './TryNextSection.jsx';
+
+// Mount-site integration lane: which invitation fires for which lane data,
+// and that acting on it never settles. The card contract itself (registry
+// copy, dismiss/markSeen writes, guard branches) is pinned in
+// src/components/GMCopilot/GMCopilot.test.jsx — not duplicated here.
 
 // URL-routed fetch mock: encounters / maps / change-data lanes only.
 function mockLanes({ encounters = [], maps = [], changeData = {} }) {
@@ -15,6 +21,15 @@ function mockLanes({ encounters = [], maps = [], changeData = {} }) {
     return { ok: true, json: async () => body };
   });
 }
+
+const OPEN_BOARD = {
+  encounters: [{ name: 'Ambush' }],
+  maps: [{ fileName: 'arena.json', name: 'Arena', isActive: false }],
+};
+const LIVE_BOARD = {
+  maps: [{ fileName: 'arena.json', name: 'Arena', isActive: false }],
+  changeData: { combatSummary: { creatures: [{ name: 'Goblin' }, { name: 'Hero' }] } },
+};
 
 describe('TryNextSection', () => {
   beforeEach(() => {
@@ -39,7 +54,6 @@ describe('TryNextSection', () => {
     renderSection();
     const card = await screen.findByRole('note', { name: /Try next: Try running combat/ });
     expect(card).toHaveTextContent('2 encounters');
-    expect(screen.queryByText(/1 encounters/)).not.toBeInTheDocument();
   });
 
   it('hides the combat invite once a live board exists, and invites TV instead', async () => {
@@ -75,20 +89,24 @@ describe('TryNextSection', () => {
     expect(screen.getByRole('note', { name: /Try next: Try running combat/ })).toBeInTheDocument();
   });
 
-  it('× dismisses an invitation forever, server-first', async () => {
-    mockLanes({ encounters: [{ name: 'Ambush' }] });
+  it('× dismisses one invitation forever, server-first, without disturbing the others', async () => {
+    mockLanes(OPEN_BOARD);
     renderSection();
-    const card = await screen.findByRole('note', { name: /Try next: Try running combat/ });
-    fireEvent.click(card.querySelector('.gm-copilot-dismiss'));
-    expect(screen.queryByRole('note', { name: /Try next: Try running combat/ })).not.toBeInTheDocument();
-    expect(getRuntimeValue('campaign', GM_COPILOT_KEY)).toEqual({ dismissed: { 'try-combat': true } });
-  });
+    const combatCard = await screen.findByRole('note', { name: /Try next: Try running combat/ });
+    // Sibling card fires on the same mount: the premise for independence.
+    expect(screen.getByRole('note', { name: /Try next: Put a battlefield/ })).toBeInTheDocument();
 
-  it('a previously dismissed invitation never resurfaces', async () => {
-    seedTrackedResources('campaign', { [GM_COPILOT_KEY]: { dismissed: { 'try-combat': true } } });
-    mockLanes({ encounters: [{ name: 'Ambush' }] });
+    fireEvent.click(within(combatCard).getByRole('button', { name: 'Dismiss this tip for good' }));
+    expect(screen.queryByRole('note', { name: /Try next: Try running combat/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('note', { name: /Try next: Put a battlefield/ })).toBeInTheDocument();
+    expect(getRuntimeValue('campaign', GM_COPILOT_KEY)).toEqual({ dismissed: { 'try-combat': true } });
+
+    // Cold re-visit: the dismissed invitation never resurfaces...
+    cleanup();
+    mockLanes(OPEN_BOARD);
     renderSection();
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    // ...while the untouched invitation still fires.
+    expect(await screen.findByRole('note', { name: /Try next: Put a battlefield/ })).toBeInTheDocument();
     expect(screen.queryByRole('note', { name: /Try next: Try running combat/ })).not.toBeInTheDocument();
   });
 
@@ -99,31 +117,16 @@ describe('TryNextSection', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('toolbelt respect: an invitation never invites into a hidden view', async () => {
-    // Every precondition genuinely holds (encounters + empty board, maps
-    // with none active) — ONLY the hidden set may kill the cards.
-    mockLanes({
-      encounters: [{ name: 'Ambush' }],
-      maps: [{ fileName: 'arena.json', name: 'Arena', isActive: false }],
-    });
-    renderSection({ hiddenViews: ['encounter', 'mapsManager'] });
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(screen.queryByRole('note', { name: /Try next: Try running combat/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('note', { name: /Try next: Put a battlefield/ })).not.toBeInTheDocument();
-  });
-
-  it('toolbelt respect: the TV invite folds when Initiative is hidden — and stands when it is not', async () => {
-    mockLanes({
-      changeData: { combatSummary: { creatures: [{ name: 'Goblin' }, { name: 'Hero' }] } },
-    });
-    renderSection({ hiddenViews: [] });
-    expect(await screen.findByRole('note', { name: /Try next: Dress the board/ })).toBeInTheDocument();
-    cleanup();
-    mockLanes({
-      changeData: { combatSummary: { creatures: [{ name: 'Goblin' }, { name: 'Hero' }] } },
-    });
-    renderSection({ hiddenViews: ['initiative'] });
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(screen.queryByRole('note', { name: /Try next: Dress the board/ })).not.toBeInTheDocument();
+  // Every precondition genuinely holds in each row — ONLY the hidden view
+  // may kill the card, and it kills exactly that card.
+  it.each([
+    { hidden: 'encounter', lanes: OPEN_BOARD, gone: /Try next: Try running combat/, kept: /Try next: Put a battlefield/ },
+    { hidden: 'mapsManager', lanes: OPEN_BOARD, gone: /Try next: Put a battlefield/, kept: /Try next: Try running combat/ },
+    { hidden: 'initiative', lanes: LIVE_BOARD, gone: /Try next: Dress the board/, kept: /Try next: Put a battlefield/ },
+  ])('toolbelt respect: hiding "$hidden" folds exactly that invitation', async ({ hidden, lanes, gone, kept }) => {
+    mockLanes(lanes);
+    renderSection({ hiddenViews: [hidden] });
+    expect(await screen.findByRole('note', { name: kept })).toBeInTheDocument();
+    expect(screen.queryByRole('note', { name: gone })).not.toBeInTheDocument();
   });
 });

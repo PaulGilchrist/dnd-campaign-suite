@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-29
+// @maintained-by-ai 2026-11-26
 /* Lane: remote-ownership chip (backlog 2026-10-29-AF). Post-576be121d the
  * stand-down tab's transport WORKS (its Pause commands the owner), but its UI
  * was indistinguishable from the owning tab's. The chip is pure derived
@@ -6,7 +6,8 @@
  * window"; the owner (frame mounted) or a stopped session never shows it.
  * Remote transitions ride the same setRuntimeObject(skipSync) SSE-echo path
  * as the adoption tests, so appear/disappear/ownership-move are exercised
- * live without a remount. */
+ * live without a remount. Transport COMMANDS on these transitions belong to
+ * MusicPlayer.remote-adoption.test.jsx — this file asserts only the chip. */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -67,18 +68,14 @@ afterEach(() => {
 });
 
 describe('MusicPlayer remote-ownership chip', () => {
-  it('is absent when nothing is playing', () => {
+  it('never shows on the owning tab: absent at rest, absent while its mounted frame plays (no flash on the play click)', () => {
     stubMusicServer();
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    expect(chip(container)).toBeNull();
-  });
+    expect(chip(container)).toBeNull(); // at rest (nothing playing)
 
-  it('is absent on the owning tab while it plays (frame mounted)', () => {
-    stubMusicServer();
-    const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.click(townButton());
+    fireEvent.click(townButton()); // local commit arms the frame in the same pass
     expect(frame(container)).not.toBeNull();
-    expect(chip(container)).toBeNull();
+    expect(chip(container)).toBeNull(); // frame mounted → we are the owner
   });
 
   it('shows on the stand-down tab when another tab starts playing, naming remote playback', () => {
@@ -93,7 +90,7 @@ describe('MusicPlayer remote-ownership chip', () => {
     expect(note.textContent).toContain('Playing in another window');
   });
 
-  it('disappears live when the owner pauses (playing:false, no reload)', () => {
+  it('disappears live when the owner pauses, and stays gone through a remote stop (no reload)', () => {
     stubMusicServer();
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     remoteMusic({ mood: 'town', playing: true, volume: 0.6, overrides: {} });
@@ -116,16 +113,16 @@ describe('MusicPlayer remote-ownership chip', () => {
     fireEvent.click(screen.getByTitle('Play')); // local resume adopts ownership
 
     expect(frame(container)).not.toBeNull();
-    expect(chip(container)).toBeNull();
+    expect(chip(container)).toBeNull(); // adoption echo must not re-show the chip
   });
 
-  it('is absent on a stopped tab and never flashes on a local play click', () => {
+  it('never flashes when the local tab stops (frame unmounts while music clears)', () => {
     stubMusicServer();
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.click(townButton()); // local commit arms the frame in the same pass
-    expect(chip(container)).toBeNull();
-
+    fireEvent.click(townButton());
     fireEvent.click(screen.getByTitle('Stop')); // local stop
-    expect(chip(container)).toBeNull();
+
+    expect(frame(container)).toBeNull();
+    expect(chip(container)).toBeNull(); // unmount ordering must not expose playing && !frame
   });
 });

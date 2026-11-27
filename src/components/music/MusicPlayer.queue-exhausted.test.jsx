@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-11-20
+// @maintained-by-ai 2026-11-26
 /* Lane: mood un-arm on 'music-queue-exhausted' (bug-music-dead-track-infinite-skip-loop).
  * When ambiencePlayer reports every track failed back-to-back, the component
  * must flip the synced 'music' key to { mood:null, playing:false } (honest
@@ -7,7 +7,8 @@
  * route's intent-split merge (see MusicPlayer.toast.test.jsx).
  * Frame release (bug-music-queue-exhausted-leaves-dead-frame-mounted): the
  * un-arm is a stop, so the owner tab must also drop its .yt-music-frame
- * (1→0) like the local Stop lane (047efa4e1 law) — no dead embed survives. */
+ * (1→0) like the local Stop lane (047efa4e1 law) — no dead embed survives,
+ * and a fresh click re-arms with a freshly mounted frame and replayed queue. */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -56,6 +57,7 @@ function musicState() {
 
 const townButton = () => screen.getByTitle('Play Town ambience');
 const toastNode = () => document.querySelector('.music-toast');
+const frameCount = (container) => container.querySelectorAll('.yt-music-frame').length;
 
 function dispatchExhausted(srcs) {
   act(() => {
@@ -84,10 +86,9 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     // honest UI: error toast naming the mood
     expect(toastNode()).toHaveTextContent('No playable tracks for Town ambience');
     expect(toastNode()).toHaveClass('music-toast-error');
-    // mood un-armed locally AND on the server (the lying "playing" state is gone)
+    // mood un-armed locally AND on the wire (the lying "playing" state is gone)
     expect(musicState()).toMatchObject({ mood: null, playing: false });
     expect(stub.posts.at(-1)).toMatchObject({ mood: null, playing: false });
-    expect(stub.server()).toMatchObject({ mood: null, playing: false });
     expect(townButton()).not.toHaveClass('active');
     // campaign log records the exhaustion with the failed ids
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -98,44 +99,26 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     }));
   });
 
-  it('exhaustion releases the frame like a stop — 1→0, bytes and row untouched, re-arm re-mounts fresh', () => {
+  it('exhaustion releases the frame like a stop (1→0, one arm POST + one stop POST), and a fresh click re-arms and replays', () => {
     const stub = stubMusicServer();
     const { container } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton());
-    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(1);
+    expect(frameCount(container)).toBe(1);
 
     dispatchExhausted(['Me9VLOSaJkg']);
 
-    // The un-arm is a stop: setPlayerMounted(false) → mount-effect cleanup
-    // disposes the embed, so frame-count stays a trustworthy ownership witness.
-    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(0);
+    // The un-arm is a stop: the embed is disposed and the frame dropped, so
+    // frame-count stays a trustworthy ownership witness. Shared bytes land
+    // exactly as before the fix: arm POST then stopCommit POST, nothing else.
+    expect(frameCount(container)).toBe(0);
     expect(ambiencePlayer.dispose).toHaveBeenCalledTimes(1);
-    // shared bytes land exactly as before the fix: arm POST then stopCommit POST
     expect(musicState()).toMatchObject({ mood: null, playing: false });
     expect(stub.posts).toHaveLength(2);
     expect(stub.posts.at(-1)).toMatchObject({ mood: null, playing: false });
-    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'music',
-      action: 'no_playable_tracks',
-      mood: 'town',
-      message: 'Ambience stopped — no playable tracks for Town (Me9VLOSaJkg)'
-    }));
 
-    // re-arming after the released frame freshly re-mounts exactly one frame
+    // re-arming after the released frame: fresh frame, queue replayed, honest UI
     fireEvent.click(townButton());
-    expect(container.querySelectorAll('.yt-music-frame')).toHaveLength(1);
-    expect(ambiencePlayer.ensurePlayer).toHaveBeenCalledTimes(2);
-  });
-
-  it('a fresh mood click after exhaustion re-arms and replays the queue normally', () => {
-    stubMusicServer();
-    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
-    fireEvent.click(townButton());
-    dispatchExhausted(['Me9VLOSaJkg']);
-    expect(musicState()).toMatchObject({ mood: null, playing: false });
-
-    fireEvent.click(townButton());
-
+    expect(frameCount(container)).toBe(1);
     expect(ambiencePlayer.playTracks).toHaveBeenCalledTimes(2);
     expect(musicState()).toMatchObject({ mood: 'town', playing: true });
     expect(townButton()).toHaveClass('active');

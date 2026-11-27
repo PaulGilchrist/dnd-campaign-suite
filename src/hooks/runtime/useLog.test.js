@@ -1,12 +1,13 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic hook-contract tests for useLog: initial load + MAX_LOG_ENTRIES
-// cap, reloadLog/addEntry delegation (logService is mocked at the boundary),
-// SSE log-event handling via the REAL shared sseClient, and subscription
-// lifecycle across campaign changes/unmount. Shared-client mechanics
-// (fan-out, connection sharing, close-on-last-unsubscribe) are covered by
+// cap, reloadLog/addEntry delegation (logService is mocked at the network
+// boundary), SSE log-event handling through the REAL shared sseClient, and the
+// subscription lifecycle across campaign changes/unmount. Shared-client
+// mechanics (one connection per campaign, fan-out, close-on-last-unsubscribe,
+// reconnects) are owned by src/services/ui/sseClient.test.js and
 // src/components/common/subscriber.test.jsx — this file only asserts what
-// useLog itself does with the events it receives.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// useLog itself does with the events it receives and the calls it makes.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 import useLog from './useLog.js';
@@ -27,8 +28,16 @@ class FakeEventSource {
     this.url = url;
     this.onmessage = null;
     this.onerror = null;
+    // Named SSE listeners (the shared sseClient registers its 'client-id'
+    // event via addEventListener). Stored so tests can fire them the way
+    // the browser would; onmessage fan-out semantics are untouched.
+    this.namedListeners = {};
     this.close = vi.fn();
     eventSources.push(this);
+  }
+
+  addEventListener(type, fn) {
+    (this.namedListeners[type] = this.namedListeners[type] || []).push(fn);
   }
 
   // Deliver a frame the way the browser would (raw SSE data string).
@@ -42,300 +51,215 @@ function subscribeUrl(campaignName) {
   return `http://localhost/subscribe?${params.toString()}`;
 }
 
-function logEvent(key, data) {
-  return { key, data };
-}
+let consoleErrorSpy;
 
 beforeEach(() => {
   resetSSEClient();
   vi.clearAllMocks();
+  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   eventSources = [];
   global.EventSource = FakeEventSource;
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('useLog', () => {
-  describe('initial state', () => {
-    it('returns empty logEntries and initialized false synchronously', () => {
-      const { result } = renderHook(() => useLog('test-campaign'));
-      expect(result.current.logEntries).toEqual([]);
-      expect(result.current.initialized).toBe(false);
-      expect(typeof result.current.addEntry).toBe('function');
-      expect(typeof result.current.reloadLog).toBe('function');
-    });
+  it('starts empty and loads the log on mount', async () => {
+    logService.getLog.mockResolvedValue([{ text: 'loaded' }]);
 
-    it('does nothing when campaignName is falsy', async () => {
-      const { result } = renderHook(() => useLog(null));
-      await act(async () => {});
-      expect(result.current.logEntries).toEqual([]);
-      expect(result.current.initialized).toBe(false);
-      expect(logService.getLog).not.toHaveBeenCalled();
-      expect(eventSources).toHaveLength(0);
+    const { result } = renderHook(() => useLog('test-campaign'));
+    expect(result.current.logEntries).toEqual([]);
+    expect(result.current.initialized).toBe(false);
+
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
     });
+    expect(logService.getLog).toHaveBeenCalledWith('test-campaign');
+    expect(result.current.logEntries).toEqual([{ text: 'loaded' }]);
   });
 
-  describe('initialization', () => {
-    it('loads the log via getLog on mount and sets initialized', async () => {
-      logService.getLog.mockResolvedValue([{ text: 'loaded' }]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      expect(logService.getLog).toHaveBeenCalledWith('test-campaign');
-      expect(result.current.logEntries).toEqual([{ text: 'loaded' }]);
+  it('does nothing with a falsy campaign: no load, no subscribe, no writes', async () => {
+    const { result } = renderHook(() => useLog(null));
+    await act(async () => {
+      await result.current.reloadLog();
+      await result.current.addEntry({ text: 'Hello' });
     });
 
-    it('slices loaded entries to MAX_LOG_ENTRIES (200) when log has more', async () => {
-      const manyEntries = Array.from({ length: 250 }, (_, i) => ({
-        text: `entry ${i}`,
-      }));
-      logService.getLog.mockResolvedValue(manyEntries);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      expect(result.current.logEntries).toHaveLength(200);
-      expect(result.current.logEntries[0].text).toBe('entry 50');
-      expect(result.current.logEntries[199].text).toBe('entry 249');
-    });
-
-    it('logs error and keeps empty entries when getLog rejects', async () => {
-      const error = new Error('fetch failed');
-      logService.getLog.mockRejectedValue(error);
-
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load log:', error);
-      expect(result.current.logEntries).toEqual([]);
-
-      consoleErrorSpy.mockRestore();
-    });
+    expect(result.current.logEntries).toEqual([]);
+    expect(result.current.initialized).toBe(false);
+    expect(eventSources).toHaveLength(0);
+    // logService is the network boundary: silence here IS the observable
+    // no-request contract for the falsy guards in each effect/callback.
+    expect(logService.getLog).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
   });
 
-  describe('reloadLog', () => {
-    it('replaces entries with fresh getLog results', async () => {
-      logService.getLog.mockResolvedValue([{ text: 'fresh' }]);
+  it('slices a loaded log to the 200-entry tail', async () => {
+    logService.getLog.mockResolvedValue(
+      Array.from({ length: 250 }, (_, i) => ({ text: `entry ${i}` }))
+    );
 
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      logService.getLog.mockResolvedValue([{ text: 'fresher' }]);
-      await act(async () => {
-        await result.current.reloadLog();
-      });
-
-      expect(logService.getLog).toHaveBeenCalledTimes(2);
-      expect(result.current.logEntries).toEqual([{ text: 'fresher' }]);
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
     });
 
-    it('logs error when reloadLog rejects', async () => {
-      const error = new Error('reload failed');
-      logService.getLog.mockRejectedValue(error);
-
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      await act(async () => {
-        await result.current.reloadLog();
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to reload log:', error);
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('does not call getLog when campaignName is falsy', async () => {
-      const { result } = renderHook(() => useLog(null));
-      await act(async () => {
-        await result.current.reloadLog();
-      });
-      expect(logService.getLog).not.toHaveBeenCalled();
-    });
+    expect(result.current.logEntries).toHaveLength(200);
+    expect(result.current.logEntries[0].text).toBe('entry 50');
+    expect(result.current.logEntries[199].text).toBe('entry 249');
   });
 
-  describe('addEntry', () => {
-    it('delegates to logService.addEntry with campaign name and entry', async () => {
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
+  it('logs a failed initial load and keeps the empty log', async () => {
+    const error = new Error('fetch failed');
+    logService.getLog.mockRejectedValue(error);
 
-      await act(async () => {
-        await result.current.addEntry({ text: 'Hello' });
-      });
-      expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
-        text: 'Hello',
-      });
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
     });
 
-    it('logs error when addEntry rejects', async () => {
-      const error = new Error('add failed');
-      logService.addEntry.mockRejectedValue(error);
-
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      await act(async () => {
-        await result.current.addEntry({ text: 'fail' });
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to add log entry:', error);
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('does not call addEntry when campaignName is falsy', async () => {
-      const { result } = renderHook(() => useLog(null));
-      await act(async () => {
-        await result.current.addEntry({ text: 'Hello' });
-      });
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load log:', error);
+    expect(result.current.logEntries).toEqual([]);
   });
 
-  describe('SSE event handling', () => {
-    it('subscribes through the shared SSE client with the campaign URL', () => {
-      renderHook(() => useLog('test-campaign'));
-      expect(eventSources).toHaveLength(1);
-      expect(eventSources[0].url).toBe(subscribeUrl('test-campaign'));
+  it('delegates addEntry to logService and logs failures without throwing', async () => {
+    logService.getLog.mockResolvedValue([]);
+    logService.addEntry.mockResolvedValue();
+
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
     });
 
-    it('appends log events in order after the initial load', async () => {
-      logService.getLog.mockResolvedValue([{ text: 'loaded' }]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        eventSources[0].emit(logEvent('log-1', { text: 'sse one' }));
-        eventSources[0].emit(logEvent('log-2', { text: 'sse two' }));
-      });
-
-      expect(result.current.logEntries).toEqual([
-        { text: 'loaded' },
-        { text: 'sse one' },
-        { text: 'sse two' },
-      ]);
+    await act(async () => {
+      await result.current.addEntry({ text: 'Hello' });
     });
-
-    it('caps appended entries at MAX_LOG_ENTRIES (200)', async () => {
-      logService.getLog.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        for (let i = 0; i < 205; i++) {
-          eventSources[0].emit(logEvent(`log-${i}`, { text: `entry ${i}` }));
-        }
-      });
-
-      expect(result.current.logEntries).toHaveLength(200);
-      expect(result.current.logEntries[0].text).toBe('entry 5');
-      expect(result.current.logEntries[199].text).toBe('entry 204');
+    // Delegation IS the seam contract: local state is not updated here,
+    // the SSE echo delivers the entry back.
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      text: 'Hello',
     });
+    expect(result.current.logEntries).toEqual([]);
 
-    it('clears entries when SSE event data is null', async () => {
-      logService.getLog.mockResolvedValue([
-        { text: 'existing' },
-        { text: 'also existing' },
-      ]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        eventSources[0].emit(logEvent('log-clear', null));
-      });
-
-      expect(result.current.logEntries).toEqual([]);
+    const error = new Error('add failed');
+    logService.addEntry.mockRejectedValue(error);
+    await act(async () => {
+      await result.current.addEntry({ text: 'fail' });
     });
-
-    it('ignores events whose key does not start with "log-"', async () => {
-      logService.getLog.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        eventSources[0].emit(logEvent('other-event', { text: 'ignored' }));
-      });
-
-      expect(result.current.logEntries).toHaveLength(0);
-    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Failed to add log entry:',
+      error
+    );
   });
 
-  describe('campaign changes and cleanup', () => {
-    it('reloads log and re-subscribes when campaignName changes', async () => {
-      logService.getLog.mockResolvedValue([{ text: 'old' }]);
+  it('replaces entries on reloadLog and logs reload failures', async () => {
+    logService.getLog.mockResolvedValue([{ text: 'fresh' }]);
 
-      const { result, rerender } = renderHook(
-        ({ campaignName }) => useLog(campaignName),
-        { initialProps: { campaignName: 'campaign-a' } }
-      );
-
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      logService.getLog.mockResolvedValue([{ text: 'new' }]);
-      rerender({ campaignName: 'campaign-b' });
-
-      await waitFor(() => {
-        expect(result.current.logEntries).toEqual([{ text: 'new' }]);
-      });
-
-      expect(logService.getLog).toHaveBeenCalledWith('campaign-a');
-      expect(logService.getLog).toHaveBeenCalledWith('campaign-b');
-      expect(eventSources).toHaveLength(2);
-      expect(eventSources[0].url).toBe(subscribeUrl('campaign-a'));
-      expect(eventSources[0].close).toHaveBeenCalled();
-      expect(eventSources[1].url).toBe(subscribeUrl('campaign-b'));
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
     });
 
-    it('closes the connection on unmount', async () => {
-      logService.getLog.mockResolvedValue([]);
-
-      const { result, unmount } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      expect(eventSources[0].close).not.toHaveBeenCalled();
-      unmount();
-      expect(eventSources[0].close).toHaveBeenCalled();
+    logService.getLog.mockResolvedValue([{ text: 'fresher' }]);
+    await act(async () => {
+      await result.current.reloadLog();
     });
+    expect(result.current.logEntries).toEqual([{ text: 'fresher' }]);
+
+    const error = new Error('reload failed');
+    logService.getLog.mockRejectedValue(error);
+    await act(async () => {
+      await result.current.reloadLog();
+    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to reload log:', error);
+    // Failed reload leaves the previous entries untouched.
+    expect(result.current.logEntries).toEqual([{ text: 'fresher' }]);
+  });
+
+  it('appends log-* SSE events in order, capped at the 200-entry tail', async () => {
+    logService.getLog.mockResolvedValue([{ text: 'loaded' }]);
+
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
+    });
+
+    act(() => {
+      for (let i = 0; i < 201; i++) {
+        eventSources[0].emit({ key: `log-${i}`, data: { text: `entry ${i}` } });
+      }
+    });
+
+    // Last-200 window: the loaded entry and the oldest emits are evicted,
+    // survivors keep their arrival order.
+    expect(result.current.logEntries).toHaveLength(200);
+    expect(result.current.logEntries[0].text).toBe('entry 1');
+    expect(result.current.logEntries[199].text).toBe('entry 200');
+  });
+
+  it('clears the log when an SSE event carries null data', async () => {
+    logService.getLog.mockResolvedValue([{ text: 'existing' }]);
+
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
+    });
+
+    act(() => {
+      eventSources[0].emit({ key: 'log-clear', data: null });
+    });
+
+    expect(result.current.logEntries).toEqual([]);
+  });
+
+  it('ignores events whose key does not start with "log-"', async () => {
+    logService.getLog.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useLog('test-campaign'));
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
+    });
+
+    act(() => {
+      eventSources[0].emit({ key: 'other-event', data: { text: 'ignored' } });
+    });
+
+    expect(result.current.logEntries).toHaveLength(0);
+  });
+
+  it('reloads and re-subscribes on campaign change, closing connections on switch and unmount', async () => {
+    logService.getLog.mockResolvedValue([{ text: 'old' }]);
+
+    const { result, rerender, unmount } = renderHook(
+      ({ campaignName }) => useLog(campaignName),
+      { initialProps: { campaignName: 'campaign-a' } }
+    );
+
+    await waitFor(() => {
+      expect(result.current.initialized).toBe(true);
+    });
+
+    logService.getLog.mockResolvedValue([{ text: 'new' }]);
+    rerender({ campaignName: 'campaign-b' });
+
+    await waitFor(() => {
+      expect(result.current.logEntries).toEqual([{ text: 'new' }]);
+    });
+    expect(logService.getLog).toHaveBeenCalledWith('campaign-a');
+    expect(logService.getLog).toHaveBeenCalledWith('campaign-b');
+    expect(eventSources.map(source => source.url)).toEqual([
+      subscribeUrl('campaign-a'),
+      subscribeUrl('campaign-b'),
+    ]);
+    // useLog unsubscribes on every seam: old campaign closed on switch,
+    // new campaign closed on unmount (last-subscriber mechanics are
+    // sseClient-owned; this pins that useLog actually releases them).
+    expect(eventSources[0].close).toHaveBeenCalled();
+    expect(eventSources[1].close).not.toHaveBeenCalled();
+
+    unmount();
+    expect(eventSources[1].close).toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearRuntimeState, seedTrackedResources, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import {
@@ -8,12 +9,14 @@ import {
   soundScreenLabel,
   tvScreensOf,
   nextTvPresenceValue,
-  releaseTvPresenceKeepalive,
 } from './soundOwner.js';
 
 // jsdom default hostname is 'localhost' → the GM branch of the predicate;
 // the TV branch rides the localStorage `initiative-tv` pref (mocked in
 // src/test/setup.js), flipped here directly.
+// The pagehide keepalive-release lane is proved end-to-end through its only
+// production caller in src/hooks/ui/useTvSoundPresence.test.js (URL, keepalive
+// flag, stripped body, no double-release) — not restated as a unit test here.
 
 describe('soundOwner', () => {
   beforeEach(() => {
@@ -28,8 +31,11 @@ describe('soundOwner', () => {
     expect(isSoundOwnerHere()).toBe(true); // localhost, TV pref off
   });
 
-  it('claim writes {screen} server-first and readSoundScreen follows', () => {
+  it('claim writes the canonical claim-only shape and moves the speaker slot', () => {
     claimSoundScreen('Test Camp', 'tv');
+    const stored = getRuntimeValue('campaign', SOUND_OWNER_KEY);
+    expect(stored).toEqual({ screen: 'tv' });
+    expect('tvScreens' in stored).toBe(false); // no phantom empty map
     expect(readSoundScreen()).toBe('tv');
     // This localhost non-TV tab is NOT the speaker once the TV owns sound…
     expect(isSoundOwnerHere()).toBe(false);
@@ -102,28 +108,6 @@ describe('soundOwner', () => {
         screen: 'gm',
         tvScreens: { [token]: true, 'tab-foreign': true },
       });
-    });
-
-    it('claimSoundScreen on an empty store writes the canonical claim-only shape', () => {
-      claimSoundScreen('Test Camp', 'tv');
-      const stored = getRuntimeValue('campaign', SOUND_OWNER_KEY);
-      expect(stored).toEqual({ screen: 'tv' });
-      expect('tvScreens' in stored).toBe(false); // no phantom empty map
-    });
-
-    it('pagehide release keepalive-POSTs the stripped value to the soundOwner key', () => {
-      const marked = nextTvPresenceValue({ screen: 'tv' }, true);
-      expect(releaseTvPresenceKeepalive('Test Camp', marked)).toBe(true);
-      expect(fetch).toHaveBeenCalledTimes(1);
-      const [url, init] = fetch.mock.calls[0];
-      expect(url).toBe('/api/campaigns/Test%20Camp/soundOwner');
-      expect(init.method).toBe('POST');
-      expect(init.keepalive).toBe(true);
-      expect(JSON.parse(init.body)).toEqual({ value: { screen: 'tv' } });
-      // Nothing marked → nothing sent (the non-TV tab stays write-silent).
-      fetch.mockClear();
-      expect(releaseTvPresenceKeepalive('Test Camp', { screen: 'tv' })).toBe(false);
-      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

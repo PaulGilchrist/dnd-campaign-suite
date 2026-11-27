@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Wrapper-lane lastAttack seam for createLogDamageAndShow — only the stamping
 // paths not owned elsewhere. Plain-damage store/merge and the skip guards
 // (rolls/damageType absent) are authority in handlers/handlePlainDamage.test.js
@@ -140,6 +140,8 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
         pendingSaves: {},
     };
 
+    const FROZEN_NOW = 1731600000000;
+
     const fireBolt = (context) => ({
         name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context,
     });
@@ -148,6 +150,7 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
 
         // Plain-damage defaults; individual tests opt into their seam.
         getRuntimeValue.mockImplementation(() => null);
@@ -162,7 +165,7 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
     // handleAutoMiss stamps lastAttack so counterspell/riposte lanes can
     // see the miss — the only coverage of that stamp anywhere.
     // -----------------------------------------------------------------------
-    it('auto-miss stamps lastAttack with rollType auto-miss and zero damage', async () => {
+    it('auto-miss stamps lastAttack with the full production auto-miss shape', async () => {
         await createLogDamageAndShow(deps)(fireBolt({
             attackerName: 'TestFighter',
             targetName: 'Goblin',
@@ -170,23 +173,29 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
             isAutoMiss: true,
         }));
 
-        expect(lastAttackWrites()).toHaveLength(1);
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
+        // Full-shape census: buildAutoMissLastAttack's 15 fields, frozen timestamp.
+        expect(lastAttackWrites()).toEqual([
+            ['campaign', 'lastAttack', {
                 attackerName: 'TestFighter',
                 targetName: 'Goblin',
                 rollType: 'auto-miss',
-                damageName: 'Fire Bolt',
                 damageFormula: '1d10',
+                damageName: 'Fire Bolt',
+                damageType: 'fire',
                 rawDamage: 0,
                 primaryDamage: 0,
                 primaryDamageType: 'fire',
+                actualDamage: 0,
                 damageApplied: false,
-            }),
-            'test-campaign'
-        );
+                statusEffects: null,
+                affectedTargets: ['Goblin'],
+                rangeReason: undefined,
+                timestamp: FROZEN_NOW,
+            }, 'test-campaign'],
+        ]);
+        // The auto-miss return short-circuits the wrapper — no plain-damage
+        // re-stamp downstream.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
     });
 
     // -----------------------------------------------------------------------
@@ -240,6 +249,13 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
             },
         });
 
+        expect(isMagicMissileImmune).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+        // Sentinel that the immunity branch actually ran (log row is written):
+        expect(deps.logEntry).toHaveBeenCalledWith(
+            expect.objectContaining({ note: 'Shield: Immune to Magic Missile' })
+        );
+        // ... yet the short-circuit means no damage application and no stamp.
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(lastAttackWrites()).toHaveLength(0);
     });
 
@@ -259,11 +275,25 @@ describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', ()
             attackName: 'Fire Bolt',
         }));
 
-        expect(lastAttackWrites()).toHaveLength(1);
-        expect(lastAttackWrites()[0][2]).toEqual(expect.objectContaining({
-            attackerName: 'TestFighter',
-            targetName: 'NonExistent',
-            damageApplied: true,
-        }));
+        // The write survives the missing roster entry: targetName/attackName
+        // come from context, damage fields carry the raw adjusted total (no
+        // apply ran), and affectedTargets falls back to [] because there is
+        // no resolved target to name.
+        expect(lastAttackWrites()).toEqual([
+            ['campaign', 'lastAttack', {
+                attackerName: 'TestFighter',
+                targetName: 'NonExistent',
+                attackName: 'Fire Bolt',
+                rolls: [5],
+                rawDamage: 5,
+                primaryDamage: 5,
+                primaryDamageType: 'fire',
+                damageTypes: ['fire'],
+                actualDamage: 5,
+                damageApplied: true,
+                statusEffects: null,
+                affectedTargets: [],
+            }, 'test-campaign'],
+        ]);
     });
 });

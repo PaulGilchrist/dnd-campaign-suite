@@ -1,16 +1,27 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Component-level contract for SpellOverlayControls: shape picker + DEFAULTS
+// reset, per-shape param face (labels, fallbacks, writes), armed-only copy,
+// active-list counting/skipping, and remove/Clear-All wiring. Sibling split:
+// same-shape chip identity (label/tooltip/aria) lives in
+// SpellOverlayControls.chip-label.test.jsx; the unarmed manage-only face
+// (disabled controls, both placement hints absent) in
+// SpellOverlayControls.unarmed-params.test.jsx.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 
-// Mirrors PARAM_FIELDS in the component: numeric inputs + fallback per shape.
+// Mirrors PARAM_FIELDS in the component: numeric inputs + label/fallback per
+// shape, plus the armed placement hint (drag-for-angle for CONE/LINE/CUBE).
+// Pinning labels here also locks the cone rename to `Cone Spread (°)` — the
+// old `Angle (°)` label collided with the hint's ORIENTATION meaning
+// (backlog FU 2026-11-09) — while the param key stays the contract.
 const SHAPE_CASES = [
-  { shape: OverlayShape.SPHERE, hint: 'Click map to place', fields: [{ param: 'radiusFt', fallback: 20 }] },
-  { shape: OverlayShape.CYLINDER, hint: 'Click map to place', fields: [{ param: 'radiusFt', fallback: 20 }] },
-  { shape: OverlayShape.CUBE, hint: 'Click map to place, drag for angle', fields: [{ param: 'sizeFt', fallback: 15 }] },
-  { shape: OverlayShape.CONE, hint: 'Click map to place, drag for angle', fields: [{ param: 'distanceFt', fallback: 60 }, { param: 'coneAngle', fallback: 90 }] },
-  { shape: OverlayShape.LINE, hint: 'Click map to place, drag for angle', fields: [{ param: 'distanceFt', fallback: 60 }, { param: 'widthFt', fallback: 5 }] },
+  { shape: OverlayShape.SPHERE, hint: 'Click map to place', fields: [{ param: 'radiusFt', label: 'Radius (ft)', fallback: 20 }] },
+  { shape: OverlayShape.CYLINDER, hint: 'Click map to place', fields: [{ param: 'radiusFt', label: 'Radius (ft)', fallback: 20 }] },
+  { shape: OverlayShape.CUBE, hint: 'Click map to place, drag for angle', fields: [{ param: 'sizeFt', label: 'Size (ft)', fallback: 15 }] },
+  { shape: OverlayShape.CONE, hint: 'Click map to place, drag for angle', fields: [{ param: 'distanceFt', label: 'Distance (ft)', fallback: 60 }, { param: 'coneAngle', label: 'Cone Spread (°)', fallback: 90 }] },
+  { shape: OverlayShape.LINE, hint: 'Click map to place, drag for angle', fields: [{ param: 'distanceFt', label: 'Distance (ft)', fallback: 60 }, { param: 'widthFt', label: 'Width (ft)', fallback: 5 }] },
 ];
 
 const PREV_PARAMS = { radiusFt: 20, sizeFt: 15, distanceFt: 60, coneAngle: 90, widthFt: 5 };
@@ -72,28 +83,16 @@ describe('SpellOverlayControls', () => {
     expect(onCancelMode).toHaveBeenCalled();
   });
 
-  it.each(SHAPE_CASES)('$shape: renders param inputs with fallbacks and updates each param', ({ shape, fields }) => {
+  it.each(SHAPE_CASES)('$shape: shows $hint and edits each labeled param with its fallback', ({ shape, hint, fields }) => {
     renderComponent({ selectedShape: shape, isActive: true });
-    const inputs = screen.getAllByRole('spinbutton');
-    expect(inputs).toHaveLength(fields.length);
-    fields.forEach((field, i) => {
-      expect(inputs[i]).toHaveValue(field.fallback);
-      fireEvent.change(inputs[i], { target: { value: '25' } });
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(fields.length);
+    fields.forEach((field) => {
+      const input = screen.getByLabelText(field.label);
+      expect(input).toHaveValue(field.fallback);
+      fireEvent.change(input, { target: { value: '25' } });
       expect(appliedParams()).toEqual(expect.objectContaining({ [field.param]: 25 }));
     });
-  });
-
-  // Backlog FU 2026-11-09: the cone spread field was labeled `Angle (°)` —
-  // colliding with the placement hint's ORIENTATION meaning. Pin the renamed
-  // label while the param key stays the contract (`coneAngle`).
-  it('labels the cone spread param Cone Spread (°) and writes coneAngle', () => {
-    renderComponent({ selectedShape: OverlayShape.CONE, isActive: true });
-    const input = screen.getByLabelText('Cone Spread (°)');
-    expect(input).toBeInTheDocument();
-    expect(screen.queryByText('Angle (°)')).not.toBeInTheDocument();
-    expect(input).toHaveValue(90);
-    fireEvent.change(input, { target: { value: '45' } });
-    expect(appliedParams()).toEqual(expect.objectContaining({ coneAngle: 45 }));
   });
 
   it('treats non-numeric and empty input values as 0', () => {
@@ -105,19 +104,9 @@ describe('SpellOverlayControls', () => {
     }
   });
 
-  it('shows a next-placement-only hint beside the param inputs on mount', () => {
-    const { container } = renderComponent({ isActive: true });
-    const hint = screen.getByText('Params apply to the next placement only');
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveClass('spell-overlay-hint');
-    // Sits with/under the param row: sibling of the .spell-overlay-row holding the inputs
-    const paramRow = container.querySelector('.spell-overlay-row + .spell-overlay-hint');
-    expect(paramRow).toBe(hint);
-  });
-
-  it('hides the active section when there are no overlays', () => {
-    renderComponent();
-    expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
+  it('shows the params-apply-to-next-placement hint while armed', () => {
+    renderComponent({ isActive: true });
+    expect(screen.getByText('Params apply to the next placement only')).toHaveClass('spell-overlay-hint');
   });
 
   // Panel fixtures must be renderable overlays — malformed rows are skipped
@@ -132,6 +121,14 @@ describe('SpellOverlayControls', () => {
     widthFt: 5,
     color: 'rgba(255,80,60,0.07)',
     ...item,
+  });
+
+  it.each([
+    { case: 'no overlays', overlays: [] },
+    { case: 'only malformed rows', overlays: [{ id: 'junk', shape: 'sphere', x: 1, y: 1, radius: 5 }] },
+  ])('hides the active section when the board has $case', ({ overlays }) => {
+    renderComponent({ overlays });
+    expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
   });
 
   it('lists active overlays with an honest count and shape labels', () => {
@@ -159,11 +156,6 @@ describe('SpellOverlayControls', () => {
     expect(items[0].querySelector('span').textContent).toBe('Sphere (1,1)');
   });
 
-  it('hides the active section entirely when every row is junk', () => {
-    renderComponent({ overlays: [{ id: 'junk', shape: 'sphere', x: 1, y: 1, radius: 5 }] });
-    expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
-  });
-
   it('calls onRemoveOverlay and onClearAll from the active list', () => {
     const overlays = [
       validOverlay({ id: 'o1', shape: OverlayShape.CUBE }),
@@ -174,15 +166,5 @@ describe('SpellOverlayControls', () => {
     expect(onRemoveOverlay).toHaveBeenCalledWith('o1');
     fireEvent.click(screen.getByRole('button', { name: 'Clear All' }));
     expect(onClearAll).toHaveBeenCalled();
-  });
-
-  it('hides the placement hint when not active', () => {
-    renderComponent();
-    expect(screen.queryByText(/Click map to place/)).not.toBeInTheDocument();
-  });
-
-  it.each(SHAPE_CASES)('$shape shows hint: $hint', ({ shape, hint }) => {
-    renderComponent({ selectedShape: shape, isActive: true });
-    expect(screen.getByText(hint)).toBeInTheDocument();
   });
 });

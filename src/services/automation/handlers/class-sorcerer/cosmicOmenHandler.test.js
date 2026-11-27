@@ -1,16 +1,18 @@
-// @maintained-by-ai 2026-10-15
-// Producer-lane unit tests for cosmicOmenHandler: uses gate, omen parsing,
-// popup composition, uses-decrement, and campaign logging — all behind mocked
-// runtime/dice/log deps (deterministic). Canonical pending-store routing and
-// {value,type} consumer shape are covered against the REAL store in
-// cosmicOmenHandler.pending-store.test.js (CLA-065 lens); this file keeps
-// only the mock-call-args pins the real-store lens cannot see (campaign
-// argument on the pending write — fetch is inert there).
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, clearCosmicOmenEffect } from './cosmicOmenHandler.js';
+// @maintained-by-ai 2026-11-26
+// Producer-lane unit tests for cosmicOmenHandler: uses gate (incl. usesMax
+// resolution and the ?? usesMax first-use default), omen parsing (incl. the
+// corrupted-JSON refusal), exact popup/log composition, and ordered commit
+// censuses — all behind mocked runtime/dice/log deps with a frozen Date.now.
+// Canonical pending-store routing and {value,type} consumer shape are covered
+// against the REAL store in cosmicOmenHandler.pending-store.test.js (CLA-065
+// lens); this file keeps the mock-call-args pins the real-store lens cannot
+// see: the campaign argument on the pending write (fetch is inert there) and
+// the uses-decrement write ORDER.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { handle } from './cosmicOmenHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
@@ -31,302 +33,211 @@ const { rollExpression } = await import('../../../dice/diceRoller.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { evaluateAutoExpression } = await import('../../../combat/automation/automationService.js');
 
-beforeEach(() => {
-    vi.clearAllMocks();
-});
+const CAMPAIGN = 'test-campaign';
+const FROZEN_NOW = 1700000000000;
+const WEAL = { type: 'Weal', isEven: true, starMapRoll: 10 };
+const WOE = { type: 'Woe', isEven: false, starMapRoll: 7 };
 
 function makePlayerStats(overrides = {}) {
-    return {
-        name: 'TestSorcerer',
-        ...overrides,
-    };
+    return { name: 'TestSorcerer', ...overrides };
 }
 
-function makeAction(overrides = {}) {
-    return {
-        name: 'Cosmic Omen',
-        automation: {
-            type: 'cosmic_omen',
-            ...overrides.automation,
+function makeAction(automation = {}, name = 'Cosmic Omen') {
+    return { name, automation: { type: 'cosmic_omen', ...automation } };
+}
+
+// Exact-key router over the handler's two runtime reads. Any *Uses key routes
+// to `uses` so feature-name→uses-key derivation stays observable.
+function mockRuntime({ uses = null, omen = JSON.stringify(WEAL) } = {}) {
+    getRuntimeValue.mockImplementation((_name, key) => {
+        if (key.endsWith('Uses')) return uses;
+        if (key === 'cosmicOmenEffect') return omen;
+        return null;
+    });
+}
+
+function pendingWrite(value, type) {
+    return ['cosmicOmen', 'cosmicOmenPendingBonus', JSON.stringify({ value, type }), CAMPAIGN];
+}
+
+describe('cosmicOmenHandler.handle', () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        // Re-pin stable impls after the reset (handler chains .catch on addEntry).
+        setRuntimeValue.mockResolvedValue(undefined);
+        addEntry.mockResolvedValue(undefined);
+        rollExpression.mockReturnValue({ total: 4 });
+        getRuntimeValue.mockImplementation(() => null);
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+    });
+
+    afterEach(() => {
+        Date.now.mockRestore();
+    });
+
+    it.each([
+        {
+            label: 'exhausted uses (number)',
+            automation: { usesMax: 3 }, uses: 0, omen: JSON.stringify(WEAL),
+            description: 'Cosmic Omen has no uses remaining. Recharges on a Long Rest.',
         },
-        ...overrides,
-    };
-}
+        {
+            label: 'exhausted uses (string-coerced "0")',
+            automation: { usesMax: 3 }, uses: '0', omen: JSON.stringify(WEAL),
+            description: 'Cosmic Omen has no uses remaining. Recharges on a Long Rest.',
+        },
+        {
+            label: 'no omen active',
+            automation: {}, uses: 2, omen: null,
+            description: 'Cosmic Omen has no omen active. Consult your Star Map on Long Rest.',
+        },
+        {
+            label: 'corrupted omen JSON',
+            automation: {}, uses: 2, omen: '{broken',
+            description: 'Cosmic Omen has corrupted omen data.',
+        },
+    ])('refuses ($label) with the exact info popup and a zero-write census', async (c) => {
+        mockRuntime({ uses: c.uses, omen: c.omen });
 
-function setupRuntimeValues(overrides) {
-    getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-        return overrides[key] ?? null;
-    });
-}
+        const action = makeAction(c.automation);
+        const result = await handle(action, makePlayerStats(), CAMPAIGN);
 
-describe('cosmicOmenHandler', () => {
-    describe('uses check', () => {
-        it('returns popup with "no uses remaining" when current uses is zero or negative', async () => {
-            const zeroValues = [0, '0', -1];
-
-            for (const usesValue of zeroValues) {
-                vi.clearAllMocks();
-                setupRuntimeValues({ cosmicOmenUses: usesValue });
-
-                const action = makeAction({ automation: { usesMax: 3 } });
-                const result = await handle(action, makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('no uses remaining');
-                expect(result.payload.description).toContain('Recharges on a Long Rest');
-            }
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Cosmic Omen',
+                description: c.description,
+                automation: { type: 'cosmic_omen', ...c.automation },
+            },
         });
-
-        it('proceeds when usesMax > 0 and current uses is positive', async () => {
-            const positiveValues = [2, 1];
-
-            for (const usesValue of positiveValues) {
-                vi.clearAllMocks();
-                setupRuntimeValues({
-                    cosmicOmenUses: usesValue,
-                    cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-                });
-                rollExpression.mockReturnValue({ total: 4 });
-
-                const action = makeAction({ automation: { usesMax: 3 } });
-                const result = await handle(action, makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('1d6');
-            }
-        });
-
-        it('handles uses_expression evaluation correctly', async () => {
-            vi.clearAllMocks();
-            evaluateAutoExpression.mockReturnValue(2);
-            setupRuntimeValues({
-                cosmicOmenUses: 2,
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-            });
-            rollExpression.mockReturnValue({ total: 3 });
-
-            const action = makeAction({ automation: { uses_expression: 'proficiency_bonus' } });
-            const result = await handle(action, makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).not.toContain('no uses remaining');
-            expect(result.payload.description).toContain('1d6');
-        });
-
-        it('proceeds without checking uses when usesMax is 0 and no uses_expression (unlimited)', async () => {
-            setupRuntimeValues({ cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }) });
-            rollExpression.mockReturnValue({ total: 2 });
-
-            const action = makeAction({ automation: { usesMax: 0 } });
-            const result = await handle(action, makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('1d6');
-        });
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    describe('omen effect check', () => {
-        it('returns popup with "no omen active" when cosmicOmenEffect is null', async () => {
-            getRuntimeValue.mockReturnValue(null);
+    it('refuses a failed d6 roll after the gates with the exact popup and zero writes', async () => {
+        mockRuntime({ uses: 1, omen: JSON.stringify(WEAL) });
+        rollExpression.mockReturnValue(null);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        const action = makeAction({ usesMax: 3 });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no omen active');
-            expect(result.payload.description).toContain('Star Map');
+        expect(rollExpression).toHaveBeenCalledWith('1d6');
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Cosmic Omen',
+                description: 'Cosmic Omen roll failed.',
+                automation: { type: 'cosmic_omen', usesMax: 3 },
+            },
         });
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    describe('d6 roll failure', () => {
-        it('returns popup with "roll failed" when rollExpression returns falsy', async () => {
-            setupRuntimeValues({
-                cosmicOmenUses: 1,
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-            });
-            rollExpression.mockReturnValue(null);
+    it.each([
+        {
+            label: 'Weal (Even) arms +pending',
+            omen: WEAL, value: 4,
+            description: '<b>Cosmic Omen</b><br/>Star Map result: <b>Weal (Even)</b>, Star Map roll: <b>10</b><br/>1d6: <b>4</b><br/>Next d20 test: <b>+4</b>',
+            logDescription: 'TestSorcerer used Cosmic Omen (Weal). Rolled 1d6: 4. Next d20 test modified +4.',
+        },
+        {
+            label: 'Woe (Odd) arms -pending',
+            omen: WOE, value: 3,
+            description: '<b>Cosmic Omen</b><br/>Star Map result: <b>Woe (Odd)</b>, Star Map roll: <b>7</b><br/>1d6: <b>3</b><br/>Next d20 test: <b>-3</b>',
+            logDescription: 'TestSorcerer used Cosmic Omen (Woe). Rolled 1d6: 3. Next d20 test modified -3.',
+        },
+    ])('commits a $label with exact popup, ordered write census, and frozen log entry', async (c) => {
+        mockRuntime({ uses: 3, omen: JSON.stringify(c.omen) });
+        rollExpression.mockReturnValue({ total: c.value });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        const action = makeAction({ usesMax: 3 });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('roll failed');
+        expect(rollExpression).toHaveBeenCalledWith('1d6');
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Cosmic Omen',
+                description: c.description,
+                automation: { type: 'cosmic_omen', usesMax: 3 },
+            },
         });
-    });
-
-    describe('Weal (Even)', () => {
-        it('generates correct popup and stores pending bonus for Weal', async () => {
-            const rollValues = [4, 0];
-
-            for (const d6Value of rollValues) {
-                vi.clearAllMocks();
-                setupRuntimeValues({
-                    cosmicOmenUses: 1,
-                    cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-                });
-                rollExpression.mockReturnValue({ total: d6Value });
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('Weal');
-                expect(result.payload.description).toContain('Even');
-                expect(result.payload.description).toContain(`+${d6Value}`);
-            }
-
-            const pendingCall = setRuntimeValue.mock.calls.find(
-                (call) => call[1] === 'cosmicOmenPendingBonus'
-            );
-            expect(pendingCall).toBeDefined();
-            // Mock-call-args lens is the only place the campaign argument is
-            // visible (real-store cache ignores campaign; fetch is inert there).
-            expect(pendingCall[0]).toBe('cosmicOmen');
-            expect(pendingCall[3]).toBe('test-campaign');
-            const pendingData = JSON.parse(pendingCall[2]);
-            expect(pendingData.type).toBe('Weal');
+        // Exact census in write order: uses decrement first, then the canonical
+        // global pending store. The mock-args lens is the only place the
+        // campaign argument is visible (real-store cache ignores it).
+        expect(setRuntimeValue.mock.calls).toEqual([
+            ['TestSorcerer', 'cosmicOmenUses', 2, CAMPAIGN],
+            pendingWrite(c.value, c.omen.type),
+        ]);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+            type: 'ability_use',
+            characterName: 'TestSorcerer',
+            abilityName: 'Cosmic Omen',
+            description: c.logDescription,
+            timestamp: FROZEN_NOW,
         });
     });
 
-    describe('Woe (Odd)', () => {
-        it('generates correct popup and stores pending bonus for Woe', async () => {
-            setupRuntimeValues({
-                cosmicOmenUses: 1,
-                cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
-            });
-            rollExpression.mockReturnValue({ total: 3 });
+    it.each([
+        {
+            label: 'usesMax 0 is unlimited',
+            automation: { usesMax: 0 }, exprValue: undefined, uses: 5,
+            expectedCalls: [pendingWrite(4, 'Weal')],
+        },
+        {
+            label: 'uses_expression evaluating to 0 is unlimited',
+            automation: { uses_expression: 'proficiency_bonus' }, exprValue: 0, uses: null,
+            expectedCalls: [pendingWrite(4, 'Weal')],
+        },
+        {
+            label: 'uses_expression evaluating to 2 spends from the counter',
+            automation: { uses_expression: 'proficiency_bonus' }, exprValue: 2, uses: 2,
+            expectedCalls: [['TestSorcerer', 'cosmicOmenUses', 1, CAMPAIGN], pendingWrite(4, 'Weal')],
+        },
+    ])('$label — zero uses spend for unlimited lanes', async (c) => {
+        mockRuntime({ uses: c.uses });
+        evaluateAutoExpression.mockReturnValue(c.exprValue);
+        const stats = makePlayerStats();
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        await handle(makeAction(c.automation), stats, CAMPAIGN);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Woe');
-            expect(result.payload.description).toContain('Odd');
-            expect(result.payload.description).toContain('-3');
-
-            const pendingCall = setRuntimeValue.mock.calls.find(
-                (call) => call[1] === 'cosmicOmenPendingBonus'
-            );
-            expect(pendingCall).toBeDefined();
-            const pendingData = JSON.parse(pendingCall[2]);
-            expect(pendingData.type).toBe('Woe');
-        });
+        expect(setRuntimeValue.mock.calls).toEqual(c.expectedCalls);
+        if (c.automation.uses_expression) {
+            expect(evaluateAutoExpression).toHaveBeenCalledWith(c.automation.uses_expression, stats);
+        } else {
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
+        }
     });
 
-    describe('state updates', () => {
-        it('decrements runtime uses when usesMax > 0', async () => {
-            const scenarios = [
-                { initial: 3, expected: 2 },
-                { initial: 1, expected: 0 },
-            ];
+    it('defaults a missing runtime uses counter to max and spends one', async () => {
+        mockRuntime({ uses: null }); // ?? usesMax at both the gate and the spend
 
-            for (const { initial, expected } of scenarios) {
-                vi.clearAllMocks();
-                setupRuntimeValues({
-                    cosmicOmenUses: initial,
-                    cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-                });
-                rollExpression.mockReturnValue({ total: 5 });
+        await handle(makeAction({ usesMax: 3 }), makePlayerStats(), CAMPAIGN);
 
-                await handle(makeAction({ automation: { usesMax: 3 } }), makePlayerStats(), 'test-campaign');
-
-                const usesCall = setRuntimeValue.mock.calls.find(
-                    (call) => call[1] === 'cosmicOmenUses'
-                );
-                expect(usesCall).toBeDefined();
-                expect(usesCall[2]).toBe(expected);
-            }
-        });
-
-        it('does not decrement uses when usesMax is 0 or uses_expression evaluates to 0', async () => {
-            setupRuntimeValues({
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-            });
-            rollExpression.mockReturnValue({ total: 5 });
-
-            await handle(makeAction({ automation: { usesMax: 0 } }), makePlayerStats(), 'test-campaign');
-
-            let usesCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'cosmicOmenUses'
-            );
-            expect(usesCalls).toHaveLength(0);
-
-            vi.clearAllMocks();
-            evaluateAutoExpression.mockReturnValue(0);
-            setupRuntimeValues({
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-            });
-            rollExpression.mockReturnValue({ total: 5 });
-
-            const action = makeAction({ automation: { uses_expression: 'proficiency_bonus' } });
-            await handle(action, makePlayerStats(), 'test-campaign');
-
-            usesCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'cosmicOmenUses'
-            );
-            expect(usesCalls).toHaveLength(0);
-        });
-
-        it('logs to campaign log with correct details', async () => {
-            setupRuntimeValues({
-                cosmicOmenUses: 1,
-                cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
-            });
-            rollExpression.mockReturnValue({ total: 3 });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(addEntry).toHaveBeenCalledWith(
-                'test-campaign',
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestSorcerer',
-                    abilityName: 'Cosmic Omen',
-                    description: expect.stringContaining('Woe'),
-                })
-            );
-        });
+        expect(setRuntimeValue.mock.calls).toEqual([
+            ['TestSorcerer', 'cosmicOmenUses', 2, CAMPAIGN],
+            pendingWrite(4, 'Weal'),
+        ]);
     });
 
-    describe('result format', () => {
-        it('returns popup with correct fields and uses feature name from action', async () => {
-            setupRuntimeValues({
-                cosmicOmenUses: 1,
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 12 }),
-            });
-            rollExpression.mockReturnValue({ total: 2 });
+    it.each([
+        { actionName: 'Stellar Augury', expected: 'Stellar Augury', usesKey: 'stellarAuguryUses' },
+        { actionName: undefined, expected: 'Cosmic Omen', usesKey: 'cosmicOmenUses' },
+    ])('derives feature name and uses key from the action ($expected)', async ({ actionName, expected, usesKey }) => {
+        mockRuntime({ uses: 3 });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        const result = await handle(makeAction({ usesMax: 3 }, actionName), makePlayerStats(), CAMPAIGN);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Cosmic Omen');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-
-        it('uses custom feature name when action name is provided', async () => {
-            setupRuntimeValues({
-                cosmicOmenUses: 1,
-                cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
-            });
-            rollExpression.mockReturnValue({ total: 1 });
-
-            const result = await handle(
-                { name: 'My Custom Omen', automation: { type: 'cosmic_omen' } },
-                makePlayerStats(),
-                'test-campaign'
-            );
-
-            expect(result.payload.name).toBe('My Custom Omen');
-        });
-    });
-
-    describe('clearCosmicOmenEffect', () => {
-        it('clears cosmicOmenEffect for given player and campaign', async () => {
-            await clearCosmicOmenEffect('TestSorcerer', 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'cosmicOmenEffect',
-                null,
-                'test-campaign'
-            );
-        });
+        expect(result.payload.name).toBe(expected);
+        expect(setRuntimeValue.mock.calls).toEqual([
+            ['TestSorcerer', usesKey, 2, CAMPAIGN],
+            pendingWrite(4, 'Weal'),
+        ]);
+        expect(addEntry.mock.calls[0][1]).toMatchObject({ abilityName: expected });
     });
 });

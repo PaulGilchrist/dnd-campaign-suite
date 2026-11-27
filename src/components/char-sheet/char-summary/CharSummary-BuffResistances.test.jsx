@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation): BUFF-derived resistances on the
 // "Resistances:"/"Immunities:" rows (charSummaryCalc.js computeResistances) — one test
@@ -10,7 +10,9 @@
 //   - effect-based lane (warding_bond) and the Starry Form name matcher
 //   - allow-list NEGATIVE: a non-whitelisted buff carrying resistanceTypes contributes
 //     nothing (this also subsumes the empty-getActiveBuffs negative — a broken
-//     filter passes on [] but fails here) AND the getActiveBuffs player/campaign wiring
+//     filter passes on [] but fails here), the same buff must not render a Heroes'
+//     Feast badge (feast-badge gate negative lives here), AND the getActiveBuffs
+//     player/campaign wiring
 //   - Feign Death dual-lane (same buff feeds Resistances AND Immunities rows)
 //   - Stone Skin runtime 'stoneSkinDamageTypes' through the REAL stoneSkinHandler
 //     (additive types + buff-vs-buff AND buff-vs-runtime dedup, pinned in one render)
@@ -149,13 +151,17 @@ describe('CharSummary - buff resistance lanes', () => {
 
 // ---------------------------------------------------------------------------
 // Allow-list guard: resistanceTypes on a buff outside every name/effect matcher
-// contributes nothing. Also pins the getActiveBuffs player/campaign wiring.
+// contributes nothing — no Resistances row and no Heroes' Feast badge (the
+// feast-badge gate `heroesFeastResistances.length > 0` is only falsy when the
+// name matcher excludes the buff). Also pins the getActiveBuffs
+// player/campaign wiring.
 // ---------------------------------------------------------------------------
 describe('CharSummary - buffs outside the resistance allow-list', () => {
-    it('ignores resistanceTypes on a non-whitelisted buff and queries the right character store', () => {
+    it('ignores resistanceTypes on a non-whitelisted buff: no Resistances row, no Heroes\' Feast badge, and queries the right character store', () => {
         renderSummary([{ name: 'Bless', resistanceTypes: ['poison'] }]);
 
         expectNoResistancesRow();
+        expect(screen.queryByText("Heroes' Feast")).not.toBeInTheDocument();
         expect(getActiveBuffs).toHaveBeenCalledWith('Thorin', mockCampaignName);
     });
 });
@@ -220,9 +226,7 @@ describe('CharSummary - aura and Heroes\' Feast badges', () => {
         );
     });
 
-    it('shows no Heroes\' Feast badge when no Heroes\' Feast buff is active', () => {
-        renderSummary([{ name: 'Rage', resistanceTypes: ['bludgeoning'] }]);
-
-        expect(screen.queryByText("Heroes' Feast")).not.toBeInTheDocument();
-    });
+    // Feast-badge NEGATIVE (no Heroes' Feast buff -> gate heroesFeastResistances.length
+    // stays 0) is owned by the allow-list test above, which already asserts the badge
+    // is absent for a non-Feast buff.
 });

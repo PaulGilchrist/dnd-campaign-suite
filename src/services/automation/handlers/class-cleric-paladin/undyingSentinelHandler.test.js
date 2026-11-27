@@ -1,10 +1,13 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic unit tests for the manually-triggered undying sentinel handler
 // (heal a willing target at 0 HP). Fully mocked; the separate applyDamage.js
-// auto-trigger path is covered by applyDamage.undyingSentinel.test.js.
+// auto-trigger path is covered by applyDamage.undyingSentinel.test.js and the
+// Long-Rest latch re-arm by restRules-longRest.js (:756 batch write) — neither
+// is re-driven here. Dead exports isUndyingSentinelUsed/setUndyingSentinelUsed
+// have zero callers repo-wide (grep 2026-11-26) so they are untested by design.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
+import { handle } from './undyingSentinelHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -35,29 +38,42 @@ vi.mock('../../../ui/storage.js', () => ({
 // ── Helpers ──────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
+const playerName = 'TestCleric';
+const targetName = 'DownedAlly';
+const FROZEN_NOW = 1700000000000;
+const AUTO = { type: 'undying_sentinel' };
 
-function makePlayerStats(overrides = {}) {
+function makePlayerStats(level = 5) {
   return {
-    name: 'TestCleric',
-    level: 5,
-    class: { class_levels: [{ level: 5 }] },
-    ...overrides,
+    name: playerName,
+    level,
+    class: { class_levels: [{ level }] },
   };
 }
 
-function makeAction(automation = {}) {
+function makeAction() {
+  return { name: 'Undying Sentinel', automation: AUTO };
+}
+
+// Runtime-store router over the three keys the handler reads: the once-per-
+// long-rest latch, the player target's current HP bucket, and the max-HP
+// frame (the handler reads the SAME 'hitPoints' key for the caster-side heal
+// cap and the target-side audit row, so one value answers both).
+function mockStore({ used = false, currentHp = 0, maxHp = 50 } = {}) {
+  getRuntimeValue.mockImplementation((_name, key) => {
+    if (key === 'undyingSentinelUsed') return used;
+    if (key === 'currentHitPoints') return currentHp;
+    if (key === 'hitPoints') return maxHp;
+    return null;
+  });
+}
+
+// Full-shape popup pin: every return carries name + the action's automation.
+function popup(description) {
   return {
-    name: 'Undying Sentinel',
-    automation: { type: 'undying_sentinel', ...automation },
+    type: 'popup',
+    payload: { type: 'automation_info', name: 'Undying Sentinel', description, automation: AUTO },
   };
-}
-
-function makePlayerTarget(name = 'DownedAlly', hp = 0) {
-  return { name, type: 'player', currentHitPoints: hp };
-}
-
-function makeNPCTarget(name = 'Goblin', hp = 0) {
-  return { name, type: 'npc', currentHp: hp };
 }
 
 // ── beforeEach / afterEach ───────────────────────────────────────
@@ -68,7 +84,7 @@ let dateNowSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-  dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+  dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
 });
 
 afterEach(() => {
@@ -79,250 +95,159 @@ afterEach(() => {
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('undyingSentinelHandler', () => {
-  describe('handle', () => {
-    describe('guard clauses', () => {
-      it('returns popup when ability already used this long rest', async () => {
-        getRuntimeValue.mockReturnValue(true);
+  describe('handle — guard refusals (zero spend)', () => {
+    // Each guard face: exact full-shape popup and a zero-write census — no
+    // runtime write, no storage save, no log row, no refresh event.
+    it.each([
+      {
+        title: 'refuses when the once-per-long-rest latch is set, before any combat read',
+        store: { used: true },
+        combat: undefined,
+        stopsBeforeCombat: true,
+        description: 'Undying Sentinel has already been used (once per long rest).',
+      },
+      {
+        title: 'refuses when no combat is active',
+        store: {},
+        combat: null,
+        description: 'No combat active.',
+      },
+      {
+        title: 'refuses when no target is selected in combat',
+        store: {},
+        combat: {},
+        target: null,
+        description: 'Select a target in the combat tracker first.',
+      },
+      {
+        title: 'refuses a target above 0 HP',
+        store: { currentHp: 5 },
+        combat: {},
+        target: { name: targetName, type: 'player', currentHitPoints: 5 },
+        description: 'DownedAlly is not at 0 Hit Points.',
+      },
+    ])('$title', async (tc) => {
+      mockStore(tc.store);
+      if (tc.combat !== undefined) getCombatContext.mockResolvedValue(tc.combat);
+      if ('target' in tc) getTargetFromAttacker.mockReturnValue(tc.target);
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(result).toEqual({
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            name: 'Undying Sentinel',
-            description: expect.stringContaining('already been used'),
-          }),
-        });
-      });
-
-      it('returns popup when no combat is active', async () => {
-        getRuntimeValue.mockReturnValue(false);
-        getCombatContext.mockResolvedValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result).toEqual({
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            description: 'No combat active.',
-          }),
-        });
-      });
-
-      it('returns popup when no target is selected in combat', async () => {
-        getRuntimeValue.mockReturnValue(false);
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result).toEqual({
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            description: 'Select a target in the combat tracker first.',
-          }),
-        });
-      });
-
-      it('returns popup when target is not at 0 HP', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockImplementation((name, key) => {
-            if (key === 'currentHitPoints' && name === 'DownedAlly') return 5;
-            return null;
-          });
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(makePlayerTarget('DownedAlly', 5));
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result).toEqual({
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            description: 'DownedAlly is not at 0 Hit Points.',
-          }),
-        });
-      });
-    });
-
-    describe('successful heal — player target', () => {
-      function setupPlayerHeal(targetName = 'DownedAlly', maxHp = 50) {
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockImplementation((name, key) => {
-            if (key === 'currentHitPoints' && name === targetName) return 0;
-            if (key === 'hitPoints') return maxHp;
-            return null;
-          });
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(makePlayerTarget(targetName, 0));
-      }
-
-      it('heals target and marks ability as used', async () => {
-        setupPlayerHeal();
-        const stats = makePlayerStats({ level: 5 });
-
-        const result = await handle(makeAction(), stats, campaignName, null);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestCleric',
-          'undyingSentinelUsed',
-          true,
-          campaignName,
-        );
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'DownedAlly',
-          'currentHitPoints',
-          16,
-          campaignName,
-        );
-        expect(result.payload.description).toContain('survive');
-        expect(result.payload.description).toContain('16 HP');
-      });
-
-      it('caps healed HP at target maximum HP', async () => {
-        setupPlayerHeal('DownedAlly', 10);
-
-        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'DownedAlly',
-          'currentHitPoints',
-          10,
-          campaignName,
-        );
-      });
-
-      it('uses level 7 paladin to heal 22 HP', async () => {
-        setupPlayerHeal('DownedAlly', 100);
-
-        await handle(makeAction(), makePlayerStats({ level: 7 }), campaignName, null);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'DownedAlly',
-          'currentHitPoints',
-          22,
-          campaignName,
-        );
-      });
-
-      it('posts an hp_change heal-family log entry and dispatches combat-summary-updated event', async () => {
-        setupPlayerHeal();
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        // Log-family parity (2026-11-14 resurrection log-family split): the
-        // 0-HP rescue row rides the hp_change family instead of the
-        // type:'healing' outlier, so hp_change-keyed audits see the revive.
-        expect(addEntry).toHaveBeenCalledWith(campaignName, {
-          type: 'hp_change',
-          characterName: 'TestCleric',
-          targetName: 'DownedAlly',
-          delta: 16,
-          currentHp: 16,
-          maxHp: 50,
-          isHealing: true,
-          sourceName: 'TestCleric',
-          note: 'Undying Sentinel',
-          timestamp: 1700000000000,
-        });
-        expect(dispatchEventSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'combat-summary-updated' }),
-        );
-      });
-    });
-
-    describe('successful heal — NPC target', () => {
-      // Log entry and combat-summary-updated dispatch are shared-code-path
-      // assertions already covered by the player-target heal test above;
-      // this suite covers only the NPC-specific branch (mutate currentHp
-      // on the combat summary object and persist it via storage).
-      it('mutates currentHp on the NPC and saves combatSummary', async () => {
-        const target = makeNPCTarget('Goblin', 0);
-        const cs = { creatures: [target] };
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockReturnValue(null);
-        getCombatContext.mockResolvedValue(cs);
-        getTargetFromAttacker.mockReturnValue(target);
-
-        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
-
-        expect(target.currentHp).toBe(16);
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
-      });
-
-      it('logs error when addEntry promise rejects', async () => {
-        const target = makeNPCTarget('Goblin', 0);
-        const cs = { creatures: [target] };
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockReturnValue(null);
-        getCombatContext.mockResolvedValue(cs);
-        getTargetFromAttacker.mockReturnValue(target);
-        addEntry.mockRejectedValue(new Error('log failure'));
-
-        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[undyingSentinel] Error:',
-          expect.any(Error),
-        );
-        consoleErrorSpy.mockRestore();
-      });
-    });
-  });
-
-  describe('isUndyingSentinelUsed', () => {
-    it('returns true when runtime value is true', () => {
-      getRuntimeValue.mockReturnValue(true);
-
-      const result = isUndyingSentinelUsed('TestCleric', campaignName);
-
-      expect(result).toBe(true);
-      expect(getRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'undyingSentinelUsed',
-        campaignName,
-      );
-    });
-
-    it('returns false for any non-true runtime value', () => {
-      for (const value of [false, null, undefined]) {
-        getRuntimeValue.mockReturnValue(value);
-
-        expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
+      expect(result).toEqual(popup(tc.description));
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(dispatchEventSpy).not.toHaveBeenCalled();
+      if (tc.stopsBeforeCombat) {
+        expect(getCombatContext).not.toHaveBeenCalled();
       }
     });
   });
 
-  describe('setUndyingSentinelUsed', () => {
-    it('calls setRuntimeValue with the correct arguments when used=true', async () => {
-      await setUndyingSentinelUsed('TestCleric', campaignName, true);
+  describe('handle — successful heal — player target', () => {
+    // The commit contract in one table: latch write BEFORE the HP write
+    // (source order), the 1 + 3xLevel heal scaled and capped at the stored
+    // max, one combat-summary-updated event, and the full hp_change-family
+    // audit row (2026-11-14 resurrection log-family split: the 0-HP rescue
+    // rides hp_change, not the type:'healing' outlier).
+    it.each([
+      { title: 'heals at level 5 and expends the latch', level: 5, maxHp: 50, newHp: 16 },
+      { title: 'scales the heal with level (7 -> 1 + 21)', level: 7, maxHp: 100, newHp: 22 },
+      { title: 'caps the heal at the target maximum HP', level: 5, maxHp: 10, newHp: 10 },
+    ])('$title', async (tc) => {
+      mockStore({ used: false, currentHp: 0, maxHp: tc.maxHp });
+      getCombatContext.mockResolvedValue({});
+      getTargetFromAttacker.mockReturnValue({
+        name: targetName,
+        type: 'player',
+        currentHitPoints: 0,
+      });
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'undyingSentinelUsed',
-        true,
-        campaignName,
-      );
-    });
+      const result = await handle(makeAction(), makePlayerStats(tc.level), campaignName, null);
 
-    it('calls setRuntimeValue with the correct arguments when used=false', async () => {
-      await setUndyingSentinelUsed('TestCleric', campaignName, false);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'undyingSentinelUsed',
-        false,
-        campaignName,
-      );
+      expect(result).toEqual(popup(
+        `${playerName} uses Undying Sentinel to survive! ${targetName} drops to ${tc.newHp} HP and the effect is expended until a long rest.`,
+      ));
+      expect(getCombatContext).toHaveBeenCalledTimes(1);
+      expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+      expect(getTargetFromAttacker).toHaveBeenCalledWith({}, playerName);
+      // Ordered commit census: exactly two writes, latch first.
+      expect(setRuntimeValue.mock.calls).toEqual([
+        [playerName, 'undyingSentinelUsed', true, campaignName],
+        [targetName, 'currentHitPoints', tc.newHp, campaignName],
+      ]);
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(dispatchEventSpy.mock.calls.map(([e]) => e.type)).toEqual(['combat-summary-updated']);
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'hp_change',
+        characterName: playerName,
+        targetName,
+        delta: tc.newHp,
+        currentHp: tc.newHp,
+        maxHp: tc.maxHp,
+        isHealing: true,
+        sourceName: playerName,
+        note: 'Undying Sentinel',
+        timestamp: FROZEN_NOW,
+      });
     });
   });
 
+  describe('handle — successful heal — NPC target', () => {
+    it('mutates currentHp on the combat-summary row and persists it via storage', async () => {
+      const target = { name: 'Goblin', type: 'npc', currentHp: 0, maxHp: 7 };
+      const cs = { creatures: [target] };
+      mockStore({ used: false, maxHp: 50 });
+      getCombatContext.mockResolvedValue(cs);
+      getTargetFromAttacker.mockReturnValue(target);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result).toEqual(popup(
+        `${playerName} uses Undying Sentinel to survive! Goblin drops to 16 HP and the effect is expended until a long rest.`,
+      ));
+      // NPC census: the latch is the ONLY runtime write — the HP lift lands
+      // on the combat-summary object, never a currentHitPoints bucket.
+      expect(setRuntimeValue.mock.calls).toEqual([
+        [playerName, 'undyingSentinelUsed', true, campaignName],
+      ]);
+      expect(target.currentHp).toBe(16);
+      expect(storage.set.mock.calls).toEqual([['combatSummary', cs, campaignName]]);
+      expect(dispatchEventSpy.mock.calls.map(([e]) => e.type)).toEqual(['combat-summary-updated']);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'hp_change',
+        characterName: playerName,
+        targetName: 'Goblin',
+        delta: 16,
+        currentHp: 16,
+        maxHp: 7,
+        isHealing: true,
+        sourceName: playerName,
+        note: 'Undying Sentinel',
+        timestamp: FROZEN_NOW,
+      });
+    });
+
+    it('logs to console when addEntry rejects and still commits the heal', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
+      addEntry.mockRejectedValue(new Error('log failure'));
+      mockStore({ used: false, currentHp: 0, maxHp: 50 });
+      getCombatContext.mockResolvedValue({});
+      getTargetFromAttacker.mockReturnValue({ name: targetName, type: 'player', currentHitPoints: 0 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      // Drain the addEntry(...).catch(console.error) microtask.
+      await Promise.resolve();
+
+      expect(result.payload.description).toContain('survive');
+      expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[undyingSentinel] Error:',
+        expect.any(Error),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });

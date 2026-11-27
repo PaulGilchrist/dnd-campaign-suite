@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Save-disadvantage lane: owns the corona/elder-champion/targetEffect aura →
 // save-roll seam as it flows through createLogDamageAndShow into the NPC save
 // handler (roll flags + forcedMode propagation). Handler-owned resolution
@@ -135,7 +135,7 @@ vi.mock('./handleOverchannelSelfDamage.js', () => ({
     handleOverchannelSelfDamage: vi.fn(),
 }));
 
-import { getRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
@@ -207,14 +207,15 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
 
             await castFireball();
 
-            expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({
+            // Full-shape arg pin (2026-11-04 range fix): the seam calls with
+            // exactly { targetName, campaignName, damageType } — no
+            // skipRangeCheck escape hatch can hide inside a looser matcher.
+            expect(getCoronaSaveDisadvantage).toHaveBeenCalledTimes(1);
+            expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith({
                 targetName: 'Goblin',
+                campaignName: 'test-campaign',
                 damageType: 'fire',
-            }));
-            // 2026-11-04 range fix: no skipRangeCheck escape hatch from callers.
-            expect(getCoronaSaveDisadvantage).not.toHaveBeenCalledWith(
-                expect.objectContaining({ skipRangeCheck: expect.anything() })
-            );
+            });
             expect(saveRollArgs()).toEqual([
                 expect.objectContaining({ name: 'Goblin' }),
                 'DEX',
@@ -244,6 +245,9 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
         it('rolls normally when no disadvantage source applies', async () => {
             await castFireball();
 
+            // The miss path probes BOTH auras before falling through to normal.
+            expect(getCoronaSaveDisadvantage).toHaveBeenCalledTimes(1);
+            expect(getElderChampionSaveDisadvantage).toHaveBeenCalledTimes(1);
             expect(saveRollArgs()).toEqual([
                 expect.objectContaining({ name: 'Goblin' }),
                 'DEX',
@@ -251,33 +255,48 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
                 false, // no disadvantage
                 false, // no advantage
             ]);
+            expect(saveDamageLog().forcedMode).toBe('normal');
             expect(popupData().forcedMode).toBe('normal');
         });
     });
 
     describe('elder champion save disadvantage', () => {
+        const playerStats = { automation: { actions: [], passives: [] } };
+
         it('applies elder champion disadvantage when corona does not', async () => {
             getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'ElderChampion' });
 
-            await castFireball({ playerStats: { automation: { actions: [], passives: [] } } });
+            await castFireball({ playerStats });
 
-            expect(getElderChampionSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({
+            // Full-shape pin: the seam threads the caster's playerStats through
+            // to the aura util untouched.
+            expect(getElderChampionSaveDisadvantage).toHaveBeenCalledWith({
                 attackerName: 'TestWizard',
+                attackerStats: playerStats,
                 targetName: 'Goblin',
-            }));
-            expect(saveRollArgs()[3]).toBe(true);
+            });
+            expect(saveRollArgs()).toEqual([
+                expect.objectContaining({ name: 'Goblin' }),
+                'DEX',
+                15,
+                true,  // disadvantage from elder champion
+                false, // no advantage
+            ]);
             expect(saveDamageLog().forcedMode).toBe('disadvantage');
+            expect(popupData().forcedMode).toBe('disadvantage');
         });
 
         it('short-circuits elder champion when corona already set disadvantage', async () => {
             getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
             getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true });
 
-            await castFireball({ playerStats: { automation: { actions: [], passives: [] } } });
+            await castFireball({ playerStats });
 
-            expect(getCoronaSaveDisadvantage).toHaveBeenCalled();
+            expect(getCoronaSaveDisadvantage).toHaveBeenCalledTimes(1);
             expect(getElderChampionSaveDisadvantage).not.toHaveBeenCalled();
             expect(saveRollArgs()[3]).toBe(true);
+            expect(saveDamageLog().forcedMode).toBe('disadvantage');
+            expect(popupData().forcedMode).toBe('disadvantage');
         });
     });
 
@@ -302,17 +321,38 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
 
     describe('targetEffects disadvantage_on_next_save', () => {
         it('consumes the stamp into a disadvantaged roll and forcedMode log', async () => {
+            const stamp = { target: 'Goblin', effect: 'disadvantage_on_next_save' };
+            const survivor = { target: 'Orc', effect: 'disadvantage_on_next_save' };
             getRuntimeValue.mockImplementation((key, prop, cn) => {
-                if (key === 'campaign' && prop === 'targetEffects' && cn === 'test-campaign') return [
-                    { target: 'Goblin', effect: 'disadvantage_on_next_save' },
-                ];
+                if (key === 'campaign' && prop === 'targetEffects' && cn === 'test-campaign') {
+                    return [stamp, survivor];
+                }
                 return null;
             });
 
             await castFireball();
 
-            expect(saveRollArgs()[3]).toBe(true); // disadvantage from targetEffect stamp
+            expect(saveRollArgs()).toEqual([
+                expect.objectContaining({ name: 'Goblin' }),
+                'DEX',
+                15,
+                true, // disadvantage from targetEffect stamp
+                false,
+            ]);
             expect(saveDamageLog().forcedMode).toBe('disadvantage');
+            expect(popupData().forcedMode).toBe('disadvantage');
+            // Consumption is real: exactly one targetEffects write (the lastAttack
+            // write lives on a different key) and it keeps only the OTHER target's
+            // stamp — the seam never burns a neighbour's stamp.
+            const targetEffectWrites = setRuntimeValue.mock.calls.filter(
+                (call) => call[1] === 'targetEffects'
+            );
+            expect(targetEffectWrites).toEqual([
+                ['campaign', 'targetEffects', [survivor], 'test-campaign'],
+            ]);
+            // Aura probes are skipped: the stamp short-circuits the chain.
+            expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
+            expect(getElderChampionSaveDisadvantage).not.toHaveBeenCalled();
         });
     });
 });

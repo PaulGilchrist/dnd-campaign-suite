@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (per sibling delegation comments):
@@ -14,24 +14,16 @@
 //   - 'open-short-rest' window event → CharSummary-EventHandlers.test.jsx
 //   - Background popup → CharSummary-UI-Interactions.test.jsx
 //
-// Audit trim (2026-10-14): 4 tests / 221 lines → 3 tests / ~170 lines.
-//   - Verified all three tests kill their production lanes (mutation run —
-//     flipped the inspiration toggle / removed console.error / reordered
-//     setShowAllyModal before the persistence write); nothing was weak.
-//   - Inspiration it.each collapsed to ONE test: the toggle is a single
-//     `!hasInspiration` lane, so the false→true arm is fully behavioral and
-//     the true→false arm only duplicated it through the mock-echo rerender
-//     (which proves a mock, not production).
-//   - Ally suite: the never-settling-log test collapsed into the rejecting-log
-//     test — synchronously-closed-modal + persisted-allies are already asserted
-//     there before the rejection settles; an unhandled non-settling promise
-//     was the only (marginal) extra signal.
-//   - AllySelectionModal mock is now conditional: the never-opened modal renders
-//     nothing, so the "modal absent before click" negative is observable against
-//     the REAL modal instead of being an assertion about the test's own mock.
-//   - Dropped the unobservable "sheet stays mounted" assertion (its assertions
-//     live on document.body and survive component unmount) — replaced by the
-//     badge count staying pinned at 1 after the failed log.
+// Trim history: 4 → 2 tests, mutation-verified in the 2026-10-14 run
+// (flipped inspiration toggle; console.error removed; setShowAllyModal
+// reordered after the persistence write — each killed a test).
+//   - Inspiration: single test only — the toggle is one `!hasInspiration` lane,
+//     so the false→true arm is fully behavioral and true→false would only
+//     re-prove the mock's echo rerender.
+//   - Ally error path: the never-settling-log case collapsed into this
+//     rejecting-log case (sync close + persistence are asserted before the
+//     rejection settles). The modal mock renders nothing while closed, so the
+//     "absent before click" negative is production behavior, not mock trivia.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

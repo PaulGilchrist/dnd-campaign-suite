@@ -1,18 +1,22 @@
-// @maintained-by-ai 2026-10-15: 2026-11-15
+// @maintained-by-ai 2026-11-26
 // SP-100 confirm-stage refusal lane: gate-stage arming is covered by
-// useSpellMetamagicFlow.gate.test.js (breadth) and .console-error.test.js
-// (null-creatures); this file owns the confirm-stage refusal seam —
-// runRevivify refunding the paid slot (rollbackSpellSlot → setRuntimeValue)
-// when triggerRevivify answers with an automation_info popup, and NOT
-// refunding on a successful revive. PX 2026-11-15 audit-honesty: the refusal
-// leg ALSO pins that no type:'spell' cast row is stamped (deferred-stamp
-// lane, useConfirmableFlow options.deferCastLog + pending.castRefused) while
-// the success leg pins the cast row still lands with identical bytes.
+// spellGates.revivify.test.js (picker payload matrix, authoritative),
+// useSpellMetamagicFlow.gate.test.js (hook-level breadth, incl. the Revivify
+// dead-target row) and .console-error.test.js (null-creatures) — an arming
+// test here was a weaker duplicate and is removed (run2#1731). The refusal
+// branch is a single check on payload.type === 'automation_info'
+// (useSimpleSpellHandlers.js runRevivify), so ONE refusal leg is enough; the
+// "material vanished" variant was the same branch with different description
+// bytes and is removed (material refusal owned by useSpellMetamagicGates.
+// material-refused / revivify-material-precedence). This file owns exactly the
+// confirm-stage seam: runRevivify refunding the paid slot (rollbackSpellSlot →
+// setRuntimeValue) + the PX 2026-11-15 audit-honesty deferred-stamp lane
+// (useConfirmableFlow options.deferCastLog + pending.castRefused — refusal
+// stamps NO type:'spell' row; success still lands the cast row, same bytes).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
-import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { setRuntimeValue, getRuntimeValue } from '../runtime/useRuntimeState.js';
 
@@ -121,12 +125,6 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
     });
   });
 
-  it('arms picker with only the dead creature', () => {
-    const { result } = renderFlow();
-    expect(result.current.pendingRevivify).not.toBeNull();
-    expect(result.current.pendingRevivify.creatureTargets).toEqual(['Goblin C']);
-  });
-
   it('refusal: rolls the slot back, shows the popup, and stamps NO spell cast row', async () => {
     const { setPopupHtml } = await confirmAgainst({
       type: 'popup',
@@ -138,28 +136,10 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
       },
     });
 
-    // Slot pay-then-refund unchanged (2 → pay → 3 refund).
-    expect(prepareSpellCast).toHaveBeenCalled();
+    // Slot pay-then-refund (2 → pay → 3 refund); the refund write itself
+    // proves the pay stage ran, so no mock-internal assertion on prepareSpellCast.
     expect(setRuntimeValue).toHaveBeenCalledWith('Cleric', 'spell_slots_level_3', 3, 'test-campaign');
     // PX 2026-11-15 audit-honesty: nothing happened → no type:'spell' row.
-    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-    }));
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'automation_info' }));
-  });
-
-  it('refusal (material vanished): the same automation_info refund path also suppresses the spell row', async () => {
-    const { setPopupHtml } = await confirmAgainst({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Revivify',
-        automationType: 'revivify',
-        description: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
-      },
-    });
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('Cleric', 'spell_slots_level_3', 3, 'test-campaign');
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'spell',
     }));

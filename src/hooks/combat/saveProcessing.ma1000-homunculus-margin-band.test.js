@@ -1,18 +1,24 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1000: Homunculus Bite fail-margin bands — the rider-only composite save
 // chip (MA-0560 fork, MA-1000 guard fix) rides applyDamagelessSaveConditions
 // with saveConditions ['poisoned'] (shallow-band-only save_effect, MA-0639
 // twin layout) + structured context.saveMargin {failsBy:5, also:'unconscious'}
-// derived live from the monsters.json Homunculus row.
-// Shallow fail (margin < 5): POISONED ONLY — the extracted word list carries
-// no unconscious, so the shallow over-grant is suppressed at the source (§214).
-// Deep fail (margin >= 5): applySaveMarginRider adds UNCONSCIOUS with ONE
-// merged clock at the AUTHORED duration (parser duration "1 minute" →
-// rounds:10, owner ruling 2026-11-10 minutes×10). Success: zero grants, zero clock.
-// The save leg pays NO damage (§410/§416): autoDamageFormula null, so no
-// applyDamageToTarget call and no save-damage log on any band.
-// Generic rider mechanics + byte-inert fork: saveProcessing.save-margin-rider.test.js;
-// damage-bearing save leg: saveProcessing.ma1351-pseudodragon-sting-margin.test.js.
+// derived LIVE from the monsters.json Homunculus row through the real
+// processSaveRoll seam. This file owns ONLY the live-row band adjudication
+// (per the cite-skip in MonsterCardModal.ma1000-homunculus-bite-save-rider):
+// shallow fail → POISONED only (the §214 no-over-grant holds end-to-end);
+// deep fail at the boundary → Poisoned + Unconscious on ONE merged clock at
+// the AUTHORED duration ("1 minute" → rounds:10, owner ruling 2026-11-10
+// minutes×10), zero save-leg damage (§410: autoDamageFormula null);
+// success → zero grants, zero clock.
+// Delegated elsewhere, not re-anchored here:
+// - disk-row byte lock + save transport (DC/CON/save_margin/saveConditions):
+//   MonsterCardModal.ma1000-homunculus-bite-save-rider.test.js
+// - parseSaveMarginClause unit contract: MonsterCardHelpers.save-margin.test.js
+// - generic rider mechanics (boundary ≥ gate, margin-10 beyond-band prose +
+//   merged clock, clauseless byte-inert, immunity, no-double-grant):
+//   saveProcessing.save-margin-rider.test.js
+// - damage-bearing save leg contrast: saveProcessing.ma1351-pseudodragon-sting-margin.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -77,14 +83,14 @@ const TARGET = 'Bandit 1';
 
 // Live monsters.json row — the disk row buildAbilitySaveRollContext arms into
 // the rider-only save-chip context (saveDamageFormula null: rider-only fork).
+// Byte-lock of this row lives in the modal test; here it is the integration
+// subject. The deep-band anchor below fails loudly if the row ever drifts.
 const biteRow = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'))
     .find(m => m.name === 'Homunculus').actions.find(a => a.name === 'Bite');
 const SAVE_DC = biteRow.save_dc;
 const SAVE_TYPE = biteRow.save_type.slice(0, 3).toUpperCase();
-// Real parser (live-lane parity): { failsBy, also, duration } — the composite
-// row authors its "1 minute" deep band in the description, so the merged
-// clock rides the AUTHORED duration (owner ruling 2026-11-10: minutes×10).
-const MARGIN = parseSaveMarginClause(biteRow);
+// Real parser (live-lane parity): { failsBy, also, duration }.
+const MARGIN = parseSaveMarginClause(biteRow) ?? {};
 
 const biteContext = (total) => ({
     saveDc: SAVE_DC,
@@ -94,7 +100,7 @@ const biteContext = (total) => ({
     dcSuccess: null,
     autoDamageFormula: null,
     saveConditions: ['poisoned'],
-    saveMargin: MARGIN,
+    saveMargin: MARGIN.failsBy ? MARGIN : null,
     effectiveD20: total,
     effectiveBonus: 0,
 });
@@ -122,16 +128,8 @@ beforeEach(() => {
     conditionLogs.length = 0;
 });
 
-describe('MA-1000 Homunculus Bite margin bands', () => {
-    it('monsters.json data lock: rider-only row arms DC/CON margin context', () => {
-        expect(SAVE_DC).toBe(12);
-        expect(SAVE_TYPE).toBe('CON');
-        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 minute' });
-        expect(biteRow.save_effect).toMatch(/Poisoned/);
-        expect(biteRow).not.toHaveProperty('save_damage_formula');
-    });
-
-    it(`shallow fail by 3 (total ${SAVE_DC - 3}): POISONED only — no Unconscious over-grant, no clock`, async () => {
+describe('MA-1000 Homunculus Bite margin bands (live row through the real save seam)', () => {
+    it(`shallow fail by 3 (total ${SAVE_DC - 3}): POISONED only — no Unconscious over-grant, no clock, no damage`, async () => {
         await resolveNpcSave(SAVE_DC - 3);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned']);
@@ -141,20 +139,19 @@ describe('MA-1000 Homunculus Bite margin bands', () => {
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it(`deep fail at the boundary, margin exactly ${MARGIN.failsBy}: Poisoned + Unconscious, meta + log`, async () => {
+    it('deep fail at the boundary, margin exactly 5: row anchor + Poisoned + Unconscious, ONE merged rounds:10 clock (authored 1 minute ×10) — NO damage (§410)', async () => {
+        // MA-1000 disk anchor: the bands below only mean what they say if the
+        // structured margin is armed as authored (full byte-lock: modal test).
+        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 minute' });
+
         await resolveNpcSave(SAVE_DC - MARGIN.failsBy);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
+        expect(runtimeStore[`${TARGET}.activeConditionMeta`].unconscious).toMatchObject({ source: ATTACKER });
         const uncons = appliedLogs().find(e => e.condition === 'Unconscious');
         expect(uncons.sourceName).toBe(ATTACKER);
         expect(uncons.sourceAbility).toBe('Bite');
-        expect(uncons.description).toMatch(new RegExp(`failed the save by ${MARGIN.failsBy}`));
-    });
-
-    it(`deep fail beyond the band, margin ${SAVE_DC - 2}: ONE merged rounds:10 clock (authored 1 minute ×10), both legs — NO damage (§410)`, async () => {
-        await resolveNpcSave(2);
-
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
+        expect(uncons.description).toMatch(/failed the save by 5/);
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: ATTACKER,

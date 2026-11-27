@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // autoRerollHandler — applyMissTurnedHitDamage damage-payload lane (numeric-bonus seam).
 //
 // Seam map for the autoRerollHandler.test.js quint:
@@ -10,16 +10,21 @@
 //   autoRerollHandler.damagePaths.test.js (this file) — applyMissTurnedHitDamage payload
 //                                             content and rerollAttackLeg damage gating:
 //                                             exact applyDamage args, full damage log entry,
-//                                             skip-guards (formula-missing, total-0, null-AC,
-//                                             still-miss-with-formula), effectiveAc fallback
+//                                             await/catch arms, skip-guards (formula-missing
+//                                             rides the attackRoll lane), total-0, null-AC,
+//                                             still-miss-with-formula, effectiveAc fallback,
+//                                             ally attribution + logName/damageType fallbacks
 //   autoRerollHandler.miscPaths.test.js   — handleAbilityCheck / handleSaveRoll /
 //                                             consumeResourceCost / findAllyMissedAttack /
 //                                             getBardicDieSize internals
 //   autoRerollHandler.soul-blades.test.js — Homing Strikes (CLA-320) gates and economy
 //
 // Deliberately NOT owned here (owned elsewhere — do not absorb): popup full-string
-// composition and exactly-once delegation counts (attackRoll lane), ability_use log
-// content (attackRoll own / main ally routing), registry internals.
+// composition and exactly-once delegation counts (attackRoll lane), formula-missing
+// bailout (attackRoll lane pins the shared applyMissTurnedHitDamage guard), ability_use
+// log content (attackRoll own / main ally routing), registry internals. Ally-route
+// restatements of the total-0/null-AC guards were pruned 2026-11-26: those branches
+// live in functions shared by both routes and are pinned on the own route here.
 //
 // Production traffic: numeric-bonus auto_reroll rows — e.g. the 2024 channel-divinity
 // ally row in 2024/classes.json (bonus 10, range 30 ft) drives the ally lane; lastAttack
@@ -119,6 +124,13 @@ function damageLogEntries() {
     return addEntry.mock.calls.map((c) => c[1]).filter((e) => e.rollType === 'damage');
 }
 
+// Ordered commit census: rerollAttackLeg awaits applyMissTurnedHitDamage BEFORE
+// logging its own ability_use row, so a healthy lane is exactly [damage, ability_use].
+// Kills double-dispatch, dropped automation logs, and log-order regressions at once.
+function commitCensus() {
+    return addEntry.mock.calls.map((c) => c[1].rollType || c[1].type);
+}
+
 describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonus lane)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -134,13 +146,16 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
         const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
+        expect(rollExpression).toHaveBeenCalledTimes(1);
         expect(rollExpression).toHaveBeenCalledWith('2d8');
+        expect(getCombatContext).toHaveBeenCalledTimes(1);
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
         // fix#337S-LIVE(a): unscrambled contract options (applyDamage.js:1023) —
         // campaign slot holds the campaign NAME string, characters slot the array,
         // ignoreResistance floors at FALSE (resistance NOT bypassed), and the attacker
         // name rides attackerName. Pre-fix bytes were {campaignName:[stats],
         // characters:false, ignoreResistance:'TestHero'} — pinned-here honestly until flipped.
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Orc', 10, ['piercing'], {
             campaignName: 'test-campaign',
             characters: [stats],
@@ -163,13 +178,14 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
                 finalDamage: 10,
             },
         ]);
+        expect(commitCensus()).toEqual(['damage', 'ability_use']);
     });
 
     it('AWAIT arm (fix#337S a): no damage log lands before applyDamageToTarget settles; finalDamage is the resolved read', async () => {
         const stats = makePlayerStats();
         mockLiveDamage(10);
         let resolveApply;
-        vi.mocked(applyDamageToTarget).mockImplementationOnce(() => new Promise((resolve) => { resolveApply = resolve; }));
+        vi.mocked(applyDamageToTarget).mockImplementation(() => new Promise((resolve) => { resolveApply = resolve; }));
         mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' });
 
         const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5 } });
@@ -184,14 +200,26 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
         const result = await pending;
         expect(result.type).toBe('popup');
         expect(damageLogEntries()).toEqual([
-            expect.objectContaining({ rollType: 'damage', targetName: 'Orc', total: 10, finalDamage: 7 }),
+            {
+                type: 'roll',
+                characterName: 'TestHero',
+                rollType: 'damage',
+                name: 'Test Auto Reroll',
+                formula: '2d8',
+                rolls: [8, 2],
+                total: 10,
+                modifier: 0,
+                damageType: 'piercing',
+                targetName: 'Orc',
+                finalDamage: 7,
+            },
         ]);
     });
 
     it('CATCH arm (fix#337S a): applyDamage rejection is caught loud, popup still lands, no damage log', async () => {
         const stats = makePlayerStats();
         mockLiveDamage(10);
-        vi.mocked(applyDamageToTarget).mockRejectedValueOnce(new Error('apply boom'));
+        vi.mocked(applyDamageToTarget).mockRejectedValue(new Error('apply boom'));
         mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' });
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -200,6 +228,7 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
 
         expect(result.type).toBe('popup');
         expect(spy).toHaveBeenCalledWith('[autoReroll] applyDamageToTarget failed:', expect.any(Error));
+        expect(spy.mock.calls[0][1].message).toBe('apply boom');
         expect(damageLogEntries()).toHaveLength(0);
         spy.mockRestore();
     });
@@ -233,6 +262,7 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
         expect(rollExpression).not.toHaveBeenCalled();
         expect(getCombatContext).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(damageLogEntries()).toHaveLength(0);
     });
 
     it('never rolls damage dice on a still-miss even when a live formula is present', async () => {
@@ -261,14 +291,28 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
 
         expect(result.type).toBe('popup');
         expect(rollExpression).toHaveBeenCalledWith('1d8');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Shade', 8, ['force'], {
             campaignName: 'test-campaign',
             characters: [stats],
             ignoreResistance: false,
             attackerName: 'TestHero',
         });
-        expect(damageLogEntries()).toHaveLength(1);
-        expect(damageLogEntries()[0]).toMatchObject({ characterName: 'TestHero', targetName: 'Shade', formula: '1d8' });
+        expect(damageLogEntries()).toEqual([
+            {
+                type: 'roll',
+                characterName: 'TestHero',
+                rollType: 'damage',
+                name: 'Test Auto Reroll',
+                formula: '1d8',
+                rolls: [6, 2],
+                total: 8,
+                modifier: 0,
+                damageType: 'force',
+                targetName: 'Shade',
+                finalDamage: 8,
+            },
+        ]);
     });
 });
 
@@ -288,8 +332,10 @@ describe('autoRerollHandler - ally attack miss→hit damage payload (ranged-boos
         const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
+        expect(rollExpression).toHaveBeenCalledTimes(1);
         expect(rollExpression).toHaveBeenCalledWith('2d10');
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Demon', 12, ['radiant'], {
             campaignName: 'test-campaign',
             characters: [stats],
@@ -312,44 +358,41 @@ describe('autoRerollHandler - ally attack miss→hit damage payload (ranged-boos
                 finalDamage: 12,
             },
         ]);
+        expect(commitCensus()).toEqual(['damage', 'ability_use']);
     });
 
-    it('skips ally damage when damageFormula is missing', async () => {
-        mockLiveDamage(12);
-        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false });
+    it('prefers attackName for the log and floors a missing damageType at "unknown"', async () => {
+        const stats = makePlayerStats();
+        const ctx = mockLiveDamage(9);
+        // Attack-name precedence (attackName || name || 'Attack') and the
+        // damageType || 'unknown' floor in applyMissTurnedHitDamage — neither
+        // branch is exercised by any other lane in the family.
+        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', attackName: 'Multiattack Slam', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '1d10', targetName: 'Troll' });
 
         const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+        const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
-        expect(rollExpression).not.toHaveBeenCalled();
-        expect(getCombatContext).not.toHaveBeenCalled();
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-    });
-
-    it('rolls the ally formula but applies nothing when total is 0', async () => {
-        mockLiveDamage(0);
-        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' });
-
-        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 10, range: '30_ft' } });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('Miss turned into a hit');
-        expect(rollExpression).toHaveBeenCalledWith('2d6');
-        expect(getCombatContext).not.toHaveBeenCalled();
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(damageLogEntries()).toHaveLength(0);
-    });
-
-    it('does not roll ally damage when null AC falls back to the recorded miss verdict', async () => {
-        mockLiveDamage(8);
-        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, hit: false, damageFormula: '2d6', targetName: 'Goblin' });
-
-        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('N/A');
-        expect(rollExpression).not.toHaveBeenCalled();
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Troll', 9, ['unknown'], {
+            campaignName: 'test-campaign',
+            characters: [stats],
+            ignoreResistance: false,
+            attackerName: 'Ally',
+        });
+        expect(damageLogEntries()).toEqual([
+            {
+                type: 'roll',
+                characterName: 'Ally',
+                rollType: 'damage',
+                name: 'Multiattack Slam',
+                formula: '1d10',
+                rolls: [7, 2],
+                total: 9,
+                modifier: 0,
+                damageType: 'unknown',
+                targetName: 'Troll',
+                finalDamage: 9,
+            },
+        ]);
     });
 });

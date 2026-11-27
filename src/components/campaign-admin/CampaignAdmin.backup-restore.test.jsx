@@ -1,10 +1,14 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Backup & Restore flows of CampaignAdmin: snapshot creation (including the
  * snapshot-list refresh and empty state), snapshot list rendering, and
- * campaign download. Shared busy/error handling spans both flows here.
- * Rollback and upload flows are covered by CampaignAdmin.rollback-upload.test.jsx;
- * URL-encoding of campaign names is covered by CampaignAdmin.data-management.test.jsx.
+ * campaign download (blob/anchor plumbing). Owns the lane-specific busy text
+ * and the not-OK server-error surfacing for these two buttons. The shared
+ * fetch-reject branch (error from err.message) is owned by
+ * CampaignAdmin.data-management.test.jsx and rollback-upload.test.jsx, so it
+ * is not re-probed per button here. Rollback/upload flows live in
+ * CampaignAdmin.rollback-upload.test.jsx; URL-encoding of campaign names in
+ * CampaignAdmin.data-management.test.jsx.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -36,11 +40,11 @@ const zipResponse = () => ({
 });
 
 /**
- * Stub fetch with one handler per route. A handler may be a response object,
- * an Error (rejects every call), or a function of the per-route call count
- * returning either — so tests can script sequential responses (e.g. the
- * list refresh after a snapshot). Unknown URLs (child-section endpoints,
- * covered in their own test files) get a neutral OK response.
+ * Stub fetch with one handler per route. A handler may be a response object
+ * or a function of the per-route call count returning one — so tests can
+ * script sequential responses (e.g. the list refresh after a snapshot).
+ * Unknown URLs (child-section endpoints, covered in their own test files)
+ * get a neutral OK response.
  */
 function stubFetch(overrides = {}) {
     const handlers = {
@@ -57,8 +61,7 @@ function stubFetch(overrides = {}) {
     const fetchMock = vi.fn((url) => {
         callCounts[url] = (callCounts[url] || 0) + 1;
         const handler = handlers[url] ?? jsonResponse({});
-        const result = typeof handler === 'function' ? handler(callCounts[url]) : handler;
-        return result instanceof Error ? Promise.reject(result) : Promise.resolve(result);
+        return Promise.resolve(typeof handler === 'function' ? handler(callCounts[url]) : handler);
     });
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
@@ -178,13 +181,11 @@ describe('CampaignAdmin - busy and failure handling', () => {
     });
 
     it.each([
-        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, failure: jsonResponse({ error: 'Snapshot failed' }, false), expected: 'Snapshot failed', downloads: false },
-        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, failure: new Error('Network failed'), expected: 'Network failed', downloads: false },
-        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, failure: jsonResponse({ error: 'Download failed' }, false), expected: 'Download failed', downloads: true },
-        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, failure: new Error('Network failed'), expected: 'Network failed', downloads: true },
-    ])('shows $expected and re-enables buttons when $button fails', async ({ button, url, failure, expected, downloads }) => {
+        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, expected: 'Snapshot failed', downloads: false },
+        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, expected: 'Download failed', downloads: true },
+    ])('surfaces the server error and re-enables the buttons when $button is rejected', async ({ button, url, expected, downloads }) => {
         const { createSpy, clickSpy } = mockBlobDownloadPlumbing();
-        stubFetch({ [url]: failure });
+        stubFetch({ [url]: jsonResponse({ error: expected }, false) });
         render(<CampaignAdmin {...createDefaultProps()} />);
 
         fireEvent.click(screen.getByRole('button', { name: button }));
@@ -192,10 +193,12 @@ describe('CampaignAdmin - busy and failure handling', () => {
         const status = await screen.findByText(expected);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
         if (downloads) {
-            // A failed download must never trigger the blob/anchor plumbing.
+            // A rejected download must early-return before any blob/anchor plumbing.
             expect(createSpy).not.toHaveBeenCalled();
             expect(clickSpy).not.toHaveBeenCalled();
         }
-        expect(screen.getByRole('button', { name: button })).toBeEnabled();
+        // The shared busy flag releases: both backup actions are retryable.
+        expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeEnabled();
+        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeEnabled();
     });
 });

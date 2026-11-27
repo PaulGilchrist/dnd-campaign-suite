@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for the ZERO-CHARACTER FIRST-RUN doctrine (owner
  * decision 2026-11-23, improvement seeded-campaign-onboarding-asymmetry).
@@ -11,17 +11,27 @@
  * localStorage `character-wizard-offered:<campaign>` pref facade
  * `wizardOfferedStore.js`); no flag or dual-path remains.
  *
- * Pinned here:
- *  - first select of a zero-character campaign mounts NO wizard, writes NO
- *    `character-wizard-offered:*` key, and leaves the empty-state card owning
- *    the blank stage (the shell stays navigable);
- *  - the explicit wizard lane still works from that first-run view: sidebar
- *    "Add Character" opens the SAME wizard;
- *  - a SEEDED zero-character starter also never auto-opens: its checklist is
- *    mounted (with the GM-only "Build your heroes" step) instead;
- *  - a NON-localhost (LAN visitor) origin likewise gets no auto-open and burns
- *    no key (GM-only creation guard, bug-zero-char-auto-wizard-traps-lan-
- *    visitor-creation-is-gm-only, stays intact).
+ * Pinned here (and ONLY here at App level):
+ *  - first select of a zero-character preset (qa-arena) mounts NO wizard,
+ *    writes NO `character-wizard-offered:*` key, and the sidebar
+ *    "Add Character" lane from that first-run view still opens the wizard;
+ *  - a SEEDED zero-character starter (qa-starter) also never auto-opens: its
+ *    checklist mounts instead, and its GM-only "Build your heroes" step is the
+ *    explicit wizard door;
+ *  - a NON-localhost (LAN visitor) origin gets no auto-open, burns no key, and
+ *    honestly receives the card's static GM hint instead of the add door
+ *    (hostname -> isLocalhost -> EmptyCampaignState wiring; bug-zero-char-
+ *    auto-wizard-traps-lan-visitor-creation-is-gm-only).
+ *
+ * NOT re-pinned here (covered where it lives):
+ *  - card button opens the wizard / card yields while mounted, and the
+ *    dismissed-checklist epoch-remount lane — App.empty-campaign-state.test.jsx;
+ *  - the card's own markup, seed-gated affordances, and visitor hint —
+ *    components/campaign-empty-state/EmptyCampaignState.test.jsx;
+ *  - zero-character no-auto-open for a PLAIN campaign —
+ *    App.runtime-events.test.jsx; sidebar add-character -> wizard cancel /
+ *    create lifecycle and switch-teardown — App.runtime-events.test.jsx and
+ *    App.campaign-switch-wizards.test.jsx.
  *
  * Harness mirrors App.empty-campaign-state.test.jsx (shared mock doubles,
  * starter-seed lane mocked at the service boundary). localStorage is NOT
@@ -244,7 +254,7 @@ describe('App - zero-character entry never auto-opens the wizard', () => {
     vi.restoreAllMocks();
   });
 
-  it('a fresh zero-character ARENA select mounts NO wizard and burns no offer key', async () => {
+  it('a fresh zero-character ARENA select mounts NO wizard and burns no key, and the sidebar Add Character stays the explicit door', async () => {
     mockState.campaignName = 'qa-arena';
     render(<App />);
     await selectCampaign();
@@ -256,14 +266,9 @@ describe('App - zero-character entry never auto-opens the wizard', () => {
     expect(screen.getByRole('button', { name: /Add your first character/ })).toBeInTheDocument();
     // The removed pref facade wrote nothing anywhere.
     expect(offeredKeys()).toHaveLength(0);
-  });
 
-  it('the sidebar Add Character lane still opens the wizard from the first-run view', async () => {
-    mockState.campaignName = 'qa-arena';
-    render(<App />);
-    await selectCampaign();
-    expectNoWizard();
-
+    // Hero building stays an EXPLICIT click: the sidebar lane opens the
+    // SAME wizard from that first-run view.
     fireEvent.click(screen.getByTestId('add-character-btn'));
     await waitFor(() => {
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
@@ -307,8 +312,14 @@ describe('App - zero-character entry never auto-opens the wizard', () => {
     await selectCampaign();
 
     expectNoWizard();
-    // The shell is navigable for the visitor (card with hint, not a dead end).
-    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
     expect(offeredKeys()).toHaveLength(0);
+    // The hostname -> isLocalhost -> card wiring is honest: the visitor
+    // lands on the shell with the card's static GM hint, NOT the dead-end
+    // stage nor the GM-only add door.
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Ask the GM to add the first character/)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /Add your first character/ })).not.toBeInTheDocument();
   });
 });

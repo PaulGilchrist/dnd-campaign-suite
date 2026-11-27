@@ -1,9 +1,14 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic unit contract for useCharacterManagement (file upload/download,
 // active-character selection). Stable leaf hook — see note in useCharacterManagement.js:
 // intentionally NOT refactored onto useEntityManagement, so these tests ride along with
 // the hook's own handler signatures. App-level deletion/wizard flows are covered
 // separately in src/App.runtime-events.test.jsx.
+// Delete-lane splits (do not re-add here): the create===delete filename recipe is
+// pinned for every name shape in useCharacterManagement.delete-filename.test.js
+// (incl. "no campaign → throw, API untouched") and the failed-delete error state
+// (deleteErrorName arm/re-throw/roster-untouched/dismiss/clear-on-success) in
+// useCharacterManagement.delete-error.test.js — both stronger than earlier lanes here.
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useCharacterManagement from './useCharacterManagement.js';
@@ -26,10 +31,11 @@ vi.mock('../../services/campaign/campaignService.js', () => ({
 
 describe('useCharacterManagement', () => {
   describe('initial state', () => {
-    it('defaults to characters=[] and activeCharacter=null', () => {
+    it('defaults to characters=[], activeCharacter=null, unattached inputRef', () => {
       const { result } = renderHook(() => useCharacterManagement(undefined));
       expect(result.current.characters).toEqual([]);
       expect(result.current.activeCharacter).toBeNull();
+      expect(result.current.inputRef.current).toBeNull();
     });
   });
 
@@ -69,10 +75,10 @@ describe('useCharacterManagement', () => {
   });
 
   describe('handleSaveClick', () => {
-    it('calls saveAs with correct filename and JSON blob when activeCharacter exists', async () => {
+    it('saves the active character as a lowercased "<name>.json" JSON blob', async () => {
       const { saveAs } = await import('file-saver');
       const { default: Utils } = await import('../../services/ui/utils.js');
-      const char = { name: 'Dark Lord' };
+      const char = { name: 'Dark Lord', level: 3 };
 
       const { result } = renderHook(() => useCharacterManagement());
       act(() => {
@@ -84,12 +90,13 @@ describe('useCharacterManagement', () => {
       });
 
       expect(Utils.getName).toHaveBeenCalledWith('Dark Lord');
-      expect(saveAs).toHaveBeenCalledWith(
-        expect.any(Blob),
-        'dark lord.json'
-      );
+      expect(saveAs).toHaveBeenCalledTimes(1);
+      expect(saveAs).toHaveBeenCalledWith(expect.any(Blob), 'dark lord.json');
+
+      // The download payload is the whole character, pretty-printed at 4 spaces.
       const savedBlob = saveAs.mock.calls[0][0];
       expect(savedBlob.type).toBe('application/json');
+      await expect(savedBlob.text()).resolves.toBe(JSON.stringify(char, null, 4));
     });
   });
 
@@ -136,7 +143,7 @@ describe('useCharacterManagement', () => {
       vi.unstubAllGlobals();
     });
 
-    it('reads JSON files and merges into existing characters by name', async () => {
+    it('merges uploaded JSON into the roster by name and selects the first upload when none is active', async () => {
       const existing = [{ name: 'Merry' }, { name: 'Pippin' }];
       const uploaded = [{ name: 'Pippin', level: 5 }, { name: 'Legolas' }];
       const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
@@ -150,24 +157,14 @@ describe('useCharacterManagement', () => {
         result.current.handleUploadChange(createMockEvent(files));
       });
 
+      // Merge-by-name in place, new names appended, order preserved.
       expect(result.current.characters).toEqual([
         { name: 'Merry' },
         { name: 'Pippin', level: 5 },
         { name: 'Legolas' },
       ]);
-    });
-
-    it('sets activeCharacter to first uploaded when no active character', async () => {
-      const uploaded = [{ name: 'Eowyn' }];
-      const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
-
-      const { result } = renderHook(() => useCharacterManagement());
-
-      await act(async () => {
-        result.current.handleUploadChange(createMockEvent(files));
-      });
-
-      expect(result.current.activeCharacter).toEqual({ name: 'Eowyn' });
+      // No prior selection → first uploaded character becomes active (as a clone).
+      expect(result.current.activeCharacter).toEqual({ name: 'Pippin', level: 5 });
     });
 
     it('updates activeCharacter when uploaded file matches the active character by name', async () => {
@@ -209,47 +206,21 @@ describe('useCharacterManagement', () => {
 
   describe('handleDeleteCharacter', () => {
     beforeEach(() => {
-      vi.clearAllMocks();
-      window.confirm = vi.fn(() => true);
+      // A REJECTING dialog stub: nothing here (or at the leaf CharSummary,
+      // fix#36 queue) may consult it, and a cancel must never block dispatch
+      // at this layer — asserting not-called + dispatched in one shot proves
+      // the retired hook-level guard stays retired. Cancel protection lives
+      // at the confirming leaf (CharSummary-Display.test.jsx:157,
+      // CharSummary-DeleteConfirm.test.jsx).
+      window.confirm = vi.fn(() => false);
     });
 
     afterEach(() => {
       delete window.confirm;
     });
 
-    it('dispatches WITHOUT confirming — leaf CharSummary owns the prompt (fix#36 queue)', async () => {
+    it('dispatches without consulting confirm and removes the roster entry', async () => {
       const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-      const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
-
-      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
-      act(() => {
-        result.current.setCharacters(chars);
-      });
-
-      await act(async () => {
-        result.current.handleDeleteCharacter('Frodo');
-      });
-
-      // Retired-guard pin: the old hook-level dialog
-      // ("Are you sure you want to delete 'Frodo'? This cannot be undone.")
-      // is gone — confirming here stacked two dialogs per click. This hook
-      // is now a straight dispatcher.
-      expect(window.confirm).not.toHaveBeenCalled();
-      // 'Frodo' → case-preserved 'Frodo.json' (canonical create recipe; the
-      // old lowercased 'frodo.json' was the bug-character-delete-sanitizer-mismatch guess).
-      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'Frodo.json');
-      expect(result.current.characters).toEqual([{ name: 'Sam' }]);
-    });
-
-    it('is no longer gated on window.confirm — cancel protection lives at the leaf', async () => {
-      // Honest passthrough of the former "does not delete when user cancels"
-      // pin: ownership moved. At this layer a rejected dialog must NOT stop
-      // dispatch (proving the guard is gone); the cancel-never-dispatches
-      // contract is pinned at the confirming leaf in
-      // CharSummary-Display.test.jsx:157 and end-to-end in
-      // CharSummary-DeleteConfirm.test.jsx.
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-      window.confirm = vi.fn(() => false);
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
       const { result } = renderHook(() => useCharacterManagement('test-campaign'));
@@ -300,32 +271,6 @@ describe('useCharacterManagement', () => {
 
       expect(result.current.activeCharacter).toBeNull();
       expect(result.current.characters).toEqual([]);
-    });
-
-    it('throws error when no campaign is selected', async () => {
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-
-      const { result } = renderHook(() => useCharacterManagement());
-
-      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow(
-        'No campaign selected'
-      );
-      expect(deleteCharacter).not.toHaveBeenCalled();
-    });
-
-    it('throws error when server delete fails', async () => {
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-      deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
-
-      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
-      act(() => {
-        result.current.setCharacters([{ name: 'Frodo' }]);
-      });
-
-      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow(
-        'Server error'
-      );
-      expect(result.current.characters).toEqual([{ name: 'Frodo' }]);
     });
   });
 });

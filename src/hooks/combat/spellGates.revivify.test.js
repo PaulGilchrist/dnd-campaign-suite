@@ -1,11 +1,14 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // SP-100 gateRevivify lane (spellGates.js). Revivify's "died within the last
 // minute" window is NOT a wall-clock timer (no-timers policy) — the gate only
 // filters candidates by canonical dead-state via isCreatureDead, and the GM
-// adjudicates the 1-minute window at the table. This unit exercises the gate's
-// target-selection + refusal popup only; downstream revival execution lives in
-// the revivifyService.* lane.
+// adjudicates the 1-minute window at the table. This unit owns the picker
+// payload matrix (who the gate arms 'revivify' with, incl. excludeCaster);
+// the zero-corpse refusal popup bytes + revivify_refused audit row are owned
+// by spellGates.revivify-refused-row.test.js, the isCreatureDead branch truth
+// table by services/shared/hpModifier.test.js, and downstream revival
+// execution by the revivifyService.* lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -59,8 +62,9 @@ describe('SP-100 gateRevivify — dead-target picker gate', () => {
 
   it.each([
     { desc: 'offers dead monsters, filtering out living creatures', runtime: () => null, expected: ['Thug 1'] },
-    { desc: 'includes dead PCs via runtime currentHitPoints', runtime: (_n, k) => (k === 'currentHitPoints' ? 0 : null), expected: ['AllyPC', 'Thug 1'] },
-    { desc: 'includes dead PCs via runtime isDead (no HP key)', runtime: (_n, k) => (k === 'isDead' ? 1 : null), expected: ['AllyPC', 'Thug 1'] },
+    { desc: 'offers dead PCs via runtime currentHitPoints (the 1/1 summary stub never decides)', runtime: (_n, k) => (k === 'currentHitPoints' ? 0 : null), expected: ['AllyPC', 'Thug 1'] },
+    { desc: 'never offers a desynced player bucket — isDead:1 with positive runtime HP is not a corpse (bug-revivify-stale-isdead-negative-heal)', runtime: (_n, k) => (k === 'isDead' ? 1 : k === 'currentHitPoints' ? 18 : null), expected: ['Thug 1'] },
+    { desc: 'never offers the dead caster self-resurrection (excludeCaster: the runtime-dead Cleric is dropped even beside a real corpse)', runtime: (_n, k) => (_n === 'Cleric' && k === 'currentHitPoints' ? 0 : null), expected: ['Thug 1'] },
   ])('$desc', ({ runtime, expected }) => {
     getRuntimeValue.mockImplementation(runtime);
     const { handled, cfSetPending } = gate();
@@ -68,28 +72,17 @@ describe('SP-100 gateRevivify — dead-target picker gate', () => {
     expect(cfSetPending).toHaveBeenCalledWith('revivify', expect.objectContaining({ creatureTargets: expected }));
   });
 
-  it('never offers a desynced player bucket — isDead:1 with positive runtime HP is not a corpse (HP-consistent census, bug-revivify-stale-isdead-negative-heal)', () => {
-    getRuntimeValue.mockImplementation((_n, k) => (k === 'isDead' ? 1 : k === 'currentHitPoints' ? 18 : null));
-    const { handled, cfSetPending } = gate();
-    expect(handled).toBe(true);
-    // Only the honest monster corpse is offered; the 18-HP zombie is excluded.
-    expect(cfSetPending).toHaveBeenCalledWith('revivify', expect.objectContaining({ creatureTargets: ['Thug 1'] }));
-  });
-
-  it.each([
-    { desc: 'no creature is dead', runtime: () => null, creatures: [{ name: 'Cleric', type: 'player' }, { name: 'Goblin 1', type: 'npc', currentHp: 7 }] },
-    { desc: 'only the caster is dead (self-resurrection excluded)', runtime: (_n, k) => (k === 'currentHitPoints' ? 0 : null), creatures: [{ name: 'Cleric', type: 'player', currentHp: 1 }] },
-    { desc: 'a monster without HP data is treated as alive', runtime: () => null, creatures: [{ name: 'Cleric', type: 'player' }, { name: 'Mystery', type: 'npc' }] },
-  ])('refuses with popup, never opens the picker, when $desc', ({ runtime, creatures }) => {
-    getRuntimeValue.mockImplementation(runtime);
-    getCombatSummary.mockReturnValue({ creatures });
+  it('refuses (handled, no picker) when the caster is the only corpse on the board — excludeCaster empties the pool', () => {
+    getRuntimeValue.mockImplementation((_n, k) => (k === 'currentHitPoints' ? 0 : null));
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Cleric', type: 'player', currentHp: 1 }] });
     const { handled, cfSetPending, setPopupHtml } = gate();
     expect(handled).toBe(true);
     expect(cfSetPending).not.toHaveBeenCalled();
+    // Popup copy + audit-row bytes are pinned verbatim in
+    // spellGates.revivify-refused-row.test.js; here only the refusal lane fires.
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
       type: 'automation_info',
       automationType: 'revivify',
-      description: expect.stringContaining('died'),
     }));
   });
 });

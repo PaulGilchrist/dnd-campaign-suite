@@ -1,7 +1,7 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic handler-contract tests: volatile deps (buffToggle, expirations,
 // runtime store) are mocked; this file pins buffAllyHandler's own stable contract
-// (uses math, key derivation, popup shape, expiration registration).
+// (popup shape, uses-key derivation, toggle effect resolution, expiration registration).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ─────────────────────────────────────────
@@ -30,6 +30,7 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 // ── Helpers ──────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
+const ACTION_NAME = 'Tactical Warning';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -39,13 +40,13 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(overrides = {}) {
+function makeAction(automationOverrides = {}) {
   return {
-    name: 'Tactical Warning',
+    name: ACTION_NAME,
     automation: {
       type: 'buff_ally',
       effect: '',
-      ...overrides,
+      ...automationOverrides,
     },
   };
 }
@@ -59,205 +60,170 @@ describe('buffAllyHandler.handle', () => {
 
   // ── Activation / deactivation ──────────────────────────────────
 
-  describe('activation / deactivation', () => {
-    it('returns full activation popup when buff is not active', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+  it('activates: returns full activation popup and registers a remove_active_buff expiration owned by the player', async () => {
+    const ps = makePlayerStats({ name: 'Valorous Paladin' });
+    const action = { name: 'Inspiring Shield', automation: { type: 'buff_ally', effect: '' } };
+    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-      const result = await handle(action, ps, campaignName, null);
+    const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Tactical Warning');
-      expect(result.payload.automationType).toBe('buff_ally');
-      expect(result.payload.description).toBe(
-        'Tactical Warning activated — allies have Advantage on attack rolls and saving throws until the start of your next turn',
-      );
-      expect(result.payload.automation).toEqual(action.automation);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Inspiring Shield',
+        automationType: 'buff_ally',
+        description:
+          'Inspiring Shield activated — allies have Advantage on attack rolls and saving throws until the start of your next turn',
+        automation: action.automation,
+      },
     });
-
-    it('returns expired popup without registering expiration when buff is already active', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Tactical Warning');
-      expect(result.payload.description).toBe('Tactical Warning expired');
-      expect(result.payload.automation).toEqual(action.automation);
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
+    expect(expirations.addExpiration).toHaveBeenCalledWith({
+      attackerName: 'Valorous Paladin',
+      targetName: 'Valorous Paladin',
+      effects: [{ type: 'remove_active_buff', buffName: 'Inspiring Shield' }],
+      campaignName,
     });
+  });
 
-    it('registers remove_active_buff expiration on activation with player as both names', async () => {
-      const ps = makePlayerStats({ name: 'Valorous Paladin' });
-      const action = { name: 'Inspiring Shield', automation: { type: 'buff_ally', effect: '' } };
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+  it('deactivates: returns expired popup and registers no new expiration', async () => {
+    const action = makeAction();
+    buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
 
-      await handle(action, ps, campaignName, null);
+    const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith({
-        attackerName: 'Valorous Paladin',
-        targetName: 'Valorous Paladin',
-        effects: expect.arrayContaining([
-          expect.objectContaining({ type: 'remove_active_buff', buffName: 'Inspiring Shield' }),
-        ]),
-        campaignName,
-      });
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: ACTION_NAME,
+        automationType: 'buff_ally',
+        description: `${ACTION_NAME} expired`,
+        automation: action.automation,
+      },
     });
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
+  });
 
-    it('passes buffExpression, falling back to effect, as the toggle effect', async () => {
-      const cases = [
-        { automation: { effect: 'my_effect', buffExpression: 'custom_expression' }, expected: 'custom_expression' },
-        { automation: { effect: 'my_effect', buffExpression: undefined }, expected: 'my_effect' },
-      ];
+  // ── Toggle effect resolution (buffExpression || effect) ────────
 
-      for (const { automation, expected } of cases) {
-        vi.clearAllMocks();
-        const action = makeAction(automation);
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+  it.each([
+    { label: 'prefers buffExpression', buffExpression: 'custom_expression', effect: 'my_effect', expected: 'custom_expression' },
+    { label: 'falls back to effect when buffExpression is unset', buffExpression: undefined, effect: 'my_effect', expected: 'my_effect' },
+    { label: 'falls back to effect when buffExpression is empty', buffExpression: '', effect: 'my_effect', expected: 'my_effect' },
+  ])('passes the $label as the toggle effect', async ({ buffExpression, effect, expected }) => {
+    const automation = { type: 'buff_ally', effect, buffExpression };
+    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-        await handle(action, makePlayerStats(), campaignName, null);
+    await handle({ name: ACTION_NAME, automation }, makePlayerStats(), campaignName, null);
 
-        expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-          'Fighter',
-          'Tactical Warning',
-          expect.objectContaining({ effect: expected }),
-          campaignName,
-        );
-      }
-    });
+    expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+      'Fighter',
+      ACTION_NAME,
+      { ...automation, effect: expected },
+      campaignName,
+    );
   });
 
   // ── Uses exhausted ─────────────────────────────────────────────
 
-  describe('uses exhausted', () => {
-    it('returns early popup with no side effects when current uses is zero', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ usesMax: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+  const EXHAUSTED_DESCRIPTION = `${ACTION_NAME} has been used and cannot be used again until a long rest.`;
 
-      const result = await handle(action, ps, campaignName, null);
+  it.each([
+    { label: 'usesMax', automation: { usesMax: 3 }, description: EXHAUSTED_DESCRIPTION },
+    { label: 'uses fallback', automation: { uses: 2 }, description: EXHAUSTED_DESCRIPTION },
+    {
+      label: 'Rage recharge hint included',
+      automation: { usesMax: 1, recharge: 'long_rest_or_expend_rage' },
+      description: `${EXHAUSTED_DESCRIPTION} You may expend one use of Rage to restore it.`,
+    },
+    {
+      label: 'Rage recharge hint omitted for other recharges',
+      automation: { usesMax: 1, recharge: 'short_rest' },
+      description: EXHAUSTED_DESCRIPTION,
+    },
+  ])('returns the exhausted popup ($label) with zero store, toggle, or expiration writes', async ({ automation, description }) => {
+    const action = makeAction(automation);
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Tactical Warning');
-      expect(result.payload.description).toContain('cannot be used again until a long rest');
-      expect(result.payload.automation).toEqual(action.automation);
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
+    const result = await handle(action, makePlayerStats(), campaignName, null);
+
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: ACTION_NAME,
+        description,
+        automation: action.automation,
+      },
     });
-
-    it('uses the "uses" fallback field for max when usesMax is absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('cannot be used again until a long rest');
-      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-    });
-
-    it('includes or omits the Rage recharge hint based on recharge value', async () => {
-      const cases = [
-        { recharge: 'long_rest_or_expend_rage', expectHint: true },
-        { recharge: 'short_rest', expectHint: false },
-      ];
-
-      for (const { recharge, expectHint } of cases) {
-        vi.clearAllMocks();
-        const action = makeAction({ usesMax: 1, recharge });
-        useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-        const result = await handle(action, makePlayerStats(), campaignName, null);
-
-        if (expectHint) {
-          expect(result.payload.description).toContain('expend one use of Rage');
-        } else {
-          expect(result.payload.description).not.toContain('Rage');
-        }
-      }
-    });
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
   });
 
   // ── Uses tracking (not exhausted) ──────────────────────────────
 
-  describe('uses not exhausted', () => {
-    it('decrements uses under the default action-derived key and toggles buff', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ usesMax: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+  it.each([
+    {
+      label: 'decrements under the default action-derived key',
+      automation: { usesMax: 3 },
+      currentUses: 1,
+      expectedKey: 'tacticalWarningUses',
+      expectedRemaining: 0,
+    },
+    {
+      label: 'honors custom resourceKey',
+      automation: { usesMax: 3, resourceKey: 'myCustomResource' },
+      currentUses: 2,
+      expectedKey: 'myCustomResource',
+      expectedRemaining: 1,
+    },
+    {
+      label: 'treats null runtime value as maxUses',
+      automation: { usesMax: 3 },
+      currentUses: null,
+      expectedKey: 'tacticalWarningUses',
+      expectedRemaining: 2,
+    },
+    {
+      label: 'treats undefined runtime value as maxUses',
+      automation: { usesMax: 3 },
+      currentUses: undefined,
+      expectedKey: 'tacticalWarningUses',
+      expectedRemaining: 2,
+    },
+  ])('$label', async ({ automation, currentUses, expectedKey, expectedRemaining }) => {
+    const action = makeAction(automation);
+    useRuntimeState.getRuntimeValue.mockReturnValue(currentUses);
+    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-      await handle(action, ps, campaignName, null);
+    await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter',
-        'tacticalWarningUses',
-        0,
-        campaignName,
-      );
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        'Fighter',
-        'Tactical Warning',
-        expect.any(Object),
-        campaignName,
-      );
-    });
-
-    it('uses custom resourceKey when provided', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ usesMax: 3, resourceKey: 'myCustomResource' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter',
-        'myCustomResource',
-        1,
-        campaignName,
-      );
-    });
-
-    it('treats null or undefined runtime value as maxUses before decrementing', async () => {
-      for (const runtimeValue of [null, undefined]) {
-        vi.clearAllMocks();
-        const action = makeAction({ usesMax: 3 });
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-        useRuntimeState.getRuntimeValue.mockReturnValue(runtimeValue);
-
-        await handle(action, makePlayerStats(), campaignName, null);
-
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Fighter',
-          'tacticalWarningUses',
-          2,
-          campaignName,
-        );
-      }
-    });
+    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', expectedKey, campaignName);
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Fighter',
+      expectedKey,
+      expectedRemaining,
+      campaignName,
+    );
+    expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+      'Fighter',
+      ACTION_NAME,
+      expect.any(Object),
+      campaignName,
+    );
   });
 
-  // ── Edge cases ─────────────────────────────────────────────────
+  it('skips usage tracking entirely when usesMax and uses are both absent', async () => {
+    const action = makeAction();
+    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-  describe('edge cases', () => {
-    it('skips usage tracking when usesMax and uses are both absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+    const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(buffToggle.toggleBuff).toHaveBeenCalled();
-    });
+    expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(buffToggle.toggleBuff).toHaveBeenCalled();
+    expect(result.type).toBe('popup');
   });
 });

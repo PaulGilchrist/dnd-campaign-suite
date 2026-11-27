@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // CharSummary XP modes + Bait and Switch AC badge.
 //
@@ -9,8 +9,8 @@
 //   - XP modal Apply → full chain: displayed XP updates, clamped to 0, modal
 //     closes, and the write reaches the runtime store (server-first: other
 //     players see it)
-//   - XP modal Apply-with-empty-delta and Cancel → modal closes, XP and
-//     runtime store untouched
+//   - XP modal Apply-with-empty-delta and Cancel-with-valid-typed-delta →
+//     modal closes, pending change discarded, XP and runtime store untouched
 //   - Milestone checkbox → subtitle switches between "(N XP)" and
 //     "(milestone)", persisted via the runtime store
 //   - Bait and Switch AC badge: source attribution, generic-label fallback,
@@ -214,10 +214,17 @@ describe('XP Modal', () => {
     });
 
     it.each([
-        { label: 'applying with an empty delta', action: () => clickButton('Apply') },
-        { label: 'cancelling', action: () => clickButton('Cancel') },
-    ])('closes without touching XP or the runtime store when $label', ({ action }) => {
-        openXpModal(xpStats());
+        { label: 'applying with an empty delta', type: null, preview: null, action: () => clickButton('Apply') },
+        // Cancelling a pristine modal would pass trivially — type a VALID
+        // delta (preview proves it would have applied) so this really pins
+        // that Cancel discards the pending change without persisting it.
+        { label: 'cancelling a typed delta', type: '500', preview: '→ 2,800 XP', action: () => clickButton('Cancel') },
+    ])('closes without touching XP or the runtime store when $label', ({ type, preview, action }) => {
+        const input = openXpModal(xpStats());
+        if (type !== null) {
+            typeDelta(input, type);
+            expect(screen.getByText(preview)).toBeVisible();
+        }
         action();
 
         expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();

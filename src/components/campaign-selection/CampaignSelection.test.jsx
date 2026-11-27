@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
@@ -19,6 +19,7 @@ vi.mock('../../services/campaign/campaignMetaService.js', () => ({
 // The component lives-refreshes via the ONE shared SSE client (app-level
 // channel); stub it so these fetch-spying tests never touch EventSource —
 // afterEach's unstubAllGlobals removes the inert one setup.js installs.
+// The SSE-sync lane itself is owned by CampaignSelection.sse-sync.test.jsx.
 vi.mock('../../services/ui/sseClient.js', () => ({
   subscribeToSSE: vi.fn(() => () => {}),
 }));
@@ -33,6 +34,8 @@ const httpResponse = ({ ok = true, body = {} } = {}) => ({
   json: () => Promise.resolve(body),
 });
 
+// Stub fetch with an ordered response queue (server-config answered inertly
+// so create-POST spies see only the lane under test).
 function stubFetch(...responses) {
   const fetchMock = vi.fn();
   responses.forEach((response) => fetchMock.mockResolvedValue(response));
@@ -110,32 +113,8 @@ describe('CampaignSelection', () => {
       expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
 
-    it('shows an inline error with a Retry button when the folder fetch fails, and refetches in place on Retry', async () => {
+    it('refetches in place on Retry: a failed retry keeps the error lane with no polling, the next retry recovers without a reload', async () => {
       const reloadSpy = stubReload();
-      getCharacterFolders.mockRejectedValueOnce(new Error('Network error'));
-
-      render(<CampaignSelection />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
-      });
-      // In-place recovery (2026-11-02 BG): Retry refetches — no page reload,
-      // and the healthy "No campaigns found" copy must never masquerade here.
-      const retry = screen.getByRole('button', { name: 'Retry' });
-      expect(screen.queryByRole('button', { name: 'Reload Page' })).not.toBeInTheDocument();
-      expect(screen.queryByText(/No campaigns found/)).not.toBeInTheDocument();
-
-      getCharacterFolders.mockResolvedValue(['Campaign1']);
-      fireEvent.click(retry);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Campaign1' })).toBeInTheDocument();
-      });
-      expect(screen.queryByText(/Failed to load campaigns/)).not.toBeInTheDocument();
-      expect(reloadSpy).not.toHaveBeenCalled();
-    });
-
-    it('keeps the Retry affordance available when the retry itself fails (no auto-polling)', async () => {
       getCharacterFolders.mockRejectedValue(new Error('Network error'));
 
       render(<CampaignSelection />);
@@ -143,20 +122,34 @@ describe('CampaignSelection', () => {
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
       });
-      const attemptsAfterMount = getCharacterFolders.mock.calls.length;
+      expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
+      // In-place recovery (2026-11-02 BG): the error lane offers Retry, never
+      // a reload button, and the healthy "No campaigns found" copy must never
+      // masquerade here.
+      expect(screen.queryByRole('button', { name: 'Reload Page' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/No campaigns found/)).not.toBeInTheDocument();
 
+      // A retry that fails again keeps the error and a clickable Retry.
       fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
       await waitFor(() => {
-        expect(getCharacterFolders).toHaveBeenCalledTimes(attemptsAfterMount + 1);
+        expect(getCharacterFolders).toHaveBeenCalledTimes(2);
       });
-      // Still failed: error lane persists, Retry stays clickable, no reload.
       expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
 
       // Failure never becomes a polling loop — fetches only happen on clicks.
       await new Promise(r => setTimeout(r, 50));
-      expect(getCharacterFolders).toHaveBeenCalledTimes(attemptsAfterMount + 1);
+      expect(getCharacterFolders).toHaveBeenCalledTimes(2);
+
+      // The next Retry recovers in place — no page reload.
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      await waitFor(() => {
+        expect(campaignButton('Campaign1')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Failed to load campaigns/)).not.toBeInTheDocument();
+      expect(reloadSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -177,23 +170,24 @@ describe('CampaignSelection', () => {
       expect(screen.getByText(/No campaigns found/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'New Campaign' })).toBeInTheDocument();
       expect(screen.queryByText('Campaign1')).not.toBeInTheDocument();
-      // Healthy-but-empty is a FINAL answer, not an error: exactly one fetch,
-      // no Retry lane, no retry loop (2026-11-02 BG).
+      // Healthy-but-empty is a FINAL answer, not an error: exactly one fetch
+      // and no Retry lane (2026-11-02 BG). (No-polling-on-idle is proven in
+      // the error-lane test above; not re-waited here.)
       expect(getCharacterFolders).toHaveBeenCalledTimes(1);
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
-      await new Promise(r => setTimeout(r, 50));
-      expect(getCharacterFolders).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('create campaign modal', () => {
-    it('opens from the New Campaign button, discards the typed name on Cancel, and reopens blank', async () => {
+    // Open/close mechanics (Escape, backdrop, Cancel) are owned by
+    // CampaignSelection.create-modal-dismiss.test.jsx and the dialog a11y
+    // trio by CampaignSelection.standard-modal-a11y.test.jsx. This test
+    // covers the two lanes unique here: the input's accessible name and the
+    // draft-discarded-on-dismiss contract.
+    it('gives the name input an explicit accessible name and reopens blank after Cancel discards the draft', async () => {
       await renderCampaigns();
 
       openCreateModal();
-      expect(screen.getByRole('heading', { level: 2, name: 'New Campaign' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
       // Backlog 2026-11-18 LA: explicit accessible name (an aria-label, not
       // the placeholder fallback) on the inline campaign-name input.
       expect(screen.getByRole('textbox', { name: 'New campaign name', exact: true }))
@@ -203,23 +197,21 @@ describe('CampaignSelection', () => {
       expect(nameInput()).toHaveValue('My Campaign');
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(screen.queryByRole('heading', { name: 'New Campaign' })).not.toBeInTheDocument();
-      expect(screen.queryByPlaceholderText('Enter campaign name')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'New Campaign', exact: true })).not.toBeInTheDocument();
 
-      // Re-opening starts from a clean slate.
+      // Re-opening starts from a clean slate: the dismissed draft is gone.
       openCreateModal();
       expect(nameInput()).toHaveValue('');
     });
 
-    it.each([
-      ['empty', ''],
-      ['whitespace-only', '   '],
-    ])('rejects a %s campaign name without calling the API', async (_label, value) => {
+    it('rejects a whitespace-only campaign name without calling the API', async () => {
+      // Whitespace-only subsumes the empty case: the guard must trim first,
+      // so passing here proves both branches.
       const fetchSpy = stubFetch(httpResponse());
       await renderCampaigns();
 
       openCreateModal();
-      fireEvent.change(nameInput(), { target: { value } });
+      fireEvent.change(nameInput(), { target: { value: '   ' } });
       submitCampaign();
 
       await waitFor(() => {
@@ -293,36 +285,25 @@ describe('CampaignSelection', () => {
   });
 
   describe('campaign selection', () => {
-    it.each([
-      ['a campaign with characters', ['char1.json'], [{ name: 'Character1' }]],
-      ['a character-less campaign', [], []],
-    ])('loads %s and notifies the parent on click', async (_label, files, characters) => {
+    it('stays idle until a row is clicked, then loads its characters and notifies the parent — and a second pick goes through', async () => {
       const onSelect = vi.fn();
-      getCharacterFiles.mockResolvedValue(files);
-      loadCharacters.mockResolvedValue(characters);
-
-      await renderCampaigns({ onCampaignSelect: onSelect });
-      await act(async () => {
-        fireEvent.click(campaignButton('Campaign1'));
-      });
-
-      expect(getCharacterFiles).toHaveBeenCalledWith('Campaign1');
-      expect(loadCharacters).toHaveBeenCalledWith('Campaign1', files);
-      expect(onSelect).toHaveBeenCalledWith('Campaign1', characters);
-    });
-
-    it('lets the user pick a different campaign after a successful selection', async () => {
-      const onSelect = vi.fn();
-      getCharacterFiles.mockResolvedValue([]);
-      loadCharacters.mockResolvedValue([]);
+      getCharacterFiles.mockResolvedValue(['char1.json']);
+      loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
 
       await renderCampaigns({ folders: ['Campaign1', 'Campaign2'], onCampaignSelect: onSelect });
+
+      // Nothing fires unprompted: with no autoSelectCampaign prop there is
+      // no auto-selection and no character fetch (character-less campaigns
+      // just notify with whatever loadCharacters resolved).
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(getCharacterFiles).not.toHaveBeenCalled();
+
       await act(async () => {
         fireEvent.click(campaignButton('Campaign1'));
       });
-      await waitFor(() => {
-        expect(onSelect).toHaveBeenCalledWith('Campaign1', []);
-      });
+      expect(getCharacterFiles).toHaveBeenCalledWith('Campaign1');
+      expect(loadCharacters).toHaveBeenCalledWith('Campaign1', ['char1.json']);
+      expect(onSelect).toHaveBeenCalledWith('Campaign1', [{ name: 'Character1' }]);
 
       // Buttons are interactive again — a second selection goes through.
       const second = campaignButton('Campaign2');
@@ -330,10 +311,9 @@ describe('CampaignSelection', () => {
       await act(async () => {
         fireEvent.click(second);
       });
-
       expect(getCharacterFiles).toHaveBeenCalledWith('Campaign2');
-      expect(onSelect).toHaveBeenLastCalledWith('Campaign2', []);
       expect(onSelect).toHaveBeenCalledTimes(2);
+      expect(onSelect).toHaveBeenLastCalledWith('Campaign2', [{ name: 'Character1' }]);
     });
 
     it('shows an error screen when loading the campaign data fails', async () => {
@@ -371,15 +351,6 @@ describe('CampaignSelection', () => {
       rerender(<CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />);
       await act(async () => {});
       expect(onSelect).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not auto-select or fetch characters when autoSelectCampaign is absent', async () => {
-      const onSelect = vi.fn();
-
-      await renderCampaigns({ onCampaignSelect: onSelect });
-
-      expect(onSelect).not.toHaveBeenCalled();
-      expect(getCharacterFiles).not.toHaveBeenCalled();
     });
   });
 });

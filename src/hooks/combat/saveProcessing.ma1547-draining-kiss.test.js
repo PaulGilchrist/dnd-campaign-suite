@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1547: Succubus "Draining Kiss" SAVE-SEAM consumer — the §1096 save-path
 // twin of MA-1489's attack-lane hp_max_reduce seam; the authoritative save-path
 // HP-max-drain service integration (service-internals unit rides along here
@@ -166,9 +166,9 @@ describe('MA-1547 save seam — both RAW faces, ledger accumulation, legacy iner
         const out = await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 5, bonus: 0 });
         expect(out.saveSuccess).toBe(false);
         expect(saveDamageLog().finalDamage).toBe(20);
-        // transport-derived saveConditions pin: disk save_effect carries no
-        // CONDITIONS word → extract [] (the header's inert-conditions claim, live).
-        expect(extractConditionsFromSaveEffect(KISS.save_effect)).toEqual([]);
+        // (saveConditions transport pin lives with the parser truth table in
+        // MonsterCardHelpers.ma1547-draining-kiss.test.js — disk save_effect
+        // carries no CONDITIONS word, so this row's extract is [] and inert.)
 
         expect(csB().maxHp).toBe(180);
         expect(csB().maxHitPoints).toBe(180);
@@ -204,12 +204,10 @@ describe('MA-1547 save seam — both RAW faces, ledger accumulation, legacy iner
         expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('odd raw halves floored: raw 21 on success → drain rides the halved 10, not the raw 21', async () => {
-        rollExpression.mockReturnValue({ total: 21, rolls: [6, 8, 7], modifier: 0 });
-        await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 20, bonus: 0 });
-        expect(saveDamageLog().finalDamage).toBe(10);
-        expect(csB().maxHp).toBe(190);
-    });
+    // (Odd-raw floor arithmetic retired: it exercised the local
+    // computeDamageAfterSave mock's own Math.floor, and the success-face test
+    // already pins drain == post-save finalDamage — raw would drain 20, not
+    // 10. Real half-flooring is the applyDamage module's contract.)
 
     it('standing ledger {baseMax:200,reduced:10,max:190} + failed full 20 → reduced 30, max 170', async () => {
         runtimeStore['campaign.targetEffects'] = [{ target: TARGET, effect: 'hp_max_reduce', source: SUCCUBUS, baseMax: 200, reduced: 10, max: 190 }];

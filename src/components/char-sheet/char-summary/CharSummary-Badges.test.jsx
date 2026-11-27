@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership: the two SUMMARY_BADGE_SPECS badges driven by runtime combat state
 // that no other CharSummary-* sibling asserts:
@@ -19,7 +19,8 @@
 //     a different code path) and Aura of Life / Heroes' Feast badges → CharSummary-BuffResistances.test.jsx
 //   - Cover badges incl. "+2 Cover: Nature's Sanctuary" (computed from `characters` prop,
 //     which this file never passes) → CharSummary-Cover.test.jsx
-//   - Wrath of the Sea badge → CharSummary-AdditionalCoverage.test.jsx
+//   - Wrath of the Sea + Stormborn badge gates → CharSummary-AdditionalCoverage.test.jsx
+//     (their default-off badge-ABSENCE cell also lives in CharSummary-FixtureContract.test.jsx)
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -141,8 +142,8 @@ describe('CharSummary — Starry Form constellation badge', () => {
 
         renderSummary();
 
+        // getByText already fails loudly if the badge is missing.
         const badge = screen.getByText(`Starry Form - ${constellation}`);
-        expect(badge).toBeInTheDocument();
         expect(badge).toHaveClass('creature-badge', 'effect-buff');
         expect(badge).toHaveAttribute('title', expect.stringContaining(constellation));
         expect(badge).toHaveAttribute('title', expect.stringContaining(expectedBenefit));
@@ -189,8 +190,8 @@ describe('CharSummary — Nature\'s Sanctuary info badge', () => {
 
         renderSummary();
 
+        // getByText already fails loudly if the badge is missing.
         const badge = screen.getByText('Sanctuary');
-        expect(badge).toBeInTheDocument();
         expect(badge).toHaveClass('creature-badge', 'effect-buff');
         expect(badge).toHaveAttribute('title', expect.stringContaining('Protected by Druid1'));
         expect(badge).toHaveAttribute('title', expect.stringContaining(expectedTooltipFragment));

@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { clearRuntimeState, seedTrackedResources, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -32,16 +33,19 @@ describe('GMCopilot', () => {
     expect(card).toHaveTextContent(COPILOT_TIPS['initiative-flow'].body);
   });
 
-  it('renders nothing when the mount-site condition is not met', () => {
+  it('renders nothing unless armed, unsettled, and known', () => {
     renderTip({ when: false });
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
-  });
 
-  it('renders nothing once the tip is dismissed (server-first, any device)', () => {
+    cleanup();
     seedTrackedResources('campaign', {
       [GM_COPILOT_KEY]: { dismissed: { 'initiative-flow': true } },
     });
     renderTip();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+    cleanup();
+    renderTip({ tipId: 'no-such-tip' });
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
@@ -71,15 +75,12 @@ describe('GMCopilot', () => {
     expect(screen.queryByRole('button', { name: /Open Encounter/ })).not.toBeInTheDocument();
   });
 
-  it('unknown tip ids render nothing', () => {
-    renderTip({ tipId: 'no-such-tip' });
-    expect(screen.queryByRole('note')).not.toBeInTheDocument();
-  });
-
   it('registry entries can carry their own flag label and a vars-driven body', () => {
-    renderTip({ tipId: 'try-combat', vars: { encounters: 3, maps: 1 } });
+    renderTip({ tipId: 'try-combat', onAction: undefined, actionLabel: undefined, vars: { encounters: 3 } });
+    // The custom flag replaces the default one in both the accessible name and the card.
     const card = screen.getByRole('note', { name: 'Try next: Try running combat in the app' });
-    expect(card.querySelector('.gm-copilot-flag')).toHaveTextContent('Try next');
+    expect(screen.queryByText('GM tip')).not.toBeInTheDocument();
+    expect(card).toHaveTextContent('Try next');
     expect(card).toHaveTextContent('3 encounters');
   });
 });

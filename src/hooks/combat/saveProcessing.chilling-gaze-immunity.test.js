@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import monsters from '../../../public/data/monsters.json';
 import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
@@ -38,9 +38,10 @@ vi.mock('../../services/encounters/combatData.js', () => ({
     getCombatSummary: () => null,
 }));
 
-// Mirror of the REAL pure resolvers (applyDamage.js:93-132, incl. MA-0367
-// dc_success:'full'); the 'none' zero-on-success branch is additionally
-// pinned live + by applyDamage.helpers.test.js.
+// Mirror of the REAL pure resolvers (applyDamage.js computeDamageAfterSave/
+// computeDamageAfterEvasion, incl. MA-0367 dc_success:'full'); the generic
+// half/none arithmetic is owned verbatim by applyDamage.helpers.test.js —
+// this seam only pins dispatch (what saveProcessing forwards).
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
@@ -76,10 +77,11 @@ const TARGET = 'AberrantSorcerer';
 // 6d6 Cold, Paralyzed on fail, 1h gaze_immunity on success) — a hand-typed duplicate
 // goes stale silently when disk edits; this read-only IMPORT cannot. Every forwarded
 // field now derives from the real row bytes, keyed exactly as the production
-// transport stamps them (buildAbilitySaveRollContext: saveDc :1818, saveType full
-// word :1819, autoDamage fields via resolveSaveLegDamageFields :1827, saveConditions
-// save_effect-scoped :1829 via extractConditionsFromSaveEffect, successImmunity
-// verbatim passthrough :1846). The mapping lines are this lane's consumer seam.
+// transport stamps them (MonsterCardModal.jsx buildAbilitySaveRollContext: saveDc +
+// saveType full word, autoDamage fields via resolveSaveLegDamageFields, saveConditions
+// save_effect-scoped via extractConditionsFromSaveEffect, successImmunity verbatim
+// `action?.success_immunity || null` passthrough). The mapping lines are this
+// lane's consumer seam.
 const gazeRow = monsters.find((m) => m.name === 'Abominable Yeti').actions.find((a) => a.name === 'Chilling Gaze');
 const gazeContext = {
     saveDc: gazeRow.save_dc,
@@ -113,6 +115,9 @@ beforeEach(() => {
     addEntryLogs.length = 0;
 });
 
+// No-clause rows (e.g. Cold Breath) granting nothing on success is parse-owned:
+// MonsterCardHelpers.gaze-immunity.test.js null arms make grantSuccessImmunity's
+// early return the only possible outcome — no need to re-pin it at this seam.
 describe('MA-0030 Chilling Gaze dc_success:none + 1h gaze immunity', () => {
     it('successful save: ZERO damage, gaze_immunity te sourced from yeti, 600-round expiry clock, granted log', async () => {
         await resolveSave({ ...gazeContext }, true, 24);
@@ -137,27 +142,11 @@ describe('MA-0030 Chilling Gaze dc_success:none + 1h gaze immunity', () => {
         expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
     });
 
-    it('unchanged behavior: gaze fail pays FULL damage + Paralyzed with no immunity grant; plain half row stays byte-inert', async () => {
+    it('gaze fail pays FULL damage + Paralyzed with no immunity grant (success-gate: the clause never fires on a failed save)', async () => {
         await resolveSave({ ...gazeContext }, false, 11);
 
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(24);
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['paralyzed']);
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-
-        // Row without the success_immunity key: half-on-success lane untouched,
-        // no immunity clause ever granted (half math pinned in applyDamage.helpers.test.js).
-        vi.clearAllMocks();
-        await resolveSave({
-            ...gazeContext,
-            actionName: 'Cold Breath (Recharge 6)',
-            dcSuccess: 'half',
-            autoDamageFormula: '10d8',
-            saveConditions: [],
-            successImmunity: null,
-        }, true, 45);
-
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(12);
         expect(addExpiration).not.toHaveBeenCalled();
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addEntryLogs.some(e => e.automationType === 'gaze_immunity_granted')).toBe(false);

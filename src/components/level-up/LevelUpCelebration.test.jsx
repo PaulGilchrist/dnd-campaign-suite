@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 // Roadmap Item 8 — LEVEL UP celebration contract.
 //
 // Lanes driven with the REAL runtime-state module so the detection seam is
@@ -10,17 +11,26 @@
 // The milestone grant lane is the roster `level` bump a `character-update-*`
 // echo produces (App mirrors it into the roster prop we re-render with).
 //
+// Siblings own adjacent seams — do not re-pin them here:
+//  - LevelUpCelebration.actual-level-clamp.test.jsx — the roster-floor clamp;
+//  - LevelUpCelebration.visitor-wizard-door.test.jsx — origin faces and the
+//    prompt-copy split (so this file asserts no wizard-prompt copy).
+//
 // Owns:
-//  - XP crossing → banner with character name and honest "Level A → B" copy
-//    (single + multi-level jump, both rulesets);
-//  - one award leveling many characters → ONE banner naming all rows;
+//  - both award lanes → banner with character name and honest "Level A → B"
+//    copy (the ladder itself is ruleset-agnostic by construction, pinned in
+//    levelProgression.test.js; a 2024 character crossing rides the multi-row
+//    test below);
+//  - one award leveling many characters → ONE banner naming all rows,
+//    including an honest multi-level jump ("Level 1 → 3");
 //  - merged consecutive crossings (from stays, to extends);
+//  - sub-threshold awards, past-max XP (20→21), cold baselines and unarmed
+//    seed moves are never celebrated;
 //  - XP lane gated on experience mode; milestone mode celebrates the wizard
 //    level bump instead, and an experience-mode bump never double-fires;
-//  - 20→21 honesty (past-max XP is silent);
-//  - cold baseline / unarmed seed are never celebrated;
 //  - click-to-open-wizard handoff (passes the roster character, removes the
-//    row) and click-to-dismiss (× and Continue, no timers).
+//    row) and click-to-dismiss (× and Continue, no timers);
+//  - level-up flourish: one cue on the banner-appearance edge (Item 10).
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LevelUpCelebration from './LevelUpCelebration.jsx';
@@ -77,7 +87,6 @@ describe('experience mode — XP crossings on the award lane', () => {
         expect(banner).toHaveTextContent('LEVEL UP!');
         expect(banner).toHaveTextContent('Alice');
         expect(banner).toHaveTextContent('Level 1 → 2');
-        expect(banner).toHaveTextContent('Open the wizard to choose your new features.');
     });
 
     it('shows the celebration on the SSE-echoed award (replace-runtime-object lane, two-client pin)', () => {
@@ -90,19 +99,7 @@ describe('experience mode — XP crossings on the award lane', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Level 1 → 2');
     });
 
-    it.each(['5e', '2024'])('crosses identically for ruleset %s', (rules) => {
-        setup([alice({ rules })]);
-        act(() => { replaceRuntimeObject('Alice', { xp: 350 }); });
-        expect(screen.getByRole('status')).toHaveTextContent('Level 1 → 2');
-    });
-
-    it('names a multi-level jump honestly ("Level 1 → 3")', () => {
-        setup([alice()]);
-        act(() => { replaceRuntimeObject('Alice', { xp: 950 }); });
-        expect(screen.getByRole('status')).toHaveTextContent('Level 1 → 3');
-    });
-
-    it('one award leveling many characters shows ONE banner naming every character', () => {
+    it('one award leveling many characters shows ONE banner naming every character (incl. a 2024 ruleset multi-level jump)', () => {
         setup([alice(), bob()]);
         act(() => {
             replaceRuntimeObject('Alice', { xp: 350 });
@@ -121,6 +118,7 @@ describe('experience mode — XP crossings on the award lane', () => {
         act(() => { replaceRuntimeObject('Alice', { xp: 350 }); });
         act(() => { replaceRuntimeObject('Alice', { xp: 3000 }); });
         expect(screen.getAllByText('Level 1 → 4')).toHaveLength(1);
+        expect(screen.queryByText('Level 1 → 2')).not.toBeInTheDocument();
     });
 
     it('stays silent when the award does not cross a threshold', () => {
@@ -215,17 +213,15 @@ describe('dismissal and wizard handoff (click only — no timers)', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Bob');
     });
 
-    it('the corner × dismisses the whole banner without opening anything', () => {
+    it('both the corner × and Continue dismiss the whole banner without opening anything (no timers)', () => {
         const { onOpenWizard } = setup([alice()]);
         act(() => { replaceRuntimeObject('Alice', { xp: 350 }); });
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss level-up banner' }));
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
-        expect(onOpenWizard).not.toHaveBeenCalled();
-    });
 
-    it('Continue dismisses the whole banner without opening anything', () => {
-        const { onOpenWizard } = setup([alice()]);
-        act(() => { replaceRuntimeObject('Alice', { xp: 350 }); });
+        // Re-arm via a fresh crossing; Continue is the second close affordance.
+        act(() => { replaceRuntimeObject('Alice', { xp: 950 }); });
+        expect(screen.getByRole('status')).toBeInTheDocument();
         fireEvent.click(screen.getByText('Continue'));
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
         expect(onOpenWizard).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
+// @maintained-by-ai 2026-11-26
 // CLA-388 Wild Companion material-waiver seam of gateMetamagic (useSpellMetamagicGates.js
 // hasWildCompanionWaiver / isBlockedByConsumedMaterial / handleNonSorcererCast consumption).
 // 2024 classes.json (Druid lv2): "expend a spell slot or a use of Wild Shape to cast the
@@ -6,8 +6,10 @@
 // spell:'Find Familiar', resourceCost:'wild_companion'} mirrors it; the fixture below too.
 // Generic block-when-missing / pass-when-carried on the sorcerer lane is owned by
 // useSpellMetamagicFlow.gate-material.test.js; this file stays Wild-Companion-specific:
-// missing-material refusal, grant waiver (no popup, no consumption), waiver specificity,
-// and the non-sorcerer pay-and-consume lane with the material carried.
+// each unmet conjunct of hasWildCompanionWaiver refuses unpaid (one it.each leg per
+// conjunct — authorized grant, resourceCost stamp, spell-stamp specificity), the
+// authorized grant waives refusal AND consumption (scalar + array spell stamps), and
+// the non-sorcerer pay-and-consume lane with the material carried spends exactly once.
 // Like gate-material, the material service is ONLY partially mocked — getConsumedMaterial,
 // hasMaterial, and getMaterialRequirementMessage run for REAL against MATERIAL_REGISTRY
 // (Find Familiar → 'Incense (10 gp)'), so these tests validate actual gate data. Only
@@ -108,37 +110,52 @@ describe('CLA-388 consumed-material waiver (Wild Companion)', () => {
     prepareSpellCast.mockResolvedValue({ modifiedSpell: { name: 'Find Familiar' }, metaCtx: {}, slotConsumed: false });
   });
 
-  it('refuses the cast when the consumed material is missing and no grant is authorized', async () => {
-    const { onExecute, setPopupHtml } = await gate(makeDruid([wildCompanionEntry]));
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(consumeMaterial).not.toHaveBeenCalled();
+  // One branch (refuseMissingMaterial) for all three unmet conjuncts of
+  // hasWildCompanionWaiver (grant authorized, resourceCost 'wild_companion',
+  // spell stamp names this spell) — one leg per conjunct, identical assertions.
+  // The refusal copy/audit-row bytes are owned by the material-refused sibling;
+  // this lane pins only the Wild-Companion-shaped UNPAID census.
+  it.each([
+    ['grant not authorized', wildCompanionEntry, false],
+    ['free-cast feature lacks the wild_companion resourceCost', { name: 'Other Free Spell', type: 'free_spell', spell: 'Find Familiar' }, true],
+    ['wild companion grant stamped for a different spell', { ...wildCompanionEntry, spell: 'Find Steed' }, true],
+  ])('refuses unpaid when the %s conjunct fails', async (_label, entry, authorized) => {
+    isFreeCastAuthorized.mockReturnValue(authorized);
+    const { onExecute, setPopupHtml } = await gate(makeDruid([entry]));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_refused' }));
+    expect(onExecute).not.toHaveBeenCalled();
+    expect(prepareSpellCast).not.toHaveBeenCalled();
+    expect(consumeMaterial).not.toHaveBeenCalled();
   });
 
-  it('waives the refusal and the consumption when the wild companion grant is authorized', async () => {
+  // Both spell-stamp shapes the feature registry ships (scalar and array;
+  // hasWildCompanionWaiver branches on Array.isArray). Bucket placement
+  // (actions/bonusActions/specialActions) is one flattened .some scan — no
+  // extra legs; the authorization side of the grant is owned by
+  // spellPreparationService.wildCompanion.test.js.
+  it.each([
+    ['scalar', 'Find Familiar'],
+    ['array', ['Find Steed', 'Find Familiar']],
+  ])('waives the refusal and the consumption for an authorized grant with a %s spell stamp', async (_label, spell) => {
     isFreeCastAuthorized.mockReturnValue(true);
-    const { onExecute, setPopupHtml } = await gate(makeDruid([wildCompanionEntry]));
+    const { onExecute, setPopupHtml } = await gate(makeDruid([{ ...wildCompanionEntry, spell }]));
     expect(setPopupHtml).not.toHaveBeenCalled();
-    expect(onExecute).toHaveBeenCalled();
+    expect(onExecute).toHaveBeenCalledTimes(1);
     expect(consumeMaterial).not.toHaveBeenCalled();
   });
 
-  it('keeps the gate enforced for an authorized free cast from a non-material-waiving feature', async () => {
-    isFreeCastAuthorized.mockReturnValue(true);
-    const noWaiveEntry = { name: 'Other Free Spell', type: 'free_spell', spell: 'Find Familiar' };
-    const { onExecute, setPopupHtml } = await gate(makeDruid([noWaiveEntry]));
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_refused' }));
-  });
-
-  it('consumes the carried incense on a non-waived paid cast', async () => {
-    // The non-sorcerer pay-and-consume lane: carried material (real hasMaterial
-    // exact-name match) unblocks the gate and consumeMaterial is handed the exact
-    // registry item name — the waiver tests above assert the skip; this asserts the spend.
+  it('consumes the carried incense once on a non-waived paid cast', async () => {
+    // The non-sorcerer pay-and-consume lane with the waiver-eligible feature
+    // PRESENT but unauthorized: carried material (real hasMaterial exact-name
+    // match) unblocks the gate, the slot is paid once, and consumeMaterial is
+    // handed the exact registry item name once — the waiver legs above assert
+    // the skip; this asserts the spend does not leak to the paid lane.
     const druid = makeDruid([wildCompanionEntry], ['Incense (10 gp)']);
     const { onExecute, setPopupHtml } = await gate(druid);
     expect(setPopupHtml).not.toHaveBeenCalled();
-    expect(onExecute).toHaveBeenCalled();
+    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
+    expect(consumeMaterial).toHaveBeenCalledTimes(1);
     expect(consumeMaterial).toHaveBeenCalledWith(druid, 'Incense (10 gp)', CAMPAIGN);
+    expect(onExecute).toHaveBeenCalledTimes(1);
   });
 });

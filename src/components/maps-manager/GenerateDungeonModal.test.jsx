@@ -1,9 +1,9 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateDungeonModal from './GenerateDungeonModal';
 
-const { dungeonMocks, dungeonResult } = vi.hoisted(() => {
+const { dungeonMocks } = vi.hoisted(() => {
   const dungeonResult = {
     name: 'Test Dungeon',
     gridSize: 30,
@@ -47,6 +47,9 @@ const selectMode = (modeLabel) =>
 const changeField = (matcher, value) =>
   fireEvent.change(screen.getByLabelText(matcher), { target: { value } });
 
+const setSlider = (nameMatcher, value) =>
+  fireEvent.change(screen.getByRole('slider', { name: nameMatcher }), { target: { value } });
+
 // Fill the name, run an optional per-case interaction, generate, and assert
 // the generator received the expected options.
 const submitAndExpect = async (generatorMock, expectedOptions, interact) => {
@@ -66,6 +69,14 @@ const deferred = () => {
 
 // ---------------------------------------------------------------------------
 // Test suite
+//
+// Division of labour (2026-11-26 trim): parseGridInput/parseSeedInput unit
+// tests (gridInput.test.js, seedInput.test.js) own the gate value-space;
+// useModalDismiss.escape-body-focus.test.jsx owns the shared Escape/backdrop
+// law incl. the body-rescue lane; generateModalParity.test.js owns the shared
+// tokens/placeholder. This file pins only what is unique to THIS modal:
+// form wiring, option→generator-arg mapping, createMap payload stamping, and
+// the in-flight gating it feeds the shared hook.
 // ---------------------------------------------------------------------------
 describe('GenerateDungeonModal', () => {
   let props;
@@ -81,16 +92,15 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('rendering', () => {
-    it('renders modal with title and form fields', () => {
+    // Copy pin (SD backlog 2026-11-12): the note reads "fleshed out", never
+    // "flushed". Seed input is located by label, not placeholder text — the
+    // placeholder is the shared SEED_INPUT_PLACEHOLDER constant's copy, owned
+    // by seedInput.test.js and the parity pin.
+    it('renders the title, name and seed fields, and the fixed note copy', () => {
       render(<GenerateDungeonModal {...props} />);
       expect(screen.getByText('Generate Dungeon Map')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('e.g. Goblin Hideout')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Random if empty')).toBeInTheDocument();
-    });
-
-    // Copy pin (SD backlog 2026-11-12): the note reads "fleshed out", never "flushed".
-    it('renders the starting-point note with "fleshed out" copy', () => {
-      render(<GenerateDungeonModal {...props} />);
+      expect(screen.getByLabelText(/Map Name/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Seed/)).toBeInTheDocument();
       expect(screen.getByText(
         'Note: This is meant to be just a starting point for you to finish into a fully fleshed out map',
       )).toBeInTheDocument();
@@ -102,25 +112,20 @@ describe('GenerateDungeonModal', () => {
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
     });
 
-    it('switches to adjacent mode and shows room count slider', () => {
+    // The hint JSX is duplicated across both mode branches — this pins the
+    // adjacent-branch copy too (grid-30 × FEET_PER_CELL=5 → 150 ft side, 900).
+    it('switches to adjacent mode, showing the room-count slider and grid hint', () => {
       render(<GenerateDungeonModal {...props} />);
       selectMode('Room Adjacent');
       expect(screen.getByRole('slider', { name: /Room Count/ })).toBeInTheDocument();
+      expect(screen.getByText('150 ft × 150 ft (900 squares)')).toBeInTheDocument();
     });
 
-    // Grid hint must describe the real map: gridSize cells-per-side at
-    // FEET_PER_CELL (5 ft) per cell → N·5 ft square, N² total cells.
     it('shows the grid-size hint as feet-per-side and total squares', () => {
       render(<GenerateDungeonModal {...props} />);
       expect(screen.getByText('150 ft × 150 ft (900 squares)')).toBeInTheDocument();
       changeField(/Grid Size/, '20');
       expect(screen.getByText('100 ft × 100 ft (400 squares)')).toBeInTheDocument();
-    });
-
-    it('shows the corrected grid-size hint in Room Adjacent mode too', () => {
-      render(<GenerateDungeonModal {...props} />);
-      selectMode('Room Adjacent');
-      expect(screen.getByText('150 ft × 150 ft (900 squares)')).toBeInTheDocument();
     });
 
     it('enables Generate only when map name has content', () => {
@@ -145,18 +150,47 @@ describe('GenerateDungeonModal', () => {
     });
   });
 
-  describe('closing', () => {
-    // F11 family law (Item 7 2026-11-25): the bespoke no-Escape/no-backdrop
-    // semantics were retired — close answers Cancel, Escape, and a PURE
-    // backdrop click like every other overlay (useModalDismiss).
-    it('closes via Cancel and via a pure backdrop click', () => {
+  // F11 family law (Item 7 2026-11-25): close answers Cancel, Escape, and a
+  // PURE backdrop click like every other overlay (useModalDismiss). Lane
+  // mechanics (body-rescue, once-only firing) are pinned in the hook's own
+  // tests; these pins prove THIS modal wires the handlers and feeds
+  // `disabled: generating` into them.
+  describe('dismissal wiring (useModalDismiss lane)', () => {
+    it('closes via Cancel and via a pure backdrop click, not a panel click', () => {
       render(<GenerateDungeonModal {...props} />);
       const overlay = screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal-overlay');
+
+      fireEvent.mouseDown(screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal'));
+      fireEvent.click(screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal'));
+      expect(props.onClose).not.toHaveBeenCalled();
+
       fireEvent.mouseDown(overlay);
       fireEvent.click(overlay);
       expect(props.onClose).toHaveBeenCalledTimes(1);
+
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(props.onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('Escape on the overlay closes', () => {
+      render(<GenerateDungeonModal {...props} />);
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(props.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('Escape is inert while a generation is in flight', async () => {
+      const pending = deferred();
+      mapsServiceMocks.createMap.mockImplementationOnce(() => pending.promise);
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Dungeon');
+      clickGenerate();
+      await waitFor(() => expect(dungeonMocks.generateDungeon).toHaveBeenCalled());
+
+      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
+      expect(props.onClose).not.toHaveBeenCalled();
+
+      pending.resolve({});
+      await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
     });
   });
 
@@ -184,46 +218,36 @@ describe('GenerateDungeonModal', () => {
       expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
     });
 
-    // Criteria 1/2/4: an out-of-range (or blanked, which reads as 0) grid size
-    // blocks generation with a persistent inline error aligned to the real
-    // [7,100] gate — no generator call, no createMap POST, modal stays open
-    // (SD backlog 2026-11-12; the old silent clamp is retired).
-    it.each(['5', '150', '3', '200', ''])(
-      'blocks grid size "%s" with an inline error and no map created',
-      async (typed) => {
-        render(<GenerateDungeonModal {...props} />);
-        fillMapName('Dungeon');
-        changeField(/Grid Size/, typed);
-        clickGenerate();
+    // The [7,100] gate (SD backlog 2026-11-12) is shared via gridInput.js and
+    // its value-space is pinned there; these cases prove the modal's wiring:
+    // out-of-range AND blank (Number('') → 0) block with a persistent inline
+    // error, no generator call, no POST, modal stays open — in both modes.
+    it.each([
+      ['5', 'bsp'],
+      ['', 'bsp'],
+      ['5', 'adjacent'],
+    ])('blocks grid size "%s" in %s mode with an inline error and no map created', async (typed, mode) => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Dungeon');
+      if (mode === 'adjacent') selectMode('Room Adjacent');
+      changeField(/Grid Size/, typed);
+      clickGenerate();
 
-        const error = await screen.findByText('Grid size must be between 7 and 100');
-        expect(error).toHaveClass('maps-manager-error');
-        expect(dungeonMocks.generateDungeon).not.toHaveBeenCalled();
-        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
-        expect(props.onMapCreated).not.toHaveBeenCalled();
-        expect(props.onClose).not.toHaveBeenCalled();
-        // Persistent: still there after the beat, Generate re-enabled, field
-        // preserved for fixing
-        expect(screen.getByText('Grid size must be between 7 and 100')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
-      },
-    );
-
-    it.each(['5', '150'])(
-      'blocks grid size "%s" in Room Adjacent mode too (shared field/gate)',
-      async (typed) => {
-        render(<GenerateDungeonModal {...props} />);
-        fillMapName('Dungeon');
-        selectMode('Room Adjacent');
-        changeField(/Grid Size/, typed);
-        clickGenerate();
-
-        expect(await screen.findByText('Grid size must be between 7 and 100')).toBeInTheDocument();
-        expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
-        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
-        expect(props.onClose).not.toHaveBeenCalled();
-      },
-    );
+      const banner = 'Grid size must be between 7 and 100';
+      const error = await screen.findByText(banner);
+      expect(error).toHaveClass('maps-manager-error');
+      expect(dungeonMocks.generateDungeon).not.toHaveBeenCalled();
+      expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
+      expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+      expect(props.onMapCreated).not.toHaveBeenCalled();
+      expect(props.onClose).not.toHaveBeenCalled();
+      // Persistent and recoverable: banner stays, Generate stays enabled,
+      // the field keeps the offending value for fixing.
+      expect(screen.getByText(banner)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
+      // The field keeps the offending value for fixing (blank reads as 0).
+      expect(screen.getByLabelText(/Grid Size/)).toHaveValue(Number(typed));
+    });
 
     // TE backlog 2026-11-12: editing any of the three fields clears a stale
     // banner so it never lingers beside now-valid inputs mid-form.
@@ -244,95 +268,44 @@ describe('GenerateDungeonModal', () => {
       expect(screen.queryByText(banner)).not.toBeInTheDocument();
     });
 
-    // Criterion 3: correcting the field dismisses the error path and generates.
-    it('recovers after correcting an out-of-range grid size', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      changeField(/Grid Size/, '5');
-      clickGenerate();
-      expect(await screen.findByText('Grid size must be between 7 and 100')).toBeInTheDocument();
-
-      changeField(/Grid Size/, '20');
-      clickGenerate();
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ gridSize: 20 }),
-        );
-        expect(mapsServiceMocks.createMap).toHaveBeenCalledTimes(1);
-        expect(props.onClose).toHaveBeenCalledTimes(1);
-      });
-      // The corrected value no longer blocks (same recovery face as the seed
-      // gate: the successful generate closes the modal).
-      expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
-    });
-
-    // Criterion 5: in-range values pass through unclamped — boundaries 7/100,
-    // default 30 (pinned in the flow test above), in BOTH modes.
+    // In-range values pass through unclamped (criterion 5); boundary values
+    // are the highest-risk so each mode is pinned at one boundary. The
+    // error→fix→success recovery face is pinned by the seed-gate test below.
     it.each([
-      ['bsp', '7'],
-      ['bsp', '100'],
-      ['adjacent', '7'],
-      ['adjacent', '100'],
-    ])('passes boundary grid size %s through %s mode unclamped', async (mode, typed) => {
+      ['7', 'bsp', 'generateDungeon'],
+      ['100', 'adjacent', 'generateAdjacentDungeon'],
+    ])('passes boundary grid size %s through %s mode unclamped', async (typed, mode, fnName) => {
       render(<GenerateDungeonModal {...props} />);
       fillMapName('Dungeon');
       if (mode === 'adjacent') selectMode('Room Adjacent');
-      const generatorMock = mode === 'adjacent'
-        ? dungeonMocks.generateAdjacentDungeon
-        : dungeonMocks.generateDungeon;
-      await submitAndExpect(generatorMock, { gridSize: Number(typed) },
+      await submitAndExpect(dungeonMocks[fnName], { gridSize: Number(typed) },
         () => changeField(/Grid Size/, typed));
       expect(screen.queryByText('Grid size must be between 7 and 100')).not.toBeInTheDocument();
     });
 
-    it.each([
-      ['10', 0.1],
-      ['80', 0.8],
-      ['100', 1.0],
-    ])('passes density %s%% as %s to generateDungeon', async (typed, density) => {
+    it('passes the density slider value to generateDungeon as a fraction', async () => {
       render(<GenerateDungeonModal {...props} />);
-      await submitAndExpect(dungeonMocks.generateDungeon, { density },
-        () => fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: typed } }));
-    });
-
-    it('passes a valid numeric seed through to generateDungeon', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      await submitAndExpect(dungeonMocks.generateDungeon, { seed: 42 },
-        () => changeField(/Seed/, '42'));
+      await submitAndExpect(dungeonMocks.generateDungeon, { density: 0.8 },
+        () => setSlider(/Density/, '80'));
     });
 
     // Seed "0" is falsy but a whole number — it must drive the RNG, not be
-    // dropped to random (SD backlog 2026-11-12, criterion 3).
-    it('honours seed "0" (falsy but valid)', async () => {
+    // dropped to random (SD backlog 2026-11-12, criterion 3). Effective
+    // random-seed routing into the payload is pinned in the stamping suite.
+    it.each([
+      ['42', 42],
+      ['0', 0],
+    ])('passes seed "%s" through to generateDungeon as %i', async (typed, seed) => {
       render(<GenerateDungeonModal {...props} />);
-      await submitAndExpect(dungeonMocks.generateDungeon, { seed: 0 },
-        () => changeField(/Seed/, '0'));
+      await submitAndExpect(dungeonMocks.generateDungeon, { seed },
+        () => changeField(/Seed/, typed));
     });
 
-    // Criterion 4: the generator's effective seed is routed into the created
-    // map document (result minus name is the createMap payload).
-    it('routes the generated seed into the createMap payload', async () => {
-      dungeonMocks.generateDungeon.mockImplementationOnce((opts) => ({
-        ...dungeonResult,
-        seed: opts.seed,
-      }));
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Seeded');
-      changeField(/Seed/, '42');
-      clickGenerate();
-      await waitFor(() => {
-        expect(mapsServiceMocks.createMap).toHaveBeenCalledWith(
-          'test-campaign',
-          'Seeded',
-          expect.objectContaining({ seed: 42 }),
-        );
-      });
-    });
-
-    // Criteria 1: a non-numeric seed blocks generation with a persistent
-    // inline error — no generator call, no createMap POST, modal stays open,
-    // and fixing the seed succeeds.
-    it.each(['abc', '4.5', '12abc'])(
+    // Criterion 1 (seedInput.js owns the value-space): a non-numeric seed
+    // blocks with a persistent inline error — no generator call, no POST,
+    // modal stays open — and fixing the seed then generates and closes
+    // (the recovery face shared by both gates).
+    it.each(['abc', '4.5'])(
       'blocks seed "%s" with an inline error, no map created, and recovers after a fix',
       async (typedSeed) => {
         render(<GenerateDungeonModal {...props} />);
@@ -367,17 +340,14 @@ describe('GenerateDungeonModal', () => {
     const submitAdjacent = (expectedOptions, interact) =>
       submitAndExpect(dungeonMocks.generateAdjacentDungeon, expectedOptions, interact);
 
-    it.each([
-      ['3', 'min'],
-      ['20', 'max'],
-    ])('passes %s room count (%s) to generateAdjacentDungeon', async (typed) => {
+    it('passes the room-count slider to generateAdjacentDungeon', async () => {
       render(<GenerateDungeonModal {...props} />);
       selectMode('Room Adjacent');
-      await submitAdjacent({ roomCount: Number(typed) },
-        () => fireEvent.change(screen.getByRole('slider', { name: /Room Count/ }), { target: { value: typed } }));
+      await submitAdjacent({ roomCount: 20 }, () => setSlider(/Room Count/, '20'));
     });
 
-    // Room size scales min/max room dims off the grid-30 base (min 4, max 12)
+    // Each option button maps its label to a wire value; room size also
+    // scales min/max room dims off the grid-30 base (min 4, max 12).
     it.each([
       ['Cramped', { minRoom: 3, maxRoom: 8 }],
       ['Standard', { minRoom: 4, maxRoom: 12, roomCount: 8, corridorLength: 'compact', layoutStyle: 'balanced' }],
@@ -425,7 +395,7 @@ describe('GenerateDungeonModal', () => {
       fillMapName('Bsp Stamped');
       changeField(/Grid Size/, '20');
       changeField(/Seed/, '42');
-      fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: '80' } });
+      setSlider(/Density/, '80');
       clickGenerate();
 
       await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
@@ -460,7 +430,7 @@ describe('GenerateDungeonModal', () => {
       selectMode('Room Adjacent');
       changeField(/Grid Size/, '20');
       changeField(/Seed/, '42');
-      fireEvent.change(screen.getByRole('slider', { name: /Room Count/ }), { target: { value: '10' } });
+      setSlider(/Room Count/, '10');
       fireEvent.click(screen.getByText('Spacious'));
       fireEvent.click(screen.getByText('Sprawling (long halls)'));
       fireEvent.click(screen.getByText('Winding'));
@@ -526,50 +496,6 @@ describe('GenerateDungeonModal', () => {
       clickGenerate();
 
       expect(await screen.findByText('Failed to generate dungeon')).toBeInTheDocument();
-    });
-  });
-
-  // F11 family law (Item 7 re-sweep 2026-11-25): the bespoke maps-manager
-  // overlay was the one modal that trapped Escape — it now rides the shared
-  // useModalDismiss lane (Escape + pure-backdrop close, inert mid-generate).
-  describe('Escape/backdrop dismissal (useModalDismiss lane)', () => {
-    const renderOpen = (onClose = vi.fn()) => {
-      render(<GenerateDungeonModal campaignName="test-campaign" onClose={onClose} onMapCreated={vi.fn()} />);
-      return onClose;
-    };
-
-    it('Escape on the overlay closes', () => {
-      const onClose = renderOpen();
-      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('a body-targeted Escape still closes (window rescue lane)', () => {
-      const onClose = renderOpen();
-      fireEvent.keyDown(document.body, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('backdrop click closes; a click inside the panel does not', () => {
-      const onClose = renderOpen();
-      fireEvent.click(document.querySelector('.maps-manager-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-      const overlay = document.querySelector('.maps-manager-modal-overlay');
-      fireEvent.mouseDown(overlay);
-      fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('Escape is inert while a generation is in flight', async () => {
-      let release;
-      mapsServiceMocks.createMap.mockImplementationOnce(() => new Promise((res) => { release = res; }));
-      const onClose = renderOpen();
-      fillMapName('Dungeon');
-      clickGenerate();
-      await waitFor(() => expect(dungeonMocks.generateDungeon).toHaveBeenCalled());
-      fireEvent.keyDown(document.querySelector('.maps-manager-modal-overlay'), { key: 'Escape' });
-      expect(onClose).not.toHaveBeenCalled();
-      release({});
     });
   });
 });

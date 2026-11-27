@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // §9.4 — world keeper console (component lane only): the request carries the
 // referee's kind/focus, the card's exit is chosen by proposal kind, nothing
-// writes until the referee acts, and every failure stays honest.
-// Lane internals (apply routing, refusal matrix, audit) are covered by
-// applyWorldProposal.test.js; server-side funnel by world.test.js — not re-tested here.
+// writes until the referee acts, and every failed ASK stays honest.
+// Owned elsewhere (not re-tested here): the applied receipt and failed-apply
+// card-clearing lanes — AiWorldConsole.applied-state.test.jsx; quest ledger
+// scrutiny faces — .name-scrutiny / .ledger-pending / .ledger-incomplete;
+// apply internals (routing, refusal matrix, audit) — applyWorldProposal.test.js;
+// server-side funnel — world.test.js.
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
@@ -89,12 +92,11 @@ describe('AiWorldConsole — the card waits; kind chooses the exit', () => {
         expect(applyWorldProposal).not.toHaveBeenCalled();
         expect(screen.queryByRole('status')).toBeNull(); // no outcome before action
 
+        // The referee's click routes the exact proposal to the apply lane.
+        // What a SUCCESSFUL apply renders (Applied badge, notice, the card
+        // staying mounted as a receipt) is owned by .applied-state.test.jsx.
         fireEvent.click(screen.getByRole('button', { name: 'Log it' }));
         await waitFor(() => expect(applyWorldProposal).toHaveBeenCalledWith({ campaignName: CN, proposal: recap }));
-        await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Applied: logged.'));
-        // Backlog 2026-11-01 (AV) — applied-state copy: the card stays mounted
-        // as a receipt (its badge lane is pinned in .applied-state.test.jsx).
-        expect(screen.getByText('Ash and ember.')).toBeInTheDocument();
     });
 
     it('quest_draft routes to the ledger lane — rewards rendered, no Log it offered', async () => {
@@ -124,17 +126,20 @@ describe('AiWorldConsole — the card waits; kind chooses the exit', () => {
         expect(screen.queryByRole('status')).toBeNull(); // dismissing is not an outcome
     });
 
-    it('needs_human is surfaced for the GM with no apply route — only dismissal', async () => {
+    it('needs_human surfaces as a GM-facing card, not a failure notice — and offers no apply exit', async () => {
         askWorldKeeper.mockResolvedValue({ ok: false, code: 'AI_NEEDS_HUMAN', proposal: needsHuman });
         render(<AiWorldConsole campaignName={CN} />);
         fireEvent.click(generateBtn());
 
+        // The AI_NEEDS_HUMAN branch must render the PROPOSAL for the GM to
+        // read, never dress it up as a Not-applied outcome notice. The
+        // dismiss-only exit clearing without a write is owned by
+        // .applied-state.test.jsx.
         await waitFor(() => expect(screen.getByText(/GM supplies this/)).toBeInTheDocument());
+        expect(screen.queryByRole('status')).toBeNull();
         expect(screen.queryByRole('button', { name: 'Log it' })).toBeNull();
         expect(screen.queryByRole('button', { name: /Add quest/ })).toBeNull();
-
-        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-        await waitFor(() => expect(screen.queryByText(/GM supplies this/)).toBeNull());
+        expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument(); // the only exit
         expect(applyWorldProposal).not.toHaveBeenCalled();
     });
 });
@@ -162,17 +167,6 @@ describe('AiWorldConsole — failures stay honest', () => {
         expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
         expect(applyWorldProposal).not.toHaveBeenCalled();
     });
-
-    it('a refused apply says Not applied and clears the card', async () => {
-        askWorldKeeper.mockResolvedValue({ ok: true, proposal: recap });
-        applyWorldProposal.mockResolvedValue({ applied: false, detail: 'ledger write failed' });
-        render(<AiWorldConsole campaignName={CN} />);
-        fireEvent.click(generateBtn());
-        await waitFor(() => expect(screen.getByText('Ash and ember.')).toBeInTheDocument());
-
-        fireEvent.click(screen.getByRole('button', { name: 'Log it' }));
-        await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Not applied: ledger write failed'));
-        expect(screen.queryByText('Ash and ember.')).toBeNull();
-        expect(generateBtn()).toBeEnabled();
-    });
+    // A refused APPLY (card clears, honest reason notice, no premature badge)
+    // is a stronger twin of this lane owned by .applied-state.test.jsx.
 });

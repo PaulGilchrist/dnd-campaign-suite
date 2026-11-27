@@ -1,12 +1,15 @@
-// @maintained-by-ai 2026-10-14
-// Consolidated: "calls executeHandler when action has automation" + "does not call executeHandler
-// for plain actions" → 1 click-path test (asserts dispatch args and inert plain row).
-// Removed: "feature detail popup for actions with details but no automation" — duplicated,
-// stronger, in CharActions.automationHandler.test.jsx ("calls buildFeatureDetailHtml when
-// action has details"). cannotAct guard also lives there.
-// Strengthened: Metamagic display test now asserts the rendered ruleset description, not just
-// the render; setModalState-wrapper test now verifies the onSpellModalStateChange prop actually
-// receives modal-show events (it previously asserted only that the prop was defined).
+// @maintained-by-ai 2026-11-26
+// CharActions feature-row automation lane, only what no sibling owns:
+// (1) a plain row (no automation, no details) is inert — never reaches the engine
+//     or the detail popup; (2) the spell_modifier Metamagic row renders renamed
+//     "Empowered Spell" with its description routed through the ruleset-aware service.
+// Removed: positive dispatch-args test (null,[]) — click→executeHandler dispatch is
+// owned by CharActions.automationHandler.test.jsx (integration, exact-once) and the
+// mapName/characters passthrough is pinned at the hook seam with 'test-map',[] in
+// useCharActionsAutomation.{cla143-gate,fleetStep,stunning-strike}.test.js.
+// Removed: onSpellModalStateChange fan-out test — modal-show→modalState is covered
+// parameterized in CharActions.events.test.jsx (incl. rally-choice-modal-show, same
+// detail) and the prop-callback side in CharActions.recklessAttack.test.jsx.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import CharActions from './CharActions.jsx';
@@ -300,31 +303,23 @@ describe('CharActions - feature action rows', () => {
     setupFetchMock();
   });
 
-  it('clicking an automation action dispatches executeHandler with it, while a plain action stays inert', async () => {
+  it('clicking a plain action row (no automation, no details) stays inert — no engine dispatch, no detail popup', async () => {
     const stats = statsWithActions([
-      { name: 'Reckless Attack', automation: { type: 'buff', effect: 'advantage_attacks' } },
       { name: 'Plain Action', description: 'No automation here' },
     ]);
     const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
     await waitFor(() => {
-      expect(getByText('Reckless Attack:')).toBeInTheDocument();
       expect(getByText('Plain Action:')).toBeInTheDocument();
     });
 
-    await clickAction(getByText, 'Reckless Attack');
-
-    expect(executeHandler).toHaveBeenCalledTimes(1);
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Reckless Attack', automation: expect.objectContaining({ type: 'buff' }) }),
-      stats,
-      'test-campaign',
-      null,
-      [],
-    );
-
-    // Row without automation must never reach the automation engine.
     await clickAction(getByText, 'Plain Action');
-    expect(executeHandler).toHaveBeenCalledTimes(1);
+
+    // The positive dispatch path (args, popup/log/buff routing, exact-once) is pinned
+    // in CharActions.automationHandler.test.jsx; the hasAutomation gate's negative
+    // side for a fully plain row is pinned only here. (buildFeatureDetailHtml runs
+    // for every clicked row and returns null without details, so not reaching the
+    // engine is the whole observable behavior of a plain-row click.)
+    expect(executeHandler).not.toHaveBeenCalled();
   });
 
   it('renders a spell_modifier Metamagic row as Empowered Spell with its ruleset description', async () => {
@@ -342,22 +337,5 @@ describe('CharActions - feature action rows', () => {
     expect(getByText('Reroll damage dice.')).toBeInTheDocument();
     expect(queryByText(/Modify spell/)).not.toBeInTheDocument();
     expect(getEmpoweredSpellDescription).toHaveBeenCalledWith(stats.actions[0], '5e');
-  });
-
-  it('syncs modal-show events to the parent via onSpellModalStateChange', async () => {
-    const onSpellModalStateChange = vi.fn();
-    render(<CharActions {...baseProps} onSpellModalStateChange={onSpellModalStateChange} />);
-    await act(async () => { await Promise.resolve(); }); // flush mount effects (listener registration)
-
-    const detail = { attackName: 'War Cry', rallyAmount: 5 };
-    act(() => {
-      window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail }));
-    });
-
-    await waitFor(() => {
-      expect(onSpellModalStateChange).toHaveBeenCalledWith(
-        expect.objectContaining({ rallyChoiceModal: detail })
-      );
-    });
   });
 });

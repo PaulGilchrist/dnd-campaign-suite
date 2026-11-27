@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Owns the authoritative modalName → modal-state key map for the cast lane:
 // exhaustive coverage of every key in MODAL_STATE_KEYS (useSpellCastExecutor.js,
 // the same map routeCastModal shares with useActionSpellMetamagic).
@@ -84,34 +84,34 @@ describe('useSpellCastExecutor — modal key map routing', () => {
   });
 
   it.each(MODAL_ROUTE_MAP)(
-    'routes every known modalName "%s" to setModalState key "%s" (payload unchanged, popup silent)',
+    'routes every known modalName "%s" to setModalState key "%s" exactly once (payload unchanged, popup silent)',
     async (modalName, expectedKey) => {
       const payload = { data: 'payloadData' };
       const { props, setModalState } = await castWithModalNameResult({ modalName, payload });
 
+      // times(1) + exact single-key argument = full dispatch census: no second
+      // call, no extra modal keys, no popup leak.
+      expect(setModalState).toHaveBeenCalledTimes(1);
       expect(setModalState).toHaveBeenCalledWith({ [expectedKey]: payload });
       expect(props.setPopupHtml).not.toHaveBeenCalled();
     },
   );
 
-  // Payload is passed through byte-identical for every shape, including a
-  // missing payload field and a spell name unrelated to the modal key.
-  it.each([
-    ['missing payload field', undefined],
-    ['empty object payload', {}],
-    ['string payload', '<div>Plain</div>'],
-    ['nested payload', { targets: ['A', 'B', 'C'], spellLevel: 3, nested: { key: 'value' } }],
-  ])('passes %s through unchanged', async (_label, payload) => {
+  // A missing payload field still routes (pass-through, not skip-if-empty):
+  // the only shape-distinguishing case — object pass-through is already proven
+  // by every route-table row above via the same single source line.
+  it('routes an undefined payload through unchanged (no skip guard)', async () => {
     const { setModalState } = await castWithModalNameResult(
-      { modalName: 'massHealTarget', payload },
+      { modalName: 'massHealTarget', payload: undefined },
     );
 
-    expect(setModalState).toHaveBeenCalledWith({ massHealModal: payload });
+    expect(setModalState).toHaveBeenCalledTimes(1);
+    expect(setModalState).toHaveBeenCalledWith({ massHealModal: undefined });
   });
 
   it('falls back to setPopupHtml when a bare modalName result arrives without setModalState', async () => {
     // fix#308: sample modalName switched 'fear' (retired) -> live 'sleep'; the
-    // fallback seam is modalName-agnostic (:40-45 setPopupHtml without key lookup).
+    // fallback seam is modalName-agnostic (:43-44 setPopupHtml without key lookup).
     const payload = { action: { name: 'Sleep' } };
     executeSpellCast.mockResolvedValue({ modalName: 'sleep', payload });
     const props = makeProps({ setModalState: undefined });
@@ -121,7 +121,7 @@ describe('useSpellCastExecutor — modal key map routing', () => {
       await hook.current.castAction({ name: 'Fireball' }, {});
     });
 
+    expect(props.setPopupHtml).toHaveBeenCalledTimes(1);
     expect(props.setPopupHtml).toHaveBeenCalledWith(payload);
-    expect(props.setModalState).toBeUndefined();
   });
 });

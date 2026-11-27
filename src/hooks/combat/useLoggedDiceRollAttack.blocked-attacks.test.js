@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Owns the blocked-attack lane of createLogAndShow: the real attackBlockers.js
 // unblockers (popup + log content, roll aborted), attacker-side Sanctuary end,
 // Compelled Duel expiry, Resilient Sphere auto-miss, and the starryDragon.js
@@ -216,14 +216,23 @@ beforeEach(() => {
 });
 
 describe('createLogAndShow - attack blockers (real attackBlockers.js)', () => {
-    describe.each(blockerTests)('$name block', ({ handler, name }) => {
-        it('shows popup, logs, and aborts the roll when blocked', async () => {
+    // One census test for all five BLOCKERS-table entries: every handler is
+    // wired identically (check → popup + log row + abort), so five near-copies
+    // add no confidence. Each round enables exactly one blocker.
+    it('every blocker shows popup, logs, and aborts the roll; first match wins', async () => {
+        for (const { handler } of blockerTests) {
             handler.mockReturnValue(true);
             await createLogAndShow(deps)('Longsword', 5, 'attack', {
                 targetName: 'Goblin',
                 attackerName: 'TestFighter',
             });
+            handler.mockReturnValue(false);
+        }
 
+        // Each round produced exactly one popup and one log row, named per blocker.
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(blockerTests.length);
+        expect(addEntry).toHaveBeenCalledTimes(blockerTests.length);
+        for (const { handler, name } of blockerTests) {
             expect(handler).toHaveBeenCalledWith('TestFighter', 'Goblin', 'test-campaign');
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'automation_info',
@@ -234,10 +243,23 @@ describe('createLogAndShow - attack blockers (real attackBlockers.js)', () => {
                 type: 'info',
                 text: expect.stringContaining(`blocked by ${name}`),
             }));
-            // Blocked = the roll never happens.
-            expect(rollD20).not.toHaveBeenCalled();
-            expect(deps.logEntry).not.toHaveBeenCalled();
+        }
+        // Blocked = the roll never happens (zero-write census across all rounds).
+        expect(rollD20).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalled();
+
+        // Short-circuit: with two blockers armed at once, only the first
+        // BLOCKERS entry (Forcecage) renders its popup/log — the roll stays dead.
+        isForcecageBlocked.mockReturnValue(true);
+        isMazeBlocked.mockReturnValue(true);
+        await createLogAndShow(deps)('Longsword', 5, 'attack', {
+            targetName: 'Goblin',
+            attackerName: 'TestFighter',
         });
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(blockerTests.length + 1);
+        expect(addEntry).toHaveBeenCalledTimes(blockerTests.length + 1);
+        expect(deps.setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Forcecage' }));
+        expect(rollD20).not.toHaveBeenCalled();
     });
 
     it('proceeds with a normal d20 attack when no blocker fires', async () => {
@@ -248,6 +270,9 @@ describe('createLogAndShow - attack blockers (real attackBlockers.js)', () => {
 
         expect(rollD20).toHaveBeenCalled();
         expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'd20' }));
+        // Exactly one roll row, no blocker info row.
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ type: 'roll', hit: true }));
         expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             text: expect.stringContaining('blocked by'),
         }));
@@ -255,7 +280,8 @@ describe('createLogAndShow - attack blockers (real attackBlockers.js)', () => {
 });
 
 describe('createLogAndShow - sanctuary', () => {
-    it('ends the attacker\'s own Sanctuary when they make an attack', async () => {
+    it('ends the attacker\'s own Sanctuary when they make an attack, and the roll proceeds', async () => {
+        // No context.attackerName: exercises the characterName fallback too.
         getRuntimeValue.mockImplementation((key, prop) => {
             if (key === 'campaign' && prop === 'targetEffects') {
                 return [{ effect: 'sanctuary', target: 'TestFighter', source: 'Cleric' }];
@@ -264,6 +290,7 @@ describe('createLogAndShow - sanctuary', () => {
         });
         await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
+        expect(endSanctuary).toHaveBeenCalledTimes(1);
         expect(endSanctuary).toHaveBeenCalledWith(
             'Cleric',
             'TestFighter',
@@ -272,17 +299,37 @@ describe('createLogAndShow - sanctuary', () => {
         );
         // Self-targeted Sanctuary does not gate the roll — the attack proceeds.
         expect(rollD20).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a Sanctuary on another creature untouched by my attack', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign' && prop === 'targetEffects') {
+                return [{ effect: 'sanctuary', target: 'SomeoneElse', source: 'Cleric' }];
+            }
+            return null;
+        });
+        await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
+
+        expect(endSanctuary).not.toHaveBeenCalled();
+        expect(rollD20).toHaveBeenCalled();
     });
 });
 
 describe('createLogAndShow - Compelled Duel attack expiry', () => {
-    it('shows the expiry popup when the caster attacks a non-duel target', async () => {
+    // Own lane: the main .test.js mocks this handler but only exercises
+    // Taunting Step gating — no sibling pins the expiry-popup transport.
+    it('shows the expiry popup when the caster attacks a non-duel target, roll still proceeds', async () => {
         const popup = { type: 'automation_info', name: 'Compelled Duel', description: 'Effect ended' };
         checkCompelledDuelAttackExpiry.mockReturnValue(popup);
         await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
+        expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledTimes(1);
         expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestFighter', 'Goblin', 'test-campaign');
         expect(deps.setPopupHtml).toHaveBeenCalledWith(popup);
+        // Expiry is advisory only — the attack itself is not blocked.
+        expect(rollD20).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
     });
 
     it('is never consulted for non-attack roll types', async () => {
@@ -293,6 +340,7 @@ describe('createLogAndShow - Compelled Duel attack expiry', () => {
 
 describe('createLogAndShow - Resilient Sphere auto-miss', () => {
     // resolveResilientSphereAutoMiss: enclosed attacker OR enclosed target ⇒ auto-miss.
+    // Seam-only owner: every d20RollComputation sibling injects () => false.
     it.each([
         ['attacker', () => (name) => name === 'TestFighter'],
         ['target', () => (name) => name === 'Goblin'],
@@ -301,7 +349,13 @@ describe('createLogAndShow - Resilient Sphere auto-miss', () => {
         const context = { targetName: 'Goblin', attackerName: 'TestFighter' };
         await createLogAndShow(deps)('Longsword', 5, 'attack', context);
 
+        // Both parties are probed with the campaign name.
+        expect(isResilientSphereActive).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+        expect(isResilientSphereActive).toHaveBeenCalledWith('Goblin', 'test-campaign');
+        // The roll still happens — it is forced to miss, not aborted.
+        expect(rollD20).toHaveBeenCalled();
         expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ isAutoMiss: true }));
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ isAutoMiss: true }));
         expect(context.notice).toBe('Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
     });
 
@@ -318,6 +372,8 @@ describe('hasStarryDragonActive', () => {
     it('returns true only for an active Starry Form: Dragon buff', () => {
         getRuntimeValue.mockReturnValue([{ name: 'Starry Form', constellation: 'Dragon' }]);
         expect(hasStarryDragonActive('TestWizard', 'test-campaign')).toBe(true);
+        // Campaign name must ride the store read.
+        expect(getRuntimeValue).toHaveBeenLastCalledWith('TestWizard', 'activeBuffs', 'test-campaign');
 
         getRuntimeValue.mockReturnValue([{ name: 'Starry Form', constellation: 'Wyrm' }]);
         expect(hasStarryDragonActive('TestWizard', 'test-campaign')).toBe(false);

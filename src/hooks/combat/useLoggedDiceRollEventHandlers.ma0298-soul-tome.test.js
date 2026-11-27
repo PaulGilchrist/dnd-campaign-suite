@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-0298 (event-bus save-result seam): Arcanaloth Banishing Claw — a failed
 // DC 17 CHA save grants the indefinite Soul Tome te + Incapacitated via
 // soulTomeTrapService; a success grants ZERO trap state yet still pays the
@@ -7,7 +7,9 @@
 // plain attacks use (computeSecondaryRoll). Owns the EVENT-BUS wiring seam
 // only — the inline handlePlayerSaveDamage arm is covered by
 // handlePlayerSaveDamage.ma0298-crit-trap.test.js and the pending-shape keys
-// by handlePlayerSaveDamage.pending-data.test.js.
+// by handlePlayerSaveDamage.pending-data.test.js; the service internals
+// (exact te bytes, logs, turn-END repeat-save escape) by
+// soulTomeTrapService.test.js — never mirrored on this lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
@@ -45,7 +47,7 @@ vi.mock('../../services/combat/summons/summonedCreatureService.js', () => ({ str
 vi.mock('../../services/combat/creatureTypeResolver.js', () => ({ resolveCreatureType: vi.fn(() => 'player') }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({ endInvisibilityOnHostileAction: vi.fn() }));
-vi.mock('./loggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn(() => false) }));
+vi.mock('../loggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn(() => false) }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { guid: vi.fn(() => 'log-guid'), getName: vi.fn((n) => n) } }));
 vi.mock('../../services/combat/auras/pendingPopupRegistry.js', () => ({ getPendingPopupSetter: vi.fn(() => undefined) }));
 vi.mock('../../services/combat/auras/pendingSaveRegistry.js', () => ({ getPendingSavePrompt: vi.fn() }));
@@ -69,6 +71,8 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
+import { parseSoulTomeTrapClause, saveAbilityAbbr } from '../../components/encounter/MonsterCardHelpers.js';
+import monstersData from '../../../public/data/monsters.json';
 
 const TARGET = 'Wild_Sage_Druid';
 const CAMPAIGN = 'test-campaign';
@@ -78,27 +82,34 @@ const CAMPAIGN = 'test-campaign';
 window.__pendingResultHandlersInstalled = false;
 setupEventListeners({ characterName: TARGET, campaignName: CAMPAIGN, logEntry: vi.fn(), charactersRef: { current: [{ name: TARGET }] } });
 
-// Authored Arcanaloth Banishing Claw row (monsters.json): 2d4+5 Slashing +
-// 3d12 Psychic auto-secondary, DC 17 CHA, dc_success 'none', soulTome arm.
-function comboPending() {
+// BY-name disk row (monsters.json 'Arcanaloth' / 'Banishing Claw (Requires
+// Soul Tome)'): 2d4+5 Slashing + 3d12 Psychic auto-secondary, DC 17 CHA,
+// dc_success 'none'. The soulTome arm rides the pending payload VERBATIM from
+// parseSoulTomeTrapClause (handlePlayerSaveDamage.pending-data.test.js owns
+// that carry), so this lane consumes the parser's real output.
+const CLAW_ROW = monstersData.find(m => m.name === 'Arcanaloth')
+    .actions.find(a => a.name === 'Banishing Claw (Requires Soul Tome)');
+const SECONDARY = CLAW_ROW.damage_dice_secondary;
+
+function clawPending() {
     return {
         targetName: TARGET,
         rawDamage: 15,
-        saveDc: 17,
-        saveType: 'CHA',
-        dcSuccess: 'none',
-        damageType: 'Slashing',
+        saveDc: CLAW_ROW.save_dc,
+        saveType: saveAbilityAbbr(CLAW_ROW.save_type), // pending carries the abbreviated ability
+        dcSuccess: CLAW_ROW.dc_success,
+        damageType: CLAW_ROW.damage_type_primary,
         attackerName: 'Arcanaloth',
-        name: 'Banishing Claw (Requires Soul Tome)',
-        formula: '2d4 + 5',
+        name: CLAW_ROW.name,
+        formula: CLAW_ROW.damage_dice_primary,
         modifier: 5,
         rolls: [5, 5],
         campaignName: CAMPAIGN,
-        autoDamageSecondaryFormula: '3d12',
-        autoDamageSecondaryDamageType: 'Psychic',
+        autoDamageSecondaryFormula: SECONDARY,
+        autoDamageSecondaryDamageType: CLAW_ROW.damage_type_secondary,
         statusEffects: null,
         isAutoCrit: true,
-        soulTomeTrap: { effect: 'banished_demiplane', soulTome: true },
+        soulTomeTrap: parseSoulTomeTrapClause(CLAW_ROW.save_effect),
     };
 }
 
@@ -108,54 +119,79 @@ function fire(detail) {
     return new Promise((resolve) => setTimeout(resolve, 30));
 }
 
+// ordered [target, amount, types] census of every damage dispatch — a leaked/
+// stacked listener or double-dispatch seam re-fires and skews this census.
+const appliedCensus = () => applyDamageToTarget.mock.calls.map(c => [c[1], c[2], c[3]]);
+
 beforeEach(() => {
     vi.clearAllMocks();
 });
 
 describe('MA-0298 save-result seam — crit doubling + Soul Tome trap grant', () => {
-    it('failed save: FULL unhalved primary damage, secondary dice DOUBLED on crit, trap granted', async () => {
-        getPendingSavePrompt.mockReturnValue(comboPending());
+    it('failed save: FULL unhalved primary, secondary dice doubled exactly once, trap granted exactly once', async () => {
+        getPendingSavePrompt.mockReturnValue(clawPending());
         await fire({ promptId: 'p1', targetName: TARGET, success: false, roll: 5, total: 4, saveBonus: -1, saveType: 'CHA', saveDc: 17, dcSuccess: 'none', rawRolls: [5] });
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 15, ['Slashing'], expect.anything());
+        // exactly primary(Slashing 15, unhalved) + secondary(doubled 36), in order
+        expect(appliedCensus()).toEqual([
+            [TARGET, 15, ['Slashing']],
+            [TARGET, 36, ['Psychic']],
+        ]);
         // crit secondary rides the SAME doubling consumer plain attacks use
-        expect(rollExpressionDoubled).toHaveBeenCalledWith('3d12');
-        expect(rollExpression).not.toHaveBeenCalledWith('3d12');
+        expect(rollExpressionDoubled).toHaveBeenCalledTimes(1);
+        expect(rollExpressionDoubled).toHaveBeenCalledWith(SECONDARY);
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(grantSoulTomeTrap).toHaveBeenCalledTimes(1);
         expect(grantSoulTomeTrap).toHaveBeenCalledWith(expect.objectContaining({
             campaignName: CAMPAIGN,
             attackerName: 'Arcanaloth',
             targetName: TARGET,
-            saveDc: 17,
+            // BY-name anchors: DC/ability/action ride the disk row through
+            // the pending payload — never re-derive them here
+            saveDc: CLAW_ROW.save_dc,
+            saveType: saveAbilityAbbr(CLAW_ROW.save_type),
+            actionName: CLAW_ROW.name,
         }));
     });
 
-    it('success save: hit damage lands FULL (unhalved, unconditional) and ZERO trap grant', async () => {
-        getPendingSavePrompt.mockReturnValue(comboPending());
+    it('success save: hit damage lands FULL (unhalved, unconditional), secondary leg still lands, ZERO trap grant', async () => {
+        getPendingSavePrompt.mockReturnValue(clawPending());
         await fire({ promptId: 'p2', targetName: TARGET, success: true, roll: 19, total: 18, saveBonus: -1, saveType: 'CHA', saveDc: 17, dcSuccess: 'none', rawRolls: [19] });
 
         // MA-0298: RAW hit damage is unconditional — success pays the FULL
-        // pre-rolled primary (15), NOT zero, NOT half (soulTomeTrap arm key).
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 15, ['Slashing'], expect.anything());
+        // pre-rolled primary (15), NOT zero, NOT half (soulTomeTrap arm key),
+        // and the claw's psychic leg still lands unhalved on a save success.
+        expect(appliedCensus()).toEqual([
+            [TARGET, 15, ['Slashing']],
+            [TARGET, 36, ['Psychic']],
+        ]);
+        expect(rollExpressionDoubled).toHaveBeenCalledTimes(1);
+        expect(rollExpressionDoubled).toHaveBeenCalledWith(SECONDARY);
         expect(grantSoulTomeTrap).not.toHaveBeenCalled();
-        // the claw's psychic leg still lands unhalved on a save success too
-        expect(rollExpressionDoubled).toHaveBeenCalledWith('3d12');
     });
 
-    it('non-trap row stays byte-inert: MA-0218 zero-on-success, base secondary dice on a non-crit fail, no grant', async () => {
-        const pending = { ...comboPending(), soulTomeTrap: null };
+    it('non-trap row stays byte-inert: MA-0218 zero-on-success and non-crit half-fail base dice, both damage legs still land, no grant', async () => {
+        const pending = { ...clawPending(), soulTomeTrap: null };
 
         // MA-0218 regression: dc_success none save-damage row stays ZERO on success.
         getPendingSavePrompt.mockReturnValue(pending);
         await fire({ promptId: 'p3', targetName: TARGET, success: true, roll: 19, total: 18, saveBonus: -1, saveType: 'CHA', saveDc: 17, dcSuccess: 'none', rawRolls: [19] });
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 0, ['Slashing'], expect.anything());
 
-        // non-crit fail: computeDamageAfterEvasion leg + base (undoubled) secondary.
-        vi.clearAllMocks();
+        // non-crit fail: computeDamageAfterEvasion leg (full 15 on a fail) + base
+        // (undoubled) secondary. No mid-test clear — one ordered census proves
+        // each event dispatched exactly its own primary+secondary pair.
         getPendingSavePrompt.mockReturnValue({ ...pending, isAutoCrit: false });
         await fire({ promptId: 'p4', targetName: TARGET, success: false, roll: 5, total: 4, saveBonus: -1, saveType: 'CHA', saveDc: 17, dcSuccess: 'half', rawRolls: [5] });
 
+        expect(appliedCensus()).toEqual([
+            [TARGET, 0, ['Slashing']],       // MA-0218 zero-on-success preserved
+            [TARGET, 36, ['Psychic']],       // autoCrit row: doubled secondary
+            [TARGET, 15, ['Slashing']],      // non-crit fail: full via evasion leg
+            [TARGET, 18, ['Psychic']],       // base (undoubled) secondary
+        ]);
+        expect(rollExpressionDoubled).toHaveBeenCalledTimes(1);
+        expect(rollExpression).toHaveBeenCalledTimes(1);
+        expect(rollExpression).toHaveBeenCalledWith(SECONDARY);
         expect(grantSoulTomeTrap).not.toHaveBeenCalled();
-        expect(rollExpression).toHaveBeenCalledWith('3d12');
-        expect(rollExpressionDoubled).not.toHaveBeenCalled();
     });
 });

@@ -1,7 +1,11 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
+
+// Accessibility/keyboard lane only: accessible names, focus behavior, and the
+// custom role="button" list-item activation. Mechanics (open/close/save/delete
+// flows) belong to Settlements.modalActions/saveDelete/generate tests.
 
 // Module-level mock store captured by the vi.mock factory. Tests mutate its
 // `items` field before rendering so the component reads fresh state.
@@ -43,6 +47,8 @@ describe('Settlements - accessibility and keyboard', () => {
     render(<Settlements campaignName={campaignName} />);
 
   const getSearchInput = () => screen.getByLabelText('Search settlements');
+  const getEditButton = (name) =>
+    screen.getByRole('button', { name: `Edit settlement: ${name}` });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,43 +67,30 @@ describe('Settlements - accessibility and keyboard', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Header controls', () => {
-    it.each([
-      { regex: /new settlement/i, accessibleName: 'New Settlement' },
-      { regex: /generate settlement/i, accessibleName: 'Generate Settlement' },
-    ])('gives the %p button an accessible name of "$accessibleName"', ({ regex, accessibleName }) => {
-      renderSettlements();
-      expect(screen.getByRole('button', { name: regex })).toHaveAccessibleName(accessibleName);
-    });
+  it('gives the header New and Generate buttons their accessible names', () => {
+    renderSettlements();
+    expect(screen.getByRole('button', { name: 'New Settlement' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate Settlement' })).toBeInTheDocument();
   });
 
-  describe('Search controls', () => {
-    it('labels the search input and shows a named clear button only while a query is present', () => {
-      renderSettlements();
-      expect(getSearchInput()).toHaveAccessibleName('Search settlements');
-      expect(screen.queryByRole('button', { name: /clear search/i })).not.toBeInTheDocument();
+  it('labels the search input and shows a named clear button only while a query is present', () => {
+    renderSettlements();
+    expect(getSearchInput()).toHaveAccessibleName('Search settlements');
+    expect(screen.queryByRole('button', { name: /clear search/i })).not.toBeInTheDocument();
 
-      fireEvent.change(getSearchInput(), { target: { value: 'fire' } });
-      const clearBtn = screen.getByRole('button', { name: /clear search/i });
-      expect(clearBtn).toHaveAccessibleName('Clear search');
+    fireEvent.change(getSearchInput(), { target: { value: 'fire' } });
+    const clearBtn = screen.getByRole('button', { name: 'Clear search' });
 
-      fireEvent.click(clearBtn);
-      expect(screen.queryByRole('button', { name: /clear search/i })).not.toBeInTheDocument();
-    });
+    fireEvent.click(clearBtn);
+    expect(getSearchInput()).toHaveValue('');
+    expect(screen.queryByRole('button', { name: /clear search/i })).not.toBeInTheDocument();
   });
 
-  describe('Settlement modal controls', () => {
-    it('provides an accessible name for the modal close button', () => {
-      renderSettlements();
-      fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
-      expect(screen.getByRole('button', { name: /close/i })).toHaveAccessibleName('Close');
-    });
-
-    it('moves focus to the name input when the modal opens', () => {
-      renderSettlements();
-      fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
-      expect(screen.getByLabelText(/name/i)).toHaveFocus();
-    });
+  it('opens the new-settlement modal accessibly: focus lands on the name input and the close button is named', () => {
+    renderSettlements();
+    fireEvent.click(screen.getByRole('button', { name: 'New Settlement' }));
+    expect(screen.getByLabelText(/name/i)).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
   describe('Settlement list items', () => {
@@ -114,30 +107,31 @@ describe('Settlements - accessibility and keyboard', () => {
       settlementMockStore.items = [fireport];
     });
 
-    it('exposes each settlement as a focusable button labelled with the edit action', () => {
+    it('exposes each settlement as a focusable role=button labelled with the edit action', () => {
       renderSettlements();
-      const settlementItem = screen.getByRole('button', { name: /edit settlement: fireport/i });
-      expect(settlementItem).toHaveAccessibleName('Edit settlement: Fireport');
+      const settlementItem = getEditButton('Fireport');
+      // The row is a non-native <li role="button">, so tabindex=0 is the
+      // keyboard-accessibility contract that makes it reachable by Tab.
       expect(settlementItem).toHaveAttribute('tabindex', '0');
     });
 
-    it.each(['Enter', ' '])('opens the edit modal when a settlement is activated with %s', (key) => {
+    it.each(['Enter', ' '])('opens the edit modal when a settlement is activated with "%s"', (key) => {
       renderSettlements();
-      fireEvent.keyDown(screen.getByRole('button', { name: /edit settlement: fireport/i }), { key });
+      fireEvent.keyDown(getEditButton('Fireport'), { key });
       expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
     });
 
     it('does not open the edit modal when an unrelated key is pressed', () => {
       renderSettlements();
-      fireEvent.keyDown(screen.getByRole('button', { name: /edit settlement: fireport/i }), { key: 'Delete' });
+      fireEvent.keyDown(getEditButton('Fireport'), { key: 'Delete' });
       expect(screen.queryByRole('heading', { name: 'Edit Settlement' })).not.toBeInTheDocument();
     });
   });
 
-  describe('Size filter buttons', () => {
-    it.each(['Village', 'Town', 'City', 'Metropolis'])('provides a descriptive title hint on the %s filter button', (label) => {
-      renderSettlements();
+  it('gives every size filter button a descriptive title hint', () => {
+    renderSettlements();
+    for (const label of ['Village', 'Town', 'City', 'Metropolis']) {
       expect(screen.getByRole('button', { name: label })).toHaveAttribute('title', `Filter: ${label}`);
-    });
+    }
   });
 });

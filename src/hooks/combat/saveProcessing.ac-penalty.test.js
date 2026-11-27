@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-0115: Adult Green Dragon Noxious Miasma failed-save AC-penalty clause
 // — "the target takes a −2 penalty to AC until the end of its next turn".
 // The single-target save seam arms context.acPenaltyClause (MA-0073 shape);
@@ -147,6 +147,17 @@ describe('MA-0115 Noxious Miasma failed-save ac_penalty te', () => {
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(addEntryLogs.some(e => e.automationType === 'ac_penalty_granted')).toBe(false);
+    });
+
+    it('the clause value rides to the te and the log (not a hardcoded constant)', async () => {
+        await resolveSave({ ...miasmaContext, acPenaltyClause: { effect: 'ac_penalty', value: 3 } }, false, 4);
+
+        const tes = runtimeStore['campaign.targetEffects'] || [];
+        expect(tes).toHaveLength(1);
+        expect(tes[0]).toMatchObject({ effect: 'ac_penalty', value: 3 });
+
+        const grant = addEntryLogs.find(e => e.automationType === 'ac_penalty_granted');
+        expect(grant.description).toMatch(/\u22123 penalty to AC/);
     });
 
     it('rows without the clause are byte-inert: no te even on a failed save', async () => {

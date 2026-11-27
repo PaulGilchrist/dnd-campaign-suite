@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * App-level contract for view/theme title state transitions (App.jsx).
  *
@@ -9,14 +9,13 @@
  *    again always lands back on the character sheet, whichever view was
  *    open when leaving (initiative, maps manager — the maps-manager row
  *    also pins that the persistent mapsView sub-state unmounts).
- *  - Campaign switching: selecting a DIFFERENT campaign clears the maps
- *    area state — a player who had a map open in the previous campaign
- *    must be able to open the new campaign's active map with one "Maps"
- *    click (a stale mapsView of type 'map' would silently swallow the
- *    click on the player branch of handleMapsClick). Selecting a campaign
- *    also drops the previous campaign's character sheet — a zero-character
- *    campaign must show NO stale sheet and (owner doctrine 2026-11-23) NO
- *    auto-opened wizard — a stale sheet's
+ *  - Campaign switching: selecting a DIFFERENT campaign refreshes the whole
+ *    shell — it clears the maps area state (a player who had a map open in
+ *    the previous campaign must be able to open the new campaign's active
+ *    map with one "Maps" click; a stale mapsView of type 'map' would
+ *    silently swallow the click on the player branch of handleMapsClick)
+ *    AND re-arms the sheet on the NEW campaign's own roster. Selecting a
+ *    zero-character campaign must show NO stale sheet — a stale sheet's
  *    Rest buttons would write ghost buckets into the new campaign
  *    (bug-stale-character-sheet-cross-campaign-writes).
  *  - Idempotent sidebar navigation: re-clicking the button for the view
@@ -27,8 +26,8 @@
  *    values), and toggle round-trips from the default dark that persist
  *    to localStorage and echo into the Admin readout. Theme is display
  *    formatting, so localStorage is the sanctioned store here.
- *  - document.title: "<campaign> — <view>" while mounted, app name on the
- *    campaign-select screen.
+ *  - document.title: "<campaign> — <view>" while mounted, app name once
+ *    back on the campaign-select screen.
  *
  * Deliberately NOT re-tested here (covered by siblings):
  *  - Maps-click routing / back stack / manager behavior → App.map-navigation.test.jsx
@@ -36,6 +35,8 @@
  *  - map-activate SSE auto-open → App.map-activate.test.jsx
  *  - SSE dispatch table, character CRUD, roster landing → App.runtime-events.test.jsx
  *  - post-rollback carry-over landing → App.post-restore.test.jsx
+ *  - zero-character entry mounting no wizard → App.no-auto-wizard.test.jsx
+ *  - title/roster rename on a sidebar character swap → App.sheet-swap-remount.test.jsx
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -351,8 +352,8 @@ describe('App - State Transitions', () => {
     });
   });
 
-  describe('Campaign switching clears stale maps state', () => {
-    it('a player who had a map open can open the new campaign\'s active map with one Maps click', async () => {
+  describe('Campaign switching refreshes the shell', () => {
+    it('a player who had a map open opens the new campaign\'s own sheet and active map with one Maps click', async () => {
       loadMaps.mockImplementation((campaign) =>
         Promise.resolve({
           maps: campaign === 'test-campaign'
@@ -367,15 +368,20 @@ describe('App - State Transitions', () => {
       expect(screen.getByTestId('map-name').textContent).toBe('old-map');
       await backToCampaigns();
 
-      // Switch to a different campaign with its own active map.
+      // Switch to a different campaign with its OWN roster and active map.
       mockState.campaignName = 'test-campaign-two';
+      mockState.characters = [{ name: 'SecondHero', level: 2 }];
       await act(async () => {
         fireEvent.click(screen.getByTestId('select-campaign-btn'));
       });
+
+      // The shell re-arms on the NEW campaign: its header and its own
+      // first sheet, never the previous campaign's character.
       await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
         expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
+      expect(screen.getByTestId('character-name')).toHaveTextContent('SecondHero');
 
       // The stale 'old-map' view must be gone: one Maps click resolves
       // and opens the NEW campaign's map (if the old mapsView leaked,
@@ -389,7 +395,7 @@ describe('App - State Transitions', () => {
     });
   });
 
-  describe('Campaign switching clears the previous sheet', () => {
+  describe('Entering a zero-character campaign drops the previous sheet', () => {
     // Regression (bug-stale-character-sheet-cross-campaign-writes, CR run
     // 2026-11-04): selecting a campaign only re-armed the sheet view when the
     // NEW campaign had characters, so a zero-character campaign left the
@@ -397,9 +403,13 @@ describe('App - State Transitions', () => {
     // Rest/Edit/Delete buttons that POSTed the stale character's runtime
     // bucket into the new campaign's change-data (character route 404s).
     // Campaign select must now drop activeView + activeCharacter; the select
-    // callback re-arms them once the new roster loads.
-    it('entering a zero-character campaign never renders the previous campaign\'s sheet', async () => {
-      await renderInCampaign();
+    // callback re-arms them once the new roster loads. (The positive re-arm
+    // onto a new campaign's own sheet is pinned by the switch test above;
+    // no wizard auto-opens — App.no-auto-wizard.test.jsx.)
+    it('never renders the previous campaign\'s sheet or writes its buckets', async () => {
+      // The roster name must match the stale-write filter below, or the
+      // "no ghost POSTs" assertion can never fire.
+      await renderInCampaign('localhost', [{ name: 'FeyRanger', level: 3 }]);
 
       await backToCampaigns();
       mockState.campaignName = 'qa-arena';
@@ -409,15 +419,13 @@ describe('App - State Transitions', () => {
       });
 
       // New campaign owns the shell, and the stale sheet (with its Rest
-      // affordances) is gone — and per owner doctrine 2026-11-23 NO wizard
-      // auto-opens on zero-character entry either.
+      // affordances) is gone — no view is armed while it has no roster.
       await waitFor(() => {
         expect(screen.getByTestId('sidebar-campaign').textContent).toBe('qa-arena');
       });
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
       expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
       expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-      expect(document.querySelectorAll('[class*=wizard]').length).toBe(0);
 
       // Nothing carrying the old character's bucket was written to the new
       // campaign while it had no roster to seed from. (The one-time
@@ -426,23 +434,6 @@ describe('App - State Transitions', () => {
       const staleWrites = global.fetch.mock.calls.filter(([url, options]) =>
         String(options?.method) === 'POST' && String(url).includes('qa-arena') && String(url).includes('FeyRanger'));
       expect(staleWrites).toHaveLength(0);
-    });
-
-    it('selecting a campaign with characters still lands on its own first sheet', async () => {
-      await renderInCampaign();
-
-      await backToCampaigns();
-      mockState.campaignName = 'test-campaign-two';
-      mockState.characters = [{ name: 'SecondHero', level: 2 }];
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('select-campaign-btn'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('character-name')).toHaveTextContent('SecondHero');
     });
   });
 
@@ -501,11 +492,8 @@ describe('App - State Transitions', () => {
   });
 
   describe('document.title names the campaign and view', () => {
-    it('uses "<campaign> — <view>" while mounted (character names the sheet view)', async () => {
-      await renderInCampaign('localhost', [
-        { name: 'Aragorn', level: 1 },
-        { name: 'Legolas', level: 2 },
-      ]);
+    it('uses "<campaign> — <view>" while mounted and the app name back on the campaign-select screen', async () => {
+      await renderInCampaign();
 
       // Sheet mounted right after campaign select → campaign + character.
       expect(document.title).toBe('test-campaign — Aragorn');
@@ -516,18 +504,6 @@ describe('App - State Transitions', () => {
 
       await openView('log-btn', 'campaign-log-view');
       expect(document.title).toBe('test-campaign — Log');
-
-      // Selecting a character re-names the sheet section.
-      fireEvent.click(screen.getByTestId('char-btn-Legolas'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
-      });
-      expect(document.title).toBe('test-campaign — Legolas');
-    });
-
-    it('falls back to the neutral app name on the campaign-select screen', async () => {
-      await renderInCampaign('localhost', [{ name: 'Aragorn', level: 1 }]);
-      await openView('initiative-btn', 'initiative');
 
       // "Campaigns" keeps campaignName/activeView mounted in state — the
       // title must drop them, never showing a stale campaign or character.

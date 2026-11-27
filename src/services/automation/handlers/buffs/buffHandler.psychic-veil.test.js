@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Generic temp_buff tracked-uses lane of buffHandler.handle: the
 // gateTrackedBuffUses / gateBuffUses / consumeBuffUse / resolveBuffUsesMax
 // contract (Psychic Veil once-per-long-rest gate, psionic-energy-die escape
-// hatch, OFF-leg no-refund, no-uses negative case, multi-use resolution).
-// Fully mocked and deterministic. Adrenaline Rush's parallel uses lane
+// hatch incl. both getPsionicEnergy sources, OFF-leg no-refund/no-log,
+// no-uses gate skip, all five resolveBuffUsesMax branches). This lane never
+// reaches buffDurationToRounds (that minutes×10 helper is flight-lane only,
+// owner-pending divergence filed under buffHandler.buffDurationToRounds) —
+// no clock pin here. Adrenaline Rush's parallel uses lane
 // (resolveAdrenalineUsesMax via the bonus_action_dash delegate) and the
 // no-uses long_rest popup are pinned in buffHandler.basic-effects.test.js;
 // invisible / see_invisibility / haste side-effect copy lives in
@@ -94,15 +97,22 @@ function makePsychicVeil() {
   };
 }
 
+// getRuntimeValue stub for a stored-uses scenario: given uses count is the
+// runtime-stored psychicVeilUses value; everything else reads empty.
+function stubUses(uses) {
+  runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+    if (key === 'psychicVeilUses') return uses;
+    if (key === 'activeBuffs') return [];
+    if (key === 'activeConditions') return [];
+    return undefined;
+  });
+}
+
 describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'activeBuffs') return [];
-      if (key === 'activeConditions') return [];
-      return undefined;
-    });
+    stubUses(undefined);
   });
 
   it('consumes the tracked use on activation, stores psychicVeilUses 0, and logs the activation', async () => {
@@ -111,15 +121,23 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
+    // toggleBuff is THE activation seam: exact self-target arguments.
+    expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+      ps.name,
+      action.name,
+      action.automation,
+      campaignName,
+      ps.name,
+    );
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
       'psychicVeilUses',
       0,
       campaignName,
     );
-    expect(buffToggle.toggleBuff).toHaveBeenCalled();
-    expect(result.payload.description).toContain('activated on yourself (1_hour)');
-    expect(result.payload.description).toContain('0 uses remaining');
+    expect(result.payload.description).toBe(
+      'Psychic Veil activated on yourself (1_hour) (0 uses remaining)',
+    );
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
@@ -131,6 +149,9 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     );
   });
 
+  // NOTE: the tracked-uses refusal popup path in gateBuffUses does NOT log
+  // to the campaign log, unlike the parallel no-uses long-rest refusal —
+  // reported as a source divergence; deliberately not pinned either way.
   it('refuses re-activation at 0 uses with gate popup and no buff write', async () => {
     const ps = makeSoulknife();
     const action = makePsychicVeil();
@@ -143,17 +164,29 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.description).toContain('cannot be used again until a Long Rest');
+    expect(result.payload.description).toBe(
+      'Psychic Veil has been used and cannot be used again until a Long Rest.',
+    );
     expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('restores activation by expending 1 Psionic Energy Die at 0 uses', async () => {
-    const ps = makeSoulknife({ _trackedResources: { psionicEnergy: { current: 3, max: 10 } } });
+  // Escape hatch: at 0 uses, resourceCost 'psionic_energy' pays one die and
+  // the buff activates anyway — the die count comes from the stored runtime
+  // value, falling back to _trackedResources.psionicEnergy.max (getPsionicEnergy).
+  // The exhausted psychicVeilUses is still rewritten as 0 (max(0, -1)): the
+  // hatch is pay-per-activation, not a banked restore — pinned honestly.
+  it.each([
+    ['stored runtime psionicEnergy 3', undefined, 3, 2],
+    ['_trackedResources fallback max 10', 10, undefined, 9],
+  ])('restores activation by expending 1 Psionic Energy Die at 0 uses (%s)', async (_label, trackedMax, stored, expectedAfter) => {
+    const ps = makeSoulknife({
+      _trackedResources: { psionicEnergy: { current: stored ?? 0, max: trackedMax ?? 0 } },
+    });
     const action = makePsychicVeil();
-    runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'psychicVeilUses') return 0;
-      if (key === 'psionicEnergy') return 3;
+      if (key === 'psionicEnergy') return stored;
       if (key === 'activeBuffs') return [];
       return undefined;
     });
@@ -163,27 +196,41 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
       'psionicEnergy',
-      2,
+      expectedAfter,
       campaignName,
     );
-    expect(buffToggle.toggleBuff).toHaveBeenCalled();
-    expect(result.payload.description).toContain('activated on yourself');
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      ps.name,
+      'psychicVeilUses',
+      0,
+      campaignName,
+    );
+    expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+      ps.name,
+      action.name,
+      action.automation,
+      campaignName,
+      ps.name,
+    );
+    expect(result.payload.description).toBe(
+      'Psychic Veil activated on yourself (1_hour) (0 uses remaining)',
+    );
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'ability_use',
         characterName: ps.name,
         abilityName: 'Psychic Veil',
-        description: expect.stringContaining('expended 1 Psionic Energy Die'),
+        description: expect.stringContaining(`restore a use of Psychic Veil. Psionic Energy: ${expectedAfter}.`),
       }),
     );
   });
 
-  it('toggling OFF does not refund the consumed use', async () => {
+  it('toggling OFF does not refund the consumed use and writes no log', async () => {
     const ps = makeSoulknife();
     const action = makePsychicVeil();
     buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-    runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'psychicVeilUses') return 0;
       if (key === 'activeBuffs') return [{ name: 'Psychic Veil', effect: 'invisible' }];
       if (key === 'activeConditions') return ['invisible'];
@@ -193,12 +240,15 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     const result = await handle(action, ps, campaignName, null);
 
     expect(result.payload.description).toBe('Psychic Veil toggled OFF');
+    // The invisibility side-effect legitimately writes condition state, so
+    // the refund pin must target the uses key specifically.
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
       ps.name,
       'psychicVeilUses',
       expect.anything(),
       campaignName,
     );
+    expect(logService.addEntry).not.toHaveBeenCalled();
   });
 
   it('leaves temp_buff features WITHOUT uses untouched (Invisibility regression guard)', async () => {
@@ -212,22 +262,22 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
 
     expect(result.payload.description).toBe('Natural Revelation activated on yourself (1_hour)');
     expect(result.payload.description).not.toContain('uses remaining');
-    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      ps.name,
-      'naturalrevelationUses',
-      expect.anything(),
-      campaignName,
-    );
+    // gateTrackedBuffUses skips entirely (uses/usesMax both null): no
+    // *Uses write and no side-effect write for this effect — zero-write pin.
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  // resolveBuffUsesMax branches in the generic tracked-uses lane. The
-  // Adrenaline Rush parallel (resolveAdrenalineUsesMax via the
-  // bonus_action_dash delegate) is pinned in buffHandler.basic-effects.test.js —
-  // this lane is generic temp_buff and stays distinct from those pins.
+  // All five resolveBuffUsesMax branches in the generic tracked-uses lane,
+  // with no stored value. The Adrenaline Rush parallel
+  // (resolveAdrenalineUsesMax via the bonus_action_dash delegate) is pinned
+  // in buffHandler.basic-effects.test.js — this lane is generic temp_buff
+  // and stays distinct from those pins.
   it.each([
     ['numeric string uses', { uses: '2' }, 1],
     ['numeric uses', { uses: 3 }, 2],
     ['proficiency_bonus uses', { uses: 'proficiency_bonus' }, 1],
+    ['numeric usesMax with no uses', { usesMax: 2 }, 1],
+    ['default 1 when uses unrecognizable and usesMax absent', { uses: 'half' }, 0],
   ])('resolves max uses from %s and consumes one', async (_label, automation, expectedWritten) => {
     const ps = makeSoulknife({ proficiency: 2 });
     const action = {

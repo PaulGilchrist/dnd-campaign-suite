@@ -23,11 +23,23 @@ class FakeEventSource {
     this.closed = false;
     this.onmessage = null;
     this.onerror = null;
+    // Named SSE listeners (the shared sseClient registers its 'client-id'
+    // event via addEventListener). Stored so tests can fire them the way
+    // the browser would; onmessage fan-out semantics are untouched.
+    this.namedListeners = {};
     eventSources.push(this);
   }
 
   close() {
     this.closed = true;
+  }
+
+  addEventListener(type, fn) {
+    (this.namedListeners[type] = this.namedListeners[type] || []).push(fn);
+  }
+
+  fireNamed(type, data) {
+    (this.namedListeners[type] || []).forEach(fn => fn({ data }));
   }
 
   // Deliver a frame the way the browser would (raw SSE data string).

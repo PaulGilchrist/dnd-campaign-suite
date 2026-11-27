@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Behavior contract tests for the ally-selection helpers (useAllySelection.js),
 // exercised against the REAL runtime store (server-first pattern) with only the
 // network boundary (fetch) stubbed: get/set round trips through the
@@ -48,7 +48,11 @@ describe('setAllyList → getAllyList round trip', () => {
     setAllyList('Hero', ['Mia'], CAMPAIGN);
     setAllyList('Hero', [], CAMPAIGN);
 
+    // A cleared selection reverts BOTH reads: the [self] fallback and a
+    // stored [] is not an explicit list, so override lanes re-arm their
+    // type-based defaults.
     expect(getAllyList('Hero')).toEqual(['Hero']);
+    expect(hasExplicitAllyList('Hero')).toBe(false);
   });
 });
 
@@ -68,7 +72,10 @@ describe('getAllyList defaults', () => {
       const name = `Creature_${typeof stored}_${String(stored)}`;
       getStore(name).set('selectedAllies', stored);
 
+      // Junk never overrides the default AND never counts as explicit —
+      // the hasExplicitAllyList non-array branch shares this read.
       expect(getAllyList(name)).toEqual([name]);
+      expect(hasExplicitAllyList(name)).toBe(false);
     }
   });
 
@@ -82,26 +89,24 @@ describe('getAllyList defaults', () => {
   });
 });
 
-
 describe('hasExplicitAllyList (Phase 3.2 override lanes)', () => {
   it('is false until any selection has been saved (legacy party-by-type default)', () => {
     expect(hasExplicitAllyList('Goblin')).toBe(false);
   });
 
-  it('is true for the self-only DEFECTION list — the shape the tracker ally editor confirms', () => {
-    setAllyList('Hero', ['Hero'], CAMPAIGN);
+  // Assertion-identical pair: any saved non-empty array is explicit, whether
+  // it is the self-only DEFECTION shape the tracker ally editor confirms or
+  // a normal multi-name selection.
+  it.each([
+    ['the self-only DEFECTION list', ['Hero']],
+    ['a normal multi-name selection', ['Mia', 'Bran']],
+  ])('is true for %s', (_label, allies) => {
+    setAllyList('Hero', allies, CAMPAIGN);
+
     expect(hasExplicitAllyList('Hero')).toBe(true);
   });
 
-  it('is true for a normal multi-name selection', () => {
-    setAllyList('Hero', ['Mia', 'Bran'], CAMPAIGN);
-    expect(hasExplicitAllyList('Hero')).toBe(true);
-  });
-
-  it('is false for non-array stored values (server-hydrated junk never overrides)', () => {
-    getStore('Odd').set('selectedAllies', {});
-    expect(hasExplicitAllyList('Odd')).toBe(false);
-  });
+  // Non-array stored junk is asserted in the unusable-values loop above.
 });
 
 describe('server persistence', () => {

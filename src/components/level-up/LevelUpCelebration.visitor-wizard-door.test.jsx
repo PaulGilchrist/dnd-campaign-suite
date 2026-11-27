@@ -1,19 +1,26 @@
+// @maintained-by-ai 2026-11-26
 // Visitor face of the LEVEL UP celebration's wizard handoff
 // (bug-visitor-edit-wizard-unguarded-character-file-put): the banner's
 // "Open wizard" button routes the edit-wizard entry whose save lane
 // (PUT /<Name>.json) is refuseUnlessGm server-side. The banner stays a pure
 // celebration on every screen (all clients), but the dead-end door — walk a
 // visitor through the full wizard, 403 at the final save — is hidden from
-// non-localhost origins exactly like the sidebar
-// Add Character door and the starter Build-heroes row
+// non-localhost origins exactly like the sidebar Add Character door and the
+// starter Build-heroes row
 // (bug-zero-char-auto-wizard-traps-lan-visitor-creation-is-gm-only).
-import { render, screen, fireEvent, act } from '@testing-library/react';
+//
+// Owns ONLY the origin seam: the door's show/hide and the prompt-copy split
+// per hostname. The click-to-open handoff mechanics and the audio edge live
+// in LevelUpCelebration.test.jsx (which runs at the default localhost URL) —
+// do not re-pin them here.
+import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
 import LevelUpCelebration from './LevelUpCelebration.jsx';
-import { playCue } from '../../services/ui/audioCues.js';
 import { clearRuntimeState, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
+// Silence the cue lane: the appearance-edge census is owned by the sibling
+// suite; here the banner is only a vehicle for the origin-facing copy.
 vi.mock('../../services/ui/audioCues.js', async (importOriginal) => {
     const actual = await importOriginal();
     return { ...actual, playCue: vi.fn() };
@@ -32,24 +39,23 @@ function setHostname(hostname) {
     });
 }
 
-function celebrate({ armed = true, onOpenWizard = vi.fn() } = {}) {
+// Render under the given origin and drive the exact XP-crossing call every
+// award performs, so the banner is up before assertions run.
+function celebrate(hostname) {
+    setHostname(hostname);
     render(
         <LevelUpCelebration
             campaignName={CAMPAIGN}
             characters={[alice()]}
-            armed={armed}
-            onOpenWizard={onOpenWizard}
+            armed
+            onOpenWizard={vi.fn()}
         />,
     );
-    // XP crossing on the award lane — the exact call every award performs.
     act(() => { setRuntimeValue('Alice', 'xp', 350, CAMPAIGN); });
-    return onOpenWizard;
 }
 
 beforeEach(() => {
     clearRuntimeState('Alice');
-    playCue.mockClear();
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) }));
 });
 
 afterEach(() => {
@@ -61,21 +67,16 @@ afterEach(() => {
 });
 
 describe('LevelUpCelebration wizard door — origin faces', () => {
-    it('GM origin (localhost): banner + working "Open wizard" handoff, GM prompt copy', () => {
-        setHostname('localhost');
-        const onOpenWizard = celebrate();
+    it('GM origin (localhost): wizard door present with the GM prompt copy', () => {
+        celebrate('localhost');
 
-        const banner = screen.getByRole('status');
-        expect(banner).toHaveTextContent('Open the wizard to choose your new features.');
-
-        fireEvent.click(screen.getByText('Open wizard'));
-        expect(onOpenWizard).toHaveBeenCalledTimes(1);
-        expect(onOpenWizard.mock.calls[0][0]).toMatchObject({ name: 'Alice' });
+        expect(screen.getByRole('status'))
+            .toHaveTextContent('Open the wizard to choose your new features.');
+        expect(screen.getByRole('button', { name: 'Open wizard' })).toBeInTheDocument();
     });
 
     it('visitor origin (LAN IP): banner still celebrates, NO wizard door, honest GM-hands-off copy', () => {
-        setHostname('192.168.0.44');
-        const onOpenWizard = celebrate();
+        celebrate('192.168.0.44');
 
         const banner = screen.getByRole('status');
         // The celebration itself is presentation for every client.
@@ -84,7 +85,6 @@ describe('LevelUpCelebration wizard door — origin faces', () => {
         expect(banner).toHaveTextContent('Level 1 → 2');
         expect(banner).toHaveTextContent('The GM will open the wizard to choose the new features.');
         // The dead-end door (wizard → 403 at save) is gone.
-        expect(screen.queryByText('Open wizard')).not.toBeInTheDocument();
-        expect(onOpenWizard).not.toHaveBeenCalled();
+        expect(screen.queryByRole('button', { name: 'Open wizard' })).not.toBeInTheDocument();
     });
 });

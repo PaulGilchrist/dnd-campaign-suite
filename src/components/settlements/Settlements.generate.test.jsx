@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-24
+// @maintained-by-ai 2026-11-26
 // Generate-settlement behavior only: the generator's output lands in the new-
 // settlement modal as a fully prefilled draft, failures are logged without
 // opening the modal, and a dirty form is protected by a confirm-before-overwrite
@@ -194,39 +194,40 @@ describe('Settlements - generate settlement', () => {
       expect(mockSaveSettlement).not.toHaveBeenCalled();
     });
 
-    it('also prompts when the only entered content is an added service, NPC, or rumor row', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
-        throw new Error('native window.confirm fired on the generate path');
-      });
+    it('prompts when the only entered content is an added service, NPC, or rumor row', async () => {
       render(<Settlements campaignName="test" />);
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
-      fireEvent.click(screen.getByRole('button', { name: /add service/i }));
 
-      fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
+      // Each array lane is its own dirty marker (settlementFormHasUserInput
+      // unions services/notableNPCs/rumors): a lone row with zero typed text
+      // must still arm the replace prompt, and every Cancel stays fully inert.
+      for (const addLabel of [/add service/i, /add npc/i, /add rumor/i]) {
+        fireEvent.click(screen.getByRole('button', { name: addLabel }));
+        fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
-      const dialog = await screen.findByRole('dialog', { name: 'Generate Settlement' });
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-      expect(confirmSpy).not.toHaveBeenCalled();
+        const dialog = await screen.findByRole('dialog', { name: 'Generate Settlement' });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      }
       expect(generateSettlement).not.toHaveBeenCalled();
     });
 
     it('never prompts on an empty/default form — generate proceeds directly', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm');
       render(<Settlements campaignName="test" />);
 
-      // No modal open (formData null).
+      // No modal open (formData null): straight to a prefilled draft, no toll.
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
       });
-      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Generate Settlement' })).toBeNull();
 
-      // Modal freshly opened on the untouched default form (size 'village' is default, not dirty).
+      // Modal freshly opened on the untouched default form (size 'village' is
+      // a default, not user input) — still zero-friction.
       fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
 
-      expect(confirmSpy).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog', { name: 'Generate Settlement' })).toBeNull();
       await waitFor(() => {
         expect(screen.getByLabelText('Name *')).toHaveValue('Generated Town');

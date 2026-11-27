@@ -1,7 +1,10 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic hook-contract suite: encountersService is fully mocked, so this
 // file verifies the hook's state wiring (list/modal/loading state, service
-// delegation, error propagation) with no network, timers, or randomness.
+// delegation with call censuses, error propagation) with no network, timers,
+// or randomness. Service-level console.error copy is pinned in
+// ../../services/encounters/encountersService.test.js; the modal's disabled-row
+// rendering is pinned in ../../components/encounter/EncounterModal.loading-gate.test.jsx.
 // Update only if the hook's public contract changes.
 import { renderHook, act } from '@testing-library/react';
 import useEncounterManagement from './useEncounterManagement.js';
@@ -74,13 +77,14 @@ describe('useEncounterManagement', () => {
   });
 
   describe('initial state', () => {
-    it('sets initial state correctly', () => {
+    it('defaults to an empty closed surface and does not auto-fetch on mount', () => {
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
 
       expect(result.current.encounters).toEqual([]);
       expect(result.current.loading).toBe(false);
       expect(result.current.modalOpen).toBe(false);
       expect(result.current.modalMode).toBeNull();
+      expect(mockLoadEncounters).not.toHaveBeenCalled();
     });
   });
 
@@ -98,11 +102,12 @@ describe('useEncounterManagement', () => {
         await result.current.loadEncounterList();
       });
 
+      expect(mockLoadEncounters).toHaveBeenCalledTimes(1);
       expect(mockLoadEncounters).toHaveBeenCalledWith('test-campaign');
       expect(result.current.encounters).toEqual(encountersData);
     });
 
-    it('does nothing when campaignName is empty', async () => {
+    it('does nothing without a campaign: no fetch, no loading window, empty list', async () => {
       const { result } = renderHook(() => useEncounterManagement(''));
 
       await act(async () => {
@@ -111,6 +116,7 @@ describe('useEncounterManagement', () => {
 
       expect(mockLoadEncounters).not.toHaveBeenCalled();
       expect(result.current.encounters).toEqual([]);
+      expect(result.current.loading).toBe(false);
     });
 
     it('defaults to empty array when response has no encounters field', async () => {
@@ -125,20 +131,29 @@ describe('useEncounterManagement', () => {
       expect(result.current.encounters).toEqual([]);
     });
 
-    it('handles error by logging and keeping previous state (does not re-throw)', async () => {
-      mockLoadEncounters.mockRejectedValue(new Error('Network error'));
-
+    it('on failure logs once, keeps the previous list, clears loading, and does not re-throw', async () => {
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
 
+      // Land a real list first so "keeps previous state" is proven, not vacuous.
       await act(async () => {
+        mockLoadEncounters.mockResolvedValue({ encounters: [{ name: 'goblin-ambush' }] });
+        await result.current.loadEncounterList();
+      });
+      expect(result.current.encounters).toEqual([{ name: 'goblin-ambush' }]);
+
+      await act(async () => {
+        mockLoadEncounters.mockRejectedValue(new Error('Network error'));
         await expect(result.current.loadEncounterList()).resolves.toBeUndefined();
       });
 
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
       expect(consoleSpy).toHaveBeenCalledWith(
         'Failed to load encounter list:',
         expect.any(Error)
       );
-      expect(result.current.encounters).toEqual([]);
+      expect(result.current.encounters).toEqual([{ name: 'goblin-ambush' }]);
+      // finally-branch gate: no stuck-disabled rows after a failed reload.
+      expect(result.current.loading).toBe(false);
     });
 
     // QA 2026-10-24 backlog: list reloads must expose the `loading` window so
@@ -167,28 +182,6 @@ describe('useEncounterManagement', () => {
       expect(result.current.loading).toBe(false);
       expect(result.current.encounters).toEqual([{ name: 'goblin-ambush' }]);
     });
-
-    it('clears loading when the list fetch fails (no stuck-disabled rows)', async () => {
-      mockLoadEncounters.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
-
-      await act(async () => {
-        await result.current.loadEncounterList();
-      });
-
-      expect(result.current.loading).toBe(false);
-    });
-
-    it('does not raise loading when campaignName is empty', async () => {
-      const { result } = renderHook(() => useEncounterManagement(''));
-
-      await act(async () => {
-        await result.current.loadEncounterList();
-      });
-
-      expect(result.current.loading).toBe(false);
-    });
   });
 
   describe('modal state', () => {
@@ -210,29 +203,10 @@ describe('useEncounterManagement', () => {
       expect(result.current.modalMode).toBeNull();
     });
 
-    it('openLoadModal loads encounters, sets mode to load, and opens modal', async () => {
-      const encountersData = [
-        { name: 'Goblin Ambush', monsters: ['goblin'] },
-      ];
-      mockLoadEncounters.mockResolvedValue({ encounters: encountersData });
-
-      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
-
-      await act(async () => {
-        await result.current.openLoadModal();
-      });
-
-      expect(mockLoadEncounters).toHaveBeenCalledWith('test-campaign');
-      expect(result.current.encounters).toEqual(encountersData);
-      expect(result.current.modalMode).toBe('load');
-      expect(result.current.modalOpen).toBe(true);
-      expect(result.current.loading).toBe(false);
-    });
-
     // QA 2026-10-24 backlog: the load list must fetch INSIDE the open modal
     // (loading=true gates the rows) instead of landing fresh rows straight
     // into an already-clickable surface (silent-close flake).
-    it('openLoadModal opens immediately with loading=true and stays loading until the list lands', async () => {
+    it('openLoadModal opens immediately with loading=true, fetches with the campaign, and clears loading when the list lands', async () => {
       let resolveList;
       mockLoadEncounters.mockImplementation(
         () =>
@@ -250,6 +224,7 @@ describe('useEncounterManagement', () => {
       expect(result.current.modalOpen).toBe(true);
       expect(result.current.modalMode).toBe('load');
       expect(result.current.loading).toBe(true);
+      expect(mockLoadEncounters).toHaveBeenCalledWith('test-campaign');
 
       await act(async () => {
         resolveList({ encounters: [{ name: 'goblin-ambush' }] });
@@ -272,11 +247,14 @@ describe('useEncounterManagement', () => {
         data = await result.current.loadEncounterData('goblin-ambush');
       });
 
+      expect(mockLoadEncounter).toHaveBeenCalledTimes(1);
       expect(mockLoadEncounter).toHaveBeenCalledWith('test-campaign', 'goblin-ambush');
       expect(data).toEqual(encounterData);
       expect(result.current.modalOpen).toBe(false);
       expect(result.current.modalMode).toBeNull();
       expect(result.current.loading).toBe(false);
+      // Single-encounter reads must not reload the list.
+      expect(mockLoadEncounters).not.toHaveBeenCalled();
     });
 
     it('throws error, logs, and clears loading when load fails', async () => {
@@ -305,9 +283,10 @@ describe('useEncounterManagement', () => {
 
   describe('mutating operations', () => {
     for (const op of mutatingOps) {
+      const reloads = op.reloads !== false;
       const logsOnError = op.logs !== false;
 
-      it(`${op.label} delegates to the service${op.reloads === false ? ' without reloading the list' : ' and reloads the list'}`, async () => {
+      it(`${op.label} calls the service once${reloads ? ' then reloads the list after success' : ' without touching the list or modal state'}`, async () => {
         const updatedEncounters = [{ name: `${op.label}-list` }];
         op.service.mockResolvedValue({ success: true });
         mockLoadEncounters.mockResolvedValue({ encounters: updatedEncounters });
@@ -318,12 +297,19 @@ describe('useEncounterManagement', () => {
           await result.current[op.hookFn](...op.args);
         });
 
+        expect(op.service).toHaveBeenCalledTimes(1);
         expect(op.service).toHaveBeenCalledWith('test-campaign', ...op.args);
-        if (op.reloads === false) {
-          expect(mockLoadEncounters).not.toHaveBeenCalled();
-        } else {
-          expect(mockLoadEncounters).toHaveBeenCalled();
+        if (reloads) {
+          expect(mockLoadEncounters).toHaveBeenCalledTimes(1);
+          expect(mockLoadEncounters).toHaveBeenCalledWith('test-campaign');
+          // Ordered census: reload must happen AFTER the write succeeds, never
+          // optimistically before it.
+          expect(mockLoadEncounters.mock.invocationCallOrder[0]).toBeGreaterThan(
+            op.service.mock.invocationCallOrder[0]
+          );
           expect(result.current.encounters).toEqual(updatedEncounters);
+        } else {
+          expect(mockLoadEncounters).not.toHaveBeenCalled();
         }
       });
 
@@ -344,6 +330,7 @@ describe('useEncounterManagement', () => {
 
         expect(caughtError).toBe(failure);
         if (logsOnError) {
+          expect(consoleSpy).toHaveBeenCalledTimes(1);
           expect(consoleSpy).toHaveBeenCalledWith(op.logPrefix, failure);
         } else {
           // Single-layer logging (c5d784d1f fingerprint): the service owns the

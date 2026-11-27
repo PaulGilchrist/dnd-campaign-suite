@@ -1,12 +1,15 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Attack-lane seam (createLogAndShow): Potent Cantrip (2024 classes.json Evoker lv3:
 // "miss with attack roll or target succeeds on saving throw → half the cantrip's damage")
 // and Soulknife lv9 Homing Strikes gate wiring. Owns what reaches logEntry /
-// setPopupHtml / lastAttackRoll through the full lane. Unit seams covered elsewhere:
+// setPopupHtml / lastAttackRoll through the full lane, including the half-damage
+// APPLICATION through applyDamageToTarget. Unit seams covered elsewhere:
 // attackPostProcessing-cla120-potent-cantrip.test.js (formula folding, idempotency,
 // school gate) and hitResolution.soul-blades.test.js (conversion, die size, energy
-// spend, still-miss, natural 1).
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// spend, still-miss, natural 1). Handler-lane gap (run2#1778): the SEPARATE auto-miss
+// handler handleAutoMiss.js#handlePotentCantripHalfDamage has no handler-level test —
+// its decision is pinned here only at this hook seam.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', async (importOriginal) => {
     const actual = await importOriginal()
@@ -102,6 +105,7 @@ vi.mock('../../services/combat/automation/automationPassives.js', () => ({
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
@@ -120,6 +124,7 @@ import {
 } from '../../services/combat/auras/unbreakableMajesty.js';
 
 describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
+    const FROZEN_NOW = 1700000000000;
     const deps = {
         characterName: 'TestWizard',
         campaignName: 'test-campaign',
@@ -131,6 +136,7 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
         rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
         getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 15 });
         isResilientSphereActive.mockReturnValue(false);
@@ -144,6 +150,10 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
         utils.getName.mockImplementation((n) => n);
         hasIgnoreResistance.mockReturnValue(false);
         rollD20.mockReturnValue(15);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     function createFn() {
@@ -162,10 +172,12 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
         );
     }
 
+    function findKeyWrites(key) {
+        return setRuntimeValue.mock.calls.filter((call) => call[1] === key);
+    }
+
     function findHomingLastAttackRollCalls() {
-        return setRuntimeValue.mock.calls.filter(
-            (call) => call[1] === 'lastAttackRoll' && call[2]?.homingStrikesBonus
-        );
+        return findKeyWrites('lastAttackRoll').filter((call) => call[2]?.homingStrikesBonus);
     }
 
     describe('potent cantrip miss-half-damage', () => {
@@ -178,6 +190,40 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
             saveType: 'DEX',
             playerStats: withPotent,
         };
+        // Full-shape log row every positive arm produces through the lane
+        // (fresh roll of '1d10' → 10 → half 5; stored total 10 → half 5).
+        const cantripLogRow = (formula) => ({
+            type: 'roll',
+            characterName: 'TestWizard',
+            rollType: 'cantrip-miss-half-damage',
+            name: 'Fire Bolt',
+            formula,
+            rolls: [5, 5],
+            total: 5,
+            modifier: 0,
+            damageType: 'fire',
+            targetName: 'Goblin',
+            isPotentCantrip: true,
+        });
+        const cantripPopup = (formula) => ({
+            type: 'save-damage',
+            name: 'Fire Bolt',
+            formula,
+            rolls: [5, 5],
+            total: 5,
+            bonus: 0,
+            modifier: 0,
+            damageType: 'fire',
+            targetName: 'Goblin',
+            targetCurrentHp: 5,
+            targetMaxHp: 0,
+            saveDc: 13,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            finalDamage: 5,
+            damageApplied: true,
+            isPotentCantrip: true,
+        });
 
         it.each([
             ['the player lacks the passive', false, 15, { ...baseOpts, playerStats: { automation: { passives: [] } } }],
@@ -190,82 +236,74 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
             await createFn()('Fire Bolt', 3, 'attack', opts);
             expect(findCantripMissHalfDamageLogs()).toHaveLength(0);
             expect(findSaveDamagePopups()).toHaveLength(0);
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
-        it('rolls half damage from the stored damage result and logs + pops cantrip-miss-half-damage', async () => {
+        it.each([
+            ['a stored damage result', { autoDamageRollResult: { total: 10, rolls: [5, 5], modifier: 0 } }, false],
+            ['no stored result', {}, true],
+        ])('miss-half-damage rolls once from %s, applies half, logs + pops the full row', async (_label, extraOpts, expectFreshRoll) => {
             hasPotentCantrip.mockReturnValue(true);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            await createFn()('Fire Bolt', 3, 'attack', {
-                ...baseOpts,
-                autoDamageRollResult: { total: 10, rolls: [5, 5], modifier: 0 },
-            });
+            await createFn()('Fire Bolt', 3, 'attack', { ...baseOpts, ...extraOpts });
+
+            // Discriminator: the stored-result leg must NOT re-roll (CLA-120
+            // phantom roll); the fresh leg rolls '1d10' exactly once.
+            if (expectFreshRoll) {
+                expect(rollExpression).toHaveBeenCalledTimes(1);
+                expect(rollExpression).toHaveBeenCalledWith('1d10');
+            } else {
+                expect(rollExpression).not.toHaveBeenCalled();
+            }
+
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0]).toMatchObject({
-                rollType: 'cantrip-miss-half-damage',
-                isPotentCantrip: true,
-                targetName: 'Goblin',
-                damageType: 'fire',
-                total: 5,
-            });
+            expect(missLogs[0][0]).toEqual(cantripLogRow('1d10'));
+
+            // The half total reaches the damage pipeline exactly once.
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                { creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] },
+                'Goblin',
+                5,
+                ['fire'],
+                { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestWizard' }
+            );
+
             const popups = findSaveDamagePopups();
             expect(popups).toHaveLength(1);
-            expect(popups[0][0]).toMatchObject({
-                type: 'save-damage',
-                isPotentCantrip: true,
-                targetName: 'Goblin',
-                total: 5,
-                dcSuccess: 'half',
-            });
+            expect(popups[0][0]).toEqual(cantripPopup('1d10'));
         });
 
-        it('rolls fresh damage when no stored result is present', async () => {
+        // REC #931 folded (fix#364): the school-gate and zero-INT non-fold legs
+        // belong to attackPostProcessing-cla120-potent-cantrip.test.js t3. This
+        // lane keeps only the auto-miss+saveDc dispatch branch, unfolded
+        // (also pinned byte-exact by the fresh-roll arm above) and with the
+        // Evocation/EE lane-threading folded once.
+        it.each([
+            ['without Empowered Evocation', '1d10', undefined],
+            ['with Empowered Evocation on an Evocation cantrip', '1d10 + 2 [Empowered Evocation]', 2],
+        ])('applies half damage on auto miss with saveDc, formula %s', async (_label, expectedFormula, intMod) => {
             hasPotentCantrip.mockReturnValue(true);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            await createFn()('Fire Bolt', 3, 'attack', baseOpts);
-            expect(rollExpression).toHaveBeenCalledWith('1d10');
-            const missLogs = findCantripMissHalfDamageLogs();
-            expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0]).toMatchObject({
-                rollType: 'cantrip-miss-half-damage',
-                isPotentCantrip: true,
-                total: 5,
-            });
-        });
-
-        it('applies half damage on auto miss when saveDc is provided', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            await createFn()('Fire Bolt', 3, 'attack', { ...baseOpts, isAutoMiss: true });
-            const missLogs = findCantripMissHalfDamageLogs();
-            expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0]).toMatchObject({ isPotentCantrip: true, total: 5 });
-        });
-
-        it('folds Empowered Evocation into the miss half-damage formula for evocation cantrips', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(2);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
+            if (intMod !== undefined) {
+                getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
+                getEmpoweredEvocationIntModifier.mockReturnValue(intMod);
+            }
             await createFn()('Fire Bolt', 3, 'attack', {
                 ...baseOpts,
                 autoDamageSchool: 'Evocation',
                 isAutoMiss: true,
             });
-            const folded = '1d10 + 2 [Empowered Evocation]';
-            expect(rollExpression).toHaveBeenCalledWith(folded);
+            expect(rollExpression).toHaveBeenCalledTimes(1);
+            expect(rollExpression).toHaveBeenCalledWith(expectedFormula);
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0].formula).toBe(folded);
+            expect(missLogs[0][0]).toEqual(cantripLogRow(expectedFormula));
             const popups = findSaveDamagePopups();
             expect(popups).toHaveLength(1);
-            expect(popups[0][0].formula).toBe(folded);
+            expect(popups[0][0]).toEqual(cantripPopup(expectedFormula));
         });
-
-        // REC #931 folded (fix#364): the school-gate and zero-INT non-fold legs
-        // owned by attackPostProcessing-cla120-potent-cantrip.test.js t3 (same
-        // production gate, buildPotentMissFormula). Full-lane unfolded pass-through
-        // stays pinned here above (:226 rolls '1d10' byte-exact) — zero coverage loss.
     });
 
     describe('soulknife psychic blades homing strikes', () => {
@@ -286,15 +324,25 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
                 isPsychicBlade: true,
                 playerStats: ps,
             });
-            spyRandom.mockRestore();
             const homingCalls = findHomingLastAttackRollCalls();
             expect(homingCalls).toHaveLength(1);
-            expect(homingCalls[0][2]).toMatchObject({
+            // Full evidence row: the psionic die folds into the stamped bonus.
+            expect(homingCalls[0][2]).toEqual({
+                attackName: 'Psychic Blade',
+                attackerName: 'TestWizard',
+                d20: 15,
+                bonus: 11,
+                targetName: 'Goblin',
+                targetAc: 20,
                 hit: true,
                 isCrit: false,
+                effectiveAc: 20,
+                coverAcBonus: 0,
                 homingStrikesBonus: 8,
+                timestamp: FROZEN_NOW,
             });
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'psionicEnergy', 5, 'test-campaign');
+            spyRandom.mockRestore();
         });
 
         const soulknife = { name: 'Rogue', major: { name: 'Soulknife' } };
@@ -312,6 +360,7 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
                 ...extraOpts,
             });
             expect(findHomingLastAttackRollCalls()).toHaveLength(0);
+            expect(findKeyWrites('psionicEnergy')).toHaveLength(0);
         });
     });
 });

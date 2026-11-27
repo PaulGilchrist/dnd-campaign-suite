@@ -1,28 +1,25 @@
-// @improved-by-ai
+// @maintained-by-ai 2026-11-26
 /**
- * App-level contract for the zero-character empty-state card
+ * App-level wiring contract for the zero-character empty-state card
  * (backlog UM 2026-11-20, owner doctrine 2026-11-23).
  *
- * A zero-character campaign has ALWAYS landed on a FULLY BLANK main stage
- * since the retired offer-once auto-wizard was removed — nav + dice tray, no
- * affordance, the sidebar "Add Character" the only door. The card renders on
- * exactly the blank stage: campaign loaded + zero characters + no view active
- * + no wizard open.
+ * Only the seams the card's OWN gate in App.jsx needs are pinned here:
+ *  - the card's button opens the creation wizard, the card yields while the
+ *    wizard is mounted, and an explicit cancel returns the card (wizard-open
+ *    gate);
+ *  - a campaign WITH characters renders the sheet and NEVER the card
+ *    (characters-length gate);
+ *  - seeded starter: the card's "Open the starter checklist" affordance is
+ *    the door back to a locally-dismissed FirstSessionChecklist (epoch
+ *    remount).
  *
- * Pinned here:
- *  - zero characters → empty-state card ("Add your first character"), no
- *    auto-wizard, no char sheet;
- *  - pressing the card's button opens the SAME creation wizard as the sidebar
- *    Add Character, and the card yields while the wizard is mounted;
- *  - entry NEVER auto-mounts a wizard — the card owns the blank stage from
- *    the first frame (the no-auto-open contract lives in
- *    App.no-auto-wizard.test.jsx);
- *  - a campaign WITH characters renders the sheet and NEVER the card;
- *  - seeded starter campaign: the card ALSO offers "Open the starter
- *    checklist", and activating it surfaces the FirstSessionChecklist content
- *    (epoch remount revives a locally-dismissed checklist).
+ * NOT re-pinned here (covered where it lives):
+ *  - zero-character entry mounts no wizard / no sheet and burns no offer
+ *    key — App.no-auto-wizard.test.jsx (owner doctrine 2026-11-23);
+ *  - the card's own markup and the seed-gated checklist affordance —
+ *    components/campaign-empty-state/EmptyCampaignState.test.jsx.
  *
- * Harness mirrors App.wizard-offered.test.jsx (shared mock doubles). The
+ * Harness mirrors App.no-auto-wizard.test.jsx (shared mock doubles). The
  * starter-seed lane is mocked at the service boundary — one mock drives BOTH
  * the card affordance and the real FirstSessionChecklist panel.
  */
@@ -200,7 +197,7 @@ function expectNoEmptyState() {
 
 // --- Test suite ---
 
-describe('App - zero-character empty-state card', () => {
+describe('App - zero-character empty-state card wiring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -220,7 +217,7 @@ describe('App - zero-character empty-state card', () => {
       isLoading: false,
     };
 
-    mockState.campaignName = 'test-campaign';
+    mockState.campaignName = 'qa-arena';
     mockState.characters = [];
     window.alert = vi.fn();
     window.confirm = vi.fn(() => true);
@@ -238,56 +235,25 @@ describe('App - zero-character empty-state card', () => {
     vi.restoreAllMocks();
   });
 
-  it('zero characters lands on the empty-state card, not a blank stage', async () => {
-    mockState.campaignName = 'qa-arena';
+  it('the card opens the creation wizard, yields while it is mounted, and returns after cancel', async () => {
     render(<App />);
     await selectCampaign();
 
-    // No auto-wizard (owner doctrine 2026-11-23), no sheet — and the stage
-    // is NOT blank.
+    // The card owns the blank stage with NO wizard mounted until an
+    // EXPLICIT press (the full no-auto-open doctrine is pinned in
+    // App.no-auto-wizard.test.jsx).
     expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     const card = screen.getByRole('button', { name: /Add your first character/ });
-    expect(card.closest('.empty-campaign-state .ct-empty-state')).toBeInTheDocument();
-    // Plain arena campaign (no seed): the checklist affordance stays absent.
-    expect(screen.queryByRole('button', { name: /Open the starter checklist/ })).not.toBeInTheDocument();
-  });
 
-  it('pressing "Add your first character" opens the same wizard the sidebar Add Character opens, and the card yields while it is mounted', async () => {
-    mockState.campaignName = 'qa-arena';
-    render(<App />);
-    await selectCampaign();
-
-    fireEvent.click(screen.getByRole('button', { name: /Add your first character/ }));
+    // Pressing the card opens the SAME creation wizard as the sidebar
+    // Add Character, and the card steps aside while it is mounted.
+    fireEvent.click(card);
     await waitFor(() => {
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
     });
     expectNoEmptyState();
 
     // Cancel → the blank stage is again owned by the card (wizard-open gate).
-    fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Add your first character/ })).toBeInTheDocument();
-    });
-  });
-
-  it('no wizard auto-mounts on entry — the card owns the blank stage from the start, and still after an explicit open + cancel', async () => {
-    mockState.campaignName = 'qa-arena';
-    render(<App />);
-    await selectCampaign();
-
-    // Owner doctrine 2026-11-23: zero-character entry never auto-opens the
-    // wizard, so the card takes the blank stage immediately.
-    expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-    expect(localStorage.getItem('character-wizard-offered:qa-arena')).toBeNull();
-    const card = screen.getByRole('button', { name: /Add your first character/ });
-    expect(card).toBeInTheDocument();
-
-    // The card yields only to an EXPLICIT wizard open, and returns after it.
-    fireEvent.click(card);
-    await waitFor(() => {
-      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-    });
     fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Add your first character/ })).toBeInTheDocument();

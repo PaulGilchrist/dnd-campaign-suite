@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * CharSpells — spell cast popups & innate sorcery.
  *
@@ -118,7 +118,7 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
 
 vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: () => null,
-  rangeToFeet: (range) => (String(range).includes('60') ? 60 : null),
+  rangeToFeet: () => null,
 }));
 
 vi.mock('../../../services/ui/dataLoader.js', () => ({
@@ -242,9 +242,10 @@ describe('CharSpells - spell cast flow', () => {
 
   it('auto-damage from a spell attack resolves through the standalone damage pipeline', async () => {
     renderCharSpells();
-    // typeof-only seam guard cut (#245 sharpen): the invocation below TypeErrors
-    // if the producer never wired seams.autoDamageRoll (captured at render by
-    // the useLoggedDiceRoll mock), and the pipeline passthrough is fully pinned.
+    // The callback CharSpells hands useLoggedDiceRoll is captured at render
+    // by the hook mock; assert it exists so a missing wire fails with a
+    // message rather than a raw TypeError when invoked below.
+    expect(seams.autoDamageRoll, 'CharSpells should wire an autoDamageRoll callback').toBeTypeOf('function');
 
     await seams.autoDamageRoll({ autoAttack: 'spell-hit-1' }, true);
 
@@ -294,13 +295,18 @@ describe('CharSpells - words of creation target selection', () => {
     act(() => seams.openWordsOfCreation(request));
   }
 
-  it('shows the flow-supplied title, description, and targets, and selecting one dispatches it and closes the modal', () => {
-    const request = wordsOfCreationRequest({
+  // One test, two round-trips: the select and skip paths share the same
+  // setter → wordsOfCreationTarget → SecondaryTargetModal wiring, so they
+  // run back-to-back on a single render (the reopen also proves the modal
+  // state fully clears on close).
+  it('routes the flow request through the secondary-target modal: selecting dispatches the target, skipping dispatches skip, and each closes the modal', () => {
+    const selectRequest = wordsOfCreationRequest({
       onTargetSelected: vi.fn(() => seams.openWordsOfCreation(null)),
     });
     renderCharSpells();
-    openWordsOfCreation(request);
+    openWordsOfCreation(selectRequest);
 
+    // Title, description, and targets reach the modal from the flow request.
     const dialog = screen.getByRole('dialog', { name: 'Words of Creation' });
     expect(within(dialog).getByText('Choose a creature within 60 feet.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Orc' })).toBeInTheDocument();
@@ -308,23 +314,20 @@ describe('CharSpells - words of creation target selection', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Orc' }));
 
-    expect(request.onTargetSelected).toHaveBeenCalledTimes(1);
-    expect(request.onTargetSelected).toHaveBeenCalledWith('Orc');
-    expect(request.onSkip).not.toHaveBeenCalled();
+    expect(selectRequest.onTargetSelected).toHaveBeenCalledTimes(1);
+    expect(selectRequest.onTargetSelected).toHaveBeenCalledWith('Orc');
+    expect(selectRequest.onSkip).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'Words of Creation' })).not.toBeInTheDocument();
-  });
 
-  it('skip closes the modal without selecting a target', () => {
-    const request = wordsOfCreationRequest({
+    const skipRequest = wordsOfCreationRequest({
       onSkip: vi.fn(() => seams.openWordsOfCreation(null)),
     });
-    renderCharSpells();
-    openWordsOfCreation(request);
+    openWordsOfCreation(skipRequest);
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-    expect(request.onSkip).toHaveBeenCalledTimes(1);
-    expect(request.onTargetSelected).not.toHaveBeenCalled();
+    expect(skipRequest.onSkip).toHaveBeenCalledTimes(1);
+    expect(skipRequest.onTargetSelected).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'Words of Creation' })).not.toBeInTheDocument();
   });
 });

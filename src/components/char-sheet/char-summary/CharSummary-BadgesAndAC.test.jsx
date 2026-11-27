@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (per family delegation): AC totals and the acPenalty badge lane.
 //   - The displayed Armor Class NUMBER (computeArmorClassValue lives ONLY in
@@ -22,11 +22,12 @@
 //     distinct acPenalty:0 input boundary, not that default)
 //
 // Trim history: dropped the penalty:5 iteration (same path as 2), merged the
-// plain-Slow and MA-0115 attribution lanes into one table, and removed the
-// solo Warding Bond test — the stacked warding+slow case fully subsumes it
-// (same badge, tooltip, and fold-in arithmetic, plus penalty independence).
-// Badges are now located by their visible text and checked via title tooltips
-// instead of querying the .stat--penalized styling class.
+// plain-Slow and MA-0115 attribution lanes into one table, removed the solo
+// Warding Bond test (the stacked warding+slow case fully subsumes it), and
+// removed the solo Mage Armor row — the mage_armor+shield row exercises the
+// same replace-and-stack formula line, so a broken replace or Dex fold fails
+// there too. Badges are located by visible text and checked via title
+// tooltips instead of querying the .stat--penalized styling class.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -183,11 +184,14 @@ describe('CharSummary - AC Warding Bond Bonus', () => {
 describe('CharSummary - Armor Class Total Calculation', () => {
     it.each([
         { name: 'stacked Haste + Shield on base AC', buffs: [{ effect: 'haste' }, { effect: 'shield' }], expectedAC: 25 },
-        { name: 'Mage Armor replaces base AC (13 + Dex 2)', buffs: [{ effect: 'mage_armor', baseAc: 13 }], expectedAC: 15 },
-        { name: 'Mage Armor stacks with Shield', buffs: [{ effect: 'mage_armor', baseAc: 13 }, { effect: 'shield' }], expectedAC: 20 },
-        { name: 'Barkskin pins AC to 17, replacing the base value', buffs: [{ effect: 'barkskin' }], expectedAC: 17 },
-    ])('computes AC $expectedAC for $name', ({ buffs, expectedAC }) => {
-        renderSummary({ buffs });
+        // Also proves the replace (not add-on) semantics: an additive or
+        // ignored Mage Armor lands on 23/38, never 20.
+        { name: 'Mage Armor replaces base AC (13 + Dex 2) and stacks with Shield', buffs: [{ effect: 'mage_armor', baseAc: 13 }, { effect: 'shield' }], expectedAC: 20 },
+        // 17 ≠ base-18+warding-1 (19): a dead barkskin branch or an
+        // additive (rather than pinning) one both fail here.
+        { name: "Barkskin pins AC to 17, outranking the base value and Warding Bond's fold-in", buffs: [{ effect: 'barkskin' }], conditionEffects: { wardingBondAcBonus: 1 }, expectedAC: 17 },
+    ])('computes AC $expectedAC for $name', ({ buffs, conditionEffects, expectedAC }) => {
+        renderSummary({ buffs, conditionEffects });
         expect(armorClassLine()).toHaveTextContent(`Armor Class: ${expectedAC}`);
     });
 });

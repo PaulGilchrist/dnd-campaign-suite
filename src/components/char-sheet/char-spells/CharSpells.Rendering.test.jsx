@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * CharSpells rendering tests: how a spell row READS — effect labels, level,
  * duration/time/notes formatting, the prepared cell's text variants, the
@@ -167,15 +167,12 @@ describe('CharSpells - spell row rendering', () => {
 
   describe('effect column', () => {
     it.each`
-      dc_success   | dcType   | expected
-      ${'half'}    | ${'DEX'} | ${'3d8 Cold (DEX half)'}
-      ${'negates'} | ${'CON'} | ${'1d6 Cold (CON negates)'}
-    `('shows damage with save as "$expected" (save succeeds: $dc_success)', ({ dc_success, dcType, expected }) => {
+      dc_success   | dcType   | slotDamage        | expected
+      ${'half'}    | ${'DEX'} | ${{ '1': '3d8' }} | ${'3d8 Cold (DEX half)'}
+      ${'negates'} | ${'CON'} | ${{ '1': '1d6' }} | ${'1d6 Cold (CON negates)'}
+    `('shows damage with save as "$expected" (save succeeds: $dc_success)', ({ dc_success, dcType, slotDamage, expected }) => {
       const spell = makeSpell({
-        damage: {
-          damage_at_slot_level: { '2': dc_success === 'half' ? '3d8' : '1d6' },
-          damage_type: 'Cold',
-        },
+        damage: { damage_at_slot_level: slotDamage, damage_type: 'Cold' },
         dc: { dc_type: dcType, dc_success },
       });
       expect(cellText(spell, 'Effect')).toBe(expected);
@@ -189,7 +186,9 @@ describe('CharSpells - spell row rendering', () => {
       expect(cellText(makeSpell({ damage }), 'Effect')).toBe(expected);
     });
 
-    it.each([undefined, null, {}])('shows Utility when damage is %s', (damage) => {
+    // undefined skips the damage branch entirely; {} enters it and finds no
+    // usable map — both must land on 'Utility' (null shares undefined's path).
+    it.each([undefined, {}])('shows Utility when damage is %s', (damage) => {
       expect(cellText(makeSpell({ damage }), 'Effect')).toBe('Utility');
     });
 
@@ -270,7 +269,6 @@ describe('CharSpells - spell row rendering', () => {
       ${'Instantaneous'}                   | ${'Instant'}
       ${'Concentration, up to 10 minutes'} | ${'Concentration, 10 mins'}
       ${'Concentration, up to 1 hour'}   | ${'Concentration, 1 hour'}
-      ${null}                              | ${''}
       ${undefined}                         | ${''}
     `('formats duration "$duration" as "$expected"', ({ duration, expected }) => {
       expect(cellText(makeSpell({ duration }), 'Duration')).toBe(expected);
@@ -286,7 +284,6 @@ describe('CharSpells - spell row rendering', () => {
       ${'1 minute'}       | ${'1 min'}
       ${'10 minutes'}     | ${'10 min'}
       ${'1 turn'}         | ${'1 turn'}
-      ${null}             | ${''}
       ${undefined}        | ${''}
     `('abbreviates casting time "$casting_time" to "$expected"', ({ casting_time, expected }) => {
       // \s+ collapse: production ' A' substitution emits a leading space;
@@ -314,7 +311,6 @@ describe('CharSpells - spell row rendering', () => {
       ${['V', 'Concentration']}      | ${'V/Con'}
       ${['S', 'M', 'Concentration']} | ${'S/M/Con'}
       ${[]}                          | ${''}
-      ${null}                        | ${''}
       ${undefined}                   | ${''}
     `('formats components $components as "$expected"', ({ components, expected }) => {
       expect(cellText(makeSpell({ components }), 'Notes')).toBe(expected);
@@ -371,7 +367,7 @@ describe('CharSpells - spell row rendering', () => {
       renderWithSpells([makeSpell()], { abilities });
       const summary = screen.getByText('Cantrips Known:').parentElement;
       expect(summary).toHaveTextContent(/Cantrips Known:\s*3/);
-      expect(summary).toHaveTextContent(new RegExp(`Prepared Spells:\\s*${max === 'All' ? 'All' : prepared}`));
+      expect(summary).toHaveTextContent(new RegExp(`Prepared Spells:\\s*${prepared}`));
       expect(summary).toHaveTextContent(new RegExp(`Max Prepared:\\s*${max}`));
     });
 

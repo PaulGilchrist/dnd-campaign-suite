@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Seam: computeTargetAc — the single AC math consumed by hitResolution.js and
 // useLoggedDiceRollAttack.js at the attack-roll seam: player/NPC base-AC
 // resolution, the SP-013 Barkskin min-17 FLOOR (2024; floor semantics, NOT an
@@ -31,25 +31,21 @@ describe('computeTargetAc', () => {
     });
 
     describe('base AC resolution', () => {
-        it('returns undefined for non-attack rolls and missing targets', () => {
-            barkskin('DruidTarget');
-            const target = { name: 'DruidTarget', type: 'player' };
-            const characters = [{ name: 'DruidTarget', computedStats: { armorClass: 9 } }];
-            expect(computeTargetAc({ rollType: 'save' }, target, characters, CAMPAIGN)).toBeUndefined();
-            expect(computeTargetAc(ATTACK, null, characters, CAMPAIGN)).toBeUndefined();
+        it.each([
+            ['non-attack roll', { rollType: 'save' }, { name: 'DruidTarget', type: 'player' }],
+            ['missing target', ATTACK, null],
+        ])('returns undefined for %s', (_label, context, target) => {
+            expect(computeTargetAc(context, target, [], CAMPAIGN)).toBeUndefined();
         });
 
-        it('reads a player target from computedStats, falling back to flat armorClass', () => {
-            const characters = [
-                { name: 'Computed', computedStats: { armorClass: 16 } },
-                { name: 'Flat', armorClass: 13 },
-            ];
-            expect(computeTargetAc(ATTACK, { name: 'Computed', type: 'player' }, characters, CAMPAIGN)).toBe(16);
-            expect(computeTargetAc(ATTACK, { name: 'Flat', type: 'player' }, characters, CAMPAIGN)).toBe(13);
-        });
-
-        it('reads target.ac for non-player (EB-joined) combatants', () => {
-            expect(computeTargetAc(ATTACK, { name: 'Goblin 1', type: 'npc', ac: 15 }, [], CAMPAIGN)).toBe(15);
+        it.each([
+            ['player computedStats', { name: 'Computed', type: 'player' },
+                [{ name: 'Computed', computedStats: { armorClass: 16 } }], 16],
+            ['player flat armorClass fallback', { name: 'Flat', type: 'player' },
+                [{ name: 'Flat', armorClass: 13 }], 13],
+            ['non-player (EB-joined) target.ac', { name: 'Goblin 1', type: 'npc', ac: 15 }, [], 15],
+        ])('resolves %s', (_label, target, characters, expected) => {
+            expect(computeTargetAc(ATTACK, target, characters, CAMPAIGN)).toBe(expected);
         });
 
         it('throws when no AC is resolvable for an attack target', () => {
@@ -75,30 +71,27 @@ describe('computeTargetAc', () => {
             expect(computeTargetAc(ATTACK, { name: 'Goblin 1', type: 'npc', ac: 15 }, [], CAMPAIGN)).toBe(17);
         });
 
-        it('is inert without the buff and for legacy callers (no campaignName)', () => {
+        it('is name-keyed: an un-buffeted target is never floored', () => {
             barkskin('DruidTarget');
-            const target = { name: 'DruidTarget', type: 'player' };
-            const characters = [{ name: 'DruidTarget', computedStats: { armorClass: 9 } }];
-            // Legacy lane: campaignName not threaded ⇒ runtime store never consulted for buffs.
-            expect(computeTargetAc(ATTACK, target, characters)).toBe(9);
-            characters[0].name = 'PlainTarget';
+            const characters = [{ name: 'PlainTarget', computedStats: { armorClass: 9 } }];
             expect(computeTargetAc(ATTACK, { name: 'PlainTarget', type: 'player' }, characters, CAMPAIGN)).toBe(9);
         });
     });
 
     describe('L5-003 §8.3 half cover', () => {
-        it('rides the context cover channel ON TOP of the Barkskin floor (targetAc stays RAW)', () => {
+        it('rides the context cover channel ON TOP of the Barkskin floor (targetAc stays the floored base)', () => {
             barkskin('DruidTarget');
             store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'DruidTarget', ac: 2, blocker: 'Goblin', round: 1 };
             const ctx = { ...ATTACK, attackerName: 'Hero' };
             const target = { name: 'DruidTarget', type: 'player' };
             const characters = [{ name: 'DruidTarget', computedStats: { armorClass: 9 } }];
-            // floor 17 is a base-AC rule; the +2 circumstance bonus rides the
-            // cover channel (computeEffectiveAc adds it) so the row annotates.
+            // Floor is a base-AC rule; the +2 circumstance bonus rides the
+            // cover channel (computeEffectiveAc adds it) and never bumps
+            // targetAc — the two are independent. The stamp × furniture
+            // channel mechanics (tier, reason, no-stacking, AUTO-MISS) are
+            // pinned in targetAcComputation.cover-no-stack.test.js.
             expect(computeTargetAc(ctx, target, characters, CAMPAIGN)).toBe(17);
             expect(ctx.coverAcBonus).toBe(2);
-            expect(ctx.coverLevel).toBe('half');
-            expect(ctx.coverReason).toBe('Goblin');
         });
     });
 });

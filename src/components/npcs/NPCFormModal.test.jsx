@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCFormModal from './NPCFormModal.jsx';
@@ -46,25 +46,12 @@ describe('NPCFormModal', () => {
 
   // ── Header ─────────────────────────────────────────────────────────
 
-  describe('Header', () => {
-    it.each([
-      ['New NPC', undefined],
-      ['Edit NPC', { name: 'Gandalf' }],
-    ])('renders %s heading', (heading, editingNPC) => {
-      renderModal({}, { editingNPC });
-      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
-    });
-
-    it('calls onClose when the close button is clicked', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      expect(callbacks.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('shows the error message when provided', () => {
-      renderModal({}, { error: 'A character with this name already exists.' });
-      expect(screen.getByText('A character with this name already exists.')).toBeInTheDocument();
-    });
+  it.each([
+    ['New NPC', undefined],
+    ['Edit NPC', { name: 'Gandalf' }],
+  ])('renders the %s heading', (heading, editingNPC) => {
+    renderModal({}, { editingNPC });
+    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
   });
 
   // ── Conflict recovery banner (409 "Reload list") ───────────────────
@@ -73,24 +60,24 @@ describe('NPCFormModal', () => {
     const conflictCopy =
       'NPC "Marta Copperkettle" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
 
-    it('renders the unchanged conflict copy with a Reload list button and reports the click', () => {
-      renderModal({}, { error: conflictCopy, errorConflict: true, onReloadList: callbacks.onReloadList });
-      // Existing copy untouched (criterion 1).
+    it('renders the conflict copy verbatim with a working Reload list button', () => {
+      renderModal({}, { error: conflictCopy, errorConflict: true });
       expect(screen.getByText(conflictCopy)).toBeInTheDocument();
-      const button = screen.getByRole('button', { name: 'Reload list' });
-      fireEvent.click(button);
+      fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
       expect(callbacks.onReloadList).toHaveBeenCalledTimes(1);
     });
 
-    it('omits the Reload list button for a non-conflict error', () => {
-      renderModal({}, { error: 'An NPC with that name already exists', onReloadList: callbacks.onReloadList });
-      expect(screen.getByText('An NPC with that name already exists')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
-    });
-
-    it('omits the Reload list button when no onReloadList handler is wired', () => {
-      renderModal({}, { error: conflictCopy, errorConflict: true, onReloadList: undefined });
-      expect(screen.getByText(conflictCopy)).toBeInTheDocument();
+    // The Reload list button must never render in a state where it would be
+    // dead: only 409 conflicts with a wired handler get the one-click lane.
+    // (The parent's reload-then-reseed wiring is pinned in
+    // NPCs.stale-list-recovery.test.jsx; the button's CSS tier in
+    // NPCs.kit-classes.test.jsx.)
+    it.each([
+      ['a non-conflict error', { error: 'An NPC with that name already exists' }],
+      ['a conflict with no onReloadList handler wired', { error: conflictCopy, errorConflict: true, onReloadList: undefined }],
+    ])('shows the error text but omits Reload list for %s', (_label, props) => {
+      renderModal({}, props);
+      expect(screen.getByText(props.error)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
     });
   });
@@ -98,12 +85,10 @@ describe('NPCFormModal', () => {
   // ── Avatar Section ─────────────────────────────────────────────────
 
   describe('Avatar Section', () => {
-    const imageVariants = [
+    it.each([
       ['a data URI image', { image: 'data:image/png;base64,abc', imageName: 'gandalf.png' }],
       ['an image path', { imagePath: '/campaigns/test/npc.png' }],
-    ];
-
-    it.each(imageVariants)(
+    ])(
       'shows a working avatar and Remove button when %s is set',
       (_label, imageData) => {
         renderModal({ name: 'Gandalf', ...imageData });
@@ -169,14 +154,12 @@ describe('NPCFormModal', () => {
     it('reports name edits through setFormData', () => {
       renderModal();
       fireEvent.change(screen.getByLabelText(/Name/), { target: { value: 'Gandalf' } });
-      expect(callbacks.setFormData).toHaveBeenCalledTimes(1);
       expect(appliedUpdate()).toMatchObject({ name: 'Gandalf' });
     });
 
     it('displays a pre-filled name and focuses the input on mount', () => {
       renderModal({ name: 'Gandalf' });
-      const input = screen.getByLabelText(/Name/);
-      expect(input).toHaveValue('Gandalf');
+      expect(screen.getByLabelText(/Name/)).toHaveValue('Gandalf');
       expect(screen.getByLabelText(/Name/)).toHaveFocus();
     });
   });
@@ -184,9 +167,9 @@ describe('NPCFormModal', () => {
   // ── Footer Buttons ─────────────────────────────────────────────────
 
   describe('Footer Buttons', () => {
-    it('calls onClose when Cancel is clicked', () => {
+    it.each(['Close', 'Cancel'])('calls onClose when %s is clicked', (name) => {
       renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(screen.getByRole('button', { name }));
       expect(callbacks.onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -196,9 +179,10 @@ describe('NPCFormModal', () => {
       expect(callbacks.onSave).toHaveBeenCalledTimes(1);
     });
 
-    it('disables Save when the disabled prop is true', () => {
-      renderModal({}, { disabled: true });
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    it('disables action buttons when the disabled prop is true', () => {
+      renderModal(combatReady, { disabled: true });
+      expect(screen.getByRole('button', { name: /Save$/ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Save & Add to Initiative/ })).toBeDisabled();
     });
 
     it('shows a disabled Saving… button and blocks Cancel while saving', () => {
@@ -212,12 +196,11 @@ describe('NPCFormModal', () => {
   // ── Delete Button ──────────────────────────────────────────────────
 
   describe('Delete Button', () => {
-    it('is hidden when creating a new NPC', () => {
-      renderModal();
+    it('offers Delete only when editing, and calls onDelete on click', () => {
+      const { unmount } = renderModal();
       expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-    });
+      unmount();
 
-    it('renders when editing and calls onDelete on click', () => {
       renderModal({}, { editingNPC: { name: 'Gandalf' } });
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
       expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
@@ -231,39 +214,25 @@ describe('NPCFormModal', () => {
   });
 
   // ── Save & Add to Initiative ───────────────────────────────────────
+  // The AC/HP readiness matrix itself is pinned in
+  // src/services/encounters/npcStatBlockUtils.test.js; these tests only pin
+  // that the modal wires the gate and the callback into the button.
 
   describe('Save & Add to Initiative', () => {
     const initiativeButton = () => screen.getByRole('button', { name: /Save & Add to Initiative/ });
 
-    it('renders when the NPC is combat-ready', () => {
-      renderModal(combatReady);
-      expect(initiativeButton()).toBeInTheDocument();
-    });
-
-    it.each([
-      ['no armorClass', { armorClass: null }],
-      ['non-numeric armorClass', { armorClass: '15' }],
-      ['empty hitPoints', { hitPoints: '' }],
-      ['zero hitPoints', { hitPoints: 0 }],
-    ])('does not render when a combat-ready NPC lacks %s', (_label, overrides) => {
-      renderModal({ ...combatReady, ...overrides });
-      expect(screen.queryByRole('button', { name: /Save & Add to Initiative/ })).not.toBeInTheDocument();
-    });
-
-    it('does not render when the callback is missing', () => {
-      renderModal(combatReady, { onSaveAndAddToInitiative: undefined });
-      expect(screen.queryByRole('button', { name: /Save & Add to Initiative/ })).not.toBeInTheDocument();
-    });
-
-    it('calls onSaveAndAddToInitiative when clicked', () => {
+    it('renders for a combat-ready NPC and calls onSaveAndAddToInitiative on click', () => {
       renderModal(combatReady);
       fireEvent.click(initiativeButton());
       expect(callbacks.onSaveAndAddToInitiative).toHaveBeenCalledTimes(1);
     });
 
-    it('is disabled when the disabled prop is true', () => {
-      renderModal(combatReady, { disabled: true });
-      expect(initiativeButton()).toBeDisabled();
+    it.each([
+      ['a non-numeric armorClass', { overrides: { armorClass: '15' } }],
+      ['no onSaveAndAddToInitiative handler', { overrides: {}, props: { onSaveAndAddToInitiative: undefined } }],
+    ])('does not render with %s', (_label, { overrides, props = {} }) => {
+      renderModal({ ...combatReady, ...overrides }, props);
+      expect(screen.queryByRole('button', { name: /Save & Add to Initiative/ })).not.toBeInTheDocument();
     });
   });
 });

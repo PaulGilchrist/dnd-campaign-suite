@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Owns: WildSurgeBadge rendering in CharSummary —
 //   - one list item per surge effect, "#roll — effect" format
@@ -158,6 +158,9 @@ describe('CharSummary - Wild Magic Surge Effects', () => {
         expect(items[1]).toHaveAttribute('title', 'Healing');
 
         // Duration tooltip only on entries that carry a duration.
+        // `within` scans descendants only, so items[1]'s own title (the
+        // effect name) cannot satisfy this — any title-bearing child (the
+        // hourglass icon) would.
         expect(within(items[0]).getByTitle('1 round')).toBeInTheDocument();
         expect(within(items[1]).queryByTitle(/.*/)).not.toBeInTheDocument();
     });

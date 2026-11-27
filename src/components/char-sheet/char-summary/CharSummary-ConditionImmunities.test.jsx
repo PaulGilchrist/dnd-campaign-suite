@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership: the condition-immunity sources of the "Immunities:" row
 // (charSummaryCalc.js computeResistances) — NOT the aura source.
@@ -151,13 +151,24 @@ describe('CharSummary - Immunities row sources', () => {
             { name: "Heroes' Feast", conditionImmunity: ['poisoned'] },   // unique → membership pinned
             { name: 'Heroism', conditionImmunity: ['Frightened'] },       // real mixed-case value; deduped
         ]);
-        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['poison'] } });
+        renderSummary({
+            playerStats: {
+                ...mockPlayerStats,
+                immunities: ['poison'],
+                // non-buff source carrying the same lowercase type: buff values
+                // only dedup against it via the lowercase normalization
+                automationConditionImmunities: ['frightened'],
+            },
+        });
 
-        // Order: base immunities first, then buffs in CONDITION_IMMUNITY_BUFF_NAMES
-        // order (Calm Emotions < Heroes' Feast < Heroism); Heroism's mixed-case
-        // 'Frightened' normalizes to the Calm Emotions entry. If the allow-list
-        // guard broke, ', Charmed' would appear; removing a name from the list
-        // drops or reorders its type.
+        // Order: base immunities first, then the automation list, then buffs in
+        // CONDITION_IMMUNITY_BUFF_NAMES order (Calm Emotions < Heroes' Feast <
+        // Heroism). The lowercase 'frightened' from the automation source pins
+        // the entry; Heroism's mixed-case 'Frightened' normalizes to dedup
+        // against it cross-source. If the normalization broke, a duplicate
+        // ', Frightened' would render; if the allow-list guard broke,
+        // ', Charmed' would appear; removing a name from the list drops or
+        // reorders its type.
         expect(immunityRowText()).toBe('Immunities: Poison, Frightened, Poisoned');
     });
 });

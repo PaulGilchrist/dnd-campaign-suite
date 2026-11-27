@@ -1,7 +1,11 @@
-// @maintained-by-ai 2026-10-15: 2026-10-15 — deterministic mocked-seam lane; runtime store, combat
-// summary, storage, dataLoader and logService are all module-mocked; assertions pin the
-// handler's own contract (popup shapes, runtime keys, caster-folded creature rows, log
-// automationTypes). Real dice only for valid formulas with totals unpinned. No timers.
+// @maintained-by-ai 2026-11-26
+// Deterministic mocked-seam lane; runtime store, combat summary, storage, dataLoader and
+// logService are module-mocked; Date.now frozen. Pins the handler's own contract: refusal
+// families with zero-spend write censuses, full caster-folded creature-row toEqual per beast,
+// ordered commit censuses (exact mock.calls), combat-summary-updated-only dispatch, and the
+// CLA-036 Bestial Fury double-strike gate + Hunter's Mark rider. Real diceRoller for
+// rollExpression legs (totals unpinned via expect.any); rollD20 mocked for the fix#169
+// initiative fallback. Disk-row fingerprint owned by MonsterAction.ma1344 sibling.
 import { handle, confirmPrimalCompanionSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand, resolveBestialFuryStrikeGate, resolveBestialFuryMarkStrike, resolveBestialFuryBonus, BESTIAL_FURY_STRIKES_KEY, BESTIAL_FURY_MARK_LATCH_KEY } from './primalCompanionHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -61,9 +65,25 @@ vi.mock('../../../dice/diceRoller.js', async (importOriginal) => ({
 
 import { rollD20 } from '../../../dice/diceRoller.js';
 
+// Frozen wall clock so every timestamp pin is exact (no expect.any(Number) slack).
+const FROZEN_NOW = 1730000000000;
+
 describe('primalCompanionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Re-installed happy-path impls (clearAllMocks keeps call history clean but a
+        // test-local rejection/impl must never survive into the next test).
+        addEntry.mockResolvedValue({});
+        getRuntimeValue.mockReturnValue(null);
+        getCombatSummary.mockReturnValue(null);
+        loadMonsters.mockResolvedValue([]);
+        rollD20.mockReturnValue(1);
+        getCurrentCombatRound.mockReturnValue(1);
+        vi.spyOn(Date, 'now').mockReturnValue(FROZEN_NOW);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     const mockPlayerStats = {
@@ -152,494 +172,514 @@ describe('primalCompanionHandler', () => {
         { name: 'Beast of the Sky', size: 'Small', hpBase: 4, hpPerLevel: 4, speed: '10 ft', specialSpeed: 'fly 60 ft', attacks: [{ name: "Beast's Strike", damageDice: '1d4', damageFlat: '3 + WIS modifier', damageType: 'Slashing' }] },
     ];
 
-    describe('handle (summon)', () => {
-        it('returns modal when no companion is summoned', async () => {
-            getRuntimeValue.mockReturnValue(null);
+    // Caster fold for mockPlayerStats (WIS 3, spell attack +6, saveDc 13, PB 3):
+    // every action row gains damage_dice_primary (empty string when the source row
+    // has none) and non-null attack_bonus — the save-row artifacts are pinned honestly.
+    const exceptionalTrainingRow = {
+        name: 'Exceptional Training',
+        description: 'Bonus Action: The beast can take the Dash, Disengage, Dodge, or Help action. It can deal Force damage instead of its normal damage type.',
+    };
 
-            const action = makeAction({
-                automation: {
-                    type: 'primal_companion_summon',
-                    action: 'bonus_action',
-                    casting_time: '1 bonus action',
-                    companionTypes: [],
-                },
-            });
+    describe('handle (summon)', () => {
+        // Both summon-modal branches (nothing stored; stored but not on the board)
+        // return the identical modal with zero writes.
+        it.each([
+            ['no companion stored', null, null],
+            ['type stored but companion not in combat', 'Beast of the Land', { creatures: [{ name: 'TestRanger' }] }],
+        ])('returns the summon modal when %s', async (_title, stored, summary) => {
+            getRuntimeValue.mockReturnValue(stored);
+            getCombatSummary.mockReturnValue(summary);
+            const action = makeAction();
 
             const result = await handle(action, mockPlayerStats, mockCampaignName);
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('primalCompanionSummon');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBe(mockPlayerStats);
-            expect(result.payload.campaignName).toBe(mockCampaignName);
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'primalCompanionSummon',
+                payload: { action, playerStats: mockPlayerStats, campaignName: mockCampaignName },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns popup with companion info when companion is already summoned', async () => {
+        it('returns an info popup when the companion is stored AND on the combat board', async () => {
             getRuntimeValue.mockReturnValue('Beast of the Land');
             getCombatSummary.mockReturnValue({ creatures: [{ name: 'Primal Companion (Beast of the Land)' }] });
-
             const action = makeAction();
 
             const result = await handle(action, mockPlayerStats, mockCampaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.automationType).toBe('primal_companion_summon');
-            expect(result.payload.description).toContain('Beast of the Land');
-            expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('returns summon modal when companion type stored but not in combat', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger' }] });
-
-            const action = makeAction();
-
-            const result = await handle(action, mockPlayerStats, mockCampaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('primalCompanionSummon');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    automationType: 'primal_companion_summon',
+                    description: 'Primal Companion: Beast of the Land companion is active.',
+                    automation: action.automation,
+                },
+            });
         });
     });
 
     describe('confirmPrimalCompanionSummon', () => {
-        beforeEach(() => {
+        // Refusal family: every early-return shape must be a zero-spend write census
+        // (no runtime writes, no board write, no log, no board-refresh dispatch).
+        it.each([
+            {
+                label: 'no type selected',
+                selected: null,
+                description: 'No companion type selected.',
+            },
+            {
+                label: 'unknown type',
+                selected: 'Bogey Beast',
+                description: 'Unknown companion type: Bogey Beast.',
+            },
+            {
+                label: 'combat summary unavailable',
+                selected: 'Beast of the Land',
+                summary: null,
+                description: 'Failed to load combat summary.',
+            },
+            {
+                label: 'monster data not found',
+                selected: 'Beast of the Land',
+                monsters: [],
+                description: 'Failed to load Beast of the Land monster data.',
+            },
+            {
+                label: 'companionTypes config missing the selected type',
+                selected: 'Beast of the Land',
+                monsters: mockMonsters,
+                automation: { companionTypes: [] },
+                description: 'Unknown companion type: Beast of the Land.',
+            },
+        ])('refuses with $label: full refusal popup, zero writes, zero dispatch', async ({ selected, summary, monsters, automation, description }) => {
+            getCombatSummary.mockReturnValue(summary === undefined ? { creatures: [] } : summary);
+            if (monsters !== undefined) loadMonsters.mockResolvedValue(monsters);
+            const action = makeAction(automation ? { automation } : {});
+            const updated = vi.fn();
+            const rolled = vi.fn();
+            window.addEventListener('combat-summary-updated', updated);
+            window.addEventListener('initiative-rolled', rolled);
+            try {
+                const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, selected);
+
+                // Refusal payloads carry NO automationType key (honest schema).
+                expect(result).toEqual({
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: 'Primal Companion',
+                        description,
+                        automation: action.automation,
+                    },
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(storage.set).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
+                expect(updated).not.toHaveBeenCalled();
+                expect(rolled).not.toHaveBeenCalled();
+            } finally {
+                window.removeEventListener('combat-summary-updated', updated);
+                window.removeEventListener('initiative-rolled', rolled);
+            }
+        });
+
+        // Success commit: full creature-row pin (all three beasts), ordered write
+        // census, exact log entry, exact popup + logEntries, and the owner-decision
+        // dispatch (PURE board refresh — never initiative-rolled, 2026-11-10).
+        it.each([
+            {
+                type: 'Beast of the Land',
+                size: 'Medium',
+                hp: 30,
+                speed: { walk: '40 ft', climb: 'climb 40 ft' },
+                actions: [
+                    {
+                        name: "Beast's Strike",
+                        // Prose artifact pinned honestly: '+spell attack modifier' folds to '++6'.
+                        description: 'Melee Weapon Attack: ++6, reach 5 ft. Hit: 1d8+2+3 Bludgeoning/Piercing/Slashing damage.',
+                        attack_bonus: 6,
+                        reach: '5 ft.',
+                        damage_dice_primary: '1d8+2+3',
+                        damage_type_primary: 'bludgeoning/piercing/slashing',
+                    },
+                    {
+                        // MA-1344 byte-inert: rows without authored hit_conditions never gain escape_dc.
+                        name: "Beast's Strike — Charge",
+                        description: 'The beast charges forward 20 ft. The target must succeed on a DC 20 Strength saving throw or be knocked prone.',
+                        save_dc: 13,
+                        save_type: 'Str',
+                        damage_dice_primary: '',
+                        attack_bonus: 6,
+                    },
+                    exceptionalTrainingRow,
+                ],
+            },
+            {
+                type: 'Beast of the Sea',
+                size: 'Medium',
+                hp: 30,
+                speed: { walk: '5 ft', swim: 'swim 60 ft' },
+                actions: [
+                    {
+                        name: "Beast's Strike",
+                        description: 'Melee Spell Attack: ++6, reach 5 ft. Hit: 1d6+2+3 Bludgeoning or Piercing damage (your choice), and the target has the Grappled condition (escape DC = 8 + Proficiency Bonus + 3).',
+                        attack_bonus: 6,
+                        reach: '5 ft.',
+                        damage_dice_primary: '1d6+2+3',
+                        damage_type_primary: 'bludgeoning/piercing',
+                        hit_conditions: ['grappled'],
+                        // MA-1344: caster-folded grapple escape DC (8 + PB 3 + WIS 3).
+                        escape_dc: 14,
+                    },
+                    {
+                        name: "Beast's Strike — Grapple",
+                        description: 'The beast lunges to grapple the target. The target must succeed on a DC 20 Wisdom saving throw or become grappled.',
+                        save_dc: 13,
+                        save_type: 'Wis',
+                        damage_dice_primary: '',
+                        attack_bonus: 6,
+                    },
+                    exceptionalTrainingRow,
+                ],
+            },
+            {
+                type: 'Beast of the Sky',
+                size: 'Small',
+                hp: 24,
+                speed: { walk: '10 ft', fly: 'fly 60 ft' },
+                actions: [
+                    {
+                        // Honest divergence pin: the cs row folds from MONSTER data
+                        // (1d8+2+WIS), NOT from the config's attacks (1d4, 3+WIS) —
+                        // the config attacks[] is never consulted for row building.
+                        name: "Beast's Strike",
+                        description: 'Melee Weapon Attack: ++6, reach 5 ft. Hit: 1d8+2+3 Piercing damage.',
+                        attack_bonus: 6,
+                        reach: '5 ft.',
+                        damage_dice_primary: '1d8+2+3',
+                        damage_type_primary: 'piercing',
+                    },
+                    exceptionalTrainingRow,
+                ],
+            },
+        ])('summons $type: full caster-folded row, ordered commit census, one board refresh', async ({ type, size, hp, speed, actions }) => {
             getRuntimeValue.mockImplementation((scope, key) => {
                 if (scope === 'campaign' && key === 'targetEffects') return [];
                 return null;
             });
-        });
-
-        it('returns error when no type selected', async () => {
-            const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toBe('No companion type selected.');
-            expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('returns error when unknown type selected', async () => {
-            const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Unknown Type');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toContain('Unknown companion type');
-        });
-
-        it('returns error when combat summary is unavailable', async () => {
-            getCombatSummary.mockReturnValue(null);
-            const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Beast of the Land');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toBe('Failed to load combat summary.');
-        });
-
-        it('returns error when monster data not found', async () => {
-            getCombatSummary.mockReturnValue({ creatures: [] });
-            loadMonsters.mockResolvedValue([]);
-            const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Beast of the Land');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toContain('Failed to load');
-        });
-
-        it('creates creature and returns success popup when type is valid', async () => {
             getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '15', initiativeBonus: 2 }] });
             loadMonsters.mockResolvedValue(mockMonsters);
-
             const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Beast of the Land');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.automationType).toBe('primal_companion_summon');
-            expect(result.payload.description).toContain('Beast of the Land');
-            expect(result.payload.description).toContain('right after you');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRanger', 'primalCompanionType', 'Beast of the Land', mockCampaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRanger', 'primalCompanionAlive', true, mockCampaignName);
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), mockCampaignName);
-            expect(addEntry).toHaveBeenCalled();
-            expect(result.logEntries).toHaveLength(1);
-            expect(result.logEntries[0].type).toBe('summons');
-
-            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
-            expect(summonedCreature).toBeDefined();
-            expect(summonedCreature.ac).toBe(16);
-            expect(summonedCreature.maxHp).toBe(30);
-            expect(summonedCreature.currentHp).toBe(30);
-            expect(summonedCreature.size).toBe('Medium');
-            expect(summonedCreature.speed.walk).toBe('40 ft');
-            expect(summonedCreature.speed.climb).toBe('climb 40 ft');
-            expect(summonedCreature.saveBonuses.str).toBe(7);
-            expect(summonedCreature.saveBonuses.dex).toBe(3);
-            expect(summonedCreature.saveBonuses.con).toBe(6);
-            expect(summonedCreature.saveBonuses.wis).toBe(5);
-            expect(summonedCreature.actions[0].name).toBe("Beast's Strike");
-            expect(summonedCreature.actions[0].attack_bonus).toBe(6);
-            expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d8+2+3');
-            expect(summonedCreature.actions[0].damage_type_primary).toBe('bludgeoning/piercing/slashing');
-            // MA-1344 byte-inert: rows without authored hit_conditions never gain escape_dc.
-            expect(summonedCreature.actions[0].hit_conditions).toBeUndefined();
-            expect(summonedCreature.actions[0].escape_dc).toBeUndefined();
-            expect(summonedCreature.actions[0].description).toContain('1d8+2+3');
-            expect(summonedCreature.actions[0].description).toContain('+6');
-            expect(summonedCreature.actions.length).toBe(3);
-            expect(summonedCreature.actions[1].name).toBe("Beast's Strike — Charge");
-            expect(summonedCreature.actions[1].save_dc).toBe(13);
-            expect(summonedCreature.actions[1].save_type).toBe('Str');
-            // Caster initiative present: the dice-backed fallback is untouched.
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-
-        // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
-        // the summon join is a PURE board refresh — never the new-combat-reset
-        // event whose mount-scoped consumers wipe pendingOAs / round flags /
-        // Hunter's Mark / concentration.
-        it('dispatches combat-summary-updated EXACTLY once and never initiative-rolled', async () => {
-            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '15', initiativeBonus: 2 }] });
-            loadMonsters.mockResolvedValue(mockMonsters);
-
+            const displayName = `Primal Companion (${type})`;
+            const updated = vi.fn();
             const rolled = vi.fn();
-            const refreshed = vi.fn();
+            window.addEventListener('combat-summary-updated', updated);
             window.addEventListener('initiative-rolled', rolled);
-            window.addEventListener('combat-summary-updated', refreshed);
             try {
-                const result = await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
-                expect(result.type).toBe('popup');
-                expect(refreshed).toHaveBeenCalledTimes(1);
+                const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, type);
+
+                expect(result).toEqual({
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: 'Primal Companion',
+                        automationType: 'primal_companion_summon',
+                        description: `TestRanger summons a Primal Companion (${type}). It acts on your turn, right after you.`,
+                        automation: action.automation,
+                    },
+                    logEntries: [{
+                        type: 'summons',
+                        characterName: 'TestRanger',
+                        summonName: 'Primal Companion',
+                        description: `TestRanger summons a Primal Companion (${type}).`,
+                        summonedCreatures: [displayName],
+                        timestamp: FROZEN_NOW,
+                    }],
+                });
+
+                // Board row: everything the caster fold owes the combat summary.
+                expect(storage.set.mock.calls).toEqual([['combatSummary', expect.any(Object), mockCampaignName]]);
+                const cs = storage.set.mock.calls[0][1];
+                expect(cs.creatures.map(c => c.name)).toEqual(['TestRanger', displayName]); // init 15 sorts above 14.9
+                expect(cs.creatures.find(c => c.name === displayName)).toEqual({
+                    name: displayName,
+                    type: 'npc',
+                    monsterType: 'beast',
+                    initiative: '14.9', // String(caster init 15 − 0.1): acts right after the caster
+                    targetName: null,
+                    ac: 16, // 13 + WIS 3
+                    resistances: [],
+                    immunities: [],
+                    concentration: null,
+                    maxHp: hp,
+                    currentHp: hp,
+                    saveBonuses: { str: 7, dex: 3, con: 6, int: 0, wis: 5, cha: 0 }, // monster saves + PB 3
+                    monsterIndex: `primal-companion-beast-of-the-${type.split(' of the ')[1].toLowerCase()}`,
+                    size,
+                    speed,
+                    actions,
+                    summonedBy: 'TestRanger',
+                    bestialFury: false, // mockPlayerStats lacks the feature — stamp stays false
+                });
+
+                // Ordered commit census: summoned effect, then type, then alive.
+                expect(setRuntimeValue.mock.calls).toEqual([
+                    ['campaign', 'targetEffects', [{ target: displayName, source: 'TestRanger', effect: 'summoned' }], mockCampaignName],
+                    ['TestRanger', 'primalCompanionType', type, mockCampaignName],
+                    ['TestRanger', 'primalCompanionAlive', true, mockCampaignName],
+                ]);
+                expect(addEntry.mock.calls).toEqual([[mockCampaignName, {
+                    type: 'summons',
+                    characterName: 'TestRanger',
+                    summonName: 'Primal Companion',
+                    description: `TestRanger summons a Primal Companion (${type}).`,
+                    summonedCreatures: [displayName],
+                    timestamp: FROZEN_NOW,
+                }]]);
+                // Caster initiative present: the dice-backed fallback is untouched.
+                expect(rollD20).not.toHaveBeenCalled();
+                // PURE board refresh — never the new-combat-reset event whose
+                // mount-scoped consumers wipe pendingOAs / round flags / marks.
+                expect(updated).toHaveBeenCalledTimes(1);
                 expect(rolled).not.toHaveBeenCalled();
             } finally {
+                window.removeEventListener('combat-summary-updated', updated);
                 window.removeEventListener('initiative-rolled', rolled);
-                window.removeEventListener('combat-summary-updated', refreshed);
             }
         });
 
-        it('rolls the companion initiative through the canonical rollD20 lane when the caster has no initiative (fix#169 seed pin)', async () => {
+        it('rolls the companion initiative through the canonical rollD20 lane when the caster has no initiative (fix#169)', async () => {
+            getRuntimeValue.mockImplementation((scope, key) => {
+                if (scope === 'campaign' && key === 'targetEffects') return [];
+                return null;
+            });
             getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '', initiativeBonus: 2 }] });
             loadMonsters.mockResolvedValue(mockMonsters);
             rollD20.mockReturnValue(7);
 
             await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
 
-            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
             // rollD20() + casterInitBonus 2 = 9; buildPrimalCompanionCreature writes String(init − 0.1).
-            expect(rollD20).toHaveBeenCalledTimes(1);
-            expect(rollD20).toHaveBeenCalledWith();
+            expect(rollD20.mock.calls).toEqual([[]]);
+            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
             expect(summonedCreature.initiative).toBe('8.9');
         });
 
-        it('creates Beast of the Sea with correct stats', async () => {
-            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12', initiativeBonus: 1 }] });
+        it('never duplicates the summoned targetEffect on a re-summon', async () => {
+            getRuntimeValue.mockImplementation((scope, key) => {
+                if (scope === 'campaign' && key === 'targetEffects') {
+                    return [{ target: 'Primal Companion (Beast of the Land)', source: 'TestRanger', effect: 'summoned' }];
+                }
+                return null;
+            });
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '15', initiativeBonus: 2 }] });
             loadMonsters.mockResolvedValue(mockMonsters);
 
-            const action = makeAction();
+            await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
 
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Beast of the Sea');
-
-            expect(result.type).toBe('popup');
-
-            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Sea)');
-            expect(summonedCreature).toBeDefined();
-            expect(summonedCreature.ac).toBe(16);
-            expect(summonedCreature.maxHp).toBe(30);
-            expect(summonedCreature.size).toBe('Medium');
-            expect(summonedCreature.speed.swim).toBe('swim 60 ft');
-            expect(summonedCreature.actions[0].name).toBe("Beast's Strike");
-            expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d6+2+3');
-            expect(summonedCreature.actions[0].damage_type_primary).toBe('bludgeoning/piercing');
-            // MA-1344: hit_conditions passthrough + caster-folded escape DC (8 + PB 3 + WIS 3).
-            expect(summonedCreature.actions[0].hit_conditions).toEqual(['grappled']);
-            expect(summonedCreature.actions[0].escape_dc).toBe(14);
-            expect(summonedCreature.actions[0].description).toContain('escape DC = 8 + Proficiency Bonus + 3');
-            expect(summonedCreature.actions.length).toBe(3);
-            expect(summonedCreature.actions[1].name).toBe("Beast's Strike — Grapple");
-            expect(summonedCreature.actions[1].save_dc).toBe(13);
-            expect(summonedCreature.actions[1].save_type).toBe('Wis');
-            expect(summonedCreature.actions[1].escape_dc).toBeUndefined();
-        });
-
-        it('creates Beast of the Sky with correct stats', async () => {
-            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '18', initiativeBonus: 0 }] });
-            loadMonsters.mockResolvedValue(mockMonsters);
-
-            const action = makeAction();
-
-            const result = await confirmPrimalCompanionSummon(action, mockPlayerStats, mockCampaignName, 'Beast of the Sky');
-
-            expect(result.type).toBe('popup');
-
-            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Sky)');
-            expect(summonedCreature).toBeDefined();
-            expect(summonedCreature.ac).toBe(16);
-            expect(summonedCreature.maxHp).toBe(24);
-            expect(summonedCreature.size).toBe('Small');
-            expect(summonedCreature.speed.fly).toBe('fly 60 ft');
-            expect(summonedCreature.actions[0].name).toBe("Beast's Strike");
-            expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d8+2+3');
-            expect(summonedCreature.actions[0].damage_type_primary).toBe('piercing');
-            expect(summonedCreature.actions[0].hit_conditions).toBeUndefined();
-            expect(summonedCreature.actions[0].escape_dc).toBeUndefined();
-            expect(summonedCreature.actions.length).toBe(2);
+            expect(setRuntimeValue.mock.calls[0]).toEqual([
+                'campaign',
+                'targetEffects',
+                [{ target: 'Primal Companion (Beast of the Land)', source: 'TestRanger', effect: 'summoned' }],
+                mockCampaignName,
+            ]);
         });
     });
 
     describe('handleCommand', () => {
-        it('returns popup with companion and command info when companion exists', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Sky');
-
-            const action = makeAction({
-                automation: { type: 'primal_companion_command', commandType: 'beasts_strike' },
-            });
+        it('returns the command popup and writes nothing when the player lacks Bestial Fury', async () => {
+            getRuntimeValue.mockImplementation((scope, key) =>
+                (scope === 'TestRanger' && key === 'primalCompanionType') ? 'Beast of the Sky' : null
+            );
+            const action = makeAction({ automation: { type: 'primal_companion_command' } });
 
             const result = await handleCommand(action, mockPlayerStats, mockCampaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.automationType).toBe('primal_companion_command');
-            expect(result.payload.description).toContain('Beast of the Sky');
-            expect(result.payload.description).toContain("Beast's Strike");
-            // No feature on mockPlayerStats — Fury note must stay absent (hasFeature false path).
-            expect(result.payload.description).not.toContain('Bestial Fury');
-            expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('includes Bestial Fury note when player has the feature', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-            const playerStatsWithFeature = {
-                name: 'TestRanger',
-                class: {
-                    class_levels: [
-                        { features: [{ name: 'Extra Attack' }, { name: 'Bestial Fury' }] },
-                    ],
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    automationType: 'primal_companion_command',
+                    description: "Primal Companion: Commanded Beast of the Sky to use Beast's Strike.",
+                    automation: action.automation,
                 },
-            };
-
-            const result = await handleCommand(action, playerStatsWithFeature, mockCampaignName);
-
-            expect(result.payload.description).toContain("Bestial Fury: beast attacks twice!");
+            });
+            // Non-Fury command: no strike counter, no grant log (zero-spend census).
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('includes Bestial Fury note from subclass levels', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Sea');
-
-            const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-            const playerStatsWithSubclassFeature = {
+        // Bestial Fury is detected through three feature locations; major.features
+        // is pinned by the CLA-036 arming census below — this family covers the other two.
+        it.each([
+            ['class levels', {
+                name: 'TestRanger',
+                class: { class_levels: [{ features: [{ name: 'Extra Attack' }, { name: 'Bestial Fury' }] }] },
+            }],
+            ['subclass levels', {
                 name: 'TestRanger',
                 class: {
                     class_levels: [{ features: [{ name: 'Extra Attack' }] }],
-                    subclass: {
-                        class_levels: [{ features: [{ name: 'Bestial Fury' }] }],
-                    },
+                    subclass: { class_levels: [{ features: [{ name: 'Bestial Fury' }] }] },
                 },
-            };
+            }],
+        ])('notes double-strike when the feature comes from %s', async (_source, stats) => {
+            getRuntimeValue.mockImplementation((scope, key) =>
+                (key === 'primalCompanionType') ? 'Beast of the Land' : null
+            );
+            const action = makeAction({ automation: { type: 'primal_companion_command' } });
 
-            const result = await handleCommand(action, playerStatsWithSubclassFeature, mockCampaignName);
+            const result = await handleCommand(action, stats, mockCampaignName);
 
-            expect(result.payload.description).toContain("Bestial Fury: beast attacks twice!");
+            expect(result.payload.description).toBe("Primal Companion: Commanded Beast of the Land to use Beast's Strike. Bestial Fury: beast attacks twice!");
         });
 
-        it('returns error when no companion is summoned', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
+        it('refuses when no companion is summoned (zero writes)', async () => {
             const action = makeAction({ automation: { type: 'primal_companion_command' } });
 
             const result = await handleCommand(action, mockPlayerStats, mockCampaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toBe('No primal companion summoned.');
-            expect(result.payload.automation).toBe(action.automation);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    description: 'No primal companion summoned.',
+                    automation: action.automation,
+                },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
     describe('handleRestore', () => {
-        it('restores companion and returns success popup', async () => {
+        it('flips primalCompanionAlive exactly once and returns the restored popup', async () => {
             getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({
-                automation: { type: 'primal_companion_restore', spellSlotCost: true },
-            });
+            const action = makeAction({ automation: { type: 'primal_companion_restore', spellSlotCost: true } });
 
             const result = await handleRestore(action, mockPlayerStats, mockCampaignName);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRanger',
-                'primalCompanionAlive',
-                true,
-                mockCampaignName
-            );
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.automationType).toBe('primal_companion_restore');
-            expect(result.payload.description).toContain('Beast of the Land');
-            expect(result.payload.description).toContain('restored with full HP');
-            expect(result.payload.automation).toBe(action.automation);
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['TestRanger', 'primalCompanionAlive', true, mockCampaignName],
+            ]);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    automationType: 'primal_companion_restore',
+                    description: 'Primal Companion: Beast of the Land restored with full HP after 1 minute.',
+                    automation: action.automation,
+                },
+            });
+            // Pin of record: the restore lane logs nothing to the campaign log.
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns error when no companion to restore', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
+        it('refuses when no companion exists (zero writes)', async () => {
             const action = makeAction({ automation: { type: 'primal_companion_restore' } });
 
             const result = await handleRestore(action, mockPlayerStats, mockCampaignName);
 
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    description: 'No primal companion to restore.',
+                    automation: action.automation,
+                },
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Primal Companion');
-            expect(result.payload.description).toBe('No primal companion to restore.');
-            expect(result.payload.automation).toBe(action.automation);
         });
     });
 
-    describe('handleBonusActionCommand', () => {
-        it('returns modal with companion info when companion exists', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
+    describe('bonus action command (Exceptional Training)', () => {
+        const trainingAction = (automation = {}) => makeAction({
+            name: 'Exceptional Training',
+            automation: { type: 'primal_companion_bonus_action_command', ...automation },
+        });
 
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command', forceDamageOption: true },
-            });
+        it('opens the command modal when a companion is summoned', async () => {
+            getRuntimeValue.mockReturnValue('Beast of the Land');
+            const action = trainingAction({ forceDamageOption: true });
 
             const result = await handleBonusActionCommand(action, mockPlayerStats, mockCampaignName);
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('primalCompanionBonusActionCommand');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBe(mockPlayerStats);
-            expect(result.payload.campaignName).toBe(mockCampaignName);
-            expect(result.payload.companionType).toBe('Beast of the Land');
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'primalCompanionBonusActionCommand',
+                payload: { action, playerStats: mockPlayerStats, campaignName: mockCampaignName, companionType: 'Beast of the Land' },
+            });
         });
 
-        it('returns error popup when no companion is summoned', async () => {
-            getRuntimeValue.mockReturnValue(null);
+        it('refuses both modal-open and apply when no companion is summoned (zero writes)', async () => {
+            const refusal = {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Exceptional Training',
+                    description: 'No primal companion to command.',
+                    automation: trainingAction().automation,
+                },
+            };
 
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command' },
-            });
-
-            const result = await handleBonusActionCommand(action, mockPlayerStats, mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Exceptional Training');
-            expect(result.payload.description).toBe('No primal companion to command.');
-            expect(result.payload.automation).toBe(action.automation);
-        });
-    });
-
-    describe('applyBonusActionCommand', () => {
-        it('returns success popup with selected action when companion exists', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command', forceDamageOption: true },
-            });
-
-            const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, 'Dash', false);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Exceptional Training');
-            expect(result.payload.automationType).toBe('primal_companion_bonus_action_command');
-            expect(result.payload.description).toContain('Beast of the Land');
-            expect(result.payload.description).toContain('Dash');
-            expect(result.payload.description).not.toContain('Force');
-            expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('includes Force damage note when useForceDamage is true and option is available', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Sea');
-
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command', forceDamageOption: true },
-            });
-
-            const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, 'Dodge', true);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Force damage');
-            expect(result.payload.description).toContain('instead of its normal damage type');
-        });
-
-        it('omits Force damage note when useForceDamage is true but option is not available', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Sky');
-
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command', forceDamageOption: false },
-            });
-
-            const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, 'Help', true);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).not.toContain('Force damage');
-        });
-
-        it('returns error when no companion is summoned', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command' },
-            });
-
-            const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, 'Dash', false);
-
+            expect(await handleBonusActionCommand(trainingAction(), mockPlayerStats, mockCampaignName)).toEqual(refusal);
+            expect(await applyBonusActionCommand(trainingAction(), mockPlayerStats, mockCampaignName, 'Dash', false)).toEqual(refusal);
             expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Exceptional Training');
-            expect(result.payload.description).toBe('No primal companion to command.');
-            expect(result.payload.automation).toBe(action.automation);
         });
 
-        it('returns error when invalid action selected', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Sky');
+        // Force-damage note matrix: note only when BOTH the toggle and the authored
+        // option are on. Full popup pins; nothing in this lane writes or logs.
+        it.each([
+            { type: 'Beast of the Land', option: true, useForce: false, command: 'Dash', forceNote: false },
+            { type: 'Beast of the Sea', option: true, useForce: true, command: 'Dodge', forceNote: true },
+            { type: 'Beast of the Sky', option: false, useForce: true, command: 'Help', forceNote: false },
+        ])('apply: $command (option=$option, force=$useForce) folds the Force note: $forceNote', async ({ type, option, useForce, command, forceNote }) => {
+            getRuntimeValue.mockReturnValue(type);
+            const action = trainingAction({ forceDamageOption: option });
 
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command' },
+            const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, command, useForce);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Exceptional Training',
+                    automationType: 'primal_companion_bonus_action_command',
+                    description: `Exceptional Training: Commanded ${type} to take a ${command} action as a Bonus Action.`
+                        + (forceNote ? ' Companion deals Force damage instead of its normal damage type.' : ''),
+                    automation: action.automation,
+                },
             });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('rejects an unknown action name with "No action selected." (full shape)', async () => {
+            getRuntimeValue.mockReturnValue('Beast of the Sky');
+            const action = trainingAction();
 
             const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, 'InvalidAction', false);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Exceptional Training');
-            expect(result.payload.description).toBe('No action selected.');
-            expect(result.payload.automation).toBe(action.automation);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Exceptional Training',
+                    description: 'No action selected.',
+                    automation: action.automation,
+                },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-
     });
 
     // CLA-036 — Bestial Fury: double-strike economy + Hunter's Mark extra-Force rider.
@@ -664,13 +704,13 @@ describe('primalCompanionHandler', () => {
                 },
             },
         };
+        const companion = 'Primal Companion (Beast of the Land)';
         let runtimeStore;
         let currentRound;
 
         beforeEach(() => {
             runtimeStore = {};
             currentRound = 1;
-            getCombatSummary.mockReset();
             getCurrentCombatRound.mockImplementation(() => currentRound);
             getRuntimeValue.mockImplementation((scope, key) => {
                 if (scope === 'campaign' && key === 'targetEffects') return [];
@@ -681,7 +721,6 @@ describe('primalCompanionHandler', () => {
                 runtimeStore[scope] = runtimeStore[scope] || {};
                 runtimeStore[scope][key] = value;
             });
-            addEntry.mockResolvedValue({});
         });
 
         const furyStrikeAction = () => ({
@@ -693,112 +732,146 @@ describe('primalCompanionHandler', () => {
             bestial_fury_bonus: { expression: '1d6', damageType: 'Force' },
         });
 
-        describe('resolveBestialFuryBonus', () => {
-            it('reads the app-data 1d6 Force automation expression', () => {
-                expect(resolveBestialFuryBonus(furyPlayerStats)).toEqual({ expression: '1d6', damageType: 'Force' });
-            });
+        it('resolveBestialFuryBonus reads the feature automation expression, falling back to 1d6 Force', () => {
+            expect(resolveBestialFuryBonus(furyPlayerStats)).toEqual({ expression: '1d6', damageType: 'Force' });
+            const custom = {
+                class: {
+                    major: {
+                        features: [{
+                            name: 'Bestial Fury',
+                            automation: [{ type: 'primal_companion_double_strike_damage', damageExpression: '2d8', damageType: 'Radiant' }],
+                        }],
+                    },
+                },
+            };
+            expect(resolveBestialFuryBonus(custom)).toEqual({ expression: '2d8', damageType: 'Radiant' });
+            expect(resolveBestialFuryBonus({ name: 'X' })).toEqual({ expression: '1d6', damageType: 'Force' });
+        });
 
-            it('falls back to 1d6 Force without the feature', () => {
-                expect(resolveBestialFuryBonus({ name: 'X' })).toEqual({ expression: '1d6', damageType: 'Force' });
+        it('Fury summon stamps the full double-strike row onto the board (save-row twin inert)', async () => {
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12' }] });
+            loadMonsters.mockResolvedValue(mockMonsters);
+
+            await confirmPrimalCompanionSummon(makeAction(), furyPlayerStats, mockCampaignName, 'Beast of the Land');
+
+            // Level 11, WIS 3, spell attack +9, saveDc 16: full Fury-folded row.
+            expect(storage.set.mock.calls[0][1].creatures.find(c => c.name === companion)).toEqual({
+                name: companion,
+                type: 'npc',
+                monsterType: 'beast',
+                initiative: '11.9',
+                targetName: null,
+                ac: 16,
+                resistances: [],
+                immunities: [],
+                concentration: null,
+                maxHp: 60,
+                currentHp: 60,
+                saveBonuses: { str: 7, dex: 3, con: 6, int: 0, wis: 5, cha: 0 },
+                monsterIndex: 'primal-companion-beast-of-the-land',
+                size: 'Medium',
+                speed: { walk: '40 ft', climb: 'climb 40 ft' },
+                actions: [
+                    {
+                        name: "Beast's Strike",
+                        // Damage-type prose folds to Force and the (twice per turn)
+                        // suffix rides the WEAPON row...
+                        description: 'Melee Weapon Attack: ++9, reach 5 ft. Hit: 1d8+2+3 Force damage. (can be used twice per turn)',
+                        attack_bonus: 9,
+                        reach: '5 ft.',
+                        damage_dice_primary: '1d8+2+3',
+                        damage_type_primary: 'Force',
+                        bestial_fury_double_strike: true,
+                        bestial_fury_bonus: { expression: '1d6', damageType: 'Force' },
+                    },
+                    {
+                        // ...and the save-row twin honestly inherits the same prose/type
+                        // fold but NEVER the gate/rider stamps.
+                        name: "Beast's Strike — Charge",
+                        description: 'The beast charges forward 20 ft. The target must succeed on a DC 20 Strength saving throw or be knocked prone. (can be used twice per turn)',
+                        save_dc: 16,
+                        save_type: 'Str',
+                        damage_dice_primary: '',
+                        attack_bonus: 9,
+                        damage_type_primary: 'Force',
+                    },
+                    exceptionalTrainingRow,
+                ],
+                summonedBy: 'TestRanger',
+                bestialFury: true,
             });
         });
 
-        describe('summon stamps', () => {
-            it('Fury summon arms the strike gate + rider transport with provenance', async () => {
-                getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12' }] });
-                loadMonsters.mockResolvedValue(mockMonsters);
+        it('Fury command arms the 2-strike counter and logs the grant — exact census', async () => {
+            runtimeStore['TestRanger'] = { primalCompanionType: 'Beast of the Land' };
+            const action = makeAction({ automation: { type: 'primal_companion_command' } });
 
-                await confirmPrimalCompanionSummon(makeAction(), furyPlayerStats, mockCampaignName, 'Beast of the Land');
+            const result = await handleCommand(action, furyPlayerStats, mockCampaignName);
 
-                const cs = storage.set.mock.calls[0][1];
-                const companion = cs.creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
-                expect(companion.summonedBy).toBe('TestRanger');
-                expect(companion.bestialFury).toBe(true);
-                const strike = companion.actions.find(a => a.name === "Beast's Strike");
-                expect(strike.bestial_fury_double_strike).toBe(true);
-                expect(strike.bestial_fury_bonus).toEqual({ expression: '1d6', damageType: 'Force' });
-                // Save-row twin stays byte-inert (Charge never passes the attack-chip gate).
-                const charge = companion.actions.find(a => a.name === "Beast's Strike — Charge");
-                expect(charge.bestial_fury_double_strike).toBeUndefined();
-                expect(charge.bestial_fury_bonus).toBeUndefined();
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Primal Companion',
+                    automationType: 'primal_companion_command',
+                    description: "Primal Companion: Commanded Beast of the Land to use Beast's Strike. Bestial Fury: beast attacks twice!",
+                    automation: action.automation,
+                },
             });
-
-            it('non-Fury summon stays byte-inert (no stamps)', async () => {
-                getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12' }] });
-                loadMonsters.mockResolvedValue(mockMonsters);
-
-                await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
-
-                const cs = storage.set.mock.calls[0][1];
-                const companion = cs.creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
-                expect(companion.bestialFury).toBe(false);
-                expect(companion.actions[0].bestial_fury_double_strike).toBeUndefined();
-                expect(companion.actions[0].bestial_fury_bonus).toBeUndefined();
-            });
-        });
-
-        describe('handleCommand arming', () => {
-            it('Fury command arms the 2-strike counter + logs the grant', async () => {
-                getRuntimeValue.mockImplementation((scope, key) => {
-                    if (key === 'primalCompanionType') return 'Beast of the Land';
-                    const bag = runtimeStore[scope] || {};
-                    return bag[key] ?? null;
-                });
-                const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-                const result = await handleCommand(action, furyPlayerStats, mockCampaignName);
-
-                expect(result.payload.description).toContain('Bestial Fury: beast attacks twice!');
-                expect(setRuntimeValue).toHaveBeenCalledWith('Primal Companion (Beast of the Land)', BESTIAL_FURY_STRIKES_KEY, { round: 1, used: 0 }, mockCampaignName);
-                const grant = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_command');
-                expect(grant).toBeDefined();
-                expect(grant.characterName).toBe('TestRanger');
-            });
-
-            it('non-Fury command writes no counter and logs no grant', async () => {
-                getRuntimeValue.mockImplementation((scope, key) => {
-                    if (key === 'primalCompanionType') return 'Beast of the Land';
-                    const bag = runtimeStore[scope] || {};
-                    return bag[key] ?? null;
-                });
-                const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-                await handleCommand(action, mockPlayerStats, mockCampaignName);
-
-                expect(setRuntimeValue).not.toHaveBeenCalledWith('Primal Companion (Beast of the Land)', BESTIAL_FURY_STRIKES_KEY, expect.anything(), mockCampaignName);
-                expect(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_command')).toBeUndefined();
-            });
+            expect(setRuntimeValue.mock.calls).toEqual([
+                [companion, BESTIAL_FURY_STRIKES_KEY, { round: 1, used: 0 }, mockCampaignName],
+            ]);
+            expect(addEntry.mock.calls).toEqual([[mockCampaignName, {
+                type: 'automation',
+                automationType: 'bestial_fury_command',
+                characterName: 'TestRanger',
+                abilityName: 'Primal Companion',
+                description: "TestRanger commands Primal Companion (Beast of the Land) to take Beast's Strike — Bestial Fury grants 2 strikes this turn.",
+                timestamp: FROZEN_NOW,
+            }]]);
         });
 
         describe('resolveBestialFuryStrikeGate (double-strike economy)', () => {
-            const companion = 'Primal Companion (Beast of the Land)';
-
-            it('is byte-inert for unstamped rows (zero write, zero log)', () => {
+            it('is byte-inert for unstamped rows (zero write, zero log, no popup)', () => {
+                const setPopupHtml = vi.fn();
                 const refused = resolveBestialFuryStrikeGate({
-                    campaignName: mockCampaignName, monsterName: 'Bandit 1', action: { name: 'Scimitar', attack_bonus: 4 }, setPopupHtml: vi.fn(),
+                    campaignName: mockCampaignName, monsterName: 'Bandit 1', action: { name: 'Scimitar', attack_bonus: 4 }, setPopupHtml,
                 });
                 expect(refused).toBe(false);
                 expect(setRuntimeValue).not.toHaveBeenCalled();
                 expect(addEntry).not.toHaveBeenCalled();
+                expect(setPopupHtml).not.toHaveBeenCalled();
             });
 
-            it('allows exactly two strikes per command then refuses the third (zero roll)', () => {
+            it('allows exactly two strikes per command then refuses the third (zero extra write)', () => {
                 const setPopupHtml = vi.fn();
                 const press = () => resolveBestialFuryStrikeGate({
                     campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml,
                 });
 
                 expect(press()).toBe(false);
-                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 1 });
                 expect(press()).toBe(false);
-                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 2 });
+                expect(setRuntimeValue.mock.calls).toEqual([
+                    [companion, BESTIAL_FURY_STRIKES_KEY, { round: 1, used: 1 }, mockCampaignName],
+                    [companion, BESTIAL_FURY_STRIKES_KEY, { round: 1, used: 2 }, mockCampaignName],
+                ]);
 
                 expect(press()).toBe(true);
-                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 2 });
-                expect(setPopupHtml).toHaveBeenCalled();
-                const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_refused');
-                expect(refusal).toBeDefined();
-                expect(refusal.characterName).toBe(companion);
+                // Third press: no third write, popup + refusal log, zero roll seams.
+                expect(setRuntimeValue.mock.calls).toHaveLength(2);
+                expect(setPopupHtml.mock.calls).toEqual([[{
+                    type: 'automation_info',
+                    name: 'Bestial Fury',
+                    description: `${companion} has already taken both Beast's Strike attacks granted by the command this turn — attack refused.`,
+                }]]);
+                expect(addEntry.mock.calls).toEqual([[mockCampaignName, {
+                    type: 'automation',
+                    automationType: 'bestial_fury_refused',
+                    characterName: companion,
+                    abilityName: "Beast's Strike",
+                    description: `${companion}: Beast's Strike refused (bestial_fury_refused — 2 strikes already used this command).`,
+                    timestamp: FROZEN_NOW,
+                }]]);
             });
 
             it('round-wrap re-arms the counter (stale stamp reads fresh)', () => {
@@ -808,32 +881,33 @@ describe('primalCompanionHandler', () => {
                     campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml: vi.fn(),
                 });
                 expect(refused).toBe(false);
-                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 2, used: 1 });
+                expect(setRuntimeValue.mock.calls).toEqual([
+                    [companion, BESTIAL_FURY_STRIKES_KEY, { round: 2, used: 1 }, mockCampaignName],
+                ]);
             });
         });
 
         describe('resolveBestialFuryMarkStrike (Hunter\'s Mark rider)', () => {
-            const companion = 'Primal Companion (Beast of the Land)';
             let rollDamage;
 
-            function seedBoard(target) {
+            function seedBoard(markTarget) {
                 getCombatSummary.mockReturnValue({
                     creatures: [
                         { name: companion, type: 'npc', summonedBy: 'TestRanger', bestialFury: true },
-                        { name: 'TestRanger', type: 'player', concentration: target ? { spell: "Hunter's Mark", dc: 17, target } : null },
+                        { name: 'TestRanger', type: 'player', concentration: markTarget ? { spell: "Hunter's Mark", dc: 17, target: markTarget } : null },
                         { name: 'Bandit 1', type: 'npc' },
                     ],
                 });
             }
 
-            const autoHit = (targetName = 'Bandit 1') => ({
+            const autoHit = (targetName = 'Bandit 1', bonus = { expression: '1d6', damageType: 'Force' }) => ({
                 name: "Beast's Strike",
                 formula: '1d8+2+3',
                 total: 7,
                 attackerName: companion,
                 targetName,
                 bestialFuryRider: true,
-                bestialFuryBonus: { expression: '1d6', damageType: 'Force' },
+                bestialFuryBonus: bonus,
             });
 
             beforeEach(() => {
@@ -845,70 +919,82 @@ describe('primalCompanionHandler', () => {
                 const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: 'Bandit 1', autoDamage: { name: 'Scimitar', targetName: 'ElderPaladin' }, rollDamage });
                 expect(res).toBeNull();
                 expect(addEntry).not.toHaveBeenCalled();
+                expect(setRuntimeValue).not.toHaveBeenCalled();
                 expect(rollDamage).not.toHaveBeenCalled();
             });
 
-            it('first HIT under Hunter\'s Mark folds a separate 1d6 Force leg, logs trigger + grant, latches the round', async () => {
+            // Real rollExpression (diceRoller spread mock): totals unpinned, the
+            // transported expression (custom die respected) fully pinned.
+            it.each([
+                ['1d6', { expression: '1d6', damageType: 'Force' }],
+                ['2d6', { expression: '2d6', damageType: 'Force' }],
+            ])('first HIT under Hunter\'s Mark folds a separate %s leg, logs trigger + grant, latches the round', async (_label, bonus) => {
                 seedBoard('Bandit 1');
 
-                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit('Bandit 1', bonus), rollDamage });
+
+                expect(rollDamage.mock.calls).toEqual([[{
+                    name: "Beast's Strike — Bestial Fury",
+                    formula: bonus.expression,
+                    total: expect.any(Number),
+                    rolls: expect.any(Array),
+                    modifier: 0,
+                    context: { damageType: 'Force', targetName: 'Bandit 1', attackerName: companion },
+                }]]);
+                expect(res.total).toBe(rollDamage.mock.calls[0][0].total);
+                expect(setRuntimeValue.mock.calls).toEqual([
+                    [companion, BESTIAL_FURY_MARK_LATCH_KEY, 1, mockCampaignName],
+                ]);
 
                 const logs = addEntry.mock.calls.map(c => c[1]);
-                const trigger = logs.find(e => e.automationType === 'companion_beasts_strike_hit');
-                expect(trigger).toBeDefined();
-                expect(trigger.characterName).toBe(companion);
-                expect(res).not.toBeNull();
-                expect(rollDamage).toHaveBeenCalledTimes(1);
-                const leg = rollDamage.mock.calls[0][0];
-                expect(leg.formula).toBe('1d6');
-                expect(leg.context.damageType).toBe('Force');
-                expect(leg.context.attackerName).toBe(companion);
-                expect(leg.context.targetName).toBe('Bandit 1');
-                expect(leg.name).toContain('Bestial Fury');
-                expect(runtimeStore[companion][BESTIAL_FURY_MARK_LATCH_KEY]).toBe(1);
-                expect(logs.find(e => e.automationType === 'bestial_fury_mark_bonus')).toBeDefined();
-            });
-
-            it('second HIT same turn: trigger still logs, rider gated off once per turn (no extra die)', async () => {
-                seedBoard('Bandit 1');
-                runtimeStore[companion] = { [BESTIAL_FURY_MARK_LATCH_KEY]: 1 };
-
-                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
-
-                expect(res).toBeNull();
-                expect(rollDamage).not.toHaveBeenCalled();
-                const logs = addEntry.mock.calls.map(c => c[1]);
-                expect(logs.find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
-                expect(logs.find(e => e.automationType === 'bestial_fury_refused')).toBeDefined();
-            });
-
-            it('HIT on an unmarked target folds nothing (trigger logged, no refusal needed)', async () => {
-                seedBoard('Bandit 1');
-                getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: companion, summonedBy: 'TestRanger' },
-                        { name: 'TestRanger', concentration: { spell: "Hunter's Mark", dc: 17, target: 'Bandit 1' } },
-                        { name: 'Bandit 2', type: 'npc' },
-                    ],
+                expect(logs[0]).toEqual({
+                    type: 'automation',
+                    automationType: 'companion_beasts_strike_hit',
+                    characterName: companion,
+                    abilityName: "Beast's Strike",
+                    description: `${companion} hits Bandit 1 with Beast's Strike (companion_beasts_strike_hit).`,
+                    timestamp: FROZEN_NOW,
                 });
+                expect(logs[1]).toEqual(expect.objectContaining({
+                    automationType: 'bestial_fury_mark_bonus',
+                    characterName: companion,
+                    description: expect.stringContaining(`deals extra ${bonus.expression} Force (Hunter's Mark on Bandit 1)`),
+                }));
+            });
 
-                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit('Bandit 2'), rollDamage });
+            // Rider-off branches: the trigger event ALWAYS logs; the extra die never folds.
+            it.each([
+                {
+                    label: 'second HIT same turn (once-per-turn latch)',
+                    setup: () => { runtimeStore[companion] = { [BESTIAL_FURY_MARK_LATCH_KEY]: 1 }; },
+                    target: 'Bandit 1',
+                    expectRefused: true,
+                },
+                {
+                    label: 'HIT on an unmarked target',
+                    setup: () => {},
+                    target: 'Bandit 2',
+                    expectRefused: false,
+                },
+                {
+                    label: 'no Hunter\'s Mark concentration at all',
+                    setup: () => seedBoard(null),
+                    target: 'Bandit 1',
+                    expectRefused: false,
+                },
+            ])('rider off for $label: trigger logged, zero fold', async ({ setup, target, expectRefused }) => {
+                seedBoard('Bandit 1');
+                setup();
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(target), rollDamage });
 
                 expect(res).toBeNull();
                 expect(rollDamage).not.toHaveBeenCalled();
+                expect(setRuntimeValue).not.toHaveBeenCalled();
                 const logs = addEntry.mock.calls.map(c => c[1]);
                 expect(logs.find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
                 expect(logs.find(e => e.automationType === 'bestial_fury_mark_bonus')).toBeUndefined();
-            });
-
-            it('no Hunter\'s Mark concentration at all: trigger logged, zero fold', async () => {
-                seedBoard(null);
-
-                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
-
-                expect(res).toBeNull();
-                expect(rollDamage).not.toHaveBeenCalled();
-                expect(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
+                expect(!!logs.find(e => e.automationType === 'bestial_fury_refused')).toBe(expectRefused);
             });
 
             it('next round re-folds (stale latch)', async () => {
@@ -920,17 +1006,9 @@ describe('primalCompanionHandler', () => {
 
                 expect(res).not.toBeNull();
                 expect(rollDamage).toHaveBeenCalledTimes(1);
-                expect(runtimeStore[companion][BESTIAL_FURY_MARK_LATCH_KEY]).toBe(2);
-            });
-
-            it('rolls the transported bonus expression (custom die respected)', async () => {
-                seedBoard('Bandit 1');
-                const auto = autoHit();
-                auto.bestialFuryBonus = { expression: '2d6', damageType: 'Force' };
-
-                await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: auto, rollDamage });
-
-                expect(rollDamage.mock.calls[0][0].formula).toBe('2d6');
+                expect(setRuntimeValue.mock.calls).toEqual([
+                    [companion, BESTIAL_FURY_MARK_LATCH_KEY, 2, mockCampaignName],
+                ]);
             });
         });
     });

@@ -1,13 +1,18 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Ownerless minor effects at the createLogAndShow roll seam: Sundering Blow,
-// Bane/Bless attack folds, target-side Lucky feat, Sacred Weapon labelling,
-// maneuver preload, Bardic Inspiration defense context, Pending Skill Check
-// (Ambush). Behaviors with dedicated lanes were removed: ray-of-enfeeblement
-// STR disadvantage (same strCheckDisadvantage consumer is owned by
-// d20RollComputation.weakening-breath.test.js), cosmic omen fold
-// (cosmicOmenHandler.pending-store.test.js), explicit target resolution
-// (useLoggedDiceRollAttack.test.js "target resolution"), Halfling Lucky
-// reroll (d20RollComputation.test.js).
+// target-SELF-applied bane branch, Bless attack fold, target-side + attacker-side
+// Lucky feat consumption, Sacred Weapon labelling, maneuver preload, Bardic
+// Inspiration defense context, Pending Skill Check (Ambush).
+// Deferred to stronger owners (family map): ray-of-enfeeblement STR
+// disadvantage (d20RollComputation.weakening-breath.test.js), cosmic omen fold
+// (cosmicOmenHandler.pending-store.test.js), explicit target resolution +
+// log/popup essentials (useLoggedDiceRollAttack.test.js), Halfling Lucky reroll
+// and its dice law (d20RollComputation.test.js), attacker-side bane fold BYTES
+// incl. the attack-only check gate (d20RollComputation.subtract-die.test.js
+// #937 — seam-level bane re-shadow and the bane-on-check falsifier removed
+// 2026-11-26; only the target-self-applied branch survives here), Lucky-flip
+// 2d20 pool SHAPE (useLoggedDiceRollAttack.ledger-dice.test.js — §82 dice-law
+// authority; this lane pins only flag consumption + row mode/total).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -210,6 +215,11 @@ function noTarget() {
     loadCombatSummary.mockResolvedValue({ creatures: [] });
 }
 
+function mockGoblinTarget(ac = 12) {
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac });
+    loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac }] });
+}
+
 function getDefaultMocks() {
     rollD20.mockReturnValue(15);
     rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
@@ -224,15 +234,15 @@ function getDefaultMocks() {
     utils.getName.mockImplementation((n) => n);
 }
 
-describe('createLogAndShow - Sundering Blow', () => {
+describe('createLogAndShow - Sundering Blow (target-side next_attack_bonus)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
     });
 
-    it('adds +5 hit bonus when next_attack_bonus effect exists on target with default value', async () => {
+    it('folds the bonus into the log row and popup: default +5, parsed custom value, unparseable falls back to +5', async () => {
         mockTargetEffects([{ target: 'Goblin', effect: 'next_attack_bonus', value: '5' }]);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 22 });
+        mockGoblinTarget(22);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
@@ -244,161 +254,135 @@ describe('createLogAndShow - Sundering Blow', () => {
             bonus: 10,
             bonusDetail: expect.stringContaining('Sundering Blow'),
         }));
-    });
 
-    it('parses a custom effect value and falls back to +5 when unparseable', async () => {
         mockTargetEffects([{ target: 'Goblin', effect: 'next_attack_bonus', value: '10' }]);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 27 });
-        const fn = createFn();
+        mockGoblinTarget(27);
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
             bonus: 15,
         }));
 
         mockTargetEffects([{ target: 'Goblin', effect: 'next_attack_bonus', value: 'invalid' }]);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 22 });
+        mockGoblinTarget(22);
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
         expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
             bonus: 10,
         }));
     });
 
-    it('is inert when the effect is on the attacker instead of the target', async () => {
+    it('is inert when the effect sits on the attacker, and on non-attack roll types', async () => {
         mockTargetEffects([{ target: 'TestFighter', effect: 'next_attack_bonus', value: '10' }]);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+        mockGoblinTarget(12);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
             bonus: 5,
+            bonusDetail: expect.not.stringContaining('Sundering Blow'),
         }));
-    });
 
-    it('is inert for non-attack roll types', async () => {
         mockTargetEffects([{ target: 'Goblin', effect: 'next_attack_bonus', value: '10' }]);
-        const fn = createFn();
         await fn('Athletics', 3, 'check', {});
-
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
             bonus: 3,
+            bonusDetail: expect.not.stringContaining('Sundering Blow'),
         }));
     });
 });
 
-describe('createLogAndShow - Bane Attack Penalty', () => {
+describe('createLogAndShow - target-self-applied bane branch', () => {
+    // Attacker-side bane fold bytes and the attack-only gate are owned by
+    // d20RollComputation.subtract-die.test.js (#937). Only the d20RollComputation
+    // :80 branch (te.target === targetName && te.source === targetName, e.g.
+    // Blade Ward self-cast) is exercised here at the caller seam.
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
     });
 
-    it('applies -1d4 penalty when bane_penalty effect is on attacker during attack', async () => {
-        mockTargetEffects([{ target: 'TestFighter', effect: 'bane_penalty' }]);
-        rollExpression.mockReturnValue({ total: 2, rolls: [2], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+    it('rolls the -1d4 and folds the penalty when the target self-applied bane_penalty', async () => {
+        mockTargetEffects([{ target: 'Goblin', effect: 'bane_penalty', source: 'Goblin' }]);
+        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
+        mockGoblinTarget(20);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
         expect(rollExpression).toHaveBeenCalledWith('1d4');
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
+            bonus: 2,
             bonusDetail: expect.stringContaining('Bane'),
         }));
     });
-
-    it('applies bane penalty when target self-applies blade ward effect', async () => {
-        mockTargetEffects([{ target: 'Goblin', effect: 'bane_penalty', source: 'Goblin' }]);
-        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
-        expect(rollExpression).toHaveBeenCalledWith('1d4');
-    });
-
-    it('does not apply bane for non-attack roll types', async () => {
-        mockTargetEffects([{ target: 'TestFighter', effect: 'bane_penalty' }]);
-        const fn = createFn();
-        await fn('Athletics', 3, 'check', {});
-
-        expect(rollExpression).not.toHaveBeenCalledWith('1d4');
-    });
 });
 
-describe('createLogAndShow - Bless Attack Bonus', () => {
+describe('createLogAndShow - Bless attack bonus', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
     });
 
-    it('adds 1d4 bonus when bless_bonus effect is on attacker during attack', async () => {
+    it('rolls the 1d4 and folds it into attack rows only — never on checks', async () => {
         mockTargetEffects([{ target: 'TestFighter', effect: 'bless_bonus' }]);
         rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 24 });
+        mockGoblinTarget(24);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
         expect(rollExpression).toHaveBeenCalledWith('1d4');
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
+            bonus: 9,
             bonusDetail: expect.stringContaining('Bless'),
         }));
-    });
 
-    it('does not apply bless for non-attack roll types', async () => {
-        mockTargetEffects([{ target: 'TestFighter', effect: 'bless_bonus' }]);
-        const fn = createFn();
+        rollExpression.mockClear();
         await fn('Athletics', 3, 'check', {});
-
         expect(rollExpression).not.toHaveBeenCalledWith('1d4');
     });
 });
 
-describe('createLogAndShow - Lucky feat advantage/disadvantage', () => {
+describe('createLogAndShow - Lucky feat consumption', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
     });
 
-    it('applies disadvantage and clears the flag when target has luckyDisadvantageActive', async () => {
-        mockRuntimeValue({
-            'Goblin:luckyDisadvantageActive': true,
-        });
-        rollD20.mockReturnValueOnce(9).mockReturnValueOnce(3);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+    it.each([
+        { flag: 'luckyDisadvantageActive', mode: 'disadvantage', rolls: [9, 3], total: 3 },
+        { flag: 'luckyAdvantageActive', mode: 'advantage', rolls: [3, 9], total: 9 },
+    ])('consumes the target $flag flag and lands the row under $mode', async ({ flag, mode, rolls, total }) => {
+        mockRuntimeValue({ [`Goblin:${flag}`]: true });
+        rollD20.mockReturnValueOnce(rolls[0]).mockReturnValueOnce(rolls[1]);
+        mockGoblinTarget(12);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'luckyDisadvantageActive', null, 'test-campaign');
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            mode: 'disadvantage',
-            total: 3,
+        expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', flag, null, 'test-campaign');
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
+            mode,
+            total,
         }));
     });
 
-    it('applies advantage and clears the flag when target has luckyAdvantageActive', async () => {
-        mockRuntimeValue({
-            'Goblin:luckyAdvantageActive': true,
-        });
-        rollD20.mockReturnValueOnce(3).mockReturnValueOnce(9);
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'luckyAdvantageActive', null, 'test-campaign');
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            mode: 'advantage',
-            total: 9,
-        }));
-    });
-
-    it('does not consume lucky feat when forcedMode is already set', async () => {
-        mockRuntimeValue({
-            'Goblin:luckyDisadvantageActive': true,
-        });
+    it('does not consume the target flag when forcedMode is already set', async () => {
+        mockRuntimeValue({ 'Goblin:luckyDisadvantageActive': true });
+        mockGoblinTarget(12);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'disadvantage' });
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'luckyDisadvantageActive', null, 'test-campaign');
+    });
+
+    it('consumes the attacker-side luckyAdvantageActive flag once the popup is shown', async () => {
+        // Lucky Point (luckyPointHandler.js) arms the roller's own flag; the
+        // caller seam disarms it after the popup renders (line 607 lane —
+        // no other lane in the family covers this consumption).
+        mockRuntimeValue({ 'TestFighter:luckyAdvantageActive': true });
+        mockGoblinTarget(12);
+        const fn = createFn();
+        await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
+
+        expect(defaultDeps.setPopupHtml).toHaveBeenCalled();
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'luckyAdvantageActive', null, 'test-campaign');
     });
 });
 
@@ -408,28 +392,28 @@ describe('createLogAndShow - Sacred Weapon bonus detail', () => {
         getDefaultMocks();
     });
 
-    it('includes sacred weapon bonus in bonusDetail', async () => {
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+    it('labels the passed-through sacredWeaponBonus as +N Sacred Weapon in bonusDetail', async () => {
+        mockGoblinTarget(12);
         const fn = createFn();
         await fn('Longsword', 5, 'attack', {
             targetName: 'Goblin',
             sacredWeaponBonus: 4,
         });
 
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            bonusDetail: expect.stringContaining('Sacred Weapon'),
+        expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
+            bonusDetail: expect.stringContaining('+4 Sacred Weapon'),
         }));
     });
 });
 
-describe('createLogAndShow - Maneuver loading for non-attack rolls', () => {
+describe('createLogAndShow - Maneuver preload by roll type', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
         getManeuversForRules.mockResolvedValue(undefined);
     });
 
-    it('preloads 2024 maneuvers for check, skill, and initiative rolls', async () => {
+    it('preloads 2024 maneuvers on check/skill/initiative rolls only, never on attacks', async () => {
         noTarget();
         const fn = createFn();
         await fn('Athletics', 3, 'skill', {});
@@ -437,12 +421,10 @@ describe('createLogAndShow - Maneuver loading for non-attack rolls', () => {
         await fn('Initiative', 3, 'initiative', {});
 
         expect(getManeuversForRules).toHaveBeenCalledWith('2024');
-    });
 
-    it('does not load maneuvers for attack roll type', async () => {
-        const fn = createFn();
+        getManeuversForRules.mockClear();
+        mockGoblinTarget(12);
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
         expect(getManeuversForRules).not.toHaveBeenCalled();
     });
 });
@@ -499,7 +481,7 @@ describe('createLogAndShow - Bardic Inspiration Defense context', () => {
         expect(setRuntimeValue.mock.calls.filter((call) => typeof call[1] === 'string' && (call[1] === 'biPrompt' || call[1].endsWith('-biPrompt')))).toHaveLength(0);
     });
 
-    it('does not set bardicInspirationDefense when attack misses', async () => {
+    it('leaves the defense keys unset when the attack misses (distinct from hit-without-feature => false)', async () => {
         mockBardicInspiration(true, 'd6', 3);
         getTargetFromAttacker.mockReturnValue({ name: 'Bard', ac: 25 });
         const context = attackContext();
@@ -509,7 +491,7 @@ describe('createLogAndShow - Bardic Inspiration Defense context', () => {
         expect(context.bardicInspirationDefense).toBe(undefined);
     });
 
-    it('sets bardicInspirationDefense to false when target has no defense feature', async () => {
+    it('sets bardicInspirationDefense to false when the hit target has no defense feature', async () => {
         mockBardicInspiration(false, null, 0);
         const context = {
             targetName: 'Bard',
@@ -526,10 +508,10 @@ describe('createLogAndShow - Pending Skill Check Bonus (Ambush maneuver)', () =>
     beforeEach(() => {
         vi.clearAllMocks();
         getDefaultMocks();
-        noTarget();
     });
 
     it('applies and consumes pendingSkillCheckBonus on skill, ability check, and initiative rolls', async () => {
+        noTarget();
         const fn = createFn();
         const cases = [
             ['Stealth', 2, 'skill', 4],
@@ -540,7 +522,7 @@ describe('createLogAndShow - Pending Skill Check Bonus (Ambush maneuver)', () =>
             mockRuntimeValue({ 'TestFighter:pendingSkillCheckBonus': pending });
             await fn(name, bonus, rollType, {});
 
-            expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            expect(defaultDeps.logEntry).toHaveBeenLastCalledWith(expect.objectContaining({
                 rollType,
                 bonus: bonus + pending,
                 bonusDetail: expect.stringContaining('Pending Skill Check'),
@@ -549,34 +531,21 @@ describe('createLogAndShow - Pending Skill Check Bonus (Ambush maneuver)', () =>
         }
     });
 
-    it('does NOT apply pendingSkillCheckBonus to attack or save rolls', async () => {
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-        mockRuntimeValue({ 'TestFighter:pendingSkillCheckBonus': 4 });
+    it('is inert on attack/save roll types and on zero or unset values', async () => {
         const fn = createFn();
+        mockGoblinTarget(12);
+        mockRuntimeValue({ 'TestFighter:pendingSkillCheckBonus': 4 });
         await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
         await fn('DEX', 3, 'save', {});
-
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            rollType: 'attack',
-            bonus: 5,
-        }));
-        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            rollType: 'save',
-            bonus: 3,
-        }));
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'pendingSkillCheckBonus', null, 'test-campaign', true);
-    });
-
-    it('is inert when pendingSkillCheckBonus is 0 or unset', async () => {
-        const fn = createFn();
         mockRuntimeValue({ 'TestFighter:pendingSkillCheckBonus': 0 });
         await fn('Stealth', 2, 'skill', {});
         mockRuntimeValue({});
         await fn('Stealth', 2, 'skill', {});
 
-        expect(defaultDeps.logEntry).toHaveBeenCalledTimes(2);
-        for (const [entry] of defaultDeps.logEntry.mock.calls) {
-            expect(entry.bonus).toBe(2);
+        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ rollType: 'attack', bonus: 5 }));
+        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ rollType: 'save', bonus: 3 }));
+        expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ rollType: 'skill', bonus: 2 }));
+        for (const entry of defaultDeps.logEntry.mock.calls.map(([e]) => e)) {
             expect(entry.bonusDetail || '').not.toContain('Pending Skill Check');
         }
         expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'pendingSkillCheckBonus', null, 'test-campaign', true);

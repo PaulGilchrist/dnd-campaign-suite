@@ -1,8 +1,12 @@
+// @maintained-by-ai 2026-11-26
 // Pure toolbelt/nav logic (learnability backlog Item 1): the checkbox set is
 // derived from NAV_ITEMS + the Admin footer, presets are convenience
 // batch-sets whose ACTIVE state is DERIVED from the current hidden set
 // (nothing preset-shaped is stored), and the route guard resolves a hidden
 // activeView back to the neutral stage (null).
+// Rendered-dialog behavior (checkbox ticking, pills, debounce, close kit)
+// lives in ToolbeltSettings.test.jsx; this file pins only the data/logic
+// contracts that file consumes.
 import { describe, it, expect } from 'vitest';
 import {
   VIEW_LABELS,
@@ -15,13 +19,10 @@ import {
 } from './sidebarNav.js';
 
 describe('TOOLBELT_VIEWS', () => {
-  it('covers every sidebar destination (all NAV_ITEMS views + the Admin footer) exactly once', () => {
+  it('is exactly the sidebar destinations (every NAV_ITEMS view + the Admin footer), once each, labelled from VIEW_LABELS and alphabetical', () => {
+    const views = TOOLBELT_VIEWS.map((v) => v.view);
     const navViews = NAV_ITEMS.filter((i) => i.view).map((i) => i.view);
-    expect([...TOOLBELT_VIEWS.map((v) => v.view)].sort()).toEqual([...navViews, 'campaignRepair'].sort());
-    expect(new Set(TOOLBELT_VIEWS.map((v) => v.view)).size).toBe(TOOLBELT_VIEWS.length);
-  });
-
-  it('labels every entry from the shared VIEW_LABELS vocabulary and stays alphabetical by label', () => {
+    expect([...views].sort()).toEqual([...navViews, 'campaignRepair'].sort());
     for (const { view, label } of TOOLBELT_VIEWS) {
       expect(label).toBe(VIEW_LABELS[view].label);
     }
@@ -31,35 +32,33 @@ describe('TOOLBELT_VIEWS', () => {
 });
 
 describe('TOOLBELT_PRESETS', () => {
-  it('every preset hides real views and keeps every checkbox editable afterwards (it is data, not a lock)', () => {
+  it('opens with the neutral "Everything" batch-set and every other preset hides a non-empty, deduped set of real sidebar views', () => {
+    const [first, ...rest] = TOOLBELT_PRESETS;
+    expect(first.id).toBe('everything');
+    expect(first.hidden).toEqual([]);
     const known = new Set(TOOLBELT_VIEWS.map((v) => v.view));
-    for (const preset of TOOLBELT_PRESETS) {
+    for (const preset of rest) {
+      expect(preset.hidden.length).toBeGreaterThan(0);
       expect(preset.hidden.every((v) => known.has(v))).toBe(true);
       expect(new Set(preset.hidden).size).toBe(preset.hidden.length);
     }
   });
 
-  it('starts with the neutral "Everything" batch-set (hides nothing)', () => {
-    expect(TOOLBELT_PRESETS[0].id).toBe('everything');
-    expect(TOOLBELT_PRESETS[0].hidden).toEqual([]);
-  });
-
-  it('copy never names fixed levels/modes — presets are batch-set conveniences', () => {
+  it('copy never names fixed modes/levels — presets are batch-set conveniences (hints render only as tooltips, so the dialog test cannot see them)', () => {
     const copy = TOOLBELT_PRESETS.map((p) => `${p.label} ${p.hint}`).join(' ').toLowerCase();
-    expect(copy).not.toMatch(/mode|level/);
+    expect(copy).not.toMatch(/\bmode\b|\blevel\b/);
   });
 });
 
 describe('matchToolbeltPreset (derived, never stored)', () => {
-  it('matches a preset only on EXACT set equality, order-insensitive', () => {
+  it('matches a preset only on EXACT set equality (order-insensitive) and reads Custom the instant the set moves off one', () => {
     const theater = TOOLBELT_PRESETS.find((p) => p.id === 'theater');
+    const printDice = TOOLBELT_PRESETS.find((p) => p.id === 'print-dice');
+    // Exact hits, in any order; the empty set lands on the "Everything" preset.
     expect(matchToolbeltPreset(theater.hidden)).toBe(theater);
     expect(matchToolbeltPreset([...theater.hidden].reverse())).toBe(theater);
     expect(matchToolbeltPreset([])).toBe(TOOLBELT_PRESETS[0]);
-  });
-
-  it('reads Custom the instant a checkbox moves off a preset', () => {
-    const printDice = TOOLBELT_PRESETS.find((p) => p.id === 'print-dice');
+    // Adding, removing, or naming an unknown view never matches any preset.
     expect(matchToolbeltPreset([...printDice.hidden, 'mapsManager'])).toBeNull();
     expect(matchToolbeltPreset(printDice.hidden.slice(1))).toBeNull();
     expect(matchToolbeltPreset([...printDice.hidden, 'unknown-view'])).toBeNull();

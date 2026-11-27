@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { clearRuntimeState, seedTrackedResources, getRuntimeValue } from '../runtime/useRuntimeState.js';
@@ -7,8 +8,13 @@ import { useTvSoundPresence } from './useTvSoundPresence.js';
 
 // Beacon face plan (backlog 2026-11-22): a TV-mode tab under a 'tv' claim is
 // the ONLY writer on this lane — announce on mount/pref flip/echo, strip on
-// pagehide with a keepalive POST, silent (zero writes — the historical pref
-// law) for every other combination. No timers anywhere.
+// pagehide with a keepalive POST (the SOLE coverage of releaseTvPresenceKeepalive
+// end-to-end: url, keepalive flag, stripped body, held-marker release under a
+// gm claim, no double-release after SPA unmount), silent (zero writes — the
+// historical pref law) for every other combination. No timers anywhere.
+// The pure store/predicate module lives in src/services/ui/soundOwner.test.js
+// and the control UI in src/components/music/SoundOwnerControl.test.jsx —
+// nothing here restates them.
 
 const posted = () =>
   fetch.mock.calls.map(([, init]) => JSON.parse(init.body).value);
@@ -21,22 +27,23 @@ describe('useTvSoundPresence', () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
   });
 
-  it('writes NOTHING for a non-TV tab (pref off), even under a tv claim', () => {
-    seedTrackedResources('campaign', { [SOUND_OWNER_KEY]: { screen: 'tv' } });
-    renderHook(() => useTvSoundPresence('Test Camp'));
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getRuntimeValue('campaign', SOUND_OWNER_KEY)).toEqual({ screen: 'tv' });
-  });
-
-  it('writes NOTHING for a TV-pref tab while the claim is gm (zero-write pref law)', () => {
-    saveTvPref(true);
-    seedTrackedResources('campaign', { [SOUND_OWNER_KEY]: { screen: 'gm' } });
-    renderHook(() => useTvSoundPresence('Test Camp'));
-    expect(fetch).not.toHaveBeenCalled();
-    // …and with NO stored claim at all.
-    clearRuntimeState('campaign');
-    renderHook(() => useTvSoundPresence('Test Camp'));
-    expect(fetch).not.toHaveBeenCalled();
+  it('writes NOTHING outside the exact self-claim condition (zero-write pref law)', () => {
+    const silent = [
+      { label: 'pref off under a tv claim', pref: false, claim: { screen: 'tv' } },
+      { label: 'pref on under a gm claim', pref: true, claim: { screen: 'gm' } },
+      { label: 'pref on with no stored claim', pref: true, claim: null },
+    ];
+    for (const { label, pref, claim } of silent) {
+      clearRuntimeState('campaign');
+      saveTvPref(pref);
+      if (claim) seedTrackedResources('campaign', { [SOUND_OWNER_KEY]: claim });
+      const { unmount } = renderHook(() => useTvSoundPresence('Test Camp'));
+      expect(fetch, label).not.toHaveBeenCalled();
+      if (claim) {
+        expect(getRuntimeValue('campaign', SOUND_OWNER_KEY), label).toEqual(claim);
+      }
+      unmount();
+    }
   });
 
   it('a TV-pref tab under a tv claim announces its token on the shared key', () => {
@@ -87,7 +94,9 @@ describe('useTvSoundPresence', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
     expect(fetch).toHaveBeenCalledTimes(2);
-    const [, init] = fetch.mock.calls[1];
+    const [url, init] = fetch.mock.calls[1];
+    expect(url).toBe('/api/campaigns/Test%20Camp/soundOwner');
+    expect(init.method).toBe('POST');
     expect(init.keepalive).toBe(true);
     expect(JSON.parse(init.body).value).toEqual({ screen: 'tv' }); // field dropped, claim kept
     unmount();
@@ -163,7 +172,8 @@ describe('useTvSoundPresence', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
     expect(fetch).toHaveBeenCalledTimes(2);
-    const [, init] = fetch.mock.calls[1];
+    const [url, init] = fetch.mock.calls[1];
+    expect(url).toBe('/api/campaigns/Test%20Camp/soundOwner');
     expect(init.keepalive).toBe(true);
     expect(JSON.parse(init.body).value).toEqual({ screen: 'gm' }); // own token gone, claim kept
     unmount();

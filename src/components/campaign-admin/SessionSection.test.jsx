@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 // P4-a (§10.1/§10.4): session console — which pill is lit, clicks move the
 // phase with an audit, the ledger filters/enforces/caps honestly, and the
 // Take-over-manually safety valve switches enforcement + AI off.
@@ -57,17 +57,18 @@ afterEach(() => { vi.unstubAllGlobals(); });
 describe('session console', () => {
     it('lights one pill: exploration by default, synced sessionState wins when set', () => {
         const first = render(<SessionSection campaignName={CN} />);
+        // the console exposes the full phase machine
+        expect(first.getAllByRole('button', { name: /^(Exploration|Encounter|Travel|Roleplay)$/ })).toHaveLength(4);
         expect(first.getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'true');
         expect(first.getByRole('button', { name: 'Encounter' })).toHaveAttribute('aria-pressed', 'false');
         first.unmount();
 
         store.sessionState = { phase: 'travel', changedBy: 'initiative tracker' };
         const second = render(<SessionSection campaignName={CN} />);
-        for (const p of ['Exploration', 'Encounter', 'Travel', 'Roleplay']) {
-            expect(second.getByRole('button', { name: p })).toBeInTheDocument();
-        }
-        expect(second.getByRole('button', { name: 'Travel' })).toHaveAttribute('aria-pressed', 'true');
-        expect(second.getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'false');
+        // exactly one pill lit — and it is the synced one
+        const lit = second.getAllByRole('button', { pressed: true });
+        expect(lit).toHaveLength(1);
+        expect(lit[0]).toHaveAccessibleName('Travel');
         expect(second.getByText(/Last moved by initiative tracker/i)).toBeInTheDocument();
     });
 
@@ -124,12 +125,14 @@ describe('enforcement & AI audit ledger', () => {
         // Log view's generic row — getEntryText first, lane `reason` fallback.
         stubFetch([
             { type: 'enforcement_denied', creature: 'FeyRanger', bucket: 'bonusAction', message: 'Enforcement Denied', reason: 'No bonus action left this turn.' },
+            { type: 'enforcement_denied', creature: 'Vex', reason: 'Wall blocks the move.' }, // reason-only row: the fallback path
             { type: 'write_rejected', key: 'sessionState', description: 'Server rejected write to sessionState' },
         ]);
         const { findByText, queryByText } = render(<SessionSection campaignName={CN} />);
-        expect(await findByText('Enforcement Denied')).toBeInTheDocument();
+        expect(await findByText('Enforcement Denied')).toBeInTheDocument();   // message beats description/reason
+        expect(await findByText('Wall blocks the move.')).toBeInTheDocument(); // lane `reason` fallback when accessor is silent
         expect(await findByText('Server rejected write to sessionState')).toBeInTheDocument();
-        expect(queryByText(/No bonus action left this turn\./)).toBeNull();
+        expect(queryByText(/No bonus action left this turn\./)).toBeNull();   // shadowed reason never leaks beside its message
     });
 
     it('stays honestly empty on a failed fetch, then fills on Refresh', async () => {

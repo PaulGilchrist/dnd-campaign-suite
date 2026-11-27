@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+// @maintained-by-ai 2026-11-26
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import HelpDrawer from './HelpDrawer.jsx';
 
 // The guide is a build-time raw import (docs/users-guide.md?raw) — the test
 // pins the drawer BEHAVIOUR and the drift guard (section titles come from the
 // real file), not the full markdown bytes (owned by MarkdownPreview.test.jsx).
+// DOM cleanup is handled globally by src/test/setup.js.
 
 describe('HelpDrawer', () => {
-  beforeEach(() => cleanup());
-
   const open = (props = {}) =>
     render(<HelpDrawer open onClose={vi.fn()} activeView="initiative" {...props} />);
 
@@ -38,30 +38,35 @@ describe('HelpDrawer', () => {
     expect(screen.getByText('20. Tips, quirks and troubleshooting')).toBeInTheDocument();
   });
 
-  it('search narrows to matching sections; an honest line shows on no match', () => {
-    open();
+  it('search narrows to matching sections, shows an honest line on no match, and resets on reopen', () => {
+    const view = open();
     const search = screen.getByRole('searchbox', { name: 'Search the users guide' });
     fireEvent.change(search, { target: { value: 'victory banner' } });
     expect(screen.getByText('7. Running combat')).toBeInTheDocument();
     expect(screen.queryByText('11. Maps, tokens and fog of war')).not.toBeInTheDocument();
+
     fireEvent.change(search, { target: { value: 'zzzz-no-such-thing' } });
     expect(screen.getByText(/Nothing in the guide matches/)).toBeInTheDocument();
+
+    // Closing and re-opening must clear the filter so the guide is whole again.
+    view.rerender(<HelpDrawer open={false} onClose={vi.fn()} activeView="initiative" />);
+    view.rerender(<HelpDrawer open onClose={vi.fn()} activeView="initiative" />);
+    expect(screen.queryByText(/Nothing in the guide matches/)).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search the users guide' })).toHaveValue('');
+    expect(screen.getByText('11. Maps, tokens and fog of war')).toBeInTheDocument();
   });
 
-  it('closes via ×, backdrop click, and Escape', () => {
+  it('closes via backdrop click, ×, and Escape — but not on clicks inside the drawer', () => {
     const onClose = vi.fn();
-    const { rerender } = open({ onClose });
-    fireEvent.click(screen.getByTitle('Close help (Esc)'));
+    const { container } = open({ onClose });
+    fireEvent.click(container.querySelector('.help-drawer-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(1);
-    rerender(<HelpDrawer open onClose={onClose} activeView="initiative" />);
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(2);
-  });
-
-  it('a click inside the drawer does not close it', () => {
-    const onClose = vi.fn();
-    open({ onClose });
+    // A click inside the panel must NOT bubble to the backdrop's close handler.
     fireEvent.click(screen.getByRole('dialog', { name: 'Help' }));
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTitle('Close help (Esc)'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(3);
   });
 });

@@ -1,6 +1,6 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-2026: Tiamat "Frightful Presence" — exact MA-1997 (Smaug) twin. FP save
-// row (actions index 3) authored ONLY conditions:["frightened"] + save_dc/
+// row (by-name anchor) authored ONLY conditions:["frightened"] + save_dc/
 // save_type: the DC 26 Wisdom save adjudicated honestly on the live EB-NPC
 // inline lane (chip armed, Bandit 1 raw WIS +0 rolled, failure stamped on the
 // log) but extractConditionsFromSaveEffect (Helpers) is save_effect-scoped
@@ -10,15 +10,23 @@
 // DATA fix: save_effect:"…Frightened…" (canonical word §346/§52) + the MA-1577
 // adult-blue-dracolich FP service shape (OBJECT success_immunity + repeat_save
 // between save_type and save_effect — booleans kill it, MA-0147), byte-mirroring
-// the MA-1997 Smaug twin. RAW anchor (row description): repeat save at the end
+// the MA-1997 Smaug twin (save_effect clause differs: Tiamat row reads "has the
+// Frightened condition"). RAW anchor (row description): repeat save at the end
 // of each turn + 24h immunity stated; 1-minute duration = frightful_presence
 // engine default rounds:10 (same as Smaug). dc_success stays ABSENT — damageless
 // row, half-default never computes damage (§63 moot, zero hp_change live-verified).
 // Ownership (per saveProcessing.frightful-presence.test.js map): generic FP
 // machinery — extractor, Smaug row bytes, dracolich merged-clock legs — lives in
 // the twins (ma1997-smaug) and the MA-0048 file. This file pins ONLY the
-// Tiamat-specific row: DC 26 wording, the higher-DC success/fail faces on the
-// live NPC inline lane, and the refusal gate against the Tiamat-named te.
+// Tiamat-specific row: one disk fingerprint (DC 26 wording + Tiamat save_effect
+// bytes + service shape), the higher-DC success/fail faces on the live NPC
+// inline lane, and the refusal gate against the Tiamat-named te.
+// Extractor unit echo folded per MA-1997 retirement rationale: the save_effect
+// bytes are pinned verbatim below, the extraction→grant seam runs end-to-end
+// through saveContextFromRow in the live fail-face test, and the generic
+// word-scan + empty/absent arms are stronger-owned by
+// saveProcessing.ma1392-vengeful-glare-frightened-only.test.js and
+// saveProcessing.ma2013-sun-wukong-locking-word.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -26,23 +34,19 @@ import { extractConditionsFromSaveEffect, gazeImmunityActive } from '../../compo
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const TIAMAT = monsters.find((m) => m.index === 'tiamat');
-const FP = TIAMAT.actions[3];
+const FP = TIAMAT.actions.find((a) => a.name === 'Frightful Presence');
 
 describe('MA-2026 disk fingerprint: Tiamat Frightful Presence save_effect + FP service shape authored', () => {
-  it('row identity + save core byte-unchanged (live-verified exact): DC 26 WIS, control-only', () => {
+  it('row bytes: DC 26 WIS control-only core + canonical FP clause + MA-1577 service shape (objects, not booleans, MA-0147) — Smaug twin mirror', () => {
     expect(TIAMAT.name).toBe('Tiamat');
     expect(FP.name).toBe('Frightful Presence');
     expect(FP.save_dc).toBe(26);
     expect(FP.save_type).toBe('Wisdom');
     expect(FP.conditions).toEqual(['frightened']); // pre-existing byte kept (inert on the save lane, MA-1927)
     expect(FP.description).toContain('immune to Tiamat\'s Frightful Presence for 24 hours');
-  });
 
-  it('save_effect carries the canonical Frightened clause (MA-1982 one-field fix, §52 word)', () => {
     expect(FP.save_effect).toBe('The target has the Frightened condition. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage.');
-  });
 
-  it('success_immunity + repeat_save ride the MA-1577 byte-slice between save_type and save_effect (objects, not booleans, MA-0147) — Smaug twin mirror', () => {
     expect(FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
     expect(FP.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
     const keys = Object.keys(FP);
@@ -199,6 +203,6 @@ describe('MA-2026 live-lane: Frightened now lands on the failed save (was FAIL(a
     // targetEffects:[]→null re-pin is pure parser-input echo of the owner empty-arm
     // truth-table MonsterCardHelpers.gaze-immunity.test.js:48 — same parse exit
     // regardless of row. Live gate-open coverage is this lane's own success-face
-    // press above (no immunity seeded, immunity te granted at :184).
+    // press above (no immunity seeded, immunity te granted there).
   });
 });

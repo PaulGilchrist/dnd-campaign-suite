@@ -1,9 +1,11 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // L5-005 §9.2 — confirmed-ruling apply tests: gated lanes, refusals, audit.
-// Every mutating boundary (runtime store, log, dice, effect registry) is
-// mocked; the oracle lane stubs fetch to pin the server-roll URL contract.
-// Pure dispatcher over a stable applier table — deterministic, no churn
-// expected when the app changes.
+// Mutating boundaries (runtime store, log, dice, effect registry) are mocked;
+// the oracle lane stubs fetch because the server-roll URL POST *is* the seam
+// contract (the server half is covered by server/routes/campaigns-roll.test.js,
+// the rendering half by LogAiAudit.test.jsx — this file owns the writer).
+// Failure COPY law is owned by applyFailureCopy.test.js — only the routed raw
+// tail is pinned here. Audit wording 'AI ruling applied/refused:' is ours.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -28,6 +30,9 @@ import { applyRuling, isAtomicRuling } from './applyRuling.js';
 const CN = 'test-campaign';
 const OFF = { mode: 'off' };
 
+// The audit row written for the (0-based) apply call made in this test.
+const auditRow = (index = 0) => addEntry.mock.calls[index][1];
+
 beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue(null);
@@ -35,16 +40,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('applyRuling — atomic ops walk existing lanes', () => {
-    it('narrative applies as a logged outcome and audits', async () => {
+    it('narrative applies as a logged outcome; audit row is shaped', async () => {
         const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'narrative', text: 'The door opens.' } });
         expect(r.applied).toBe(true);
+        expect(r.detail).toBe('The door opens.');
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
             type: 'ai_ruling_applied',
             // MMM 2026-11-21: characterName is the sole author field — the row
             // used to stamp `name` and render an empty .log-character.
             characterName: 'AI referee',
         }));
-        expect(addEntry.mock.calls[0][1]).not.toHaveProperty('name');
+        expect(auditRow()).not.toHaveProperty('name');
+        expect(auditRow().description).toContain('AI ruling applied: narrative');
     });
 
     it('dice rolls client-side when serverDice is off (engine rolls, never the AI)', async () => {
@@ -55,7 +62,7 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'roll' }));
     });
 
-    it('d20 advantage and disadvantage use their own lanes', async () => {
+    it('d20 advantage/disadvantage use their own lanes; non-d20 with a mode falls back to the plain roll', async () => {
         const adv = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'dice', expression: '1d20+5', mode: 'advantage' } });
         expect(rollAdvantage).toHaveBeenCalled();
         expect(adv.detail).toMatch(/\(advantage\).*→ 17/);
@@ -64,14 +71,26 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
         expect(rollDisadvantage).toHaveBeenCalled();
         expect(rollAdvantage).toHaveBeenCalledTimes(1);
         expect(dis.detail).toMatch(/\(disadvantage\).*→ 3/);
+
+        // advantage is a d20-only lane — a 2d6 with a mode never fakes it
+        const plain = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'dice', expression: '2d6+3', mode: 'advantage' } });
+        expect(plain.applied).toBe(true);
+        expect(rollAdvantage).toHaveBeenCalledTimes(1);
+        expect(rollExpression).toHaveBeenCalledWith('2d6+3');
+        expect(plain.detail).toContain('→ 9');
     });
 
-    it('serverDice ON routes through the oracle (server rolls)', async () => {
+    it('serverDice ON routes through the oracle; the flag alone (mode off) never hits the server', async () => {
         const fetchFn = vi.fn(async () => ({ ok: true, json: async () => ({ total: 14, rolls: [14], roller: 'server' }) }));
         vi.stubGlobal('fetch', fetchFn);
         const r = await applyRuling({ campaignName: CN, enforcement: { mode: 'on', serverDice: true }, ruling: { type: 'dice', expression: '1d20+5' } });
         expect(fetchFn).toHaveBeenCalledWith('/api/campaigns/test-campaign/roll', expect.objectContaining({ method: 'POST' }));
         expect(r.detail).toContain('[server dice]');
+
+        // oracle needs BOTH gates — mode 'on' without serverDice stays client-side
+        await applyRuling({ campaignName: CN, enforcement: { mode: 'on' }, ruling: { type: 'dice', expression: '1d20+5' } });
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(rollExpression).toHaveBeenCalledWith('1d20+5');
     });
 
     it('target_effect registers through the campaign te store; unknown keys REFUSED', async () => {
@@ -83,8 +102,9 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
 
         const bad = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'not_a_real_key', targetName: 'Hero' } });
         expect(bad.applied).toBe(false);
-        // byte-pin the honest refusal copy — the card pre-filter must not soften this lane
-        expect(bad.detail).toBe("unknown target effect 'not_a_real_key' — not in the effect registry (refused)");
+        // the registry-honesty tokens — the card pre-filter must not soften this lane
+        expect(bad.detail).toContain("unknown target effect 'not_a_real_key'");
+        expect(bad.detail).toContain('(refused)');
 
         // Re-applying the same target+effect REPLACES (no stacking).
         await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'bless', targetName: 'Hero' } });
@@ -105,37 +125,36 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
     });
 });
 
-describe('applyRuling — never-auto ops', () => {
-    it('automation is surfaced, never auto-run (P3 parked)', async () => {
-        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'automation', actionName: 'Attack with Longsword' } });
-        expect(r.applied).toBe(false);
-        expect(r.detail).toMatch(/parked|own lane/i);
-        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_ruling_applied', description: expect.stringContaining('refused') }));
+describe('applyRuling — never-auto ops and refusals', () => {
+    it('automation and needs_human are surfaced, never auto-run (P3 parked)', async () => {
+        const auto = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'automation', actionName: 'Attack with Longsword' } });
+        expect(auto.applied).toBe(false);
+        expect(auto.detail).toMatch(/parked|own lane/i);
+        expect(auditRow(0).description).toContain('AI ruling refused: automation');
+
+        const human = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'needs_human', text: 'GM decides' } });
+        expect(human.applied).toBe(false);
+        expect(human.detail).toBe('GM decides');
     });
 
-    it('needs_human passes the referee prompt through untouched, unapplied', async () => {
-        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'needs_human', text: 'GM decides' } });
-        expect(r.applied).toBe(false);
-        expect(r.detail).toBe('GM decides');
-    });
-
-    it('unknown type refused; apply failure captured, never thrown at the console', async () => {
+    it('unknown/null rulings refused; apply failure captured with its raw tail, never thrown at the console', async () => {
         expect((await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'reality_rewrite' } })).applied).toBe(false);
         expect((await applyRuling({ campaignName: CN, enforcement: OFF, ruling: null })).applied).toBe(false);
+
+        // throw → plain-English refusal (copy law owned by applyFailureCopy.test.js);
+        // here only the routed raw tail is pinned, mirroring the director lane
         getRuntimeValue.mockImplementation(() => { throw new Error('store down'); });
         const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', expression: '1d6', amount: -1 } });
         expect(r.applied).toBe(false);
-        expect(r.detail).toContain('the save request failed — nothing was changed.');
         expect(r.detail).toContain('store down');
     });
 });
 
 describe('isAtomicRuling', () => {
     it('narrative/dice/hp/effect auto-apply in autopilot; automation & needs_human wait for the referee', () => {
-        expect(isAtomicRuling({ type: 'narrative' })).toBe(true);
-        expect(isAtomicRuling({ type: 'dice' })).toBe(true);
-        expect(isAtomicRuling({ type: 'hp_change' })).toBe(true);
-        expect(isAtomicRuling({ type: 'target_effect' })).toBe(true);
+        for (const type of ['narrative', 'dice', 'hp_change', 'target_effect']) {
+            expect(isAtomicRuling({ type })).toBe(true);
+        }
         expect(isAtomicRuling({ type: 'automation' })).toBe(false);
         expect(isAtomicRuling({ type: 'needs_human' })).toBe(false);
         expect(isAtomicRuling(null)).toBe(false);

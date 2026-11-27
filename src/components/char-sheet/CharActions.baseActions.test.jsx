@@ -1,14 +1,17 @@
-// @maintained-by-ai 2026-10-14
-// Trimmed: single-item and two-item list cases (comma-joining proven by the full-list
-// exact-text case; the ['Dash','Dodge'] render is covered by CharActions.rendering.test.jsx).
-// Strengthened: one test now asserts the full clickable contract — the base-actions row
-// makes Hide, Dodge and Grapple clickable spans and every other action plain text
-// (covers the Grapple-clickable contract that CharActions.grapple.test.jsx defers to this file).
-// Tooltip contract: every rendered base action carries a non-empty description title,
-// with ruleset-aware Dodge copy (registry in baseActionDescriptions.js).
+// @maintained-by-ai 2026-11-26
+// Lane: BASE ACTIONS ROW rendering/wiring only (CharActions.jsx base-actions map).
+// - Row structure: comma-joined text, clickable spans exactly Hide/Dodge/Grapple,
+//   every other action a plain info span (the Grapple-clickable contract that
+//   CharActions.grapple.test.jsx defers to this file).
+// - Tooltip wiring: each span's title resolves via getBaseActionTooltip(name, rules);
+//   the copy itself is pinned in baseActionDescriptions.test.js, ruleset branch for
+//   Dodge covered here at component level (proves playerStats.rules reaches the registry).
+// Click-handler behaviour is owned by CharActions.baseActionsHide.test.jsx (Hide/Dodge)
+// and CharActions.grapple.test.jsx (Grapple) — not re-pinned here.
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
+import { getBaseActionTooltip } from './baseActionDescriptions.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const _syncedStore = new Map();
@@ -218,37 +221,35 @@ describe('CharActions base actions row', () => {
     _syncedStore.clear();
   });
 
-  it.each([
-    { actions: ['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple'], expected: 'Base Actions: Hide, Dash, Disengage, Dodge, Grapple' },
-    { actions: [], expected: 'Base Actions: ' },
-  ])('renders the actions loaded from actions.json as "$expected"', async ({ actions, expected }) => {
-    await renderWithActions(actions);
-
-    expect(getBaseActionsRow().textContent).toBe(expected);
-  });
-
-  it('makes Hide, Dodge and Grapple clickable and leaves all other actions as plain text', async () => {
+  it('renders actions comma-joined with clickable spans exactly for Hide, Dodge and Grapple', async () => {
     await renderWithActions(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
 
-    const clickableNames = Array.from(getBaseActionsRow().querySelectorAll('.base-action-clickable')).map((el) => el.textContent);
-    expect(clickableNames).toEqual(['Hide', 'Dodge', 'Grapple']);
+    const row = getBaseActionsRow();
+    expect(row.textContent).toBe('Base Actions: Hide, Dash, Disengage, Dodge, Grapple');
+    expect(Array.from(row.querySelectorAll('.base-action-clickable')).map((el) => el.textContent))
+      .toEqual(['Hide', 'Dodge', 'Grapple']);
+    // Every other action must render as a plain info span, never a click target.
+    expect(Array.from(row.querySelectorAll('.base-action-info')).map((el) => el.textContent))
+      .toEqual(['Dash', 'Disengage']);
   });
 
-  it('gives every base action a non-empty description tooltip on hover', async () => {
+  it('wires every base action title to the description registry for the character ruleset', async () => {
     await renderWithActions(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
 
-    const tooltipped = Array.from(getBaseActionsRow().querySelectorAll('span[title]'));
-    expect(tooltipped.map((el) => el.textContent)).toEqual(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
-    for (const el of tooltipped) {
-      expect(el.getAttribute('title').length).toBeGreaterThan(0);
+    const spans = Array.from(getBaseActionsRow().querySelectorAll('span'));
+    expect(spans.map((el) => el.textContent)).toEqual(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
+    for (const el of spans) {
+      const tooltip = getBaseActionTooltip(el.textContent, '5e');
+      expect(tooltip).toBeTruthy();
+      expect(el.getAttribute('title')).toBe(tooltip);
     }
   });
 
   it('uses the 2024 Dodge wording (no Dex-save clause) for 2024 characters', async () => {
     await renderWithActions(['Dodge'], { rules: '2024' });
 
-    const dodge = getBaseActionsRow().querySelector('.base-action-clickable');
-    expect(dodge.getAttribute('title')).toContain('disadvantage');
-    expect(dodge.getAttribute('title')).not.toContain('Dexterity saving throws');
+    const tooltip = getBaseActionsRow().querySelector('.base-action-clickable').getAttribute('title');
+    expect(tooltip).toContain('disadvantage');
+    expect(tooltip).not.toContain('Dexterity saving throws');
   });
 });

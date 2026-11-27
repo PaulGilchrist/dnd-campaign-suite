@@ -1,14 +1,15 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Rename Campaign flow of CampaignAdmin: opening the modal, closing it
  * (Cancel / close icon / Escape) without renaming, backdrop clicks that
- * keep it open with the draft, submit validation (blank names can never
- * be submitted via button or Enter), and draft reset after success.
+ * keep it open with the draft, submit validation (blank or unchanged names
+ * can never be submitted via button or Enter), the failure face (modal
+ * stays open with the draft + server error), and draft reset after success.
  *
  * Static rendering of the Rename card (heading, description, button class)
  * and the no-modal idle state are covered by CampaignAdmin.rendering.test.jsx;
- * window alert/confirm/prompt mocks are exercised by the delete tests.
- * None of that is repeated here.
+ * lock gating by CampaignAdmin.rename-lock.test.jsx; window alert/confirm
+ * mocks by the delete tests. None of that is repeated here.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -94,13 +95,19 @@ describe('CampaignAdmin - Rename Campaign', () => {
         expect(submit()).toBeDisabled();
     });
 
-    it('submits the trimmed name once via the Rename button, closes, and reopens with a cleared draft', async () => {
+    // Regression (bug-campaign-rename-double-prompt): the modal value is the
+    // single input surface — it goes straight to onRenameCampaign and no
+    // native prompt() may fire behind the modal.
+    it('submits the trimmed name once via the Rename button with no native prompt, closes, and reopens with a cleared draft', async () => {
+        const promptSpy = vi.spyOn(window, 'prompt');
         const { props, submit } = renderWithRenameModal();
         type('  test-campaign/2  ');
         fireEvent.click(submit());
 
         expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
         expect(props.onRenameCampaign).toHaveBeenCalledWith('test-campaign/2');
+        expect(promptSpy).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
         await waitFor(() => expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument());
 
         openModal();
@@ -126,21 +133,6 @@ describe('CampaignAdmin - Rename Campaign', () => {
         expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
     });
 
-    // Regression (bug-campaign-rename-double-prompt): the modal value must be
-    // the single input surface — the name is handed to onRenameCampaign and
-    // no native prompt() may fire behind the modal.
-    it('never fires a native prompt — the modal value is passed straight to onRenameCampaign', async () => {
-        const promptSpy = vi.spyOn(window, 'prompt');
-        const { props, submit } = renderWithRenameModal();
-        type('Solo Prompt Name');
-        fireEvent.click(submit());
-
-        expect(props.onRenameCampaign).toHaveBeenCalledWith('Solo Prompt Name');
-        expect(promptSpy).not.toHaveBeenCalled();
-        await waitFor(() => expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument());
-        promptSpy.mockRestore();
-    });
-
     it('keeps the modal open with the draft and shows the server error when the rename fails', async () => {
         const { props, submit } = renderWithRenameModal({
             onRenameCampaign: vi.fn().mockRejectedValue(new Error('Campaign already exists')),
@@ -153,12 +145,19 @@ describe('CampaignAdmin - Rename Campaign', () => {
         expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
     });
 
-    it('does not submit a name identical (case-insensitively) to the current campaign name', () => {
+    it('disables submit with visible copy for a name identical (case-insensitively) to the current campaign name', () => {
         const { props, submit } = renderWithRenameModal();
         type('  Test-Campaign  ');
+        // The inline note is the only user-visible signal for this state.
+        expect(screen.getByText('The campaign already has this name')).toBeInTheDocument();
         expect(submit()).toBeDisabled();
         fireEvent.click(submit());
         expect(props.onRenameCampaign).not.toHaveBeenCalled();
         expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
+
+        // A genuinely different name clears the note and re-enables submit.
+        type('Test-Campaign II');
+        expect(screen.queryByText('The campaign already has this name')).not.toBeInTheDocument();
+        expect(submit()).toBeEnabled();
     });
 });

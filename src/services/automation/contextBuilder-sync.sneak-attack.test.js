@@ -1,7 +1,9 @@
-// @maintained-by-ai 2026-10-15
-// Deterministic contract suite for the CLA-317 sneak-attack gate in contextBuilder-sync.js
-// (computeSneakAttackDice / hasFlankingAlly). Fully mocked, no timers, stable 2024 rules —
-// no churn expected when the app changes.
+// @maintained-by-ai 2026-11-26
+// Sole sneak-attack owner of the contextBuilder-sync cluster (CLA-317 gate in
+// contextBuilder-sync.js: computeSneakAttackDice / hasFlankingAlly / allyIsIncapacitated).
+// Full output-shape contract lives in contextBuilder-sync.test.js — only the
+// sneak lane's dice + isWithinRange probe census is pinned here. Fully mocked,
+// no timers, stable 2024 rules — no churn expected when the app changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder-sync.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -46,10 +48,6 @@ vi.mock('../combat/auras/lionAuraUtils.js', () => ({
   getLionDisadvantageAgainst: vi.fn(),
 }));
 
-vi.mock('../combat/auras/coronaAuraUtils.js', () => ({
-  getCoronaSaveDisadvantage: vi.fn(),
-}));
-
 vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({
   endSanctuary: vi.fn(),
   handle: vi.fn(),
@@ -76,10 +74,6 @@ vi.mock('../combat/automation/automationService.js', () => ({
   collectWeaponMastery: vi.fn().mockReturnValue({ baseMastery: null, extraMasteries: [] }),
 }));
 
-vi.mock('../combat/automation/automationExpressions.js', () => ({
-  resolveDiceExpression: vi.fn(),
-}));
-
 vi.mock('../combat/automation/automationPassives.js', () => ({
   isResilientSphereActive: vi.fn().mockReturnValue(false),
 }));
@@ -93,7 +87,6 @@ const { getInnateSorceryBonus } = await import('../combat/buffs/buffService.js')
 const { getWolfAdvantageAgainst } = await import('../combat/auras/wolfAuraUtils.js');
 const { getDuplicityAdvantageAgainst } = await import('../combat/auras/duplicityAuraUtils.js');
 const { getLionDisadvantageAgainst } = await import('../combat/auras/lionAuraUtils.js');
-const { getCoronaSaveDisadvantage } = await import('../combat/auras/coronaAuraUtils.js');
 
 const rogueStats = {
   name: 'AasimarTest',
@@ -107,6 +100,15 @@ const rogueStats = {
   automation: { passives: [] },
 };
 
+// 5e-rules dice count sits under class_specific.sneak_attack.dice_count.
+const rogueStats5e = {
+  ...rogueStats,
+  class: {
+    name: 'Rogue',
+    class_levels: [{ level: 17, class_specific: { sneak_attack: { dice_count: 10 } } }],
+  },
+};
+
 const finesseAttack = {
   name: 'Shortsword',
   damage: '1d6+2',
@@ -117,13 +119,13 @@ const finesseAttack = {
   properties: ['Finesse', 'Light'],
 };
 
-function combatSummary(allyConds) {
+function combatSummary(allyConds, extraCreature) {
   return {
     round: 1,
     creatures: [
       { name: 'AasimarTest', type: 'player' },
       { name: 'Thug 1', type: 'npc', attitude: 'hostile' },
-      { name: 'ElderPaladin', type: 'player', ...(allyConds ? { conditions: allyConds } : {}) },
+      extraCreature || { name: 'ElderPaladin', type: 'player', ...(allyConds ? { conditions: allyConds } : {}) },
     ],
   };
 }
@@ -138,7 +140,14 @@ function setupRuntime({ latch = null, activeConditions = [], attackerAllies } = 
   });
 }
 
-describe('CLA-317: sneak attack ally-5ft gate', () => {
+const probeCalls = () => vi.mocked(isWithinRange).mock.calls;
+const flankProbe = (ally) => ['Thug 1', ally, 5];
+
+async function build(stats = rogueStats, attack = finesseAttack, mode = 'normal') {
+  return buildAttackContextSync(attack, stats, 'camp', mode);
+}
+
+describe('CLA-317: sneak attack gate (computeSneakAttackDice / hasFlankingAlly)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     buildBaseAttackContext.mockResolvedValue({
@@ -150,129 +159,131 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
     getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
     getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
     getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
     getCurrentCombatRound.mockReturnValue(1);
     getCombatContext.mockResolvedValue(combatSummary());
     isWithinRange.mockResolvedValue(false);
     setupRuntime();
   });
 
-  it('refuses sneak when no trigger: no advantage and no ally within 5 ft', async () => {
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-    expect(isWithinRange).toHaveBeenCalledWith('Thug 1', 'ElderPaladin', 5);
-  });
-
-  it('grants sneak when a healthy ally is within 5 ft of the target', async () => {
+  it('grants sneak when a healthy ally is within 5 ft — exactly one probe, sneak lane fields', async () => {
     isWithinRange.mockResolvedValue(true);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(9);
-  });
-
-  it('refuses sneak when the only ally in range has the Incapacitated condition (runtime)', async () => {
-    isWithinRange.mockResolvedValue(true);
-    setupRuntime({ activeConditions: ['incapacitated'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-  });
-
-  it('refuses sneak when the only ally in range is Stunned (grants Incapacitated)', async () => {
-    isWithinRange.mockResolvedValue(true);
-    setupRuntime({ activeConditions: ['stunned'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-  });
-
-  it('refuses sneak when ally conditions on combatSummary include Incapacitated', async () => {
-    isWithinRange.mockResolvedValue(true);
-    getCombatContext.mockResolvedValue(combatSummary([{ key: 'Incapacitated' }]));
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-  });
-
-  it('refuses sneak when the only creature within range is a hostile NPC', async () => {
-    isWithinRange.mockResolvedValue(true);
-    getCombatContext.mockResolvedValue({
-      round: 1,
-      creatures: [
-        { name: 'AasimarTest', type: 'player' },
-        { name: 'Thug 1', type: 'npc', attitude: 'hostile' },
-        { name: 'Goblin Pet', type: 'npc', attitude: 'hostile' },
-      ],
+    const result = await build();
+    expect(result).toMatchObject({
+      sneakAttackDice: 9,
+      targetName: 'Thug 1',
+      attackerName: 'AasimarTest',
+      weaponName: 'Shortsword',
     });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
+    expect(probeCalls()).toEqual([flankProbe('ElderPaladin')]);
+  });
+
+  // Flank cannot be established: each face refuses and pins the exact probe
+  // census — out-of-range probed once, missing-combat-info never probes.
+  it.each([
+    ['healthy ally out of 5 ft range probes once, no grant', { rangeHit: false, probes: [flankProbe('ElderPaladin')] }],
+    ['no combat summary', { rangeHit: true, summary: null, probes: [] }],
+    ['target absent from initiative', {
+      rangeHit: true,
+      summary: { round: 1, creatures: [{ name: 'AasimarTest', type: 'player' }, { name: 'ElderPaladin', type: 'player' }] },
+      probes: [],
+    }],
+  ])('refuses sneak — %s', async (_label, { rangeHit, summary, probes }) => {
+    isWithinRange.mockResolvedValue(rangeHit);
+    if (summary !== undefined) getCombatContext.mockResolvedValue(summary);
+    const result = await build();
     expect(result.sneakAttackDice).toBe(0);
-    expect(isWithinRange).not.toHaveBeenCalled();
+    expect(probeCalls()).toEqual(probes);
   });
 
-  it('grants sneak when a friendly NPC (non-player) ally is within 5 ft', async () => {
+  // Canonical ally clause: Incapacitated skips the ally BEFORE the range probe
+  // (census stays empty), whichever source/shape carries the condition.
+  it.each([
+    ['runtime string condition', { activeConditions: ['incapacitated'] }],
+    ['runtime object condition', { activeConditions: [{ key: 'Incapacitated' }] }],
+    ['runtime derived alias — Stunned grants Incapacitated', { activeConditions: ['stunned'] }],
+    ['conditions on combatSummary entry', { summaryConditions: [{ key: 'Incapacitated' }] }],
+  ])('refuses sneak when the only in-range ally is incapacitated (%s)', async (_label, { activeConditions, summaryConditions }) => {
     isWithinRange.mockResolvedValue(true);
-    getCombatContext.mockResolvedValue({
-      round: 1,
-      creatures: [
-        { name: 'AasimarTest', type: 'player' },
-        { name: 'Thug 1', type: 'npc', attitude: 'hostile' },
-        { name: 'Wolf Companion', type: 'npc', attitude: 'friendly' },
-      ],
-    });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(9);
-    expect(isWithinRange).toHaveBeenCalledWith('Thug 1', 'Wolf Companion', 5);
-  });
-
-  it('grants sneak via advantage without consulting the ally range loop', async () => {
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'advantage');
-    expect(result.sneakAttackDice).toBe(9);
-    expect(isWithinRange).not.toHaveBeenCalled();
-  });
-
-  it('refuses sneak with disadvantage even with adjacent ally and advantage trigger available', async () => {
-    isWithinRange.mockResolvedValue(true);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'disadvantage');
+    if (activeConditions) setupRuntime({ activeConditions });
+    if (summaryConditions) getCombatContext.mockResolvedValue(combatSummary(summaryConditions));
+    const result = await build();
     expect(result.sneakAttackDice).toBe(0);
-    expect(isWithinRange).not.toHaveBeenCalled();
+    expect(probeCalls()).toEqual([]);
   });
 
-  it('round latch blocks sneak on a second attack in the same round', async () => {
+  // Ally filter, both models: unedited attackers get the type/attitude
+  // default; Phase 3.2 betrayal — an EDITED selectedAllies list replaces it,
+  // so a defector (self-only) loses former allies and named allies keep it.
+  it.each([
+    ['only creature in range is a hostile NPC', {
+      summary: combatSummary(null, { name: 'Goblin Pet', type: 'npc', attitude: 'hostile' }),
+      dice: 0, probes: [],
+    }],
+    ['friendly NPC (non-player) ally counts', {
+      summary: combatSummary(null, { name: 'Wolf Companion', type: 'npc', attitude: 'friendly' }),
+      dice: 9, probes: [flankProbe('Wolf Companion')],
+    }],
+    ['betrayal: defector rogue (self-only edited list) loses former ally flanking', {
+      attackerAllies: ['AasimarTest'], dice: 0, probes: [],
+    }],
+    ['betrayal: edited list naming the flanker keeps the benefit', {
+      attackerAllies: ['AasimarTest', 'ElderPaladin'], dice: 9, probes: [flankProbe('ElderPaladin')],
+    }],
+  ])('ally allegiance — %s', async (_label, { summary, attackerAllies, dice, probes }) => {
     isWithinRange.mockResolvedValue(true);
-    setupRuntime({ latch: 1 });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-    expect(isWithinRange).not.toHaveBeenCalled();
+    if (summary) getCombatContext.mockResolvedValue(summary);
+    if (attackerAllies) setupRuntime({ attackerAllies });
+    const result = await build();
+    expect(result.sneakAttackDice).toBe(dice);
+    expect(probeCalls()).toEqual(probes);
   });
 
-  it('re-arms sneak on a new round', async () => {
+  // Forced mode short-circuits the lane: advantage grants outright,
+  // disadvantage refuses — neither consults the ally range loop.
+  it.each([
+    ['advantage grants without probing', 'advantage', 9],
+    ['disadvantage refuses even with adjacent ally', 'disadvantage', 0],
+  ])('forced mode — %s', async (_label, mode, dice) => {
     isWithinRange.mockResolvedValue(true);
-    setupRuntime({ latch: 1 });
-    getCurrentCombatRound.mockReturnValue(2);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(9);
+    const result = await build(rogueStats, finesseAttack, mode);
+    expect(result.sneakAttackDice).toBe(dice);
+    expect(probeCalls()).toEqual([]);
   });
 
-  // Phase 3.2 betrayal validation (arena-starter §4): an EDITED ally list on
-  // the attacker is the allegiance model — a defector (self-only) loses the
-  // flanking benefit of former allies; an edited list naming them keeps it.
-  it('betrayal: defector rogue (self-only edited list) loses a former ally\'s flanking', async () => {
+  // Once per round: latch equal to the current round blocks before probing;
+  // a new round re-arms.
+  it.each([
+    ['same round latch blocks second attack', 1, 1, 0, []],
+    ['new round re-arms sneak', 1, 2, 9, [flankProbe('ElderPaladin')]],
+  ])('round latch — %s', async (_label, latch, round, dice, probes) => {
     isWithinRange.mockResolvedValue(true);
-    setupRuntime({ attackerAllies: ['AasimarTest'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(0);
-    expect(isWithinRange).not.toHaveBeenCalledWith('Thug 1', 'ElderPaladin', 5);
+    setupRuntime({ latch });
+    getCurrentCombatRound.mockReturnValue(round);
+    const result = await build();
+    expect(result.sneakAttackDice).toBe(dice);
+    expect(probeCalls()).toEqual(probes);
   });
 
-  it('edited ally list naming the flanker keeps the sneak benefit', async () => {
+  // Weapon/class eligibility gates return before any combat lookup; the
+  // ranged face passes the gate, so its flank probe must land.
+  it.each([
+    ['non-finesse melee refused', { attack: { ...finesseAttack, name: 'Mace', properties: [], damageType: 'Bludgeoning' }, dice: 0, probes: [] }],
+    ['non-finesse ranged still qualifies', { attack: { ...finesseAttack, name: 'Shortbow', weaponType: 'ranged', properties: [] }, dice: 9, probes: [flankProbe('ElderPaladin')] }],
+    ['non-Rogue class refused', { stats: { ...rogueStats, class: { name: 'Fighter', class_levels: [] } }, dice: 0, probes: [] }],
+  ])('eligibility gate — %s', async (_label, { attack, stats, dice, probes }) => {
     isWithinRange.mockResolvedValue(true);
-    setupRuntime({ attackerAllies: ['AasimarTest', 'ElderPaladin'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
-    expect(result.sneakAttackDice).toBe(9);
+    const result = await build(stats, attack);
+    expect(result.sneakAttackDice).toBe(dice);
+    expect(probeCalls()).toEqual(probes);
   });
 
-  it('refuses sneak for non-finesse melee weapon', async () => {
-    isWithinRange.mockResolvedValue(true);
-    const result = await buildAttackContextSync(
-      { ...finesseAttack, name: 'Mace', properties: [], damageType: 'Bludgeoning' },
-      rogueStats, 'camp', 'normal'
-    );
-    expect(result.sneakAttackDice).toBe(0);
+  // Dice-count derivation per ruleset data shape (advantage isolates it).
+  it.each([
+    ['2024 sneak_attack_num_d6', rogueStats, 9],
+    ['5e class_specific.sneak_attack.dice_count', rogueStats5e, 10],
+  ])('dice count — %s', async (_label, stats, dice) => {
+    const result = await build(stats, finesseAttack, 'advantage');
+    expect(result.sneakAttackDice).toBe(dice);
+    expect(probeCalls()).toEqual([]);
   });
 });

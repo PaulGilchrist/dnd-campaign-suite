@@ -1,7 +1,8 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
-// CharSummary speed-row calculations — the ONLY owner in the CharSummary family of:
-// exhaustion reduction (applySpeedConditions), condition speed effects
+// CharSummary speed-row calculations (via CharSummary render → charSummaryCalc
+// applySpeedConditions) — the ONLY owner in the CharSummary family of:
+// exhaustion reduction, condition speed effects
 // (speedHalved / speedReduction / speedZero + halved-source notice), fly-speed
 // suffixes, and ice walk.
 // Delegated to siblings (do not duplicate here):
@@ -163,8 +164,8 @@ describe('condition speed effects', () => {
 describe('fly speed suffix from buffs', () => {
     it.each([
         { buff: { effect: 'fly_speed_equals_walk_speed' }, text: /^25 ft\., fly 25 ft\.\s*$/, label: 'generic fly mirrors walk speed, no hover' },
-        { buff: { effect: 'fly_speed_20_hover' }, text: /^25 ft\., fly 20 ft\.\s+\(hover\)\s*$/, label: 'fixed 20 ft fly with hover' },
-        { buff: { effect: 'dragon_wings', flySpeed: 60 }, text: /^25 ft\., fly 60 ft\.\s+\(hover\)\s*$/, label: 'dragon_wings uses its own flySpeed' },
+        { buff: { effect: 'fly_speed_20_hover', flySpeed: 99 }, text: /^25 ft\., fly 20 ft\.\s+\(hover\)\s*$/, label: 'fixed 20 ft fly with hover, ignoring any provided flySpeed' },
+        { buff: { effect: 'dragon_wings', flySpeed: 45 }, text: /^25 ft\., fly 45 ft\.\s+\(hover\)\s*$/, label: 'dragon_wings uses the buff flySpeed, not its 60 ft default' },
         { buff: { effect: 'glistening_flight', flySpeed: 40 }, text: /^25 ft\., fly 25 ft\.\s+\(hover\)\s*$/, label: 'glistening_flight mirrors walk speed with hover, ignoring any provided flySpeed' },
     ])('$label', ({ buff, text }) => {
         renderSummary({ buffs: [buff] });

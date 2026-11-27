@@ -1,4 +1,26 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
+// Lane: the MapsManager CRUD/activate/render surface — header states, create,
+// activate/deactivate toggles, delete, description modal, row-action naming,
+// and SSE list/activate handling.
+//
+// Deliberately NOT owned here (each lane lives in a dedicated sibling file):
+// - Rename commit/cancel/refusal lanes → MapsManager.rename-{blur-revert,
+//   confirm-cancel,cancel-error,refusal-keeps-open,aria-label,sibling-lock}
+//   .test.jsx. Only the service-failure fallback banner (unique to this file)
+//   stays below.
+// - Open → editor suffix-free SSE key contract → MapsManager.open-sse-key
+//   .test.jsx (pins both onOpenMap args byte-exactly; the dispatch smoke
+//   rides the aria-label section).
+// - Delete-modal dialog/focus semantics + intact confirm lane →
+//   MapsManager.delete-a11y.test.jsx.
+// - Activate/deactivate success notice → MapsManager.activate-notice.test.jsx.
+// - Row Regenerate faces + confirm dialog → MapsManager.regenerate.test.jsx.
+// - Empty-kebab create/rename gate → MapsManager.empty-kebab-gate.test.jsx
+//   (this harness mocks toKebabCase as identity, so that gate is unreachable
+//   here by design).
+// - Generator modal internals and twin parity → Generate*Modal.test.jsx and
+//   generateModalParity.test.js. Only the manager-side wiring (seed, refresh,
+//   close) is stubbed and pinned here.
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MapsManager from './MapsManager.jsx';
@@ -124,29 +146,24 @@ describe('MapsManager', () => {
             expect(screen.getByRole('heading', { name: 'Map' })).toBeInTheDocument();
         });
 
-        it('shows a loading indicator while maps are being fetched', () => {
-            mapsService.loadMaps.mockImplementation(() => new Promise(() => {}));
-            render(<MapsManager {...props} />);
-            expect(screen.getByText('Loading maps...')).toBeInTheDocument();
-        });
-
         // Regression (2026-10-28 improve run): the QA probe saw a Maps pane
         // painting NEITHER rows NOR loading NOR empty-state on first view
         // entry. Mount-time frames are locked here: the fetch-pending frame
         // always shows the loading affordance, and resolution paints the
         // rows with no second interaction. (The App-level blank sub-state
         // that could strand the pane with `mapsView.type === 'none'` is
-        // pinned in App.map-navigation.test.jsx.)
+        // pinned in App.map-navigation.test.jsx.) Also subsumes the plain
+        // "loading indicator shows while fetching" check.
         it('never paints a blank list area between mount and fetch resolution', async () => {
             let resolveMaps;
             mapsService.loadMaps.mockImplementation(() => new Promise((resolve) => { resolveMaps = resolve; }));
-            const { container } = render(<MapsManager {...props} />);
+            render(<MapsManager {...props} />);
 
             // Fetch still pending: loading affordance up, zero rows, and no
             // premature empty-state flash.
-            expect(container.querySelector('.maps-manager-loading')).toBeInTheDocument();
-            expect(container.querySelectorAll('.maps-manager-item')).toHaveLength(0);
-            expect(container.querySelector('.maps-manager-empty')).not.toBeInTheDocument();
+            expect(screen.getByText('Loading maps...')).toBeInTheDocument();
+            expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+            expect(screen.queryByText('No maps yet. Create one to get started.')).not.toBeInTheDocument();
 
             await act(async () => {
                 resolveMaps({
@@ -157,9 +174,9 @@ describe('MapsManager', () => {
                 });
             });
 
-            expect(container.querySelectorAll('.maps-manager-item')).toHaveLength(2);
-            expect(container.querySelector('.maps-manager-loading')).not.toBeInTheDocument();
-            expect(container.querySelector('.maps-manager-empty')).not.toBeInTheDocument();
+            expect(screen.getAllByRole('listitem')).toHaveLength(2);
+            expect(screen.queryByText('Loading maps...')).not.toBeInTheDocument();
+            expect(screen.queryByText('No maps yet. Create one to get started.')).not.toBeInTheDocument();
         });
 
         it('shows the empty state when no maps exist', async () => {
@@ -219,6 +236,8 @@ describe('MapsManager', () => {
             expect(mapsService.createMap).not.toHaveBeenCalled();
         });
 
+        // The disabled button gates mouse clicks, but Enter in the input is a
+        // separate commit lane that must still surface the refusal copy.
         it('shows an error when Enter submits an empty name', () => {
             render(<MapsManager {...props} />);
             fireEvent.keyDown(createInput(), { key: 'Enter' });
@@ -329,35 +348,6 @@ describe('MapsManager', () => {
             await renderWithMaps(makeMap({ type }));
             expect(screen.getByText(badgeText, { selector: '.map-type-badge' })).toBeInTheDocument();
         });
-
-        it('shows the Active badge and hides Activate only for the active map', async () => {
-            await renderWithMaps(
-                makeMap({ name: 'Active Map', isActive: true }),
-                makeMap({ fileName: 'map2.json', name: 'Inactive Map' }),
-            );
-
-            expect(screen.getAllByText('Active')).toHaveLength(1);
-            expect(screen.getByText('Active').closest('li')).toHaveTextContent('Active Map');
-            const activateButtons = screen.getAllByRole('button', { name: /^Activate/ });
-            expect(activateButtons).toHaveLength(1);
-            expect(activateButtons[0]).toHaveAttribute('aria-label', 'Activate "Inactive Map"');
-            expect(activateButtons[0].closest('li')).toHaveTextContent('Inactive Map');
-        });
-
-        it('calls onOpenMap with each suffix-free map name plus display name (SSE key match + notice naming)', async () => {
-            await renderWithMaps(
-                makeMap({ name: 'Map A', fileName: 'map-a.json' }),
-                makeMap({ name: 'Map B', fileName: 'map-b.json' }),
-            );
-
-            const openButtons = ['Map A', 'Map B'].map(
-                name => screen.getByRole('button', { name: `Open "${name}"` }),
-            );
-            fireEvent.click(openButtons[0]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-a', 'Map A');
-            fireEvent.click(openButtons[1]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-b', 'Map B');
-        });
     });
 
     // -----------------------------------------------------------------------
@@ -387,10 +377,11 @@ describe('MapsManager', () => {
 
     // -----------------------------------------------------------------------
     // Deactivate Button (backlog 2026-11-04 CQ: active row had no deactivate
-    // affordance — the Deactivate twin of Activate)
+    // affordance — the Deactivate twin of Activate). Owns the per-row
+    // Active-badge / toggle-state rendering.
     // -----------------------------------------------------------------------
     describe('Deactivate Button', () => {
-        it('renders Deactivate on the ACTIVE row and Activate only on inactive rows', async () => {
+        it('renders Deactivate + Active badge on the ACTIVE row and Activate only on inactive rows', async () => {
             await renderWithMaps(
                 makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
                 makeMap({ name: 'Forest', fileName: 'forest.json' }),
@@ -399,20 +390,25 @@ describe('MapsManager', () => {
             const activeRow = screen.getByText('Cave').closest('li');
             const deactivate = within(activeRow).getByRole('button', { name: 'Deactivate "Cave"' });
             expect(deactivate).toHaveTextContent('Deactivate');
-            // The Active badge and the toggle sit on the same row…
+            // The Active badge is unique and sits on the active row…
+            expect(screen.getAllByText('Active')).toHaveLength(1);
             expect(activeRow).toHaveTextContent('Active');
             // …and Activate never renders there (single toggle per row).
             expect(within(activeRow).queryByRole('button', { name: /^Activate/ })).not.toBeInTheDocument();
 
             const inactiveRow = screen.getByText('Forest').closest('li');
-            expect(within(inactiveRow).getByRole('button', { name: 'Activate "Forest"' })).toBeInTheDocument();
+            const activate = within(inactiveRow).getByRole('button', { name: 'Activate "Forest"' });
+            expect(activate).toBeInTheDocument();
             expect(within(inactiveRow).queryByRole('button', { name: /^Deactivate/ })).not.toBeInTheDocument();
+            expect(within(inactiveRow).queryByText('Active')).not.toBeInTheDocument();
         });
 
-        it('calls deactivateMap, reloads the list, and the row flips back to Activate without a page reload', async () => {
+        it('calls deactivateMap, reloads the list, and the row flips back to Activate', async () => {
             mapsService.deactivateMap.mockResolvedValue({ message: 'Map deactivated successfully', activeMap: null });
             await renderWithMaps(makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }));
             expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
+            // Server truth after the PUT: the re-fetch returns the row inactive.
+            mapsService.loadMaps.mockResolvedValue({ maps: [makeMap({ name: 'Cave', fileName: 'cave.json' })] });
 
             fireEvent.click(screen.getByRole('button', { name: 'Deactivate "Cave"' }));
 
@@ -420,30 +416,10 @@ describe('MapsManager', () => {
                 expect(mapsService.deactivateMap).toHaveBeenCalledWith('test-campaign', 'cave.json');
                 // awaited re-fetch after the PUT — no page reload required
                 expect(mapsService.loadMaps).toHaveBeenCalledTimes(2);
-            });
-            // Server truth after deactivation: the row comes back inactive —
-            // badge gone, button flipped back to Activate.
-            mapsService.loadMaps.mockResolvedValue({ maps: [makeMap({ name: 'Cave', fileName: 'cave.json' })] });
-            await emitSSE({ key: 'maps-list-test-campaign' });
-            await waitFor(() => {
+                // badge gone, button flipped back to Activate.
                 expect(screen.queryByText('Active')).not.toBeInTheDocument();
                 expect(screen.getByRole('button', { name: 'Activate "Cave"' })).toBeInTheDocument();
             });
-        });
-
-        it('clears the Active badge directly on a map-activate SSE event with activeMap null (no re-fetch)', async () => {
-            await renderWithMaps(
-                makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
-                makeMap({ name: 'Forest', fileName: 'forest.json' }),
-            );
-            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
-
-            await emitSSE({ key: 'map-activate-test-campaign', data: { activeMap: null } });
-
-            expect(screen.queryByText('Active')).not.toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Activate "Cave"' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Activate "Forest"' })).toBeInTheDocument();
-            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
         });
 
         it('shows the deactivation error message and keeps the Active row unchanged', async () => {
@@ -460,92 +436,31 @@ describe('MapsManager', () => {
     });
 
     // -----------------------------------------------------------------------
-    // Rename Flow
+    // Rename Flow — commit/cancel/refusal lanes are pinned by the
+    // rename-* sibling files (see header). Only the service-failure fallback
+    // banner lives here.
     // -----------------------------------------------------------------------
     describe('Rename Flow', () => {
-        const map = () => makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' });
-
-        it('saves the rename via Enter and closes the input', async () => {
-            await renderWithMaps(map());
-            const input = startRename();
-            fireEvent.change(input, { target: { value: 'Renamed Map' } });
-            fireEvent.keyDown(input, { key: 'Enter' });
-
-            await waitFor(() => {
-                expect(mapsService.renameMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json', 'Renamed Map');
-            });
-            expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-        });
-
-        // Backlog 2026-11-25 BC: blur is a REVERT, never a commit — leaving the
-        // editor without Enter/Confirm discards the pending value (zero writes).
-        it('reverts the rename on blur with zero writes', async () => {
-            await renderWithMaps(map());
-            const input = startRename();
-            fireEvent.change(input, { target: { value: 'Renamed Map' } });
-            fireEvent.blur(input);
-
-            expect(mapsService.renameMap).not.toHaveBeenCalled();
-            expect(screen.queryByDisplayValue('Renamed Map')).not.toBeInTheDocument();
-            expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-        });
-
-        it('cancels the rename when Escape is pressed', async () => {
-            await renderWithMaps(map());
-            fireEvent.keyDown(startRename(), { key: 'Escape' });
-
-            expect(screen.queryByDisplayValue('Dungeon Level 1')).not.toBeInTheDocument();
-            expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-            expect(mapsService.renameMap).not.toHaveBeenCalled();
-        });
-
-        it.each([
-            ['Enter', ''],
-            ['Enter', 'Dungeon Level 1'],
-        ])('cancels the rename when %s submits %o', async (trigger, value) => {
-            await renderWithMaps(map());
-            const input = startRename();
-            if (value !== 'Dungeon Level 1') {
-                fireEvent.change(input, { target: { value } });
-            }
-            if (trigger === 'Enter') {
-                fireEvent.keyDown(input, { key: 'Enter' });
-            } else {
-                fireEvent.blur(input);
-            }
-
-            expect(mapsService.renameMap).not.toHaveBeenCalled();
-            expect(screen.queryByDisplayValue('Dungeon Level 1')).not.toBeInTheDocument();
-        });
-
-        it('rejects a rename to a duplicate name (case-insensitive, kebab-normalized)', async () => {
-            await renderWithMaps(map(), makeMap({ name: 'Forest', fileName: 'forest.json' }));
-            const input = startRename();            fireEvent.change(input, { target: { value: 'forest' } });
-            fireEvent.keyDown(input, { key: 'Enter' });
-
-            await waitFor(() => {
-                expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
-            });
-            expect(mapsService.renameMap).not.toHaveBeenCalled();
-            // Refused, not closed: the editor stays armed holding 'forest'.
-            expect(screen.getByDisplayValue('forest')).toBeInTheDocument();
-        });
-
-        it('shows the default rename error when the service fails', async () => {
+        it('shows the default rename error and closes the editor when the service fails', async () => {
             mapsService.renameMap.mockRejectedValue(new Error());
-            await renderWithMaps(map());
+            await renderWithMaps(makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' }));
             const input = startRename();
             fireEvent.change(input, { target: { value: 'New Name' } });
             fireEvent.keyDown(input, { key: 'Enter' });
 
             await waitFor(() => {
+                expect(mapsService.renameMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json', 'New Name');
                 expect(screen.getByText('Failed to rename map')).toBeInTheDocument();
             });
+            // The failed commit closes the editor; the row keeps its old name.
+            expect(screen.queryByDisplayValue('New Name')).not.toBeInTheDocument();
+            expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
         });
     });
 
     // -----------------------------------------------------------------------
-    // Delete Flow
+    // Delete Flow (dialog semantics and the intact confirm-delete lane are
+    // pinned by MapsManager.delete-a11y.test.jsx)
     // -----------------------------------------------------------------------
     describe('Delete Flow', () => {
         it('opens the confirmation modal and closes it on Cancel', async () => {
@@ -556,6 +471,7 @@ describe('MapsManager', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
+            expect(mapsService.deleteMap).not.toHaveBeenCalled();
         });
 
         it('closes via Cancel when the overlay is clicked (backdrop dismiss, 2026-11-13 AD)', async () => {
@@ -565,17 +481,6 @@ describe('MapsManager', () => {
             fireEvent.click(screen.getByRole('heading', { name: 'Delete Map' }).closest('.modal-shell-overlay'));
             expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
             expect(mapsService.deleteMap).not.toHaveBeenCalled();
-        });
-
-        it('calls deleteMap and closes the modal when confirmed', async () => {
-            await renderWithMaps(makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' }));
-            openDeleteModal();
-            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
-
-            await waitFor(() => {
-                expect(mapsService.deleteMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json');
-                expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
-            });
         });
 
         // Regression (bug-gm-activate-without-open-gridless-roller-lane,
@@ -588,32 +493,25 @@ describe('MapsManager', () => {
             fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
 
             await waitFor(() => {
+                expect(mapsService.deleteMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json');
                 expect(props.onMapDeleted).toHaveBeenCalledWith('dungeon-level-1');
             });
         });
 
-        it('does not report a deletion when the delete request fails', async () => {
-            mapsService.deleteMap.mockRejectedValue(new Error('gone wrong'));
+        it.each([
+            ['gone wrong', 'gone wrong'],
+            [undefined, 'Failed to delete map'],
+        ])('a failed delete shows %s, closes the modal, and never reports a deletion', async (message, expected) => {
+            mapsService.deleteMap.mockRejectedValue(new Error(message));
             await renderWithMaps(makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' }));
             openDeleteModal();
             fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
 
             await waitFor(() => {
-                expect(screen.getByText('gone wrong')).toBeInTheDocument();
-            });
-            expect(props.onMapDeleted).not.toHaveBeenCalled();
-        });
-
-        it('shows the default delete error and closes the modal', async () => {
-            mapsService.deleteMap.mockRejectedValue(new Error());
-            await renderWithMaps(makeMap({ name: 'Dungeon Level 1' }));
-            openDeleteModal();
-            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
-
-            await waitFor(() => {
-                expect(screen.getByText('Failed to delete map')).toBeInTheDocument();
+                expect(screen.getByText(expected)).toBeInTheDocument();
                 expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
             });
+            expect(props.onMapDeleted).not.toHaveBeenCalled();
         });
     });
 
@@ -647,6 +545,7 @@ describe('MapsManager', () => {
             await renderWithMaps(makeMap({ name: 'Dungeon Level 1' }));
             await openEditModal();
 
+            fireEvent.change(screen.getByPlaceholderText(/Describe this map/), { target: { value: 'Discarded.' } });
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             expect(screen.queryByRole('heading', { name: /Edit Description/ })).not.toBeInTheDocument();
             expect(mapsService.updateMapDescription).not.toHaveBeenCalled();
@@ -771,27 +670,39 @@ describe('MapsManager', () => {
             expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
         });
 
-        it('ignores events for other campaigns and events with a missing or empty key', async () => {
-            await renderWithMaps(makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }));
+        it('clears every Active badge on a map-activate echo with activeMap null (no re-fetch)', async () => {
+            await renderWithMaps(
+                makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
+                makeMap({ name: 'Forest', fileName: 'forest.json' }),
+            );
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
 
-            await emitSSE({ key: 'map-activate-other-campaign', data: { activeMap: 'something-else' } });
-            await emitSSE(null);
-            await emitSSE({ key: '' });
+            await emitSSE({ key: 'map-activate-test-campaign', data: { activeMap: null } });
 
-            expect(screen.getAllByText('Active')).toHaveLength(1);
-            expect(screen.getByText('Active').closest('li')).toHaveTextContent('Cave');
+            expect(screen.queryByText('Active')).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Activate "Cave"' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Activate "Forest"' })).toBeInTheDocument();
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
         });
 
-        it('handles a map-activate event with missing data gracefully', async () => {
+        it('ignores events for other campaigns, keyless events, and data-less activate echoes', async () => {
             await renderWithMaps(
                 makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
                 makeMap({ name: 'Forest', fileName: 'forest.json' }),
             );
 
+            await emitSSE({ key: 'map-activate-other-campaign', data: { activeMap: 'something-else' } });
+            await emitSSE({ key: 'maps-list-other-campaign' });
+            await emitSSE(null);
+            await emitSSE({ key: '' });
+            // Own campaign but no payload: neither the truthy nor the null
+            // branch fires — the render must stay exactly as it was.
             await emitSSE({ key: 'map-activate-test-campaign' });
 
             expect(screen.getAllByText('Active')).toHaveLength(1);
             expect(screen.getByText('Active').closest('li')).toHaveTextContent('Cave');
+            expect(screen.getByRole('button', { name: 'Deactivate "Cave"' })).toBeInTheDocument();
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
         });
     });
 });

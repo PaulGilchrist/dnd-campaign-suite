@@ -1,29 +1,32 @@
-// @maintained-by-ai 2026-10-14
-// Fixture-contract tests for createBaseProps (shared by ~24 CharActionModals test files).
-// Only the non-tautological contracts are covered here:
-//  1. The prop shape the component consumes — every prop must exist as the right type
-//     (props are spread into the component; a missing/non-function prop crashes consumer tests).
-//  2. setModalState's closure wiring — plain-object updates mutate the *same* modalState
-//     object this factory call returned (production setModalState only ever receives plain
-//     objects, per useCharActionModals.js, so updater-function semantics are not tested).
-// Per-property override merging and per-call vi.fn identity are omitted — they restate
-// `...overrides` / vi.fn() language guarantees. Override behavior itself is exercised
-// implicitly by every consumer test that passes custom modalState/handlers through this factory.
-// Component rendering: CharActionModals.rendering.test.jsx; handlers: CharActionModals.handlers.test.jsx.
+// @maintained-by-ai 2026-11-26
+// Fixture-contract tests for createBaseProps (shared test factory, ~25 CharActionModals
+// test files). Exactly two contracts are pinned, nothing else:
+//  1. Prop shape — every prop consumers spread into <CharActionModals> exists with the
+//     right type; one whole-object toEqual catches missing props, wrong types, and
+//     stray extra props in a single failure. A missing handler prop crashes all
+//     consumer lanes, so this is the fast diagnostic for that.
+//  2. setModalState closure wiring — plain-object patches merge via Object.assign into
+//     the SAME modalState object this factory call returned, and each call is isolated.
+//     Production setModalState (useCharActionModals.js:13-19) only ever receives plain
+//     objects and is never called with falsy updates, so the helper's updater-function
+//     branch and the hook's clear-on-null branch are dead defensive code and are not
+//     pinned here.
+// Per-property override merging is exercised implicitly by every consumer test passing
+// custom modalState/handlers through this factory. Component rendering:
+// CharActionModals.rendering.test.jsx; handlers: CharActionModals.handlers.test.jsx.
 
 import { describe, it, expect } from 'vitest';
 import { createBaseProps } from './CharActionModals.test-utils.jsx';
 
 describe('createBaseProps fixture contract', () => {
-  it('provides the full prop shape consumers spread into CharActionModals, with fresh isolated state per call', () => {
-    const props = createBaseProps();
-    const { setModalState, modalState, ...values } = props;
-
-    expect(values).toEqual({
+  it('provides the full prop shape consumers spread into CharActionModals', () => {
+    expect(createBaseProps()).toEqual({
       playerStats: { name: 'Test Character' },
       campaignName: 'test-campaign',
       characters: [],
       pendingDamage: null,
+      modalState: {},
+      setModalState: expect.any(Function),
       handleMasteryClose: expect.any(Function),
       handleWeaponMasteryChoice: expect.any(Function),
       handleWeaponKindMasteryClose: expect.any(Function),
@@ -47,29 +50,23 @@ describe('createBaseProps fixture contract', () => {
       handleDivinationSavantConfirm: expect.any(Function),
       handleIllusionSavantConfirm: expect.any(Function),
     });
-    // Call-and-assert (#245 sharpen): setModalState is live and its patch
-    // lands in this call's modalState — the write channel ~24 consumers use.
-    props.setModalState({ propShapeProbe: true });
-    expect(props.modalState).toEqual({ propShapeProbe: true });
-
-    // Fresh state objects per call so consumer tests cannot leak into each other.
-    const second = createBaseProps();
-    expect(second.modalState).not.toBe(modalState);
-    expect(second.setModalState).not.toBe(setModalState);
   });
 
-  it('setModalState({ patch }) mutates the modalState object returned by the same call', () => {
+  it('setModalState merges patches into the same modalState object, isolated per factory call', () => {
     const props = createBaseProps();
     const shared = props.modalState;
 
+    // Second patch overwrites the first key — the modal-close pattern consumers use.
     props.setModalState({ cleaveModal: { id: 1 } });
     props.setModalState({ cleaveModal: null, shieldBashModal: { id: 2 } });
 
-    // Same reference so consumer tests that hold props.modalState observe updates.
+    // Same reference so consumer tests holding props.modalState observe every update.
     expect(props.modalState).toBe(shared);
     expect(shared).toEqual({ cleaveModal: null, shieldBashModal: { id: 2 } });
 
-    // Isolated from other factory calls.
-    expect(createBaseProps().modalState).toEqual({});
+    // Fresh calls cannot leak state between consumer tests.
+    const second = createBaseProps();
+    expect(second.modalState).not.toBe(shared);
+    expect(second.modalState).toEqual({});
   });
 });

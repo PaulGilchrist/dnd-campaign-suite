@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -153,17 +153,16 @@ describe('FighterFeatures', () => {
     expect(section.textContent).toContain(`Extra Attacks: ${expected}`);
   });
 
-  it.each([
-    ['2024 tracks uses from classLevel.second_wind', '2024', 1, { second_wind: 2 }, 2],
-    ['2024 without a matching row tracks 0 uses', '2024', 1, {}, 0],
-    // 5e canon (classes.json Fighter lv1 'Second Wind'): exactly one use,
-    // recharged by a rest, at every level — never the dead 0/0 row.
-    ['5e tracks one use at level 1', '5e', 1, {}, 1],
-    ['5e tracks one use at level 18 with class_specific rows', '5e', 18, { class_specific: { action_surges: 2, extra_attacks: 2 } }, 1],
-  ])('second wind: %s', (_label, rules, level, classLevelData, uses) => {
-    renderFighter(fighterStats(level, classLevelData, { rules }));
+  // The full derivation table (both rulesets, no-row fallback, non-Fighter)
+  // is owned by trackedResources.secondWind.test.js. Here only the wiring is
+  // at stake: the secondWindUses row must render computeSecondWindMax. The
+  // strongest case is the bug regression — a 5e Fighter whose class_specific
+  // rows carry action_surges/extra_attacks but no second_wind must show the
+  // canonical one use, never the dead 0/0 row.
+  it('wires secondWindUses to one 5e use even when class_specific rows lack a second_wind column', () => {
+    renderFighter(fighterStats(18, { class_specific: { action_surges: 2, extra_attacks: 2 } }));
     expect(screen.getByTestId('tracked-resource-secondWindUses'))
-      .toHaveTextContent(`Second Wind: ${uses}/${uses}`);
+      .toHaveTextContent('Second Wind: 1/1');
   });
 
   it('renders the mastery value and opens the mastery modal when clicked', () => {

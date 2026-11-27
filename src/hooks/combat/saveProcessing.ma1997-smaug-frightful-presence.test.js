@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1997: Smaug the Golden "Frightful Presence" — FP save row authored ONLY
 // conditions:["frightened"] + save_dc/save_type: the DC 22 Wisdom save adjudicated
 // honestly on the live EB-NPC inline lane (chip armed, victim rolled, failure
@@ -45,11 +45,14 @@ describe('MA-1997 disk fingerprint: Smaug Frightful Presence save_effect + FP se
     expect(FP.dc_success).toBeUndefined(); // damageless row — half-default never pays damage (§63 moot)
   });
 
-  it('extractor grants frightened (was save_effect-less inert → [] → applyDamagelessSaveConditions early-return)', () => {
-    expect(extractConditionsFromSaveEffect(FP.save_effect)).toEqual(['frightened']);
-    expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
-  });
-
+  // Extractor unit fold: `extractConditionsFromSaveEffect(FP.save_effect)` →
+  // ['frightened'] is redundant — the save_effect bytes are pinned verbatim
+  // above, the extraction→grant seam runs end-to-end through
+  // saveContextFromRow in the live fail-face test below, and the generic
+  // word-scan + empty/absent-input arms are stronger-owned by
+  // saveProcessing.ma1392-vengeful-glare-frightened-only.test.js:119 (FP rows
+  // → ['frightened']) and saveProcessing.ma2013-sun-wukong-locking-word.test.js:63
+  // (save_effect-less row → [], the exact pre-fix FAIL(a) input).
   it('gazeImmunityActive refuses FP re-fires once the success-immunity te stands (live refused press)', () => {
     const immunityTe = { target: 'Bandit 2', effect: 'frightful_presence_immunity', source: 'Smaug the Golden 1' };
     expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 2' }, monsterName: 'Smaug the Golden 1', targetEffects: [immunityTe] })).toEqual(

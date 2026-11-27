@@ -1,12 +1,14 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // handleSpellAttackClick lane only. The shared showCastPopup routing, confirm
-// payment/metaCtx semantics, and skip lane are covered by the sibling lanes
-// (castClick / confirm / skip / modalRouting / aoeClick) — this file owns the
-// attack-click contract: cannotAct gate, spell-not-found delegation, the
-// non-sorcerer immediate cast, and the pendingActionMetamagic the sorcerer
-// lane queues from the SPELL object (spell.level / spell.casting_time — this
-// lane ignores attack.spellLevel/castingTime), plus CLA-230 forcedMode
-// threading through both cast paths.
+// payment/metaCtx/pending-clearing semantics, skip lane, base API shape, and
+// the damage-lane psionic truth table are owned by the sibling lanes
+// (castClick / confirm / skip / modalRouting / aoeClick / base .test.js) —
+// this file owns the attack-click contract: cannotAct gate (with denial
+// popup), spell-not-found delegation, the non-sorcerer immediate cast, and
+// the pendingActionMetamagic the sorcerer lane queues from the SPELL object
+// (spell.level / spell.casting_time — this lane ignores
+// attack.spellLevel/castingTime), plus CLA-230 forcedMode/advantageReason
+// threading through both cast paths and the attack-lane metamagic-wins gate.
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useActionSpellMetamagic } from './useActionSpellMetamagic.js';
@@ -51,8 +53,9 @@ const { isPsionicSpell, hasPsionicSorcery } = await import('../../services/rules
 
 // ── Click harness ────────────────────────────────────────────────────────────
 // Renders the hook and clicks handleSpellAttackClick; returns props/result and
-// the last executeSpellCast args (or null when nothing cast) for downstream
-// assertions. Mirrors the clickAoE pattern in the aoeClick lane.
+// a lazy lastCast() reader so assertions made after a later confirm see the
+// newest cast, not a click-time snapshot. Mirrors the clickAoE pattern in the
+// aoeClick lane.
 
 async function clickAttack(propsOverrides = {}, attackOverrides = {}) {
   const props = makeHookProps(propsOverrides);
@@ -67,30 +70,31 @@ async function clickAttack(propsOverrides = {}, attackOverrides = {}) {
     props,
     attack,
     result,
-    // Re-read on demand so assertions made after a later confirm/skip see
-    // the newest cast, not a click-time snapshot.
     lastCast: () => executeSpellCast.mock.calls.at(-1) ?? [null, null, null],
   };
 }
+
+const sorcererWith = (spell) => ({
+  playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
+});
 
 describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
   setupBeforeEach();
 
   // ── Guards and delegation ──────────────────────────────────────────────────
 
-  it('returns early without casting when cannotAct is true, and still exposes the full API', async () => {
+  it('blocks the click when cannotAct is true: loud denial popup, no delegate, no cast, nothing queued', async () => {
     const { props, result } = await clickAttack({ cannotAct: true });
 
+    // RB-1115: a blocked press pops the canonical condition reason (enforcement
+    // off path) and stops before any spell lookup or cast dispatch.
+    expect(props.setPopupHtml).toHaveBeenCalledWith(
+      expect.stringContaining('cannot take actions'),
+    );
     expect(props.handleAttackClick).not.toHaveBeenCalled();
     expect(prepareSpellCast).not.toHaveBeenCalled();
     expect(executeSpellCast).not.toHaveBeenCalled();
-    expect(result.current).toMatchObject({
-      pendingActionMetamagic: null,
-      handleActionMetamagicConfirm: expect.any(Function),
-      handleActionMetamagicSkip: expect.any(Function),
-      handleActionSpellDamageClick: expect.any(Function),
-      handleSpellAttackClick: expect.any(Function),
-    });
+    expect(result.current.pendingActionMetamagic).toBeNull();
   });
 
   it('delegates to handleAttackClick when the spell is not found (any class)', async () => {
@@ -106,7 +110,7 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
 
   // ── Non-sorcerer: immediate cast (castSpellAttackWithoutMetamagic) ───────
 
-  it('casts immediately for a non-sorcerer, threading targetName and never inventing forcedMode', async () => {
+  it('casts immediately for a non-sorcerer, threading target info and inventing no forcedMode/advantageReason', async () => {
     const spell = makeSpell();
     const buildCtx = vi.fn(async () => ({ targetName: 'Orc B' }));
     const { lastCast } = await clickAttack(
@@ -118,30 +122,18 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
     const [, castMetaCtx, castOpts] = lastCast();
     // CLA-230: no ctx.forcedMode ⇒ nothing fabricated into the cast metaCtx.
     expect(castMetaCtx.forcedMode).toBeUndefined();
+    expect(castMetaCtx.advantageReason).toBeUndefined();
     expect(await castOpts.getTargetInfo()).toEqual({ name: 'Orc B' });
   });
 
-  it('CLA-230: threads ctx.forcedMode into the non-sorcerer cast metaCtx', async () => {
-    const spell = makeSpell();
-    const buildCtx = vi.fn(async () => ({ targetName: 'Zombie 1', forcedMode: 'advantage' }));
-    const { lastCast } = await clickAttack(
-      { playerStats: makeNonSorcererStats({ spellAbilities: { spells: [spell] } }), buildCtx },
-    );
-
-    expect(lastCast()[1].forcedMode).toBe('advantage');
-    // No threaded reason → the field stays undefined (legacy generic chip copy).
-    expect(lastCast()[1].advantageReason).toBeUndefined();
-  });
-
-  it('attribution parity: threads ctx.advantageReason alongside forcedMode (corona spell face)', async () => {
-    const spell = makeSpell();
+  it('CLA-230 + attribution parity: threads ctx.forcedMode and advantageReason into the non-sorcerer cast', async () => {
     const buildCtx = vi.fn(async () => ({
       targetName: 'Zombie 1',
       forcedMode: 'disadvantage',
       advantageReason: 'Corona of Light — sunlight aura of War_Cleric — proximity unmeasured (gridless) — GM-enforced',
     }));
     const { lastCast } = await clickAttack(
-      { playerStats: makeNonSorcererStats({ spellAbilities: { spells: [spell] } }), buildCtx },
+      { playerStats: makeNonSorcererStats({ spellAbilities: { spells: [makeSpell()] } }), buildCtx },
     );
 
     const castMetaCtx = lastCast()[1];
@@ -151,45 +143,53 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
 
   // ── Sorcerer: queue pending metamagic from the SPELL, not the attack row ──
 
-  it('queues pendingActionMetamagic populated from the spell (level, casting_time)', async () => {
-    const spell = makeSpell({ level: 4, casting_time: '1 Bonus Action' });
-    const { result } = await clickAttack({
-      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
-    }, { spellLevel: 0 }); // attack-row level ignored by this lane — spell.level wins
+  it.each([
+    {
+      label: 'spell.level and spell.casting_time win over the attack row',
+      spell: { level: 4, casting_time: '1 Bonus Action' },
+      attack: { spellLevel: 0 },
+      expected: { spellName: 'Fireball', spellLevel: 4, castingTime: '1 Bonus Action' },
+    },
+    {
+      label: "castingTime falls back to 'Action' when the spell has no casting_time",
+      spell: { casting_time: undefined },
+      attack: {},
+      expected: { spellName: 'Fireball', spellLevel: 3, castingTime: 'Action' },
+    },
+  ])('queues pendingActionMetamagic from the SPELL — $label', async ({ spell, attack, expected }) => {
+    const { result } = await clickAttack(
+      sorcererWith(makeSpell(spell)),
+      attack,
+    );
 
-    const pending = result.current.pendingActionMetamagic;
-    expect(pending).not.toBeNull();
-    expect(pending.spellName).toBe('Fireball');
-    expect(pending.spellLevel).toBe(4);
-    expect(pending.castingTime).toBe('1 Bonus Action');
-    expect(pending.isPsionic).toBe(false);
-    expect(pending.psionicCost).toBe(0);
-  });
-
-  it("falls back to castingTime 'Action' when the spell has no casting_time", async () => {
-    const spell = makeSpell({ casting_time: undefined });
-    const { result } = await clickAttack({
-      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
+    expect(result.current).toMatchObject({
+      pendingActionMetamagic: expect.objectContaining({
+        ...expected,
+        isPsionic: false,
+        psionicCost: 0,
+        action: expect.any(Function),
+      }),
     });
-
-    expect(result.current.pendingActionMetamagic.castingTime).toBe('Action');
+    // Queue-only: the click itself never prepares or casts.
+    expect(prepareSpellCast).not.toHaveBeenCalled();
+    expect(executeSpellCast).not.toHaveBeenCalled();
   });
 
-  it('flags psionic and costs spell.level only when both spell and sorcery are psionic', async () => {
+  it('flags psionic and charges spell.level only when spell and sorcery both agree', async () => {
     const cases = [
-      { isPsionic: true, hasSorcery: true, expectPsionic: true, expectCost: 3 },
+      // spell.level (4), not the attack row (2), sets the psionic cost.
+      { isPsionic: true, hasSorcery: true, expectPsionic: true, expectCost: 4 },
       { isPsionic: true, hasSorcery: false, expectPsionic: false, expectCost: 0 },
     ];
 
     for (const c of cases) {
-      vi.clearAllMocks();
       isPsionicSpell.mockReturnValue(c.isPsionic);
       hasPsionicSorcery.mockReturnValue(c.hasSorcery);
-      const spell = makeSpell();
 
-      const { result } = await clickAttack({
-        playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
-      });
+      const { result } = await clickAttack(
+        sorcererWith(makeSpell({ level: 4 })),
+        { spellLevel: 2 },
+      );
 
       const pending = result.current.pendingActionMetamagic;
       expect(pending.isPsionic, `isPsionic ${c.isPsionic} hasSorcery ${c.hasSorcery}`).toBe(c.expectPsionic);
@@ -199,52 +199,35 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
 
   // ── Sorcerer: metamagic-resolved cast (queueSpellAttackMetamagic.action) ──
 
-  it('executes the queued cast on confirm with ctx.forcedMode and target info, then clears pending', async () => {
-    const spell = makeSpell();
-    const buildCtx = vi.fn(async () => ({ targetName: 'Goblin A', forcedMode: 'advantage' }));
-    const { result, lastCast } = await clickAttack({
-      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
-      buildCtx,
-    });
-
-    expect(result.current.pendingActionMetamagic).not.toBeNull();
-    expect(executeSpellCast).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await result.current.handleActionMetamagicConfirm({});
-    });
-
-    // CLA-230: ctx.forcedMode survives into the metamagic-resolved cast.
-    const [, castMetaCtx, castOpts] = lastCast();
-    expect(castMetaCtx.forcedMode).toBe('advantage');
-    expect(await castOpts.getTargetInfo()).toEqual({ name: 'Goblin A' });
-    expect(result.current.pendingActionMetamagic).toBeNull();
-  });
-
-  it('attribution parity: queued metamagic cast carries ctx.advantageReason too (lion spell face)', async () => {
-    const spell = makeSpell();
+  it('executes the queued cast on confirm with ctx.forcedMode, advantageReason, and target info', async () => {
     const buildCtx = vi.fn(async () => ({
       targetName: 'Goblin A',
       forcedMode: 'disadvantage',
       advantageReason: 'Lion rage aura — enemy of raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced',
     }));
     const { result, lastCast } = await clickAttack({
-      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
+      ...sorcererWith(makeSpell()),
       buildCtx,
     });
+
+    expect(executeSpellCast).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.handleActionMetamagicConfirm({});
     });
 
-    expect(lastCast()[1].advantageReason).toBe('Lion rage aura — enemy of raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced');
+    // CLA-230 + attribution parity survive the metamagic detour; pending
+    // clearing and payment are the confirm lane's contract.
+    const [, castMetaCtx, castOpts] = lastCast();
+    expect(castMetaCtx.forcedMode).toBe('disadvantage');
+    expect(castMetaCtx.advantageReason).toBe('Lion rage aura — enemy of raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced');
+    expect(await castOpts.getTargetInfo()).toEqual({ name: 'Goblin A' });
   });
 
-  it('CLA-230: metamagic-provided forcedMode (e.g. innate sorcery) wins over ctx value', async () => {
-    const spell = makeSpell();
+  it('CLA-230: a forcedMode already in the metaCtx (e.g. innate sorcery) wins over the ctx value', async () => {
     const buildCtx = vi.fn(async () => ({ targetName: 'Zombie 1', forcedMode: 'advantage' }));
     const { result } = await clickAttack({
-      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
+      ...sorcererWith(makeSpell()),
       buildCtx,
     });
 

@@ -1,12 +1,15 @@
-// @maintained-by-ai 2026-10-15
-// attackRiderHandler.handleShieldBash save-flow lane: save-prompt shape, DC resolution,
-// FT-082 _shieldBashBaseAttack stash, save-damage outcome logging, oncePerTurn skip
-// passthrough. Prerequisite refusals (shield / lastAttack) are owned by
-// attackRiderHandler.shield-bash.test.js; handle() routing + effect dispatch by
-// attackRiderHandler.test.js; the Charger size gate by
-// attackRiderHandler.charger-size-gate.test.js; restoreBaseAttackAfterBash internals
-// by services/combat/steps/features/shieldBash.test.js.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai 2026-11-26
+// attackRiderHandler.handleShieldBash save-flow lane: save-prompt shape, the DC
+// resolution matrix (numeric passthrough / 'ability' delegate / formula default),
+// FT-082 ordered setRuntimeValue census (stash before the save; restore+clear on
+// the success seam only), full-shape ordered addEntry census (prompt row then
+// outcome row, FROZEN timestamp), the expanded-Prone chooser payload (nowhere
+// else pinned), oncePerTurn skip passthrough. Prerequisite refusals (shield /
+// lastAttack) are owned by attackRiderHandler.shield-bash.test.js; handle()
+// routing + effect dispatch by attackRiderHandler.test.js; the Charger size gate
+// by attackRiderHandler.charger-size-gate.test.js; restoreBaseAttackAfterBash
+// internals by services/combat/steps/features/shieldBash.test.js.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle } from './attackRiderHandler.js';
 
@@ -51,7 +54,18 @@ import { checkOncePerTurnWithSkip } from '../../common/oncePerTurn.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
+const NOW = 1_700_000_000_000;
+const CAMPAIGN = 'test-campaign';
+
 const LAST_ATTACK = { hit: true, attackerName: 'TestHero', weaponType: 'melee', targetName: 'Goblin' };
+
+// Production SavePromptModal result shape: saveBonus + total, never bare bonus.
+const SAVE_FAIL = { success: false, roll: 5, total: 5, saveBonus: 0 };
+const SAVE_SUCCESS = { success: true, roll: 18, total: 18, saveBonus: 3 };
+
+// FT-082 stash readable by the restore seam: a valid base attack (attackName
+// present, not Shield Bash-shaped).
+const BASE_ATTACK = { ...LAST_ATTACK, attackName: 'Longsword', damageType: 'slashing' };
 
 function makeShieldBashAction(overrides = {}) {
     const { automation: automationOverrides, ...rest } = overrides;
@@ -73,7 +87,7 @@ function makeShieldBashAction(overrides = {}) {
     };
 }
 
-function makePlayerStats(overrides = {}) {
+function shieldStats() {
     return {
         name: 'TestHero',
         proficiency: 3,
@@ -81,25 +95,15 @@ function makePlayerStats(overrides = {}) {
             { name: 'Strength', bonus: 2 },
             { name: 'Dexterity', bonus: 2 },
         ],
-        inventory: {
-            equipped: overrides.equipped || [],
-            backpack: [],
-        },
-        equipment: overrides.equipment || [],
-        ...overrides,
+        inventory: { equipped: ['Shield'], backpack: [] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
     };
 }
 
-function shieldStats() {
-    return makePlayerStats({
-        equipped: ['Shield'],
-        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-    });
-}
-
-function setupShieldBashMocks(saveResult) {
-    getRuntimeValue.mockImplementation((_scope, key, _camp) => {
+function setupShieldBashMocks(saveResult, stash = null) {
+    getRuntimeValue.mockImplementation((_scope, key) => {
         if (key === 'lastAttack') return LAST_ATTACK;
+        if (key === '_shieldBashBaseAttack') return stash;
         return null;
     });
     vi.mocked(createSaveListener).mockReturnValue({
@@ -108,124 +112,179 @@ function setupShieldBashMocks(saveResult) {
     });
 }
 
+const stashCall = ['TestHero', '_shieldBashBaseAttack', LAST_ATTACK, CAMPAIGN];
+
+const PROMPT_ROW = {
+    type: 'roll',
+    name: 'Shield Bash',
+    characterName: 'TestHero',
+    rollType: 'save-damage',
+    targetName: 'Goblin',
+    saveDc: 15,
+    saveType: 'STR',
+    description: 'Shield Bash: Goblin must make a STR saving throw (DC 15).',
+    timestamp: NOW,
+};
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('attackRiderHandler - Shield Bash save flow', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(Date, 'now').mockReturnValue(NOW);
+        vi.mocked(buildSaveDc).mockReturnValue(15);
         vi.mocked(checkOncePerTurnWithSkip).mockResolvedValue(null);
     });
 
-    it.each([
-        {
-            saveResult: { success: false, roll: 5, total: 5, saveBonus: 0 },
-            expectedType: 'modal',
-            description: 'failed save',
-            outcomeLog: {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('failed save: stashes the base attack, prompts once, logs prompt+outcome in order, opens the chooser with the expanded Prone option', async () => {
+        const stats = shieldStats();
+        const action = makeShieldBashAction();
+        setupShieldBashMocks(SAVE_FAIL);
+
+        const result = await handle(action, stats, CAMPAIGN, 'map');
+
+        // FT-082: base weapon attack stashed before the save so the
+        // save-resolution lastAttack clobber cannot block same-turn Hamstring;
+        // the fail leg does NOT restore (chooser resolves later).
+        expect(setRuntimeValue.mock.calls).toEqual([stashCall]);
+
+        expect(createSaveListener).toHaveBeenCalledWith(CAMPAIGN, {
+            targetName: 'Goblin',
+            attackerName: 'TestHero',
+            saveType: 'STR',
+            saveDc: 15,
+            dcSuccess: false,
+            sourceName: 'Shield Bash',
+        });
+
+        // Exact two log rows, in order: prompt before the save resolves, then
+        // the outcome row. Outcome-neutral copy on the fail leg ("Choose an
+        // effect.") — the chooser commits/declines after this row.
+        expect(addEntry.mock.calls).toEqual([
+            [CAMPAIGN, PROMPT_ROW],
+            [CAMPAIGN, {
+                ...PROMPT_ROW,
+                description: 'Goblin failed the STR save (DC 15). Choose an effect.',
                 saveResult: 'failure',
                 total: 5,
                 rolls: [5],
                 bonus: 0,
                 formula: '1d20',
-                text: 'Goblin failed the STR save (DC 15). Choose an effect.',
-            },
-        },
-        {
-            saveResult: { success: true, roll: 18, total: 18, saveBonus: 3 },
-            expectedType: 'popup',
-            description: 'successful save',
-            outcomeLog: {
-                saveResult: 'success',
-                total: 18,
-                rolls: [18],
-                bonus: 3,
-                formula: '1d20+3',
-                text: 'Goblin succeeded the STR save (DC 15).',
-            },
-        },
-    ])('should $expectedType result on $description', async ({ saveResult, expectedType, outcomeLog }) => {
-        const action = makeShieldBashAction();
-        setupShieldBashMocks(saveResult);
+            }],
+        ]);
 
-        const result = await handle(action, shieldStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe(expectedType);
-
-        // FT-082 collateral: base weapon attack stashed before the save so the
-        // save-resolution lastAttack clobber cannot block same-turn Hamstring.
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_shieldBashBaseAttack', LAST_ATTACK, 'test-campaign');
-
-        if (expectedType === 'modal') {
-            expect(result.modalName).toBe('shieldBash');
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+        expect(result).toEqual({
+            type: 'modal',
+            modalName: 'shieldBash',
+            payload: {
+                action: {
+                    name: 'Shield Bash',
+                    // empty authored options expand into the Prone chooser
+                    // option (expandPushOrProneOptions, pinned nowhere else).
+                    options: [{
+                        name: 'Prone',
+                        effect: 'prone',
+                        saveType: 'STR',
+                        saveDc: 15,
+                        saveAbility: 'STR',
+                    }],
+                    automation: action.automation,
+                },
+                playerStats: stats,
+                campaignName: CAMPAIGN,
                 targetName: 'Goblin',
-                attackerName: 'TestHero',
-                saveType: 'STR',
                 saveDc: 15,
-                dcSuccess: false,
-                sourceName: 'Shield Bash',
-            });
-            // Save prompt logged before the save resolves.
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-damage',
-                targetName: 'Goblin',
-                saveType: 'STR',
-                saveDc: 15,
-                description: 'Shield Bash: Goblin must make a STR saving throw (DC 15).',
-            }));
-        } else {
-            expect(result.payload.description).toBe('Goblin succeeded on STR save (DC 15). Shield Bash has no effect.');
-        }
-
-        // Save outcome logged with the resolved roll shape.
-        const outcome = addEntry.mock.calls.find(c => c[1]?.saveResult === outcomeLog.saveResult);
-        expect(outcome).toBeDefined();
-        expect(outcome[1]).toMatchObject({
-            type: 'roll',
-            name: 'Shield Bash',
-            characterName: 'TestHero',
-            rollType: 'save-damage',
-            targetName: 'Goblin',
-            saveDc: 15,
-            saveType: 'STR',
-            total: outcomeLog.total,
-            rolls: outcomeLog.rolls,
-            bonus: outcomeLog.bonus,
-            formula: outcomeLog.formula,
-            description: outcomeLog.text,
+            },
         });
     });
 
-    it('should delegate DC to buildSaveDc when saveDc is "ability"', async () => {
+    it('successful save: restores and clears the stashed base attack (FT-082), logs the resolved-roll outcome, returns the no-effect popup', async () => {
+        const action = makeShieldBashAction();
+        setupShieldBashMocks(SAVE_SUCCESS, BASE_ATTACK);
+
+        const result = await handle(action, shieldStats(), CAMPAIGN, 'map');
+
+        // Ordered FT-082 seam census: stash, then on the success leg only,
+        // restore campaign lastAttack and clear the stash.
+        expect(setRuntimeValue.mock.calls).toEqual([
+            stashCall,
+            ['campaign', 'lastAttack', BASE_ATTACK, CAMPAIGN],
+            ['TestHero', '_shieldBashBaseAttack', null, CAMPAIGN],
+        ]);
+
+        // Outcome row (calls[1]) with the production save-result shape mapped:
+        // saveBonus 3 → bonus 3 + '+3' formula. Prompt row pinned in full next door.
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        expect(addEntry.mock.calls[1]).toEqual([CAMPAIGN, {
+            ...PROMPT_ROW,
+            description: 'Goblin succeeded the STR save (DC 15).',
+            saveResult: 'success',
+            total: 18,
+            rolls: [18],
+            bonus: 3,
+            formula: '1d20+3',
+        }]);
+
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Shield Bash',
+                description: 'Goblin succeeded on STR save (DC 15). Shield Bash has no effect.',
+                automation: action.automation,
+            },
+        });
+    });
+
+    it.each([
+        {
+            description: "'ability' delegates to buildSaveDc",
+            saveDc: 'ability',
+            dropStrength: false,
+            expectedDc: 17,
+            delegated: true,
+        },
+        {
+            description: 'null with Strength present computes 8 + STR + proficiency',
+            saveDc: null,
+            dropStrength: false,
+            expectedDc: 13,
+            delegated: false,
+        },
+        {
+            description: 'null with missing Strength ability falls back to DC 11',
+            saveDc: null,
+            dropStrength: true,
+            expectedDc: 11,
+            delegated: false,
+        },
+    ])('DC resolution: $description', async ({ saveDc, dropStrength, expectedDc, delegated }) => {
         vi.mocked(buildSaveDc).mockReturnValue(17);
-        const action = makeShieldBashAction({ automation: { saveDc: 'ability' } });
-        setupShieldBashMocks({ success: false, roll: 5, total: 5, saveBonus: 0 });
-
-        const result = await handle(action, shieldStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('modal');
-        expect(buildSaveDc).toHaveBeenCalledWith(action.automation, expect.objectContaining({ name: 'TestHero' }));
-        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ saveDc: 17 }));
-    });
-
-    it('should use default formula DC 11 when saveDc is null and Strength ability is missing', async () => {
-        const action = makeShieldBashAction({ automation: { saveDc: null } });
         const stats = shieldStats();
-        stats.abilities = [{ name: 'Dexterity', bonus: 2 }];
-        setupShieldBashMocks({ success: false, roll: 5, total: 5, saveBonus: 0 });
+        if (dropStrength) {
+            stats.abilities = [{ name: 'Dexterity', bonus: 2 }];
+        }
+        const action = makeShieldBashAction({ automation: { saveDc } });
+        setupShieldBashMocks(SAVE_FAIL);
 
-        const result = await handle(action, stats, 'test-campaign', 'map');
+        const result = await handle(action, stats, CAMPAIGN, 'map');
 
-        // 8 + STR bonus (absent → 0) + proficiency 3 = 11
         expect(result.type).toBe('modal');
-        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ saveDc: 11 }));
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            saveDc: 11,
-        }));
+        if (delegated) {
+            expect(buildSaveDc).toHaveBeenCalledTimes(1);
+            expect(buildSaveDc).toHaveBeenCalledWith(action.automation, stats);
+        } else {
+            expect(buildSaveDc).not.toHaveBeenCalled();
+        }
+        expect(createSaveListener).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({ saveDc: expectedDc }));
+        expect(result.payload.saveDc).toBe(expectedDc);
     });
 
-    it('should return the oncePerTurn skip result without prompting a save or stashing the base attack', async () => {
+    it('oncePerTurn skip: returns the skip popup without prompting a save, stashing, or logging', async () => {
         const skipStub = {
             type: 'popup',
             payload: {
@@ -234,13 +293,14 @@ describe('attackRiderHandler - Shield Bash save flow', () => {
                 description: 'Shield Bash has already been used this turn. Skip?',
             },
         };
-        setupShieldBashMocks({ success: false, roll: 5, total: 5, saveBonus: 0 });
+        setupShieldBashMocks(SAVE_FAIL);
         vi.mocked(checkOncePerTurnWithSkip).mockResolvedValue(skipStub);
 
-        const result = await handle(makeShieldBashAction(), shieldStats(), 'test-campaign', 'map');
+        const result = await handle(makeShieldBashAction(), shieldStats(), CAMPAIGN, 'map');
 
         expect(result).toBe(skipStub);
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 });

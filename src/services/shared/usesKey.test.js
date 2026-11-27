@@ -1,48 +1,36 @@
+// @maintained-by-ai 2026-11-26
 // 2026-11-15 uses-key convention convergence: getRuntimeUsesKey is the ONE exported
-// derivation for persisted uses-latch keys (camelCase stem + 'Uses'). These pins lock
-// the casing table and cross-check the derived key against the data-declared
-// resourceKey values in public/data/2024/classes.json so derivation and disk law
-// can never drift casing again (the all-lowercase Relentless Rage stem vs the
-// camelCase rageOfTheGodsUses declared-key family was the split this closed).
+// derivation for persisted uses-latch keys (camelCase stem + 'Uses'). The table below
+// pins each casing rule once (multi-word camel, single-word lowercase, whitespace
+// collapse, apostrophe stripping); the disk cross-check re-derives every data-declared
+// *Uses resourceKey in public/data/2024/classes.json so derivation and disk law can
+// never drift casing again (the all-lowercase Relentless Rage stem vs the camelCase
+// rageOfTheGodsUses declared-key family was the split this closed).
 import { describe, it, expect } from 'vitest';
 import { getRuntimeUsesKey } from './usesKey.js';
 import classes2024 from '../../../public/data/2024/classes.json';
 
-describe('getRuntimeUsesKey — casing table', () => {
+describe('getRuntimeUsesKey — casing rules', () => {
     const table = [
-        ['Relentless Rage', 'relentlessRageUses'],
+        // Multi-word features become camelCase.
         ['Second Wind', 'secondWindUses'],
-        ['Wholeness of Body', 'wholenessOfBodyUses'],
-        ['Uncanny Metabolism', 'uncannyMetabolismUses'],
-        ['Action Surge', 'actionSurgeUses'],
-        ['Cosmic Omen', 'cosmicOmenUses'],
-        ['Dread Ambush', 'dreadAmbushUses'],
-        ['Encouraging Song', 'encouragingSongUses'],
-        ['Healing Hands', 'healingHandsUses'],
-        ['Spell Thief', 'spellThiefUses'],
-        ['Searing Vengeance', 'searingVengeanceUses'],
-        ['Psychic Veil', 'psychicVeilUses'],
-        ['Warding Flare', 'wardingFlareUses'],
-        ['Breath Weapon', 'breathWeaponUses'],
-        ['Warping Implosion', 'warpingImplosionUses'],
-        ['Restore Balance', 'restoreBalanceUses'],
-        // Single-word features stay all-lowercase (first letter lowered only),
-        // and surrounding/interior whitespace collapses.
+        // Single-word features stay all-lowercase (first letter lowered only).
         ['Stonecunning', 'stonecunningUses'],
-        ['Tireless', 'tirelessUses'],
+        // Surrounding/interior whitespace collapses.
         ['  Flurry  ', 'flurryUses'],
-        // Apostrophes are stripped — matches the data-declared camel stems
-        // (classes.json "Nature's Veil" -> naturesVeilUses) and the giant-ancestry
-        // option keys (Cloud's Jaunt -> cloudsJauntUses) that pre-dated the helper.
+        // Apostrophes are stripped — straight (classes.json "Nature's Veil") and
+        // curly (giant-ancestry option keys "Cloud\u2019s Jaunt" pre-dated the helper).
         ['Nature\'s Veil', 'naturesVeilUses'],
-        ['Cloud\'s Jaunt', 'cloudsJauntUses'],
-        ['Thief\'s Reflexes', 'thiefsReflexesUses'],
+        ['Cloud\u2019s Jaunt', 'cloudsJauntUses'],
+        // Contract pin: shared-pool aliases (Evergreen Wild Shape, Land's Aid) reuse
+        // this canonical latch key, which is not itself declared on disk.
+        ['Wild Shape', 'wildShapeUses'],
     ];
     it.each(table)('%s -> %s', (featureName, expectedKey) => {
         expect(getRuntimeUsesKey(featureName)).toBe(expectedKey);
     });
 
-    it('throws on non-string input (mirrors the legacy inline derivations)', () => {
+    it('throws TypeError on non-string input', () => {
         expect(() => getRuntimeUsesKey(null)).toThrow(TypeError);
         expect(() => getRuntimeUsesKey(undefined)).toThrow(TypeError);
     });
@@ -69,14 +57,11 @@ describe('getRuntimeUsesKey — cross-check vs data-declared resourceKey (classe
     const usesPairs = collectDeclaredPairs(classes2024, [])
         .filter(p => p.resourceKey.endsWith('Uses') && !SHARED_POOL_ALIASES.has(p.name));
 
-    it('finds the named family features (guard against silent drift of the scan)', () => {
+    it('scan finds the family features (guard against a vacuous cross-check)', () => {
         const names = new Set(usesPairs.map(p => p.name));
-        expect(names.has('Zealous Presence')).toBe(true);
-        expect(names.has('Rage of the Gods')).toBe(true);
-        expect(names.has('Second Wind')).toBe(true);
-        expect(names.has('Nature\'s Veil')).toBe(true);
-        expect(names.has('Tireless')).toBe(true);
-        expect(names.has('Intimidating Presence')).toBe(true);
+        const expected = ['Zealous Presence', 'Rage of the Gods', 'Second Wind',
+            'Nature\'s Veil', 'Tireless', 'Intimidating Presence'];
+        expect(expected.filter(name => !names.has(name))).toEqual([]);
     });
 
     it('derived key === declared resourceKey for every *Uses resourceKey on disk', () => {
@@ -84,12 +69,5 @@ describe('getRuntimeUsesKey — cross-check vs data-declared resourceKey (classe
             .filter(p => getRuntimeUsesKey(p.name) !== p.resourceKey)
             .map(p => `${p.name} -> derived ${getRuntimeUsesKey(p.name)} vs declared ${p.resourceKey}`);
         expect(mismatches).toEqual([]);
-    });
-
-    it('explicit pins for the named family features', () => {
-        expect(getRuntimeUsesKey('Zealous Presence')).toBe('zealousPresenceUses');
-        expect(getRuntimeUsesKey('Rage of the Gods')).toBe('rageOfTheGodsUses');
-        expect(getRuntimeUsesKey('Intimidating Presence')).toBe('intimidatingPresenceUses');
-        expect(getRuntimeUsesKey('Wild Shape')).toBe('wildShapeUses');
     });
 });

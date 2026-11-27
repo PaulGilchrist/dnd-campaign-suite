@@ -1,7 +1,11 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic state-machine contract tests for useTravelManagement. All services
 // and the runtime store are fully mocked, so this suite stays green across app churn
-// unless the hook's own observable contract changes.
+// unless the hook's own observable contract changes. Bug-lane siblings own the deep
+// seams (session phase, trip owner, write-back, budget seeds, weather copy, null
+// echoes); THIS file owns the core travel state machine: mount defaults/resume,
+// plan/cancel/destination, advance transitions, day reset (camp), forced march,
+// event lifecycle, and the max-EX display gate.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useTravelManagement from './useTravelManagement.js';
@@ -28,6 +32,14 @@ vi.mock('../../services/campaign/randomEventService.js', () => ({
 
 vi.mock('../../services/encounters/encounterGenerator.js', () => ({
   generateEncounterSuggestions: vi.fn(() => []),
+}));
+
+// sessionService's audit transport. The hook stays REAL through sessionService
+// (mid-route advances arm the travel phase, which POSTs an audit line); the
+// phase-OWNERSHIP semantics are the session-phase/traveling-phase siblings'
+// lane — here we only need the transport silent so the suite never fetches.
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(async () => {}),
 }));
 
 function _valuesEqual(a, b) {
@@ -100,6 +112,9 @@ const { shouldTriggerEvent, generateRandomEvent } = await import('../../services
 const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
 const { getRuntimeValue, setRuntimeValue, setRuntimeObject, getStore } = await import('../runtime/useRuntimeState.js');
 const { hasSelfRestoration } = await import('../../services/combat/automation/automationService.js');
+// REAL module import: pins arrival prose against the producer/consumer shared
+// constant instead of a locally duplicated string.
+const { TRIP_ARRIVAL_MESSAGE } = await import('../../services/maps/travelSession.js');
 
 const defaultPath = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
 
@@ -165,9 +180,12 @@ describe('useTravelManagement', () => {
       expect(s.lastMessage).toBeNull();
       expect(s.currentPosition).toBeNull();
       expect(s.remainingSteps).toEqual([]);
-      expect(s.paceInfo.id).toBe('normal');
+      expect(s.hexesRemaining).toBe(0);
+      expect(s.paceInfo).toEqual({ id: 'normal', name: 'Normal' });
       expect(s.eventFrequency).toBe('normal');
       expect(s.rerollsRemaining).toBe(3);
+      expect(s.exhaustionMultiplier).toBe(100);
+      expect(s.partyHasMaxExhaustion).toBe(false);
       expect(s.travelLog).toEqual([]);
     });
 
@@ -199,40 +217,22 @@ describe('useTravelManagement', () => {
     });
   });
 
-  describe('startPlanning', () => {
-    it('resets mode to planning and clears destination, path, and message', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => {
-        result.current.setDestinationAndPath({ q: 2, r: 0 });
-      });
-      act(() => {
-        result.current.startPlanning();
-      });
+  // startPlanning and cancelTravel are the two trip-entry/exit resets: identical
+  // observable effect except the mode they park on (claim/release provenance is
+  // owned by the trip-owner sibling).
+  it.each([
+    ['startPlanning', 'planning'],
+    ['cancelTravel', 'inactive'],
+  ])('%s parks an in-progress plan on idle bytes with mode %s', (action, mode) => {
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    act(() => { result.current[action](); });
 
-      expect(result.current.travelMode).toBe('planning');
-      expect(result.current.destination).toBeNull();
-      expect(result.current.path).toEqual([]);
-      expect(result.current.pathIndex).toBe(0);
-      expect(result.current.lastMessage).toBeNull();
-    });
-  });
-
-  describe('cancelTravel', () => {
-    it('resets mode to inactive and clears all travel state', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => {
-        result.current.setDestinationAndPath({ q: 2, r: 0 });
-      });
-      act(() => {
-        result.current.cancelTravel();
-      });
-
-      expect(result.current.travelMode).toBe('inactive');
-      expect(result.current.destination).toBeNull();
-      expect(result.current.path).toEqual([]);
-      expect(result.current.pathIndex).toBe(0);
-      expect(result.current.lastMessage).toBeNull();
-    });
+    expect(result.current.travelMode).toBe(mode);
+    expect(result.current.destination).toBeNull();
+    expect(result.current.path).toEqual([]);
+    expect(result.current.pathIndex).toBe(0);
+    expect(result.current.lastMessage).toBeNull();
   });
 
   describe('setDestinationAndPath', () => {
@@ -244,9 +244,10 @@ describe('useTravelManagement', () => {
       });
 
       expect(result.current.destination).toEqual(to);
-      expect(result.current.path).toHaveLength(3);
+      expect(result.current.path).toEqual(defaultPath);
       expect(result.current.travelMode).toBe('planning');
       expect(result.current.pathIndex).toBe(0);
+      // Seam contract: pathfinding must receive the full grid context.
       expect(calculatePath).toHaveBeenCalledWith(
         baseArgs.partyPosition, to, { hexCols: baseArgs.hexCols, hexRows: baseArgs.hexRows, terrain: baseArgs.terrain, roads: baseArgs.roads }
       );
@@ -274,25 +275,29 @@ describe('useTravelManagement', () => {
     });
   });
 
-  describe('changePace', () => {
-    it('updates travelPace, resets exhaustion, and recalculates dailyBudget', () => {
-      const { result } = renderHook(() => useTravelManagement({
-        ...baseArgs,
-        initialTravelState: { dayExhausted: true, forcedMarchHours: 2 },
-      }));
-      act(() => {
-        result.current.changePace('fast');
-      });
-
-      expect(result.current.travelPace).toBe('fast');
-      expect(result.current.dayExhausted).toBe(false);
-      expect(result.current.forcedMarchHours).toBe(0);
-      expect(applyExhaustionSpeedPenaltyToBudget).toHaveBeenCalled();
+  it('changePace moves to the new pace budget at the NEW pace and clears the day penalties', () => {
+    // Mount parked on a penalized day (FM hours 2, exhausted). Pre-fix
+    // stale-closure lane is the forced-march-budget sibling's; here the pin is
+    // the observable bundle: pace adopted, budget re-derived through the
+    // service at the NEW pace id, hours/exhaustion reset alongside it.
+    getDailyHexBudget.mockImplementation((pace) => (pace === 'fast' ? 8 : 6));
+    const { result } = renderHook(() => useTravelManagement({
+      ...baseArgs,
+      initialTravelState: { dayExhausted: true, forcedMarchHours: 2 },
+    }));
+    act(() => {
+      result.current.changePace('fast');
     });
+
+    expect(getDailyHexBudget).toHaveBeenCalledWith('fast');
+    expect(result.current.travelPace).toBe('fast');
+    expect(result.current.dailyBudget).toBe(8);
+    expect(result.current.dayExhausted).toBe(false);
+    expect(result.current.forcedMarchHours).toBe(0);
   });
 
-  describe('toggleHorseback', () => {
-    it('toggles horseback true then false', () => {
+  describe('horseback', () => {
+    it('toggleHorseback flips the flag both ways', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
       expect(result.current.horseback).toBe(false);
 
@@ -301,6 +306,25 @@ describe('useTravelManagement', () => {
 
       act(() => { result.current.toggleHorseback(); });
       expect(result.current.horseback).toBe(false);
+    });
+
+    it('mounted advances accrue at 1/HORSEBACK_SPEED_MULTIPLIER of the footed cost', () => {
+      // Family gap: every lane toggles economics around the multiplier; this
+      // pins the only producer that applies it to advance accrual.
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+
+      act(() => { result.current.toggleHorseback(); });
+      let res;
+      act(() => { res = result.current.advanceOneHex(); });
+
+      expect(res).toEqual({ moved: true });
+      expect(result.current.accruedCost).toBe(0.5);
+
+      // On foot the same base cost accrues in full.
+      act(() => { result.current.toggleHorseback(); });
+      act(() => { result.current.advanceOneHex(); });
+      expect(result.current.accruedCost).toBe(1.5);
     });
   });
 
@@ -320,27 +344,13 @@ describe('useTravelManagement', () => {
       let res;
       act(() => { res = result.current.advanceOneHex(); });
 
-      expect(res.moved).toBe(true);
+      expect(res).toEqual({ moved: true });
       expect(result.current.pathIndex).toBe(1);
       expect(result.current.accruedCost).toBe(1);
       expect(baseArgs.onPartyMove).toHaveBeenCalledWith({ q: 1, r: 0 });
     });
 
-    it('returns { moved: true, arrived: true } when reaching the destination', () => {
-      calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }]);
-      const to = { q: 1, r: 0 };
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
-
-      let res;
-      act(() => { res = result.current.advanceOneHex(); });
-
-      expect(res.arrived).toBe(true);
-      expect(result.current.travelMode).toBe('inactive');
-      expect(result.current.lastMessage).toBe('The party has arrived at their destination.');
-    });
-
-    it('arrival clears the completed-trip planning keys (improve 2026-10-26-D)', async () => {
+    it('arrival deactivates the trip, echoes the shared prose, and clears the completed-trip keys (improve 2026-10-26-D)', async () => {
       // Pre-fix fingerprint: completing a trip left travel-destination/-path/
       // -pathIndex in the campaign bucket beside travel-mode:inactive.
       // Post-fix: the three trip keys are parked on idle bytes locally AND
@@ -354,10 +364,11 @@ describe('useTravelManagement', () => {
       let res;
       await act(async () => { res = result.current.advanceOneHex(); });
 
-      expect(res.arrived).toBe(true);
-      // Arrived state still self-consistent: mode inactive + arrival prose.
+      // Full return contract + self-consistent arrived state: mode inactive
+      // next to the arrival prose (pinned against the shared constant).
+      expect(res).toEqual({ moved: true, arrived: true });
       expect(result.current.travelMode).toBe('inactive');
-      expect(result.current.lastMessage).toBe('The party has arrived at their destination.');
+      expect(result.current.lastMessage).toBe(TRIP_ARRIVAL_MESSAGE);
       // Trip keys cleared from hook state and the campaign store…
       expect(result.current.destination).toBeNull();
       expect(result.current.path).toEqual([]);
@@ -402,43 +413,35 @@ describe('useTravelManagement', () => {
       expect(result.current.destination).toBeNull();
     });
 
-    it('does not advance when accruedCost would exceed dailyBudget', () => {
-      const to = { q: 2, r: 0 };
+    it('rejects an advance over budget, flags the day, and moves nothing', () => {
+      // The mount-time over-budget FLAG lane is day-exhausted-init's; here the
+      // pin is the reject producer: message, no accrual, no party move.
       const { result } = renderHook(() => useTravelManagement({
         ...baseArgs,
         initialTravelState: { dailyBudget: 0 },
       }));
-      act(() => { result.current.setDestinationAndPath(to); });
+      act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
 
-      act(() => { result.current.advanceOneHex(); });
+      let res;
+      act(() => { res = result.current.advanceOneHex(); });
+
+      expect(res).toEqual({ moved: false });
       expect(result.current.dayExhausted).toBe(true);
       expect(result.current.lastMessage).toContain('exhausted their travel budget');
+      expect(result.current.accruedCost).toBe(0);
+      expect(result.current.pathIndex).toBe(0);
+      expect(baseArgs.onPartyMove).not.toHaveBeenCalled();
 
-      let res;
+      // And it keeps rejecting on the next press.
       act(() => { res = result.current.advanceOneHex(); });
-      expect(res.moved).toBe(false);
+      expect(res).toEqual({ moved: false });
     });
 
-    it('returns { moved: false } when weather makes travel impossible', () => {
-      getHexMoveCostWithRoad.mockReturnValue(null);
-      const to = { q: 2, r: 0 };
-      const { result } = renderHook(() => useTravelManagement({
-        ...baseArgs,
-        weather: { label: 'Cataclysmic', moveCostMod: null },
-      }));
-      act(() => { result.current.setDestinationAndPath(to); });
-
-      let res;
-      act(() => { res = result.current.advanceOneHex(); });
-
-      expect(res.moved).toBe(false);
-      expect(result.current.lastMessage).toContain('makes travel impossible');
-    });
-
-    it('triggers a random event and pauses travel when shouldTriggerEvent returns true', () => {
+    it('advance into an event moves, returns the event, and pauses the trip', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      advanceIntoEvent(result);
+      const res = advanceIntoEvent(result);
 
+      expect(res).toEqual({ moved: true, event: { type: 'encounter', title: 'Random Event' } });
       expect(result.current.travelMode).toBe('paused');
       expect(result.current.pendingEvent).toEqual({ type: 'encounter', title: 'Random Event' });
       expect(result.current.lastMessage).toContain('Random Event');
@@ -461,40 +464,35 @@ describe('useTravelManagement', () => {
       expect(result.current.lastMessage).toBe('A new day dawns. Travel budget refreshed.');
     });
 
-    it('transitions from paused to planning', () => {
-      const { result: pausedResult } = renderHook(() => useTravelManagement({
-        ...baseArgs,
-        campaignName: 'test-campaign-paused',
-        initialTravelState: { travelMode: 'paused' },
-      }));
-      act(() => { pausedResult.current.forceCamp(); });
-      expect(pausedResult.current.travelMode).toBe('planning');
+    it('camping from a spawned event dismisses it and resumes planning', () => {
+      // Pre-fix this test seeded `initialTravelState: { pendingEvent }`, which
+      // the hook never reads — vacuous. Real lane: advance into an event
+      // (paused + pendingEvent live), then camp.
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      advanceIntoEvent(result);
+
+      act(() => { result.current.forceCamp(); });
+
+      expect(result.current.pendingEvent).toBeNull();
+      expect(result.current.travelMode).toBe('planning');
+      expect(result.current.lastMessage).toBe('A new day dawns. Travel budget refreshed.');
     });
 
-    it('does not transition from inactive', () => {
-      const { result: inactiveResult } = renderHook(() => useTravelManagement({
-        ...baseArgs,
-        campaignName: 'test-campaign-inactive',
-        initialTravelState: { travelMode: 'inactive' },
-      }));
-      act(() => { inactiveResult.current.forceCamp(); });
-      expect(inactiveResult.current.travelMode).toBe('inactive');
-    });
-
-    it('clears pendingEvent', () => {
+    it('does not change travelMode to planning if mode is inactive', () => {
       const { result } = renderHook(() => useTravelManagement({
         ...baseArgs,
-        initialTravelState: { pendingEvent: { type: 'encounter' } },
+        initialTravelState: { travelMode: 'inactive' },
       }));
       act(() => { result.current.forceCamp(); });
-      expect(result.current.pendingEvent).toBeNull();
+      expect(result.current.travelMode).toBe('inactive');
     });
   });
 
   describe('forcedMarch', () => {
-    it('increases forcedMarchHours and resets budget when no one has self restoration', () => {
-      hasSelfRestoration.mockReturnValue(false);
+    it('adds exhaustion through the runtime store, re-pays the budget, and drops the multiplier', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
+      expect(result.current.exhaustionMultiplier).toBe(100);
+
       let returned;
       act(() => { returned = result.current.forcedMarch(); });
 
@@ -503,9 +501,15 @@ describe('useTravelManagement', () => {
       expect(result.current.dayExhausted).toBe(false);
       expect(result.current.accruedCost).toBe(0);
       expect(result.current.lastMessage).toContain('Forced march');
+      // Seam contract: exhaustion rides the runtime store per character
+      // (the store is the only path to the character sheets).
+      expect(setRuntimeValue).toHaveBeenCalledWith('Hero', 'exhaustionLevel', 1, 'test-campaign');
+      // Derived multiplier follows the new hours (budget math per-stack is the
+      // forced-march-budget sibling's lane).
+      expect(result.current.exhaustionMultiplier).toBe(Math.round(Math.pow(5 / 6, 1) * 100));
     });
 
-    it('returns false and shows message when a character has max exhaustion', () => {
+    it('returns false and shows the refusal when a character has max exhaustion', () => {
       getRuntimeValue.mockReturnValue(6);
       const { result } = renderHook(() => useTravelManagement(baseArgs));
       let returned;
@@ -513,28 +517,32 @@ describe('useTravelManagement', () => {
 
       expect(returned).toBe(false);
       expect(result.current.lastMessage).toContain('Cannot forced march');
+      expect(result.current.forcedMarchHours).toBe(0);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Hero', 'exhaustionLevel', expect.anything(), expect.anything());
+    });
+
+    it('skips party members with self restoration', () => {
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        characters: [{ name: 'Paladin' }, { name: 'Fighter' }],
+      }));
+      hasSelfRestoration.mockImplementation((char) => char?.name === 'Paladin');
+
+      let returned;
+      act(() => { returned = result.current.forcedMarch(); });
+
+      expect(returned).toBe(true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'exhaustionLevel', 1, 'test-campaign');
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Paladin', 'exhaustionLevel', expect.anything(), expect.anything());
     });
   });
 
-  describe('partyHasMaxExhaustion', () => {
-    it('returns true when any character has exhaustion >= EXHAUSTION_LEVELS', () => {
-      getRuntimeValue.mockReturnValue(6);
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      expect(result.current.partyHasMaxExhaustion).toBe(true);
-    });
-
-    it('returns false when no character has max exhaustion', () => {
-      getRuntimeValue.mockReturnValue(3);
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      expect(result.current.partyHasMaxExhaustion).toBe(false);
-    });
-  });
-
+  // The persisted travel-lastMessage header keeps showing the last FM press's
+  // success copy even after the party hits max EX — while the FM button is
+  // natively disabled. The hook's returned lastMessage swaps ONLY that copy
+  // (prefix-matched) while maxed; every other message passes through. The
+  // three cells below are the swap truth table (max × prefix).
   describe('stale-march copy display gate (backlog 2026-10-30-AN)', () => {
-    // The persisted travel-lastMessage header keeps showing the last FM press's
-    // success copy even after the party hits max EX — while the FM button is
-    // natively disabled. The hook's returned lastMessage swaps ONLY that copy
-    // (prefix-matched) while maxed; every other message passes through.
     const SUCCESS_COPY = 'Forced march — 1 exhaustion added to all party members. Daily budget reduced to 33%.';
     const REFUSAL_COPY = 'Cannot forced march — a party member has reached maximum exhaustion.';
     const seedMessage = (text) => getStore('campaign').set('travel-lastMessage', text);
@@ -548,7 +556,6 @@ describe('useTravelManagement', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
       expect(result.current.partyHasMaxExhaustion).toBe(true);
       expect(result.current.lastMessage).toBe(REFUSAL_COPY);
-      expect(result.current.lastMessage).not.toContain('1 exhaustion added');
     });
 
     it('passes the success copy through byte-identical below max (no regression)', () => {
@@ -568,52 +575,35 @@ describe('useTravelManagement', () => {
   });
 
   describe('event handling', () => {
-    it('returns the event from advanceOneHex when an event triggers', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      const res = advanceIntoEvent(result);
-
-      expect(res.moved).toBe(true);
-      expect(res.event).toEqual({ type: 'encounter', title: 'Random Event' });
-    });
-
-    it('acceptEvent returns the pending event and clears it', () => {
+    // accept navigates away (PLANNING restore); skip re-joins the route. From
+    // this first-advance pause both legs park on planning — the mid-route
+    // skip-restores-traveling resume is the traveling-phase sibling's lane.
+    it.each([
+      ['acceptEvent', { type: 'encounter', title: 'Random Event' }],
+      ['skipEvent', undefined],
+    ])('%s clears the pending event and returns %s', (method, expected) => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
       advanceIntoEvent(result);
 
-      let evt;
-      act(() => { evt = result.current.acceptEvent(); });
-      expect(evt).toEqual({ type: 'encounter', title: 'Random Event' });
+      let out;
+      act(() => { out = result.current[method](); });
+
+      expect(out).toEqual(expected);
       expect(result.current.pendingEvent).toBeNull();
       expect(result.current.travelMode).toBe('planning');
+      expect(result.current.lastMessage).toBeNull();
     });
 
-    it('skipEvent clears the pending event without returning it', () => {
+    it('rerollEvent spends rerolls one per press, regenerates, and stops at zero', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      advanceIntoEvent(result);
-
-      let skipped;
-      act(() => { skipped = result.current.skipEvent(); });
-      expect(skipped).toBeUndefined();
-      expect(result.current.pendingEvent).toBeNull();
-      expect(result.current.travelMode).toBe('planning');
-    });
-
-    it('rerollEvent generates a new event and decrements rerollsRemaining', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      advanceIntoEvent(result);
+      advanceIntoEvent(result); // 1 generation from the advance
 
       act(() => { result.current.rerollEvent(); });
       expect(result.current.rerollsRemaining).toBe(2);
       expect(result.current.pendingEvent).toEqual({ type: 'encounter', title: 'Random Event' });
-    });
 
-    it('rerollEvent stops once rerolls are exhausted', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      advanceIntoEvent(result);
-
-      for (let i = 0; i < 3; i++) {
-        act(() => { result.current.rerollEvent(); });
-      }
+      act(() => { result.current.rerollEvent(); });
+      act(() => { result.current.rerollEvent(); });
       expect(result.current.rerollsRemaining).toBe(0);
       // 1 event from the advance + 3 rerolls; a 4th reroll must not generate more.
       expect(generateRandomEvent).toHaveBeenCalledTimes(4);
@@ -642,7 +632,8 @@ describe('useTravelManagement', () => {
         difficultyLabel: 'Easy',
         totalXP: 50,
       });
-      // Plains terrain at { q: 1, r: 0 } maps to grassland/desert environments.
+      // Seam contract: plains terrain at { q: 1, r: 0 } maps to
+      // grassland/desert environments for the generator.
       expect(generateEncounterSuggestions).toHaveBeenCalledWith(expect.objectContaining({
         monsters: [{ name: 'Goblin' }],
         playerLevels: baseArgs.playerLevels,
@@ -652,37 +643,26 @@ describe('useTravelManagement', () => {
   });
 
   describe('computed values', () => {
-    it('hexesRemaining decreases as the party advances', () => {
-      const to = { q: 2, r: 0 };
+    it('currentPosition, remainingSteps, and hexesRemaining track the party along the path', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
+      expect(result.current.currentPosition).toBeNull();
+      expect(result.current.remainingSteps).toEqual([]);
+      expect(result.current.hexesRemaining).toBe(0);
+
+      act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+      expect(result.current.currentPosition).toEqual({ q: 0, r: 0 });
+      expect(result.current.remainingSteps).toEqual([{ q: 1, r: 0 }, { q: 2, r: 0 }]);
       expect(result.current.hexesRemaining).toBe(2);
 
       act(() => { result.current.advanceOneHex(); });
+      expect(result.current.currentPosition).toEqual({ q: 1, r: 0 });
+      expect(result.current.remainingSteps).toEqual([{ q: 2, r: 0 }]);
       expect(result.current.hexesRemaining).toBe(1);
 
-      act(() => { result.current.advanceOneHex(); });
+      let res;
+      act(() => { res = result.current.advanceOneHex(); });
+      expect(res.arrived).toBe(true);
       expect(result.current.hexesRemaining).toBe(0);
-    });
-
-    it('exhaustionMultiplier reflects forcedMarchHours', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      expect(result.current.exhaustionMultiplier).toBe(100);
-
-      act(() => { result.current.forcedMarch(); });
-      expect(result.current.exhaustionMultiplier).toBe(Math.round(Math.pow(5 / 6, 1) * 100));
-    });
-
-    it('currentPosition is null when no path, then reflects path[pathIndex]', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      expect(result.current.currentPosition).toBeNull();
-
-      const to = { q: 2, r: 0 };
-      act(() => { result.current.setDestinationAndPath(to); });
-      expect(result.current.currentPosition).toEqual({ q: 0, r: 0 });
-
-      act(() => { result.current.advanceOneHex(); });
-      expect(result.current.currentPosition).toEqual({ q: 1, r: 0 });
     });
   });
 });

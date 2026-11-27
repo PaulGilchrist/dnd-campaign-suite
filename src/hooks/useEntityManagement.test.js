@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15
+// @maintained-by-ai 2026-11-26
 // Deterministic hook-contract suite for the generic useEntityManagement hook:
 // all load/save/delete dependencies are plain vi.fn() mocks, so there is no
 // network, timer, or randomness here. This is the ONLY coverage of the hook
@@ -42,15 +42,22 @@ describe('useEntityManagement', () => {
     vi.restoreAllMocks();
   });
 
-  describe('initial state', () => {
-    it('starts with no items, not loading, and exposes the load/save/delete API', () => {
+  describe('public contract', () => {
+    it('starts with no items, not loading, and exposes loadItems/saveItems/deleteItem', () => {
       const { result } = render(createHooks());
 
+      expect(Object.keys(result.current)).toEqual([
+        'items',
+        'loading',
+        'loadItems',
+        'saveItems',
+        'deleteItem',
+      ]);
       expect(result.current.items).toEqual([]);
       expect(result.current.loading).toBe(false);
-      expect(typeof result.current.loadItems).toBe('function');
-      expect(typeof result.current.saveItems).toBe('function');
-      expect(typeof result.current.deleteItem).toBe('function');
+      for (const fn of ['loadItems', 'saveItems', 'deleteItem']) {
+        expect(typeof result.current[fn]).toBe('function');
+      }
     });
   });
 
@@ -62,7 +69,7 @@ describe('useEntityManagement', () => {
       const { result } = render(hooks, {});
       await flush();
 
-      expect(hooks.load).toHaveBeenCalledWith(campaignName);
+      expect(hooks.load.mock.calls).toEqual([[campaignName]]);
       expect(result.current.items).toEqual([{ id: 1 }]);
     });
 
@@ -76,7 +83,7 @@ describe('useEntityManagement', () => {
   });
 
   describe('campaign switching', () => {
-    it('reloads when the campaign changes', async () => {
+    it('reloads exactly once per campaign, in order, when the campaign changes', async () => {
       const hooks = createHooks();
       hooks.load.mockResolvedValue([{ id: 1 }]);
 
@@ -91,36 +98,29 @@ describe('useEntityManagement', () => {
       rerender({ campaign: 'test-campaign-2' });
       await flush();
 
-      expect(hooks.load).toHaveBeenLastCalledWith('test-campaign-2');
+      expect(hooks.load.mock.calls).toEqual([
+        [campaignName],
+        ['test-campaign-2'],
+      ]);
       expect(result.current.items).toEqual([{ id: 2 }]);
     });
   });
 
   describe('loadItems', () => {
-    it('populates items from an array response', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue([{ id: 1, name: 'Entity 1' }]);
-
-      const { result } = render(hooks);
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(hooks.load).toHaveBeenCalledWith(campaignName);
-      expect(result.current.items).toEqual([{ id: 1, name: 'Entity 1' }]);
-    });
-
+    // Mount-with-default already proves the array happy path; here only the
+    // defensive normalization branches that could leak a non-array into
+    // items.
     it.each([
-      ['the response key is missing', {}],
-      ['the response key holds null', { entities: null }],
-      ['the response key holds a non-array', { entities: 'not an array' }],
+      ['responseKey set but the response key is missing', { responseKey: 'entities' }, {}],
+      ['responseKey set but the response key holds a non-array', { responseKey: 'entities' }, { entities: 'not an array' }],
+      ['no responseKey and a non-array response', {}, 'not an array'],
     ])(
       'falls back to an empty list when %s',
-      async (_label, response) => {
+      async (_label, options, response) => {
         const hooks = createHooks();
         hooks.load.mockResolvedValue(response);
 
-        const { result } = render(hooks, { responseKey: 'entities' });
+        const { result } = render(hooks, options);
         await act(async () => {
           await result.current.loadItems();
         });
@@ -129,18 +129,6 @@ describe('useEntityManagement', () => {
         expect(result.current.loading).toBe(false);
       }
     );
-
-    it('falls back to an empty list when a non-array response has no responseKey', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue('not an array');
-
-      const { result } = render(hooks);
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.items).toEqual([]);
-    });
 
     it('reports loading while a fetch is in flight and clears it afterwards', async () => {
       const hooks = createHooks();
@@ -170,7 +158,7 @@ describe('useEntityManagement', () => {
       expect(result.current.items).toEqual([{ id: 7 }]);
     });
 
-    it('keeps previously loaded items and logs the failure when the backend rejects', async () => {
+    it('keeps previously loaded items and stops loading when the backend rejects', async () => {
       const hooks = createHooks();
       hooks.load
         .mockResolvedValueOnce([{ id: 1 }])
@@ -188,15 +176,11 @@ describe('useEntityManagement', () => {
 
       expect(result.current.items).toEqual([{ id: 1 }]);
       expect(result.current.loading).toBe(false);
-      expect(consoleError).toHaveBeenCalledWith(
-        'Failed to load items list:',
-        expect.any(Error)
-      );
     });
   });
 
   describe('saveItems', () => {
-    it('saves the payload then repopulates items from the server state', async () => {
+    it('saves the payload then reloads strictly afterwards to repopulate from server state', async () => {
       const hooks = createHooks();
       const payload = [{ id: 1, name: 'Draft' }];
       const serverState = [{ id: 1, name: 'Saved' }];
@@ -208,13 +192,16 @@ describe('useEntityManagement', () => {
         await result.current.saveItems(payload);
       });
 
-      expect(hooks.save).toHaveBeenCalledWith(campaignName, payload);
-      expect(hooks.load).toHaveBeenCalledTimes(1);
-      expect(hooks.load).toHaveBeenCalledWith(campaignName);
+      expect(hooks.save.mock.calls).toEqual([[campaignName, payload]]);
+      expect(hooks.load.mock.calls).toEqual([[campaignName]]);
+      // Reload-after-write ordering: the refresh must never precede the save.
+      expect(hooks.load.mock.invocationCallOrder[0]).toBeGreaterThan(
+        hooks.save.mock.invocationCallOrder[0]
+      );
       expect(result.current.items).toEqual(serverState);
     });
 
-    it('rethrows and logs the failure without reloading when the save fails', async () => {
+    it('rethrows without reloading when the save fails', async () => {
       const hooks = createHooks();
       hooks.save.mockRejectedValue(new Error('Save failed'));
 
@@ -226,17 +213,15 @@ describe('useEntityManagement', () => {
       ).rejects.toThrow('Save failed');
 
       expect(hooks.load).not.toHaveBeenCalled();
-      expect(consoleError).toHaveBeenCalledWith(
-        'Failed to save items:',
-        expect.any(Error)
-      );
     });
 
     it('stays silent on a handled 409 conflict — the service layer owns the single warn (improve 2026-10-27-J)', async () => {
       // The editor banner + "Reload list" affordance own user feedback and
       // the service layer logs the one redacted warn, so the hook must add
       // neither a warn nor a red console ERROR for the conflict case.
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
       const conflictMessage =
         'Faction "Harpers" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
       const hooks = createHooks();
@@ -253,34 +238,30 @@ describe('useEntityManagement', () => {
 
       expect(consoleWarn).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
-      consoleWarn.mockRestore();
     });
   });
 
   describe('deleteItem', () => {
-    it('deletes by id then repopulates the remaining items from the server state', async () => {
+    it('deletes by id then reloads strictly afterwards to repopulate from server state', async () => {
       const hooks = createHooks();
       hooks.delete.mockResolvedValue(undefined);
-      hooks.load
-        .mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }])
-        .mockResolvedValueOnce([{ id: 'b' }]);
+      hooks.load.mockResolvedValue([{ id: 'b' }]);
 
       const { result } = render(hooks);
-      await act(async () => {
-        await result.current.loadItems();
-      });
-      expect(result.current.items).toEqual([{ id: 'a' }, { id: 'b' }]);
-
       await act(async () => {
         await result.current.deleteItem('a');
       });
 
-      expect(hooks.delete).toHaveBeenCalledWith(campaignName, 'a');
-      expect(hooks.load).toHaveBeenCalledTimes(2);
+      expect(hooks.delete.mock.calls).toEqual([[campaignName, 'a']]);
+      expect(hooks.load.mock.calls).toEqual([[campaignName]]);
+      // Reload-after-delete ordering: the refresh must never precede the delete.
+      expect(hooks.load.mock.invocationCallOrder[0]).toBeGreaterThan(
+        hooks.delete.mock.invocationCallOrder[0]
+      );
       expect(result.current.items).toEqual([{ id: 'b' }]);
     });
 
-    it('rethrows and logs the failure without reloading when the delete fails', async () => {
+    it('rethrows without reloading when the delete fails', async () => {
       const hooks = createHooks();
       hooks.delete.mockRejectedValue(new Error('Delete failed'));
       hooks.load.mockResolvedValue([{ id: 'a' }]);
@@ -293,10 +274,6 @@ describe('useEntityManagement', () => {
       ).rejects.toThrow('Delete failed');
 
       expect(hooks.load).not.toHaveBeenCalled();
-      expect(consoleError).toHaveBeenCalledWith(
-        'Failed to delete item:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -357,37 +334,57 @@ describe('useEntityManagement', () => {
   });
 
   describe('error log messages', () => {
-    // Each operation names failures differently; responseKey should appear
-    // in all of them. Default (responseKey-less) messages and rejection
-    // behaviour are asserted per-operation above — here we only check the
-    // responseKey naming got logged.
+    // Single census of every console.error template the hook can emit, for
+    // both the default ('items'/'item') naming and the responseKey naming.
+    // Rethrow/no-reload behavior is asserted per-operation above.
     const messageCases = [
       {
-        label: 'loadItems',
+        label: 'loadItems default',
+        options: {},
+        run: (result) => result.loadItems(),
+        expected: 'Failed to load items list:',
+      },
+      {
+        label: 'loadItems with responseKey',
+        options: { responseKey: 'entities' },
         run: (result) => result.loadItems(),
         expected: 'Failed to load entities list:',
       },
       {
-        label: 'saveItems',
+        label: 'saveItems default',
+        options: {},
+        run: (result) => result.saveItems([{ id: 1 }]),
+        expected: 'Failed to save items:',
+      },
+      {
+        label: 'saveItems with responseKey',
+        options: { responseKey: 'entities' },
         run: (result) => result.saveItems([{ id: 1 }]),
         expected: 'Failed to save entities:',
       },
       {
-        label: 'deleteItem',
+        label: 'deleteItem default (singular "item")',
+        options: {},
+        run: (result) => result.deleteItem('entity-id-123'),
+        expected: 'Failed to delete item:',
+      },
+      {
+        label: 'deleteItem with responseKey',
+        options: { responseKey: 'entities' },
         run: (result) => result.deleteItem('entity-id-123'),
         expected: 'Failed to delete entities:',
       },
     ];
 
     it.each(messageCases)(
-      'names the responseKey when $label fails',
-      async ({ run, expected }) => {
+      'logs $label',
+      async ({ options, run, expected }) => {
         const hooks = createHooks();
         hooks.load.mockRejectedValue(new Error('Network error'));
         hooks.save.mockRejectedValue(new Error('Save failed'));
         hooks.delete.mockRejectedValue(new Error('Delete failed'));
 
-        const { result } = render(hooks, { responseKey: 'entities' });
+        const { result } = render(hooks, options);
         await act(async () => {
           await run(result.current).catch(() => {});
         });

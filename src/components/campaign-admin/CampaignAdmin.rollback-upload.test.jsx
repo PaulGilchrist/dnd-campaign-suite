@@ -1,25 +1,29 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 /**
  * Rollback & Upload flows of CampaignAdmin: the destructive confirmation gate
- * (one full-lifecycle test per flow — campaign-naming warning copy, danger
- * styling, overlay/content clicks are inert, Cancel/close dismiss without
- * contacting the server), client-side zip validation (the check is by file
- * name, case-sensitive ".zip" is the documented contract, plus the accept
- * filter), the archive pre-flight: a valid zip opens the confirm modal only
- * once /admin/upload-inspect (stubbed recognising by default) resolves —
- * POST wiring for /admin/rollback and /admin/upload — including
- * URL-encoding of the campaign name, which the data-management sibling
- * encode-checks only for its own routes — one assertion set per terminal
- * outcome (busy/success/error, alert copy, reload semantics), the
- * postRestoreNotice sessionStorage handoff that survives the reload, and the
- * restored-snapshot banner.
+ * (one representative full-lifecycle test on the shared ConfirmModal —
+ * campaign-naming warning copy, danger styling, overlay/content clicks are
+ * inert, close dismisses without contacting the server; the Cancel leg lives
+ * in CampaignAdmin.rollback-modal.test.jsx and snapshot-restore.test.jsx),
+ * client-side zip validation (the check is by file name, case-sensitive
+ * ".zip" is the documented contract, plus the accept filter), the archive
+ * pre-flight (a valid zip opens the confirm modal only once
+ * /admin/upload-inspect — stubbed recognising by default — resolves), POST
+ * wiring for /admin/rollback and /admin/upload — including URL-encoding of
+ * the campaign name, which the data-management sibling encode-checks only
+ * for its own routes — one assertion set per terminal outcome (busy/success/
+ * error, strip copy, reload semantics), the postRestoreNotice sessionStorage
+ * handoff that survives the reload, and the restored-snapshot banner.
  *
- * Sibling files cover the other flows and are deliberately not repeated here:
- * backup-restore (snapshot/download), data-management (clear/reset), rename,
- * delete, rendering (idle state, including "no restore banner before
- * anything happens"), and theme-toggle. Child consoles (Enforcement, Session,
- * AI Referee) get neutral stub responses so only rollback/upload traffic is
- * asserted. Every campaign name used is a test-campaign variant.
+ * Not repeated here (same shared code, sibling owns it): the rollback HTTP-
+ * rejection face (runRollback is shared with the per-row Restore lane —
+ * CampaignAdmin.snapshot-restore.test.jsx pins it), the upload modal copy
+ * and confirmed-success face for the plain-name case
+ * (CampaignAdmin.upload-inspect.test.jsx), and Cancel/× input-reset after
+ * dismissing the Upload gate (CampaignAdmin.upload-cancel.test.jsx).
+ * Child consoles (Enforcement, Session, AI Referee) get neutral stub
+ * responses so only rollback/upload traffic is asserted. Every campaign name
+ * used is a test-campaign variant.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -144,14 +148,15 @@ afterEach(() => {
 });
 
 describe('CampaignAdmin - Rollback', () => {
-    it('gates rollback behind a destructive confirmation naming the campaign — dismissing it sends nothing', async () => {
+    it('gates rollback behind a destructive confirmation naming the campaign — backdrop/content clicks are inert and dismissing sends nothing', async () => {
         const fetchMock = stubFetch();
         const { container } = renderAdmin({ campaignName: TRICKY });
 
         fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
 
         const heading = screen.getByRole('heading', { name: 'Rollback Campaign' });
-        // The warning names this campaign verbatim and spells out the loss.
+        // The warning names this campaign verbatim, special characters and
+        // all, and spells out the loss.
         const warning = screen.getByText(/overwrite ALL current campaign data/);
         expect(warning.textContent).toContain(`"${TRICKY}"`);
         // Styled destructively so it can never be mistaken for a safe action.
@@ -159,17 +164,14 @@ describe('CampaignAdmin - Rollback', () => {
         expect(confirmBtn).toHaveClass('ct-btn-danger');
         expect(confirmBtn.querySelector('i.fa-exclamation-triangle')).toBeInTheDocument();
 
-        // Only the explicit Cancel/close controls dismiss it.
+        // Incidental clicks never dismiss this gate (the Cancel/×-dismiss
+        // legs are pinned by the rollback-modal and snapshot-restore
+        // siblings on this same shared modal).
         fireEvent.click(document.querySelector('.ct-modal-overlay'));
         fireEvent.click(heading);
         expect(screen.getByRole('heading', { name: 'Rollback Campaign' })).toBeInTheDocument();
 
         fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
-        expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
-
-        // Re-open, then dismiss via Cancel too.
-        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
 
         // Flush microtasks: a rollback POST would already have landed.
@@ -201,25 +203,17 @@ describe('CampaignAdmin - Rollback', () => {
         expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
     });
 
-    it.each([
-        {
-            name: 'the server rejects it',
-            handler: jsonResponse({ error: 'No snapshot found' }, false),
-            statusText: 'No snapshot found',
-        },
-        {
-            name: 'the request never reaches the server',
-            handler: new Error('Network failed'),
-            statusText: 'Network failed',
-        },
-    ])('surfaces the error when rollback $name, without reloading or storing a restore notice', async ({ handler, statusText }) => {
-        const fetchMock = stubFetch({ rollback: handler });
+    // The server-rejection face of this shared runRollback path is pinned by
+    // CampaignAdmin.snapshot-restore.test.jsx on the per-row lane; only the
+    // transport-error branch is this file's to prove for rollback.
+    it('surfaces the error when a rollback request never reaches the server, without reloading or storing a restore notice', async () => {
+        const fetchMock = stubFetch({ rollback: new Error('Network failed') });
         renderAdmin();
 
         await openRollbackModal();
         clickModalConfirm();
 
-        const status = await screen.findByText(statusText);
+        const status = await screen.findByText('Network failed');
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
         expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(1);
         expect(window.location.reload).not.toHaveBeenCalled();
@@ -262,12 +256,11 @@ describe('CampaignAdmin - Upload', () => {
     describe('file validation', () => {
         it.each([
             { name: 'test.txt', type: 'text/plain' },
-            { name: 'backup.tar.gz', type: 'application/gzip' },
             // Documented contract: the name check is case-sensitive — only
-            // exactly ".zip" passes, even though the OS picker may label
-            // both alike and both arrive with a zip MIME type.
+            // exactly ".zip" passes, even though the OS picker may label it
+            // alike and it arrives with a zip MIME type. ("tar.gz"/"Zip"
+            // hit the same endsWith branch as these two.)
             { name: 'test.ZIP', type: 'application/zip' },
-            { name: 'test.Zip', type: 'application/zip' },
         ])(
             'rejects $name with an error, clears the input, and never opens the modal or uploads',
             async ({ name, type }) => {
@@ -300,43 +293,6 @@ describe('CampaignAdmin - Upload', () => {
             expect(fileInput().value).toBe('');
             expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
             await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
-        });
-    });
-
-    describe('confirmation gate', () => {
-        it('opens on a valid zip naming the campaign, archive, and safety net — dismissing it never uploads', async () => {
-            const fetchMock = stubFetch();
-            const { container } = renderAdmin({ campaignName: TRICKY });
-
-            await selectRecognisedZip('backup.zip');
-
-            const heading = screen.getByRole('heading', { name: 'Upload Campaign' });
-            const warning = screen.getByText(/replace ALL current campaign data/);
-            expect(warning.textContent).toContain(`"${TRICKY}"`);
-            expect(warning.textContent).toContain('"backup.zip"');
-            // The auto-rollback safety net is spelled out before anything happens.
-            expect(screen.getByText(/safety net/i)).toBeInTheDocument();
-            expect(screen.getByText(/automatically rolled back/i)).toBeInTheDocument();
-            expect(screen.queryByText('Please select a .zip file')).not.toBeInTheDocument();
-
-            const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
-            expect(confirmBtn).toHaveClass('ct-btn-danger');
-            expect(confirmBtn.querySelector('i.fa-exclamation-triangle')).toBeInTheDocument();
-
-            // Only the explicit Cancel/close controls dismiss it.
-            fireEvent.click(document.querySelector('.ct-modal-overlay'));
-            fireEvent.click(heading);
-            expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
-
-            fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
-
-            // Re-open, then dismiss via Cancel too.
-            await selectRecognisedZip('backup.zip');
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
-
-            await waitFor(() => expect(postCount(fetchMock, adminPath(TRICKY, 'upload'))).toBe(0));
         });
     });
 
@@ -396,6 +352,16 @@ describe('CampaignAdmin - Upload', () => {
                 renderAdmin({ campaignName: TRICKY });
 
                 const file = await selectRecognisedZip('backup.zip');
+                // The confirm gate, before anything happens, names the
+                // campaign and archive verbatim and spells out the
+                // auto-rollback safety net. (Its dismiss legs are pinned by
+                // CampaignAdmin.upload-cancel.test.jsx on the same modal.)
+                const warning = screen.getByText(/replace ALL current campaign data/);
+                expect(warning.textContent).toContain(`"${TRICKY}"`);
+                expect(warning.textContent).toContain('"backup.zip"');
+                expect(warning.textContent).toMatch(/safety net/i);
+                expect(warning.textContent).toMatch(/automatically rolled back/i);
+
                 clickModalConfirm();
 
                 const status = await screen.findByText(statusText);

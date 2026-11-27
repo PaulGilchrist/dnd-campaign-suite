@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // MA-1489: Specter "Life Drain" HP-max-drain lane — the fix that made the
 // HIT clause "its Hit Point maximum decreases by an amount equal to the damage
 // taken" LAND (was FAIL(a) zero-state, §947: hpMaxReduction consumers
@@ -6,11 +6,13 @@
 // life-drain lane; MA-1451 byte-twin mocking. Locks the seam this lane OWNS
 // (the drain core lives in hpMaxReduceService.js and is unit-covered by the
 // MA-1547 save-path suite; secondary-pool scoping + attacker regain by
-// MA-1645; wraith row twin by MA-1728):
+// MA-1645; wraith row twin by MA-1728; the te registry SHAPE is owned by
+// targetEffectDefinitions.test.js and the parseHitHpMaxReduce negative truth
+// tables by MonsterCardHelpers.ma1645-nightbringer-bite-drain.test.js):
 // (1) specter.actions[0] authors the structured hit_hp_max_reduce key,
-//     existing bytes byte-pinned, parser structured-key-only / byte-inert
-//     elsewhere; (2) the hp_max_reduce registry spec (only pin app-wide);
-//     (3) on every resolved hit the handler-reached consumer reduces cs
+//     existing bytes byte-pinned, clause arms hpMaxReduce; (2) the
+//     hp_max_reduce description copy this lane's badges render;
+// (3) on every resolved hit the handler-reached consumer reduces cs
 //     maxHp by exactly the damage TAKEN, clamps currentHp, stamps the
 //     *HitPoints variants the entry carries (§296/§298), registers the
 //     hp_max_reduce te ledger {baseMax, reduced, max}, logs the old→new
@@ -21,8 +23,8 @@
 //     reaching 0 clamps lethal via the canonical applyDamageToTarget choke
 //     point with the pre-clamp currentHp; (7) zero-damage rider hits and
 //     unauthored rows are zero-write (zero logs honestly);
-//     (8) LONG_REST_TARGET_EFFECT_CLEAR_KEYS pins 'hp_max_reduce' and the LR
-//     restore runs before the clear.
+//     (8) the LR restore runs BEFORE the ledger clear (the LR row-clear
+//     behavior itself is covered by restRules-longRest-special.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 
@@ -100,7 +102,7 @@ import { registerTargetEffect, getEffectDefinition } from '../../../services/com
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import storage from '../../../services/ui/storage.js';
 import { createPlainDamageHandler } from './handlePlainDamage.js';
-import { buildHitConditionClause, parseHitHpMaxReduce } from '../../../components/encounter/MonsterCardHelpers.js';
+import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
 
 const SPECTER = monsters.find(m => m.index === 'specter');
@@ -143,7 +145,7 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
 
     const grantLog = () => deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
 
-    it('DATA & PARSER: specter.actions[0] authors the structured HP-max rider (bytes byte-pinned); parser is structured-key-only, byte-inert elsewhere', () => {
+    it('DATA: specter.actions[0] authors the structured HP-max rider — bytes byte-pinned, clause arms hpMaxReduce', () => {
         expect(LIFE_DRAIN.hit_hp_max_reduce).toEqual({ equal_to: 'damage' });
         expect(LIFE_DRAIN.attack_bonus).toBe(4);
         expect(LIFE_DRAIN.reach).toBe('5 ft.');
@@ -158,22 +160,15 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
             targetEffect: null,
             hpMaxReduce: { equalTo: 'damage' },
         });
-        expect(parseHitHpMaxReduce({})).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: {} })).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'healing' } })).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: 'damage' })).toBeNull();
-        const banditRow = monsters.find(m => m.name === 'Bandit').actions.find(a => a.attack_bonus != null);
-        expect(parseHitHpMaxReduce(banditRow)).toBeNull();
-        expect(buildHitConditionClause(banditRow)).toBeNull();
+        // Parser negative truth tables (missing key, scalar, wrong scope)
+        // are owned by MonsterCardHelpers.ma1645-nightbringer-bite-drain
+        // (:56-65); clauseless-row null by handlePlainDamage.hitClause
+        // (:211-215). Not re-litigated here.
     });
 
-    it('REGISTRY: hp_max_reduce registered Saves & Checks debuff, source field only (ledger rides extraProps)', () => {
+    it('REGISTRY: hp_max_reduce description copy stays in force (full spec shape pinned by targetEffectDefinitions.test.js)', () => {
         const def = getEffectDefinition('hp_max_reduce');
         expect(def).toBeTruthy();
-        expect(def.label).toBe('HP Max Reduced');
-        expect(def.cls).toBe('effect-debuff');
-        expect(def.group).toBe('Saves & Checks');
-        expect(def.fields).toEqual(['source']);
         expect(def.description).toMatch(/Hit Point maximum/i);
         expect(def.description).toMatch(/long rest/i);
     });
@@ -276,14 +271,18 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         expect(deps.logEntry.mock.calls.map(c => c[0]).some(e => (e.automationType || '').startsWith('hp_max_reduce') || e.condition === 'Max HP Reduced')).toBe(false);
     });
 
-    it('LR CLEAR KEYS: LONG_REST_TARGET_EFFECT_CLEAR_KEYS pins hp_max_reduce and the LR restore runs BEFORE the clear filter', () => {
+    it('LR ORDER: hp_max_reduce is a long-rest clear key and the drain restore runs BEFORE the ledger clear (restore reads the ledgers the clear wipes)', () => {
+        // Row-clear BEHAVIOR (the resting creature's owned hp_max_reduce te
+        // row is removed) is covered end-to-end by
+        // restRules-longRest-special.test.js; this pins only the ledger-first
+        // ordering that behavior test cannot observe from the residue alone.
         const src = readFileSync('src/services/rules/effects/restRules-longRest.js', 'utf8');
         const clearArray = src.match(/const LONG_REST_TARGET_EFFECT_CLEAR_KEYS = \[[\s\S]*?\n\]/)[0];
         expect(clearArray).toContain("'hp_max_reduce'");
-        // Both lanes are scoped to the resting character (per-creature seam
-        // law, owner ruling 2026-11-10): calls carry (campaignName, name).
-        const restoreCall = src.search(/\n {2}restoreHpMaxDrainsOnLongRest\(campaignName, name\)/);
-        const clearCall = src.search(/\n {2}clearLongRestCampaignTargetEffects\(campaignName, name\)/);
+        // Line-anchored so function-definition lines (which start with
+        // `function`) cannot shadow the call sites; indent-agnostic.
+        const restoreCall = src.search(/^[ \t]*restoreHpMaxDrainsOnLongRest\(campaignName, name\)/m);
+        const clearCall = src.search(/^[ \t]*clearLongRestCampaignTargetEffects\(campaignName, name\)/m);
         expect(restoreCall).toBeGreaterThan(-1);
         expect(clearCall).toBeGreaterThan(-1);
         expect(restoreCall).toBeLessThan(clearCall);

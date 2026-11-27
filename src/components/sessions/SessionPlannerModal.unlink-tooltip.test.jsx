@@ -1,14 +1,7 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai 2026-11-26
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
-
-beforeEach(() => {
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: { writeText: vi.fn(async () => {}) },
-  });
-});
 
 const NOTE_GUID = 'cb7fa303-dfcc-4586-b7da-4c37e568dd4c';
 const NOTE_LABEL = 'Important Plot Hook The ancient artifact is hidden in the o';
@@ -64,7 +57,7 @@ describe('SessionPlannerModal unlink tooltips', () => {
     expect(container.innerHTML).not.toContain(NOTE_GUID);
   });
 
-  it('falls back to the raw value when no option label matches', () => {
+  it('falls back to the raw GUID in the tooltip and still unlinks by GUID when no option label matches', () => {
     const { props } = renderModal({
       resourceOptions: { maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] },
     });

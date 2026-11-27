@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-15: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // SP-105: the popup/log payload must forward the resolver's authoritative
 // effectiveAc (+2 Shield of Faith, +5 Shield — public/data/spells.json) so
 // computedHit can never flip a resolved MISS into a damage-applying HIT.
@@ -242,14 +242,35 @@ describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
         expect(control.hit).toBe(true);
     });
 
-    it('forwards shield spell +5 into effectiveAc and payload', async () => {
+    it('folds shield +5 alone and stacked with an active Shield of Faith into effectiveAc and payload', async () => {
         getShieldAcBonus.mockReturnValue(5);
         await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
 
         const popup = deps.setPopupHtml.mock.calls[0][0];
         expect(popup.effectiveAc).toBe(17);
         expect(popup.shieldAcBonus).toBe(5);
+        expect(popup.shieldOfFaithAcBonus).toBe(0);
         expect(popup.hit).toBe(false);
+
+        // Both spell buffs active: the channels SUM (12 + 5 + 2) and each
+        // field rides its own key on the log row — no bleed, no shadowing.
+        getShieldOfFaithAcBonus.mockReturnValue(2);
+        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
+
+        const stacked = deps.setPopupHtml.mock.calls[1][0];
+        expect(stacked.effectiveAc).toBe(19);
+        expect(stacked.shieldAcBonus).toBe(5);
+        expect(stacked.shieldOfFaithAcBonus).toBe(2);
+        expect(stacked.hit).toBe(false);
+        // effectiveAc 19 can only be the stacked row (the lone-shield row is 17).
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'roll',
+            rollType: 'attack',
+            effectiveAc: 19,
+            shieldAcBonus: 5,
+            shieldOfFaithAcBonus: 2,
+            hit: false,
+        }));
     });
 
     it('folds cover bonus into the forwarded effectiveAc', async () => {

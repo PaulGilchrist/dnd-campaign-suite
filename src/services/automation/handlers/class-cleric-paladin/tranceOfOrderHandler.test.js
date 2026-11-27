@@ -1,11 +1,17 @@
-// @maintained-by-ai 2026-10-15
-// Deterministic unit tests for the Trance of Order handler (CLA-364): a stable
-// state machine over the runtime store (free use → 0, 5 SP restore, refusals
-// with zero spend) plus isActive/deactivate contracts. All dependencies mocked;
-// no timers, DOM, or wall-clock coupling. Handler-level coverage lives only
-// here — sibling suites (automationModifiers, sorcery info builder,
-// trackedResources, UI) cover different seams and are not duplicated below.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai 2026-11-26
+// Deterministic unit coverage for the Trance of Order handler (CLA-364): the
+// runtime-store state machine (free press → uses 0 + active true + refresh
+// event, 5 SP restore at the exact >= 5 boundary, refusals with a zero-spend
+// census) plus isActive/deactivate contracts. Every popup and log row is
+// pinned full-shape (activation payloads carry NO automationType; refusals do)
+// with a frozen Date.now on the two refusal rows. Adjacent seams live in
+// sibling suites and are NOT duplicated here: modifier rows
+// (automationModifiers.test.js), the info-builder card (automationInfoBuilder/
+// sorcery.test.js), the never-seeded uses latch (trackedResourcesAdditional),
+// Long-Rest null re-arm (restRules-longRest), and initiative clear-down via
+// deactivate (useInitiativeEffects.activeStateClearing). No timers or
+// wall-clock coupling — durations here are static popup text only.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle, isActive, deactivate } from './tranceOfOrderHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
@@ -19,7 +25,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
-    getCurrentSorceryPoints: vi.fn(() => 10),
+    getCurrentSorceryPoints: vi.fn(),
 }));
 
 vi.mock('../../../character/classFeatures.js', () => ({
@@ -30,299 +36,260 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-function makeAction(name) {
-    return {
-        name: name || 'Trance of Order',
-        automation: {
-            type: 'trance_of_order',
-            action: 'bonus_action',
-            duration: '1_minute',
-            restoreCost: 5,
-        },
-    };
+const campaignName = 'test-campaign';
+const playerName = 'Test Character';
+const activeKey = 'tranceOfOrderActive';
+const usesKey = 'tranceOfOrderUses';
+const AUTO = {
+    type: 'trance_of_order',
+    action: 'bonus_action',
+    duration: '1_minute',
+    restoreCost: 5,
+};
+
+function makeAction(name = 'Trance of Order') {
+    return { name, automation: AUTO };
 }
 
-function makePlayerStats(overrides) {
+// Strip action.name entirely (exercises the `|| 'Trance of Order'` default).
+function makeUnnamedAction() {
+    return { automation: AUTO };
+}
+
+function makePlayerStats() {
     return {
-        name: 'Test Character',
+        name: playerName,
         level: 14,
-        class: {
-            name: 'Sorcerer',
-            class_levels: [{ level: 14 }],
-        },
-        resources: {
-            sorcery_points: { current: 10 },
-        },
-        ...overrides,
+        class: { name: 'Sorcerer', class_levels: [{ level: 14 }] },
+        resources: { sorcery_points: { current: 10 } },
     };
 }
 
-describe('Trance of Order Handler', () => {
-    const campaignName = 'test-campaign';
-    const playerName = 'Test Character';
-    const activeKey = 'tranceOfOrderActive';
-    const usesKey = 'tranceOfOrderUses';
+// Runtime-store router over the two trance keys.
+function mockStore({ active = false, uses = 1 }) {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === activeKey) return active;
+        if (key === usesKey) return uses;
+        return null;
+    });
+}
+
+// Activation payloads OMIT automationType; refusal payloads include it —
+// full-shape toEqual pins the divergence.
+function activationPopup(featureName, description) {
+    return {
+        type: 'popup',
+        payload: { type: 'automation_info', name: featureName, description, automation: AUTO },
+    };
+}
+
+function refusalPopup(featureName, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            automationType: AUTO.type,
+            description,
+            automation: AUTO,
+        },
+    };
+}
+
+// The shared commit contract of both activation paths: exactly two writes in
+// source order (uses → active) and exactly one UI refresh event.
+function expectActivationCommit(dispatchSpy) {
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+        [playerName, usesKey, 0, campaignName],
+        [playerName, activeKey, true, campaignName],
+    ]);
+    expect(dispatchSpy.mock.calls.map(([e]) => e.type)).toEqual(['trance-of-order-updated']);
+}
+
+describe('tranceOfOrderHandler', () => {
+    let dispatchSpy;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     });
 
-    describe('handle()', () => {
-        it('should activate Trance of Order when uses are available', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 1;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
+    afterEach(() => {
+        dispatchSpy.mockRestore();
+    });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('activated');
-            expect(result.payload.description).toContain('Attack rolls against you can\'t benefit from Advantage');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                activeKey,
-                true,
-                campaignName,
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                usesKey,
-                0,
-                campaignName,
-            );
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: playerName,
-                    abilityName: 'Trance of Order',
-                }),
-            );
-        });
-
-        it('should restore and activate by spending 5 SP when no uses remain and player has enough SP', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(result.payload.description).toContain('5 SP');
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName, 10);
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                activeKey,
-                true,
-                campaignName,
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                usesKey,
-                0,
-                campaignName,
-            );
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    description: expect.stringContaining('spending 5 Sorcery Points'),
-                }),
-            );
-        });
-
-        it('should return error popup and log a refusal when no uses remain and player lacks SP', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            metamagic.getCurrentSorceryPoints.mockReturnValue(2);
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats({
-                resources: { sorcery_points: { current: 2 } },
-            }), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'automation',
-                    characterName: playerName,
-                    description: expect.stringContaining('trance_of_order_refused no_uses'),
-                }),
-            );
-        });
-
-        it('should include automation config and use custom action name in the popup payload', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 1;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction('Custom Feature'), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.name).toBe('Custom Feature');
-            expect(result.payload.description).toContain('Custom Feature');
-            expect(result.payload.automation).toEqual({
-                type: 'trance_of_order',
-                action: 'bonus_action',
-                duration: '1_minute',
-                restoreCost: 5,
-            });
-        });
-
-        it('should use default feature name when action.name is undefined', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 1;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle({ automation: makeAction().automation }, makePlayerStats(), campaignName, null);
-
-            expect(result.payload.name).toBe('Trance of Order');
-            expect(result.payload.description).toContain('Trance of Order');
-        });
-
-        it('should handle null getClassFeatures returning maxSorceryPoints=0', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 1;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('activated');
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
-        // CLA-364 BUG-A: null/unset stored uses mean the once-per-Long-Rest
-        // free use is still available (warpingImplosionUses null-as-available
-        // pattern — trackedResources no longer seeds 0 at feature grant; Long
-        // Rest null-re-arm via restRules-constants LONG_REST_RESOURCES). Even
-        // when the player could afford the 5 SP restore, the press is free.
-        it('should activate free when stored uses are null/unset (first press or Long Rest re-arm, CLA-364 BUG-A)', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return null;
-                if (key === usesKey) return null;
-                return null;
-            });
+    describe('handle() — free press', () => {
+        // The stored-uses state machine, CLA-364 BUG-A (null/unset means the
+        // once-per-Long-Rest free use is still available — warpingImplosion
+        // null-as-available pattern; even with 20 SP affordable the press is
+        // free) — and name derivation in one family. SP stays wealthy in
+        // every case so `spendSorceryPoints` never called proves the press
+        // cost nothing.
+        it.each([
+            { title: 'consumes the stored use', uses: 1, action: makeAction(), featureName: 'Trance of Order' },
+            { title: 'treats null/unset uses as the free press (first press or Long-Rest re-arm, CLA-364 BUG-A)', uses: null, action: makeAction(), featureName: 'Trance of Order' },
+            { title: 'frames popup and log with a custom action name', uses: 1, action: makeAction('Custom Feature'), featureName: 'Custom Feature' },
+            { title: "defaults the name to 'Trance of Order' when action.name is absent", uses: 1, action: makeUnnamedAction(), featureName: 'Trance of Order' },
+        ])('$title', async (tc) => {
+            mockStore({ active: false, uses: tc.uses });
             metamagic.getCurrentSorceryPoints.mockReturnValue(20);
             classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+            const result = await handle(tc.action, makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(result.payload.description).not.toContain('5 SP');
+            expect(result).toEqual(activationPopup(
+                tc.featureName,
+                `${tc.featureName} activated. Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
+            ));
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                usesKey,
-                0,
-                campaignName,
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                activeKey,
-                true,
-                campaignName,
-            );
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({ type: 'ability_use' }),
-            );
-        });
-
-        // CLA-364 BUG-B: re-click while tranceOfOrderActive refuses with zero
-        // spend and zero state writes (mirrors sorceryHandler already_active /
-        // stonecunning re-click refusal phrasing).
-        it('should refuse re-press while already active with zero spend (CLA-364 BUG-B)', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return true;
-                if (key === usesKey) return 0;
-                return null;
+            expectActivationCommit(dispatchSpy);
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: tc.featureName,
+                description: `${playerName} activated ${tc.featureName} (Bonus Action, 1 minute). Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
             });
-            metamagic.getCurrentSorceryPoints.mockReturnValue(20);
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
+        });
+    });
+
+    describe('handle() — 5 SP restore', () => {
+        // currentSP sits on the exact boundary (=== 5 must spend). The class
+        // max flows into both the affordability read and the spend clamp;
+        // null class features defend down to 0 (`?.maxSorceryPoints || 0`).
+        it.each([
+            { title: 'clamps the spend to the class max', features: { maxSorceryPoints: 10 }, maxSP: 10 },
+            { title: 'defaults maxSP to 0 on null class features', features: null, maxSP: 0 },
+        ])('restores and activates at exactly 5 SP: $title', async (tc) => {
+            mockStore({ active: false, uses: 0 });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(5);
+            classFeatures.getClassFeatures.mockReturnValue(tc.features);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('already active');
+            expect(result).toEqual(activationPopup(
+                'Trance of Order',
+                'Trance of Order activated (5 SP spent). Attack rolls against you can\'t benefit from Advantage. D20 tests treat 9 or lower as 10.',
+            ));
+            expect(metamagic.getCurrentSorceryPoints).toHaveBeenCalledWith(playerName, tc.maxSP);
+            expect(metamagic.spendSorceryPoints).toHaveBeenCalledTimes(1);
+            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName, tc.maxSP);
+            expectActivationCommit(dispatchSpy);
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Trance of Order',
+                description: `${playerName} restored and activated Trance of Order by spending 5 Sorcery Points.`,
+            });
+        });
+    });
+
+    describe('handle() — refusals (logged, zero spend)', () => {
+        // Each refusal face: exact full-shape popup, one full refusal log row
+        // (frozen timestamp), and a zero-spend census — no SP consumed, no
+        // runtime write, no refresh event.
+        it('refuses no_uses below the 5 SP restore boundary (currentSP 4)', async () => {
+            mockStore({ active: false, uses: 0 });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(4);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
+            const now = Date.now();
+            const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result).toEqual(refusalPopup(
+                'Trance of Order',
+                'Trance of Order has no uses remaining. Recharges on a Long Rest, or you can spend 5 Sorcery Points to restore.',
+            ));
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'automation',
-                    characterName: playerName,
-                    description: expect.stringContaining('trance_of_order_refused already_active'),
-                }),
-            );
+            expect(dispatchSpy).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                characterName: playerName,
+                abilityName: 'Trance of Order',
+                automationType: AUTO.type,
+                description: 'Trance of Order refused: trance_of_order_refused no_uses — not enough Sorcery Points to restore (needs 5). Nothing spent.',
+                timestamp: now,
+            });
+            dateSpy.mockRestore();
         });
 
-        // Shared contract of the .catch(e => console.error(...)) guards on
-        // addEntry in both the free-activation and 5 SP restore paths.
-        it('should still return the activation popup and log to console when addEntry rejects', async () => {
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-            metamagic.getCurrentSorceryPoints.mockReturnValue(10);
-            logService.addEntry.mockReturnValue(Promise.reject(new Error('log failed')));
+        // CLA-364 BUG-B: the already-active gate fires BEFORE any uses/SP
+        // read matters — uses=1 available and 20 SP affordable must still
+        // refuse with zero writes (mirrors sorceryHandler already_active).
+        it('refuses re-press while already active with zero spend (CLA-364 BUG-B)', async () => {
+            mockStore({ active: true, uses: 1 });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(20);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
+            const now = Date.now();
+            const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
 
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            // Free-use activation path
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === usesKey) return 1;
-                return null;
+            expect(result).toEqual(refusalPopup(
+                'Trance of Order',
+                'Trance of Order is already active. It lasts 1 minute.',
+            ));
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(dispatchSpy).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                characterName: playerName,
+                abilityName: 'Trance of Order',
+                automationType: AUTO.type,
+                description: 'Trance of Order refused: trance_of_order_refused already_active. It lasts 1 minute. Nothing spent.',
+                timestamp: now,
             });
-            const freeResult = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(freeResult.type).toBe('popup');
-            expect(freeResult.payload.description).toContain('activated');
-
-            // 5 SP restore path
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === usesKey) return 0;
-                return null;
-            });
-            const spendResult = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(spendResult.type).toBe('popup');
-            expect(spendResult.payload.description).toContain('5 SP');
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName, 10);
-
-            expect(consoleSpy).toHaveBeenCalledWith('[tranceOfOrder] Error:', expect.any(Error));
-            expect(consoleSpy).toHaveBeenCalledTimes(2);
-            consoleSpy.mockRestore();
+            dateSpy.mockRestore();
         });
+    });
+
+    // Shared contract of the .catch(e => console.error(...)) guards on all
+    // three addEntry sites: a failed log write never breaks the popup or the
+    // commit — each branch still completes its state machine.
+    it('logs to console and still commits when addEntry rejects (all three paths)', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        logService.addEntry.mockRejectedValue(new Error('log failed'));
+        classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
+        metamagic.getCurrentSorceryPoints.mockReturnValue(5);
+
+        mockStore({ active: true, uses: 0 });
+        const refusal = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        expect(refusal.payload.description).toContain('already active');
+
+        mockStore({ active: false, uses: 1 });
+        const free = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        expect(free.payload.description).toContain('activated.');
+
+        mockStore({ active: false, uses: 0 });
+        const restore = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        expect(restore.payload.description).toContain('(5 SP spent)');
+
+        expect(metamagic.spendSorceryPoints).toHaveBeenCalledTimes(1);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(4);
+        expect(dispatchSpy.mock.calls.map(([e]) => e.type)).toEqual([
+            'trance-of-order-updated',
+            'trance-of-order-updated',
+        ]);
+        expect(consoleSpy).toHaveBeenCalledTimes(3);
+        expect(consoleSpy).toHaveBeenCalledWith('[tranceOfOrder] Error:', expect.any(Error));
+        consoleSpy.mockRestore();
     });
 
     describe('isActive()', () => {
-        it('should return true when the active flag is true, false otherwise', () => {
+        it('reads the active key and is strictly true-only', () => {
             runtimeState.getRuntimeValue.mockReturnValue(true);
             expect(isActive(playerName)).toBe(true);
+            expect(runtimeState.getRuntimeValue).toHaveBeenLastCalledWith(playerName, activeKey, null);
 
-            runtimeState.getRuntimeValue.mockReturnValue(false);
+            // `=== true` law: truthy non-booleans are NOT active.
+            runtimeState.getRuntimeValue.mockReturnValue(1);
             expect(isActive(playerName)).toBe(false);
 
             runtimeState.getRuntimeValue.mockReturnValue(null);
@@ -331,9 +298,10 @@ describe('Trance of Order Handler', () => {
     });
 
     describe('deactivate()', () => {
-        it('should set the active flag to false for the given player', () => {
+        it('writes exactly one active=false for the given player', () => {
             deactivate(playerName, campaignName);
 
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 activeKey,

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation): the "Vulnerabilities:"
 // row of StatListsBlock (CharSummary.jsx:273) — the ONLY non-empty
@@ -16,11 +16,15 @@
 //       row") — only the null/undefined guard branches are unique here.
 //
 // Trimmed vs previous revision: the verbatim-vs-capitalized contrast test was
-// removed — the multi-case it.each already pins the FULL row text with mixed
+// removed — the multi-case render already pins the FULL row text with mixed
 // casing ("fire, Piercing, cold"), so copy-pasted capitalization into this
 // row still fails loudly here. Resistances capitalization is its siblings'
 // contract. beforeEach re-pin also dropped: the vi.mock factory pins
 // getActiveBuffs to [] and vi.clearAllMocks preserves implementations.
+// Further trimmed: the single-value render case (a one-element .join adds no
+// behavior the multi-case does not pin) and the empty-array omission case
+// (FixtureContract "omits every empty stat-list row" covers it on the
+// shared fixture) — only the null/undefined loose-guard branches stay.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -88,20 +92,21 @@ function vulnerabilityRow() {
 // Vulnerabilities row
 // ---------------------------------------------------------------------------
 describe('CharSummary - Vulnerabilities row', () => {
-    it.each([
-        { values: ['poison'], expected: 'Vulnerabilities: poison' },
-        { values: ['fire', 'Piercing', 'cold'], expected: 'Vulnerabilities: fire, Piercing, cold' },
-    ])('renders the row as "$expected"', ({ values, expected }) => {
-        renderSummary({ playerStats: { ...mockPlayerStats, vulnerabilities: values } });
+    it('renders the row verbatim as "Vulnerabilities: fire, Piercing, cold"', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, vulnerabilities: ['fire', 'Piercing', 'cold'] },
+        });
 
         // Exact content pins label, join order, ", " separator, and that
         // values render verbatim (no forced capitalization — unlike the
         // Resistances row, this row must never title-case "fire").
-        expect(vulnerabilityRow()).toHaveTextContent(expected);
+        expect(vulnerabilityRow()).toHaveTextContent('Vulnerabilities: fire, Piercing, cold');
     });
 
+    // Empty-array omission is owned by FixtureContract on the shared fixture;
+    // these two cases pin the `!= null` loose guard (CharSummary.jsx:274) —
+    // tightening it to `!== null` or dropping it fails here.
     it.each([
-        { label: 'an empty array', vulnerabilities: [] },
         { label: 'null', vulnerabilities: null },
         { label: 'undefined', vulnerabilities: undefined },
     ])('omits the row when vulnerabilities is $label', ({ vulnerabilities }) => {

@@ -1,9 +1,11 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
-// Duplicate-name contract for the NPCs manager: saving a new NPC (or renaming
-// onto another NPC's name, any case) must show an inline error without
-// persisting, mirroring the server guard in server/routes/npcs.js — which
-// also 400s the same message plus the bestiary-name refusal (npcs.json is
-// for CUSTOM NPCs only, pre-made monsters join via the Encounter Builder).
+// @maintained-by-ai 2026-11-26
+// Duplicate-name contract for the NPCs manager's CLIENT guard (handleSave and
+// handleSaveAndAddToInitiative each check hasDuplicateName): saving a new NPC
+// (or renaming onto another NPC's name, any case/whitespace) shows an inline
+// error without persisting; saving an NPC under its own current name stays
+// allowed. The server 400 backstop (same copy, plus the bestiary-name refusal
+// in server/routes/npcs.js) rendering is pinned in NPCs.stale-list-recovery
+// .test.jsx; the guard's own live save-failure banner is NOT retested here.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCs from './NPCs';
@@ -96,7 +98,7 @@ describe('NPCs duplicate-name guard', () => {
     mockSaveNPC.mockResolvedValue({ success: true });
   });
 
-  it.each(['QA Test NPC', 'qa test npc'])(
+  it.each(['QA Test NPC', 'qa test npc', '  QA Test NPC  '])(
     'blocks saving a new NPC named "%s" as a duplicate, without persisting',
     (name) => {
       renderNPCs();
@@ -112,13 +114,15 @@ describe('NPCs duplicate-name guard', () => {
     }
   );
 
-  it('blocks renaming an existing NPC onto another NPC name but allows saving its own name', async () => {
+  it('blocks renaming onto another NPC name but still allows saving under its own name', async () => {
     renderNPCs();
     fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
     setName('QA Test NPC');
     clickSave();
 
-    expect(screen.getByTestId('npc-form-error')).toBeInTheDocument();
+    expect(screen.getByTestId('npc-form-error')).toHaveTextContent(
+      'An NPC with that name already exists'
+    );
     expect(mockSaveNPC).not.toHaveBeenCalled();
 
     setName('Goblin');
@@ -133,12 +137,14 @@ describe('NPCs duplicate-name guard', () => {
     setName('QA Test NPC');
     fireEvent.click(screen.getByTestId('save-add-init-btn'));
 
-    expect(screen.getByTestId('npc-form-error')).toBeInTheDocument();
+    expect(screen.getByTestId('npc-form-error')).toHaveTextContent(
+      'An NPC with that name already exists'
+    );
     expect(mockSaveNPC).not.toHaveBeenCalled();
     expect(mockAddNPCToInitiative).not.toHaveBeenCalled();
   });
 
-  it('clears the error when reopening the form and saves a uniquely-named NPC', async () => {
+  it('recovers after a duplicate block: reopening clears the error and a unique name saves and closes', async () => {
     renderNPCs();
     openNewForm();
     setName('QA Test NPC');
@@ -153,19 +159,5 @@ describe('NPCs duplicate-name guard', () => {
     clickSave();
     await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
-  });
-
-  it('shows the server error message inline when the server rejects a save', async () => {
-    mockSaveNPC.mockRejectedValueOnce(new Error('An NPC with that name already exists'));
-    renderNPCs();
-    openNewForm();
-    setName('Other NPC');
-    clickSave();
-
-    await waitFor(() => expect(screen.getByTestId('npc-form-error')).toBeInTheDocument());
-    expect(screen.getByTestId('npc-form-error')).toHaveTextContent(
-      'An NPC with that name already exists'
-    );
-    expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
   });
 });

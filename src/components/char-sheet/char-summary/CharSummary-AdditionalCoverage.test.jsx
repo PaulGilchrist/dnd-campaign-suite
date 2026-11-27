@@ -1,12 +1,14 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Lane: speed overrides derived from activeBuffs/playerStats priority chains
 // (deriveAspectSpeeds + aquatic_adaptation) and Stormborn resistances gated on
 // wrathOfTheSeaActive (computeResistances). Stormborn is covered ONLY here;
 // sibling files (Movement, SpeedCalculations, PassiveEffects, ResistanceTypes)
 // explicitly delegate climb/swim overrides and Stormborn to this file.
-// Wrath-of-the-Sea badge rendering is covered in CharSummary-Badges.test.jsx —
-// here the badge is only asserted as a side-pin of the same gate.
+// The Wrath-of-the-Sea badge's positive render is owned ONLY here (CharSummary-
+// Badges delegates it; FixtureContract pins only the all-off absence). The badge
+// gate (flag alone) and the Resistances gate (flag + Stormborn damage types) are
+// pinned separately by the Stormborn describe below.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

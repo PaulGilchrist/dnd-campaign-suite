@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14
+// @maintained-by-ai 2026-11-26
 //
 // Coverage ownership (CharSummary family delegation):
 //   This file is the ONLY owner of the AC-row cover badges — the
@@ -172,11 +172,6 @@ describe('CharSummary AC-row cover badges', () => {
     // missing characters prop. None of them may show any cover badge.
     it.each([
         {
-            case: 'nothing grants cover (inert ally)',
-            characters: [makeCharacter('Sister')],
-            seed: {},
-        },
-        {
             case: 'characters prop is null',
             characters: null,
             seed: {},
@@ -190,6 +185,13 @@ describe('CharSummary AC-row cover badges', () => {
             case: 'ally has Aura of Protection but no smite active',
             characters: [auraAlly('Sister')],
             seed: {},
+        },
+        {
+            case: 'bulwark names the player but the effect is not active',
+            characters: [makeCharacter('Ally')],
+            seed: {
+                'Ally.bulwarkOfForceTargets': ['Thorin'],
+            },
         },
         {
             case: 'bulwark is active but names only another target',

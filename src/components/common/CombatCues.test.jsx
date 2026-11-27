@@ -1,16 +1,17 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-26
 // Roadmap Item 10 (sensory cues) — the log-lane outcome consumer.
 // subscribeToSSE is the only seam mocked (the shared-singleton law is its own
-// suite's job); the cueForLogEntry decode runs for real, only playCue is
-// spied. Pins: one subscription per campaign, cue per live attack/save/death
-// append (crit/hit/miss/fumble, save success/failure, monster-death,
-// player-down, player-death through the real decoder), silence for everything
-// else (damage entries, concentration saves, notes, log-clear data:null,
-// other keys), PER-ROW idempotence (a duplicate delivery of the same row id
-// cues once, and the module-level seen-guard survives a remount), and clean
-// unsubscribe on unmount. There is deliberately NO initial GET — mounts never
-// replay a backlog. Row fixtures carry a server-style id because every log.js
-// append stamps one on the wire.
+// suite's job); the cueForLogEntry decode runs for real through the wiring —
+// per-branch decoder truth-tables live in audioCues.test.js, the App-level
+// one-instance mount law in App.combat-cues.test.jsx. What THIS file pins:
+// mount lifecycle (one subscription per campaign, no initial GET — mounts
+// never replay a backlog, clean unsubscribe), the live-append → cue wiring
+// for each moment family, the component's own key/data guards, PER-ROW
+// idempotence via alreadyCued (dup delivery cues once, the module-level
+// seen-guard survives a remount, distinct ids always win the bounded FIFO),
+// and the Nat flourish: fires only for the two table-moments, replaces on a
+// fresh row, never re-flourishes a duplicate, self-removes on animation end.
+// Row fixtures carry a server-style id because every log.js append stamps one.
 import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CombatCues from './CombatCues.jsx';
@@ -34,6 +35,8 @@ const emit = (event) => {
 
 const logEvent = (data) => ({ key: 'log-test-campaign', data });
 
+const cuesPlayed = () => playCue.mock.calls.map(([cue]) => cue);
+
 beforeEach(() => {
     subscribeToSSE.mockClear();
     playCue.mockClear();
@@ -41,18 +44,16 @@ beforeEach(() => {
 });
 
 describe('CombatCues', () => {
-    it('renders nothing and never fetches on mount (SSE-only, no backlog replay)', () => {
+    it('renders nothing, never fetches, subscribes once per campaign and unsubscribes on unmount', () => {
         const fetchSpy = vi.spyOn(globalThis, 'fetch');
-        const { container } = render(<CombatCues campaignName='test-campaign' />);
-        expect(container).toBeEmptyDOMElement();
-        expect(fetchSpy).not.toHaveBeenCalled();
-        fetchSpy.mockRestore();
-    });
-
-    it('subscribes to the shared lane per campaign and unsubscribes on unmount', () => {
         const cleanup = vi.fn();
         subscribeToSSE.mockReturnValueOnce(cleanup);
         const view = render(<CombatCues campaignName='test-campaign' />);
+        // SSE-only: no backlog GET on mount.
+        expect(view.container).toBeEmptyDOMElement();
+        expect(fetchSpy).not.toHaveBeenCalled();
+        fetchSpy.mockRestore();
+        expect(subscribeToSSE).toHaveBeenCalledTimes(1);
         expect(subscribeToSSE).toHaveBeenCalledWith('test-campaign', expect.any(Function));
         view.unmount();
         expect(cleanup).toHaveBeenCalledTimes(1);
@@ -63,43 +64,32 @@ describe('CombatCues', () => {
         expect(subscribeToSSE).not.toHaveBeenCalled();
     });
 
-    it('cues attack outcomes off live log appends', () => {
+    it('cues every outcome family off live log appends through the real decoder', () => {
         render(<CombatCues campaignName='test-campaign' />);
         emit(logEvent({ id: 'a1', type: 'roll', rollType: 'attack', hit: true }));
         emit(logEvent({ id: 'a2', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true }));
         emit(logEvent({ id: 'a3', type: 'roll', rollType: 'attack', hit: false, isNatural1: true }));
         emit(logEvent({ id: 'a4', type: 'roll', rollType: 'attack', hit: false }));
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(['hit', 'crit', 'fumble', 'miss']);
-    });
-
-    it('cues save outcomes and deaths off live log appends', () => {
-        render(<CombatCues campaignName='test-campaign' />);
         emit(logEvent({ id: 's1', type: 'roll', rollType: 'save', saveResult: 'success' }));
         emit(logEvent({ id: 's2', type: 'roll', rollType: 'save', saveResult: 'failure' }));
         emit(logEvent({ id: 'd1', type: 'hp_change', threshold: 'dead', targetName: 'Goblin' }));
         emit(logEvent({ id: 'd2', type: 'hp_change', threshold: 'dead', targetName: 'Thorin', isPlayer: true }));
         emit(logEvent({ id: 'd3', type: 'death_save', characterName: 'Thorin', result: 'dead' }));
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual([
-            'save-success', 'save-failure', 'monster-death', 'player-down', 'player-death',
+        expect(cuesPlayed()).toEqual([
+            'hit', 'crit', 'fumble', 'miss',
+            'save-success', 'save-failure',
+            'monster-death', 'player-down', 'player-death',
         ]);
     });
 
-    it('cues each distinct row id exactly once across a barrage (never suppressed)', () => {
-        render(<CombatCues campaignName='test-campaign' />);
-        const ids = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'];
-        ids.forEach((id) => emit(logEvent({ id, type: 'roll', rollType: 'attack', hit: true })));
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(Array(7).fill('hit'));
-    });
-
-    it('a duplicate delivery of the same row id cues at most once', () => {
+    it('a duplicate delivery of the same row id cues at most once; a distinct row still voices', () => {
         render(<CombatCues campaignName='test-campaign' />);
         const critRow = { id: 'dup-1', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true };
         emit(logEvent(critRow));
         emit(logEvent(critRow)); // exact SSE resend
         emit(logEvent({ ...critRow })); // byte-identical twin object
-        // A distinct row still voices right after the suppressed dups.
         emit(logEvent({ id: 'dup-2', type: 'roll', rollType: 'attack', hit: true }));
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(['crit', 'hit']);
+        expect(cuesPlayed()).toEqual(['crit', 'hit']);
     });
 
     it('the seen-guard survives a remount — a replayed row id stays silent, new ids still cue', () => {
@@ -112,16 +102,16 @@ describe('CombatCues', () => {
         subscribeToSSE.mockClear();
         render(<CombatCues campaignName='test-campaign' />);
         emit(logEvent(critRow)); // remount replay — must NOT re-cue
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(['crit']);
+        expect(cuesPlayed()).toEqual(['crit']);
 
         // Fresh rows after the remount cue normally.
         emit(logEvent({ id: 'remount-2', type: 'hp_change', threshold: 'dead', targetName: 'Goblin' }));
-        expect(playCue.mock.calls.map(([cue]) => cue)).toEqual(['crit', 'monster-death']);
+        expect(cuesPlayed()).toEqual(['crit', 'monster-death']);
     });
 
     it('the seen-set is a bounded FIFO — distinct ids always win over stale memory', () => {
         render(<CombatCues campaignName='test-campaign' />);
-        // Flood past MAX_CUED_ROW_IDS: every distinct row cues (N cues for N rows).
+        // Flood past MAX_CUED_ROW_IDS (200): every distinct row cues.
         for (let i = 0; i < 260; i++) {
             emit(logEvent({ id: `flood-${i}`, type: 'roll', rollType: 'attack', hit: true }));
         }
@@ -133,67 +123,60 @@ describe('CombatCues', () => {
         expect(playCue).toHaveBeenCalledTimes(261);
     });
 
-    it('stays silent on damage entries, concentration saves, notes, log-clears and foreign keys', () => {
+    it('stays silent on foreign keys, key-gaps and log-clears (data:null)', () => {
         render(<CombatCues campaignName='test-campaign' />);
-        emit(logEvent({ type: 'roll', rollType: 'damage', isCrit: true, hit: true }));
-        emit(logEvent({ type: 'roll', rollType: 'save', name: 'Concentration Save', saveResult: 'success' }));
-        emit(logEvent({ type: 'roll', rollType: 'save' }));
-        emit(logEvent({ type: 'hp_change', threshold: 'bloodied', targetName: 'Goblin' }));
-        emit(logEvent({ type: 'death_save', characterName: 'Thorin', success: true }));
-        emit(logEvent({ type: 'note' }));
-        emit(logEvent(null));
+        emit(logEvent(null)); // log-clear event
         emit({ key: 'combatSummary-test-campaign', data: { type: 'roll', rollType: 'attack', hit: true } });
-        emit({ data: null });
+        emit({ data: null }); // no key at all
+        // A row that decodes to no cue (damage) still never voices here —
+        // HpFeedback owns HP movement, the attack cue already sounded.
+        emit(logEvent({ id: 'x1', type: 'roll', rollType: 'damage', isCrit: true, hit: true }));
         expect(playCue).not.toHaveBeenCalled();
     });
 
     // ── Nat-flourish visual twin (Phase 6) ──
     describe('full-screen Nat flourish', () => {
-        const fire = (row) => {
+        // The flourish is React state — an SSE callback firing outside a
+        // React event needs act() to flush the render.
+        const fire = (row) => act(() => emit(logEvent(row)));
+
+        it('flourishes only the two table-moments, replaces on a fresh row, never re-flourishes a duplicate', () => {
             render(<CombatCues campaignName='test-campaign' />);
-            // The flourish is React state — an SSE callback firing outside a
-            // React event needs act() to flush the render (playCue-only tests
-            // above never needed it because the spy is not state).
-            act(() => emit(logEvent(row)));
-        };
-
-        it('a crit append renders the golden flourish, aria-hidden and click-through', () => {
-            fire({ id: 'fl-1', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
-            const flourish = document.querySelector('.nat-flourish-crit');
-            expect(flourish).not.toBeNull();
-            expect(flourish).toHaveAttribute('aria-hidden', 'true');
-            expect(flourish.textContent).toBe('CRITICAL HIT!');
-        });
-
-        it('a fumble append renders the red CRITICAL MISS flourish', () => {
-            fire({ id: 'fl-2', type: 'roll', rollType: 'attack', hit: false, isNatural1: true });
-            const flourish = document.querySelector('.nat-flourish-fumble');
-            expect(flourish).not.toBeNull();
-            expect(flourish.textContent).toBe('CRITICAL MISS!');
-        });
-
-        it('ordinary hits and saves never flourished — only the two table-moments', () => {
-            fire({ id: 'fl-3', type: 'roll', rollType: 'attack', hit: true });
-            emit(logEvent({ id: 'fl-4', type: 'roll', rollType: 'save', saveResult: 'success' }));
+            // Ordinary hits and saves are never flourished.
+            fire({ id: 'fl-1', type: 'roll', rollType: 'attack', hit: true });
+            fire({ id: 'fl-2', type: 'roll', rollType: 'save', saveResult: 'success' });
             expect(document.querySelector('.nat-flourish')).toBeNull();
+
+            // A crit renders the golden flourish, aria-hidden.
+            fire({ id: 'fl-3', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
+            const crit = document.querySelector('.nat-flourish-crit');
+            expect(crit).not.toBeNull();
+            expect(crit).toHaveAttribute('aria-hidden', 'true');
+            expect(crit.textContent).toBe('CRITICAL HIT!');
+
+            // A duplicate delivery of the same row must NOT replace the live flourish.
+            fire({ id: 'fl-3', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
+            expect(document.querySelector('.nat-flourish-crit')).toBe(crit);
+
+            // A fresh fumble row REPLACES it with the red flourish.
+            fire({ id: 'fl-4', type: 'roll', rollType: 'attack', hit: false, isNatural1: true });
+            expect(document.querySelector('.nat-flourish-crit')).toBeNull();
+            const fumble = document.querySelector('.nat-flourish-fumble');
+            expect(fumble).not.toBeNull();
+            expect(fumble.textContent).toBe('CRITICAL MISS!');
         });
 
-        it('a duplicate delivery of the same crit row does not re-flourish (per-row idempotence)', () => {
-            const row = { id: 'fl-5', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true };
-            fire(row);
-            const first = document.querySelector('.nat-flourish-crit');
-            act(() => emit(logEvent(row)));
-            expect(document.querySelector('.nat-flourish-crit')).toBe(first);
-        });
-
-        it('the flourish element carries the self-removal contract (onAnimationEnd → unmount)', () => {
-            // jsdom has no animation-event plumbing (RTL's animationEnd never
-            // reaches React's delegated listener here), so the contract is
-            // pinned on the fiber props directly; the browser lifecycle is
-            // verified live (Playwright): appear → CSS keyframe → animationend
-            // → onDone → removed.
-            fire({ id: 'fl-6', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
+        it('the flourish self-removes when its animation ends (onAnimationEnd → unmount)', () => {
+            // jsdom has no animation-event plumbing: neither RTL's
+            // animationEnd nor a raw bubbling AnimationEvent dispatch reaches
+            // React's delegated listener (re-verified 2026-11-26), so the
+            // contract is pinned on the fiber props directly; the browser
+            // lifecycle is verified live (Playwright): appear → CSS keyframe →
+            // animationend → onDone → removed.
+            render(<CombatCues campaignName='test-campaign' />);
+            fire({ id: 'fl-5', type: 'roll', rollType: 'attack', hit: true, isCrit: true, isNatural20: true });
             const flourish = document.querySelector('.nat-flourish-crit');
+            expect(flourish).not.toBeNull();
             const propsKey = Object.keys(flourish).find((k) => k.startsWith('__reactProps$'));
             expect(typeof flourish[propsKey].onAnimationEnd).toBe('function');
             act(() => flourish[propsKey].onAnimationEnd());

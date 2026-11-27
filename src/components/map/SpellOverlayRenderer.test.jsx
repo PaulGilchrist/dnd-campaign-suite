@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
@@ -48,13 +48,14 @@ describe('SpellOverlayRenderer', () => {
     it('renders one group per known shape plus the pending overlay, and a layer wrapper', () => {
         const { container } = renderComponent(
             [makeSphere(), makeCylinder(), makeCube(), makeCone(), makeLine()],
-            makeSphere({ id: 'pending-1' }),
+            makeSphere({ id: 'pending-1', radiusFt: 40 }),
         );
         expect(container.querySelector('g.spell-overlay-layer')).toBeInTheDocument();
         const groups = getGroups(container);
         expect(groups.length).toBe(6);
         // pending overlay renders last, after the committed overlays
-        expect(groups[5].querySelector('circle.spell-overlay')).toBeInTheDocument();
+        expect(groups[5].querySelector('circle.spell-overlay').getAttribute('r'))
+            .toBe(String(px(40)));
     });
 
     it('skips overlays with an unknown shape but renders the rest', () => {
@@ -64,13 +65,17 @@ describe('SpellOverlayRenderer', () => {
     });
 
     describe('sphere overlay', () => {
-        it('renders a circle centered on its grid cell with radius from radiusFt', () => {
+        it('renders a circle centered on its grid cell with radius from radiusFt and a move handle at the center', () => {
             const { container } = renderComponent([makeSphere({ radiusFt: 20 })]);
             const circle = container.querySelector('circle.spell-overlay');
             const { x, y } = center(5, 5);
             expect(circle.getAttribute('cx')).toBe(String(x));
             expect(circle.getAttribute('cy')).toBe(String(y));
             expect(circle.getAttribute('r')).toBe(String(px(20)));
+            const handles = getHandles(container);
+            expect(handles.length).toBe(1);
+            expect(handles[0].getAttribute('cx')).toBe(String(x));
+            expect(handles[0].getAttribute('cy')).toBe(String(y));
         });
 
         it('fills with the overlay color and strokes at fixed alpha regardless of fill alpha', () => {
@@ -78,15 +83,6 @@ describe('SpellOverlayRenderer', () => {
             const circle = container.querySelector('circle.spell-overlay');
             expect(circle.getAttribute('fill')).toBe('rgba(0,255,0,0.35)');
             expect(circle.getAttribute('stroke')).toBe(`rgba(0,255,0,${OVERLAY_STROKE_ALPHA})`);
-        });
-
-        it('renders a move handle at the center', () => {
-            const { container } = renderComponent([makeSphere()]);
-            const handles = getHandles(container);
-            expect(handles.length).toBe(1);
-            const { x, y } = center(5, 5);
-            expect(handles[0].getAttribute('cx')).toBe(String(x));
-            expect(handles[0].getAttribute('cy')).toBe(String(y));
         });
     });
 
@@ -174,18 +170,15 @@ describe('SpellOverlayRenderer', () => {
     });
 
     // Knob wiring (backlog 2026-11-09 FU): the cone/line TIP knob drives the
-    // hook's rotate lane via onRotateStart; knobs that don't act must not
-    // advertise a grab cursor.
+    // hook's rotate lane via onRotateStart; every other knob (origin moves,
+    // non-rotatable shapes, decorative tips with no live rotate lane) must
+    // stay out of the rotate lane and never advertise a grab cursor.
     describe('rotate knob wiring', () => {
-        const renderWithRotate = (overlays, pendingOverlay = null, onRotateStart = vi.fn()) => ({
-            onRotateStart,
-            ...renderComponent(overlays, pendingOverlay, onRotateStart),
-        });
-
         it('cone and line tip knobs carry a grab cursor and dispatch pointerdown to onRotateStart with their overlay', () => {
             const cone = makeCone();
             const line = makeLine();
-            const { container, onRotateStart } = renderWithRotate([cone, line]);
+            const onRotateStart = vi.fn();
+            const { container } = renderComponent([cone, line], null, onRotateStart);
             const coneTip = getGroups(container)[0].querySelectorAll('circle.spell-overlay-handle')[1];
             const lineTip = getGroups(container)[1].querySelectorAll('circle.spell-overlay-handle')[1];
             expect(coneTip.style.cursor).toBe('grab');
@@ -201,38 +194,30 @@ describe('SpellOverlayRenderer', () => {
             expect(onRotateStart.mock.calls[1][1]).toBe(line);
         });
 
-        it('origin move knobs carry no rotate handler (the svg zone-body lane owns moves)', () => {
-            const { container, onRotateStart } = renderWithRotate([makeCone(), makeLine()]);
-            const originKnobs = [...getGroups(container)]
-                .flatMap((g) => [...g.querySelectorAll('circle.spell-overlay-handle')])
-                .filter((k) => k.style.cursor === 'move');
-            expect(originKnobs.length).toBe(2);
-            originKnobs.forEach((knob) => fireEvent.pointerDown(knob, { button: 0 }));
+        it('only tip knobs reach the rotate lane: every move-cursor knob (origin and non-rotatable shapes) dispatches nothing', () => {
+            const onRotateStart = vi.fn();
+            const { container } = renderComponent(
+                [makeCone(), makeLine(), makeSphere(), makeCylinder(), makeCube()],
+                null,
+                onRotateStart,
+            );
+            const moveKnobs = [...getHandles(container)].filter((k) => k.style.cursor === 'move');
+            // origin knobs of cone + line, plus one knob each for sphere/cylinder/cube
+            expect(moveKnobs.length).toBe(5);
+            moveKnobs.forEach((knob) => fireEvent.pointerDown(knob, { button: 0 }));
             expect(onRotateStart).not.toHaveBeenCalled();
         });
 
-        it('non-rotatable shapes never advertise a grab cursor on their knobs', () => {
-            const { container, onRotateStart } = renderWithRotate([makeSphere(), makeCylinder(), makeCube()]);
-            const handles = getHandles(container);
-            expect(handles.length).toBe(3);
-            handles.forEach((knob) => {
-                expect(knob.style.cursor).toBe('move');
-                fireEvent.pointerDown(knob, { button: 0 });
-            });
-            expect(onRotateStart).not.toHaveBeenCalled();
-        });
+        it('tip knobs stay decorative without a live rotate lane: pending previews and handler-less hosts get default cursor and no dispatch', () => {
+            const withLane = vi.fn();
+            const { container: pending } = renderComponent([], makeCone({ id: 'pending-cone' }), withLane);
+            const pendingTip = getGroups(pending)[0].querySelectorAll('circle.spell-overlay-handle')[1];
+            expect(pendingTip.style.cursor).toBe('default');
+            fireEvent.pointerDown(pendingTip, { button: 0 });
+            expect(withLane).not.toHaveBeenCalled();
 
-        it('the pending placement preview keeps its tip knob decorative: no handler, default cursor', () => {
-            const { container, onRotateStart } = renderWithRotate([], makeCone({ id: 'pending-cone' }));
-            const tip = getGroups(container)[0].querySelectorAll('circle.spell-overlay-handle')[1];
-            expect(tip.style.cursor).toBe('default');
-            fireEvent.pointerDown(tip, { button: 0 });
-            expect(onRotateStart).not.toHaveBeenCalled();
-        });
-
-        it('a host without a rotate handler gets decorative tip knobs instead of dead grab promises', () => {
-            const { container } = renderComponent([makeCone(), makeLine()]);
-            const tips = [...getGroups(container)]
+            const { container: noHost } = renderComponent([makeCone(), makeLine()]);
+            const tips = [...getGroups(noHost)]
                 .flatMap((g) => [...g.querySelectorAll('circle.spell-overlay-handle')])
                 .filter((k) => k.style.cursor !== 'move');
             expect(tips.length).toBe(2);

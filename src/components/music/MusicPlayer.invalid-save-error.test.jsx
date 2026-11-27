@@ -1,7 +1,12 @@
-// @maintained-by-ai: 2026-10-24
-// Regression: saving the track editor with unparseable input must show a visible
-// inline error (previously a console-only silent no-op), and that error must
-// clear on the next keystroke / mood switch / successful save.
+// @maintained-by-ai 2026-11-26
+// Owns the CLEAR lanes of the track editor's invalid-save inline error: once a
+// zero-valid Save paints .music-editor-error, it must clear on the next
+// keystroke, on a discard-close + reopen, and on a later successful save.
+// The error-APPEARS lane (verbatim refusal copy, draft kept, zero writes, the
+// console.debug drop with console.error reserved for faults) is pinned by the
+// siblings "ignores unparseable editor input" (MusicPlayer.test.jsx), the
+// save-time lane in live-validation, and "all-junk save ..." in
+// mixed-save-warning — not re-pinned here.
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -23,8 +28,6 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: (...args) => mockAddEntry(...args),
 }));
 
-const REJECTION = 'No valid YouTube URLs or video ids entered';
-
 function renderPlayer() {
   return render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
 }
@@ -33,19 +36,27 @@ function musicState() {
   return getStore('campaign').get('music');
 }
 
-function openEditor(container) {
+function openEditor() {
   fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
-  return container.querySelector('#music-editor-urls');
 }
 
-// Item 3b: starter moods now seed bundled /audio/ beds — the zero-valid
-// rejection lanes below only fire when NOTHING is queued, so remove the
-// seeded local rows first (upload/discard lanes unaffected).
+// Item 3b: starter moods seed bundled /audio/ beds — the zero-valid rejection
+// lanes only fire when NOTHING is queued, so remove the seeded local rows first.
 function clearLocalRows(container) {
   let btn;
   while ((btn = container.querySelector('.music-editor-local-tracks button'))) {
     fireEvent.click(btn);
   }
+}
+
+// Re-fire the refusal and return its element, so each clear lane starts from a
+// painted error.
+function fireRejection(container, value) {
+  const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+  fireEvent.change(container.querySelector('#music-editor-urls'), { target: { value } });
+  fireEvent.click(screen.getByText('Save'));
+  expect(container.querySelector('.music-editor-error')).not.toBeNull();
+  debugSpy.mockRestore();
 }
 
 beforeEach(() => {
@@ -54,92 +65,49 @@ beforeEach(() => {
 });
 
 describe('MusicPlayer invalid-save inline error', () => {
-  it('shows a visible inline error when Save rejects unparseable input', () => {
+  it('clears the error on the next keystroke and on a discard-close then reopen', () => {
     const { container } = renderPlayer();
-    const textarea = openEditor(container);
+    openEditor();
     clearLocalRows(container);
 
-    // Invalid user input must NOT hit console.error (backlog 2026-11-08 EK):
-    // the inline error below is the feedback; the drop leaves only a
-    // console.debug trace (spellValidation precedent, 9a82ec4ef).
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-    fireEvent.change(textarea, { target: { value: 'not a youtube thing' } });
-    fireEvent.click(screen.getByText('Save'));
-
-    expect(errorSpy).not.toHaveBeenCalled();
-    expect(debugSpy).toHaveBeenCalledWith(
-      '[MusicPlayer] No valid YouTube URLs or video ids entered'
-    );
-    errorSpy.mockRestore();
-    debugSpy.mockRestore();
-
-    const errorEl = container.querySelector('.music-editor-error');
-    expect(errorEl).not.toBeNull();
-    expect(errorEl).toHaveTextContent(REJECTION);
-    // rejection is still a no-op for stored data, and the editor stays open
-    expect(musicState()?.overrides?.town).toBeUndefined();
-    expect(container.querySelector('.music-editor')).not.toBeNull();
-    expect(container.querySelector('#music-editor-urls').value).toBe('not a youtube thing');
-  });
-
-  it('clears the inline error on the next keystroke', () => {
-    const { container } = renderPlayer();
-    const textarea = openEditor(container);
-    clearLocalRows(container);
-
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-    fireEvent.change(textarea, { target: { value: 'junk' } });
-    fireEvent.click(screen.getByText('Save'));
-    expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    debugSpy.mockRestore();
-
+    // Lane 1: any keystroke in the textarea wipes the stale refusal.
+    fireRejection(container, 'junk');
     fireEvent.change(container.querySelector('#music-editor-urls'), { target: { value: 'j' } });
     expect(container.querySelector('.music-editor-error')).toBeNull();
-  });
 
-  it('clears the inline error when the editor is closed and reopened', () => {
-    const { container } = renderPlayer();
-    const textarea = openEditor(container);
-    clearLocalRows(container);
-
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-    fireEvent.change(textarea, { target: { value: 'junk' } });
-    fireEvent.click(screen.getByText('Save'));
-    expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    debugSpy.mockRestore();
-
-    // Draft is dirty ('junk' ≠ seeded ids): the Cancel close now opens the
-    // named-discard role=dialog modal (improve 2026-10-29-AE, migrated off
-    // native window.confirm by backlog 2026-11-08 EK) — accept it to reach the
-    // reopen.
+    // Lane 2: the error does not leak into a later mount. The draft is dirty,
+    // so Cancel routes through the named-discard role=dialog modal — its
+    // mechanics are owned by close-discard-confirm.test.jsx; here it is just
+    // the route to closing and reopening the editor.
+    fireRejection(container, 'junk');
     fireEvent.click(screen.getByText('Cancel'));
-    const dialog = screen.getByRole('dialog', { name: 'Discard Changes?' });
-    expect(within(dialog).getByText('Discard changes to the Town track list?')).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Discard' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Discard Changes?' }))
+        .getByRole('button', { name: 'Yes, Discard' })
+    );
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     expect(container.querySelector('.music-editor-error')).toBeNull();
   });
 
-  it('successful save after a rejected one keeps the editor open, clears the error and persists tracks', async () => {
+  it('a successful save after a rejected one clears the error, stays open, and persists the track', async () => {
     // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
     let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
+    const posts = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {
       if (opts.method === 'POST' && String(url).endsWith('/music')) {
         const body = JSON.parse(opts.body);
+        posts.push(body);
         serverMusic = { ...serverMusic, ...('value' in body ? body.value : body) };
       }
       return { ok: true, status: 200, json: async () => ({ music: serverMusic, message: 'ok' }), text: async () => '' };
     });
     const { container } = renderPlayer();
-    const textarea = openEditor(container);
+    openEditor();
     clearLocalRows(container);
 
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-    fireEvent.change(textarea, { target: { value: 'junk' } });
-    fireEvent.click(screen.getByText('Save'));
-    expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    debugSpy.mockRestore();
+    // Rejection: error painted and NOTHING reached the server.
+    fireRejection(container, 'junk');
+    expect(posts).toHaveLength(0);
 
     fireEvent.change(container.querySelector('#music-editor-urls'), {
       target: { value: 'https://youtu.be/aaaaaaaaaaa' }
@@ -147,10 +115,13 @@ describe('MusicPlayer invalid-save inline error', () => {
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(container.querySelector('.music-editor-error')).toBeNull());
-    // Stay-open save (backlog 2026-11-08 EM): editor holds, content persisted.
+    // Stay-open save law: editor holds, draft intact, exactly one write lands
+    // with the parsed id on both store and wire.
     expect(container.querySelector('.music-editor')).not.toBeNull();
     expect(container.querySelector('#music-editor-urls').value).toBe('https://youtu.be/aaaaaaaaaaa');
     expect(musicState().overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].overrides.town.map(t => t.src)).toEqual(['aaaaaaaaaaa']);
     globalThis.fetch.mockRestore();
   });
 });

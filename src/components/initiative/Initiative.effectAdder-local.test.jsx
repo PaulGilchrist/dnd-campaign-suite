@@ -1,14 +1,16 @@
-// @maintained-by-ai
+// @maintained-by-ai 2026-11-26
 // LANE: Initiative.effectAdder-local — locks the 2026-11-19 owner demotion of
 // the EffectAdder open-modal target from the shared campaign change-data store
 // to per-client React state (local-vs-synced law, ephemeral-UI-flag category).
 // The old lane (useEffectAdderTarget.js, delete-on-close evict doctrine) POSTed
 // a fresh top-level open-flag key on EVERY open — retired entirely. Every
-// lifecycle leg (mount / open / Cancel / Apply-close / unmount-while-open /
-// remount-after-unmount) must touch the runtime store ZERO times with any
+// lifecycle leg must touch the runtime store ZERO times with any
 // effectAdder-shaped key: no setRuntimeValue, no setRuntimeObject, no
-// deleteRuntimeKey, no useSyncedState hydration. Boundary mocks mirror the
-// retired Initiative.effectAdder-evict.test.jsx (REC #837 + zero-network guard).
+// deleteRuntimeKey, no useSyncedState hydration. The legs are pinned as three
+// lifecycles — (1) mount→open→Cancel, (2) Apply-close (adjacent targetEffects
+// lane must still land), (3) unmount-while-open→remount (no evict, no restore).
+// Boundary mocks mirror the retired Initiative.effectAdder-evict.test.jsx
+// (REC #837 + zero-network guard).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
@@ -178,51 +180,44 @@ describe('Initiative effectAdderTarget local state (2026-11-19 store demotion)',
         expect(screen.getByTestId('effect-adder')).toBeInTheDocument();
     };
 
-    it('mount hydrates the open flag from NOTHING (no synced-key read, zero store traffic)', async () => {
+    it('mount→open→Cancel lifecycle stays fully local: the flag never touches the store', async () => {
         await mount();
+        // Mount hydrates the open flag from NOTHING (no synced-key read).
         expectZeroAdderTraffic();
-    });
-
-    it('open sets the local flag with the creature — zero runtime-store writes', async () => {
-        await mount();
+        // Open sets a LOCAL flag with the creature — zero runtime-store writes.
         await openAdder();
         expect(screen.getByTestId('effect-adder').textContent).toContain('Alice');
         expectZeroAdderTraffic();
-    });
-
-    it('Cancel closes with zero store traffic (old lane DELETEd; local flag just unmounts)', async () => {
-        await mount();
-        await openAdder();
+        // Cancel just unmounts the local flag (the old lane DELETEd a key).
         await act(async () => { fireEvent.click(screen.getByTestId('ea-cancel')); });
         expect(screen.queryByTestId('effect-adder')).toBeNull();
         expectZeroAdderTraffic();
     });
 
-    it('Apply-close leg: honest effect write still lands, open flag writes nothing', async () => {
+    it('Apply-close leg: honest effect write lands on campaign targetEffects, open flag writes nothing', async () => {
         await mount();
         await openAdder();
         vi.mocked(runtime.setRuntimeValue).mockClear();
         await act(async () => { fireEvent.click(screen.getByTestId('ea-apply')); });
         expect(screen.queryByTestId('effect-adder')).toBeNull();
-        // Adjacent lane intact: the Effects-tab apply writes targetEffects…
+        // Adjacent lane intact: the Effects-tab apply writes the real entry…
         const teWrites = vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => key === 'targetEffects');
         expect(teWrites).toHaveLength(1);
+        expect(teWrites[0][0]).toBe('campaign');
+        expect(teWrites[0][2]).toEqual([{ target: 'Alice', effect: 'marked' }]);
         // …while the open flag stays fully out of the store.
-        expect(adderStoreWrites()).toHaveLength(0);
-        expect(adderEvicts()).toHaveLength(0);
-    });
-
-    it('view-switch (unmount) while the adder is open: zero traffic (nothing to evict)', async () => {
-        const view = await mount();
-        await openAdder();
-        act(() => { view.unmount(); });
         expectZeroAdderTraffic();
     });
 
-    it('remount (view-switch / campaign re-select unmount) does NOT restore the open adder, zero traffic', async () => {
+    it('unmount-while-open evicts nothing; remount does NOT restore the open adder', async () => {
         const view = await mount();
         await openAdder();
+        // Old delete-on-close evict doctrine is retired: unmounting mid-open
+        // must fire no eviction/write traffic.
         act(() => { view.unmount(); });
+        expectZeroAdderTraffic();
+        // Fresh mount cannot resurrect the modal from the synced store — the
+        // flag was per-client local state.
         await mount();
         expect(screen.queryByTestId('effect-adder')).toBeNull();
         expectZeroAdderTraffic();

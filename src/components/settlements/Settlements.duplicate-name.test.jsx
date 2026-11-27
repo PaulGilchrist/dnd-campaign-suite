@@ -1,8 +1,10 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
+// @maintained-by-ai 2026-11-26
 // Lane: duplicate-name guard only (Settlements.jsx hasDuplicateName + inline error).
 // Collisions block save with an inline error and keep the modal open; editing an
-// existing settlement under its own name must never trip the guard; server-side
-// duplicate rejections surface inline. Happy-path saves live in the saveDelete lane.
+// existing settlement under its own name must never trip the guard. Generic
+// server-rejected saves (message rendered inline, modal + draft survive) live in
+// the saveDelete lane; 409-conflict banner copy in conflict-reload. Happy-path
+// saves also live in the saveDelete lane.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -149,20 +151,5 @@ describe('Settlements - duplicate-name guard', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     openNewSettlement();
     expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
-  });
-
-  it('surfaces a server-side rejection message inline and keeps the modal open', async () => {
-    mockSaveSettlement.mockRejectedValue(new Error(DUPLICATE_ERROR));
-
-    render(<Settlements campaignName="test" />);
-
-    openNewSettlement();
-    typeSetName('Brand New Hamlet');
-    clickSave();
-
-    await waitFor(() => {
-      expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
-    });
-    expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
   });
 });

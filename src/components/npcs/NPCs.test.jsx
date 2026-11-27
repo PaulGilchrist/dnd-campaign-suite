@@ -1,9 +1,9 @@
-// @maintained-by-ai 2026-10-14: 2026-10-14
-// NPCs container contracts: list load/empty/loading, search, create/generate/
-// edit/delete flows, saveNPC rename args, and the add-to-initiative seam
-// (args, blocked-stats error, needs-weapon Add-anyway confirm). SSE sync,
-// duplicate-name
-// guard, form shell, row rendering, and stat-block forms live in the
+// @maintained-by-ai 2026-11-26
+// NPCs container contracts: list load/empty/loading, search filtering,
+// create/generate/edit/delete flows, saveNPC rename args, and the
+// add-to-initiative seam (args, blocked-stats error, needs-weapon
+// Add-anyway/Cancel dialog). SSE sync, duplicate-name guard, kit classes,
+// 409 recovery, form shell, row rendering, and stat-block forms live in the
 // sibling test files.
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -131,11 +131,13 @@ describe('NPCs', () => {
   // ── Initial Render ────────────────────────────────────────────────
 
   describe('Initial render', () => {
-    it('renders New NPC, Generate NPC, and the search input', () => {
+    it('renders the toolbar and one row per loaded NPC', () => {
       renderNPCs();
       expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
       expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
     });
 
     it('loads NPCs on mount and again when campaignName changes', () => {
@@ -152,12 +154,6 @@ describe('NPCs', () => {
       expect(management.loadItems).not.toHaveBeenCalled();
     });
 
-    it('renders one row per loaded NPC', () => {
-      renderNPCs();
-      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-    });
-
     it('renders the empty state when there are no NPCs', () => {
       renderNPCs([]);
       expect(screen.getByText(/No NPCs yet/i)).toBeInTheDocument();
@@ -172,10 +168,12 @@ describe('NPCs', () => {
   // ── Search / Filter ───────────────────────────────────────────────
 
   describe('Search filtering', () => {
-    it('shows a clear button only while a query is set and clearing it restores all NPCs', () => {
+    it('filters rows to matches and shows a clear button only while a query is set; clearing restores all rows', () => {
       renderNPCs();
       expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
       fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
+      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+      expect(screen.queryByTestId('npc-list-item-Wizard')).not.toBeInTheDocument();
       expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
       fireEvent.click(screen.getByLabelText('Clear search'));
       expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
@@ -332,25 +330,18 @@ describe('NPCs', () => {
       expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
     });
 
-    it('arms the in-app Add-anyway confirm when the service refuses an attack-less NPC', async () => {
-      mockAddNPCToInitiative.mockResolvedValue('needs-weapon');
-      renderNPCs();
-      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-      const dialog = await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
-      expect(dialog).toHaveTextContent(
-        'Goblin has no weapons or attacks. If you add them to Initiative now, they will fight with an Unarmed Strike.'
-      );
-      // Refusal is zero-write: the service ran once, nothing was re-run.
-      expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(1);
-    });
-
-    it('Add anyway re-runs the join with the host-confirmed addUnarmed flag', async () => {
+    it('Add anyway re-runs the attack-less join with the host-confirmed addUnarmed flag', async () => {
       mockAddNPCToInitiative
         .mockResolvedValueOnce('needs-weapon')
         .mockResolvedValueOnce('added');
       renderNPCs();
       fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-      await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+      // The service's zero-write refusal arms the in-app confirm verbatim.
+      const dialog = await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+      expect(dialog).toHaveTextContent(
+        'Goblin has no weapons or attacks. If you add them to Initiative now, they will fight with an Unarmed Strike.'
+      );
+      expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(1);
       fireEvent.click(screen.getByRole('button', { name: 'Add anyway', exact: true }));
       await waitFor(() => expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(2));
       expect(mockAddNPCToInitiative).toHaveBeenLastCalledWith(

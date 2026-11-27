@@ -1,14 +1,15 @@
-// @maintained-by-ai 2026-10-14: 2026-10-23
-// MA-0367 inline-save seam (unique lane): fixture converted to helper-built
-// per #505 — context fields derive BY-name from the authored Bearded Devil/
-// Infernal Glaive disk row and the wound arm is BUILT via the PRODUCER
-// parseInfernalWoundClause (parser-owned shape, never hand-transcribed).
-// processSaveRoll with the REAL
-// infernalWoundService — failed save wires context.infernalWound → te + ONE
-// rounds:10 clock + grant log; dc_success:'full' keeps auto-damage unhalved
-// on BOTH outcomes; success grants ZERO wound. Service internals (te shape,
-// RAW already-wounded guard) live in infernalWoundService.test.js; the
-// save-result DOM-event seam lives in useLoggedDiceRollEventHandlers.
+// @maintained-by-ai 2026-11-26
+// MA-0367 inline-save seam (unique lane): fixture built per #505 — context
+// fields derive BY-name from the authored Bearded Devil/Infernal Glaive disk
+// row (symbol lookup, no line-pin: the row drifts) and the wound arm is BUILT
+// via the PRODUCER parseInfernalWoundClause (parser-owned shape, never
+// hand-transcribed). processSaveRoll with the REAL infernalWoundService —
+// failed save wires context.infernalWound → te + ONE rounds:10 clock + grant
+// log; dc_success:'full' keeps auto-damage unhalved on BOTH outcomes; success
+// grants ZERO wound. Service internals (exact te bytes, RAW already-wounded
+// refusal + refused log, close seams, bleed ticks) live in
+// infernalWoundService.test.js; the save-result DOM-event seam lives in
+// useLoggedDiceRollEventHandlers.infernal-wound.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -49,9 +50,12 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 const applyDamageToTarget = vi.fn(async (_cs, _t, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg }));
+// Mirror of the REAL pure resolvers (MA-0367 'full' arm included); the generic
+// half/none arithmetic is owned verbatim by applyDamage.helpers.test.js — this
+// seam only pins dispatch. computeDamageAfterSave stays exported because the
+// MonsterCardHelpers module under test imports it at module scope.
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    // byte mirror of the REAL edited semantics (MA-0367 adds the 'full' arm)
     computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : dcSuccess === 'full' ? raw : 0),
     computeDamageAfterEvasion: (total, success, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (success ? 0 : Math.floor(total / 2))
@@ -86,10 +90,12 @@ const CAMPAIGN = 'test-campaign';
 const DEVIL = 'Bearded Devil 1';
 const TARGET = 'AberrantSorcerer';
 
-// BY-name disk row (monsters.json:8897 'Bearded Devil' / 'Infernal Glaive') —
-// every authored save/damage key maps straight onto the context the upstream
-// save-rolls builder forwards; the wound arm rides parseInfernalWoundClause
-// output verbatim (useLoggedDiceRollAttack.js:154).
+// BY-name disk row (monsters.json 'Bearded Devil' → 'Infernal Glaive' action;
+// keyed by name, never by line — the row has drifted before) — every authored
+// save/damage key maps straight onto the context the production save-roll
+// builders stamp (MonsterCardModal buildAbilitySaveRollContext/buildSaveOptions
+// `infernalWound: parseInfernalWoundClause(action)`; combo lane rides
+// useLoggedDiceRollAttack.js comboTrapArmsFromContext).
 const GLAIVE_ROW = monstersData.find(m => m.name === 'Bearded Devil')
     .actions.find(a => a.name === 'Infernal Glaive');
 
@@ -130,37 +136,39 @@ beforeEach(() => {
 });
 
 describe('MA-0367 block-save Infernal Wound grant', () => {
-    it('failed save: FULL unhalved auto-damage + infernal_wound te + rounds:10 clock + grant log', async () => {
+    it('failed save: disk formula rolls FULL unhalved auto-damage + infernal_wound te + rounds:10 clock + grant log', async () => {
         await resolveSave({ ...glaiveContext }, false, 4);
 
+        // the authored damage dice actually drive the roll, and the 'full'
+        // dc_success arm never halves a failure
+        expect(rollExpression.mock.calls.some(([formula]) => formula === GLAIVE_ROW.damage_dice_primary)).toBe(true);
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(7);
-        expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Slashing']);
+        expect(applyDamageToTarget.mock.calls[0][3]).toEqual([GLAIVE_ROW.damage_type_primary]);
 
         const te = woundTe();
         expect(te).toMatchObject({ target: TARGET, effect: 'infernal_wound', source: DEVIL, bleedDie: '1d10', duration: 'until_1_minute' });
 
+        // current-bytes pin: grantInfernalWound still issues the CLA-334
+        // minutes×10 clock (1 minute = rounds:10). The owner duration policy
+        // (≥1-minute effects go combat-scoped — cleared by new initiative /
+        // rest, never a rounds countdown) is PENDING against that service;
+        // re-pin this together with it when it lands, do not launder here.
         const clocks = runtimeStore[`${DEVIL}.pendingExpirations`] || [];
         expect(clocks).toHaveLength(1);
         expect(clocks[0].expiryRounds).toBe(10);
         expect(clocks[0].effects[0]).toMatchObject({ type: 'remove_target_effect', effectKey: 'infernal_wound' });
 
         expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_granted')).toBe(true);
-
-        // lane-level idempotence: the lane re-fires the service on every failed
-        // save; the service's RAW guard (service tests) must keep it at ONE
-        // wound / ONE clock and record only a refusal on the re-fire.
-        addEntryLogs.length = 0;
-        await resolveSave({ ...glaiveContext }, false, 3);
-        expect((runtimeStore['campaign.targetEffects'] || []).filter(te2 => te2.effect === 'infernal_wound' && te2.target === TARGET)).toHaveLength(1);
-        expect(runtimeStore[`${DEVIL}.pendingExpirations`] || []).toHaveLength(1);
-        expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_refused')).toBe(true);
+        // re-fire idempotence (RAW already-wounded refusal, no second te/
+        // clock, refused log) is owned byte-exact by infernalWoundService.
+        // test.js 'already-wounded RAW refusal' — not mirrored on this lane.
     });
 
     it('successful save: FULL unhalved damage, ZERO wound / clock / grant (save gates only the wound)', async () => {
         await resolveSave({ ...glaiveContext }, true, 20);
 
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(7);
-        expect(woundTe()).toBeFalsy();
+        expect(woundTe()).toBeUndefined();
         expect(runtimeStore[`${DEVIL}.pendingExpirations`] || []).toHaveLength(0);
         expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_granted')).toBe(false);
     });
