@@ -1,19 +1,21 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * LongRestButton.clickHandlers.test.jsx — owns the CLICK-DISPATCH seam.
  *
  * Lane ownership for LongRestButton tests:
  *  - This file: clicking the button dispatches through handleLongRest with
  *    exact args to applyLongRest, and branches correctly — falsy celestial
- *    payload completes the rest immediately (zero-arg onLongRest, no modal,
- *    no game-state writes); truthy payload opens the Celestial Resilience
- *    modal with the full merged payload and defers everything else.
+ *    payload completes the rest immediately (single zero-arg onLongRest, no
+ *    modal, no game-state writes); truthy payload opens the Celestial
+ *    Resilience modal with the FULL prop set (prose interpolated from the
+ *    grant's own maxTargets/tempHp data, fix#164) and defers everything
+ *    else. Also pins in-flight double-click behavior (no latch).
  *  - LongRestButton.modalInteractions.test.jsx: everything AFTER the modal
  *    opens (confirm/skip flows, setTempHp per ally, log payloads).
  *  - LongRestButton.rendering.test.jsx: DOM contract (button text, title,
  *    trance suffix).
  */
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LongRestButton from './LongRestButton.jsx';
 
@@ -88,13 +90,17 @@ describe('LongRestButton - click dispatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     captured.props = null;
-    // Deterministic default: a plain long rest with no celestial allies.
+    // Re-baseline every test: a plain long rest with no celestial allies.
     restRules.applyLongRest.mockResolvedValue({});
   });
 
+  // Two falsy arms kill the whole guard-mutant family for
+  // `result?.celestialResilienceAllies`: the null-valued arm fails
+  // `!== undefined`-style and `in`-style checks; the missing-key arm fails
+  // `!== null`-style and `in`-style checks. A third undefined-valued arm
+  // would kill no mutant these two do not already kill (same-branch trim).
   describe.each([
     ['null', { celestialResilienceAllies: null }],
-    ['undefined', { celestialResilienceAllies: undefined }],
     ['a missing key', {}],
   ])('when applyLongRest resolves with %s celestial ally payload', (_label, result) => {
     it('completes the rest directly without a modal or game-state writes', async () => {
@@ -107,19 +113,25 @@ describe('LongRestButton - click dispatch', () => {
         fireEvent.click(screen.getByRole('button'));
       });
 
-      expect(restRules.applyLongRest).toHaveBeenCalledWith(basePlayerStats, mockCampaignName);
-      // Exactly one invocation, with zero arguments.
-      await waitFor(() => {
-        expect(onLongRest.mock.calls).toEqual([[]]);
-      });
+      // Exactly one dispatch, exact args, same stats instance by reference.
+      expect(restRules.applyLongRest.mock.calls).toEqual([[basePlayerStats, mockCampaignName]]);
+      expect(restRules.applyLongRest.mock.calls[0][0]).toBe(basePlayerStats);
+      // Async act has already flushed the handler's continuation: the rest
+      // completed exactly once, with zero arguments (no waitFor needed).
+      expect(onLongRest.mock.calls).toEqual([[]]);
       expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
+      // Zero-silence negative legs: nothing was applied behind the scenes.
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
   });
 
+  // Non-default data (maxTargets 3 ≠ the producer's default 5, distinct
+  // self/ally temp HP) so hardcoded prose or swapped values cannot pass:
+  // every number in the modal copy must be interpolated from this grant.
   it('opens the Celestial Resilience modal with the full payload and defers the rest', async () => {
-    restRules.applyLongRest.mockResolvedValue({ celestialResilienceAllies: celestialData });
+    const grant = { ...celestialData, maxTargets: 3 };
+    restRules.applyLongRest.mockResolvedValue({ celestialResilienceAllies: grant });
     const onLongRest = vi.fn();
 
     render(<LongRestButton {...makeProps({ onLongRest })} />);
@@ -128,28 +140,31 @@ describe('LongRestButton - click dispatch', () => {
       fireEvent.click(screen.getByRole('button'));
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('creature-selection-modal')).toBeInTheDocument();
-    });
+    await screen.findByTestId('creature-selection-modal');
 
-    // The click handler forwards the rules targets to the modal; the temp
-    // HP values ride along in the note text and are consumed by the
-    // confirm/skip callbacks held on this seam.
-    expect(captured.props).toEqual(expect.objectContaining({
-      targets: celestialData.creatureTargets,
-      maxTargets: celestialData.maxTargets,
+    // Full-shape census of every prop forwarded at the seam — extra or
+    // missing props fail here, not just the ones we happened to list.
+    expect(captured.props).toEqual({
+      title: 'Celestial Resilience',
+      icon: 'fa-shield-heart',
+      targets: grant.creatureTargets,
+      maxTargets: 3,
+      description: 'Choose up to 3 allies to gain temporary hit points from your Celestial Resilience.',
+      note: 'You gain 5 temporary hit points. Each selected ally gains 10 temporary hit points.',
+      confirmLabel: 'Grant Resilience',
+      confirmIcon: 'fa-shield-heart',
       onConfirm: expect.any(Function),
       onSkip: expect.any(Function),
-    }));
-    expect(captured.props.note).toMatch(/\b5 temporary hit points/);
-    expect(captured.props.note).toMatch(/\b10 temporary hit points/);
+    });
+    // The rules' target array rides through by reference — not cloned/rebuilt.
+    expect(captured.props.targets).toBe(celestialData.creatureTargets);
 
-    // Coupling pin (fix#158/fix#164 law): the number in the description is
-    // the SAME celestialResilienceModal.maxTargets forwarded to the picker
-    // at LongRestButton.jsx:67/:68 — never a retyped literal. The default 5
-    // is producer-owned: celestialResilienceHandler.js:70 (auto.maxAllies
-    // || 5) mapped through restRules-longRest.js:392 into this payload.
-    expect(captured.props.description).toBe(`Choose up to ${celestialData.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`);
+    // Coupling pin (fix#164 law, re-verified against current bytes): the
+    // count in the description is interpolated from the SAME maxTargets
+    // forwarded to the picker (LongRestButton.jsx) — never a retyped "5"
+    // literal. The default 5 is producer-owned:
+    // celestialResilienceHandler.js `auto.maxAllies || 5` mapped through
+    // restRules-longRest.js into this payload.
     expect(Number(captured.props.description.match(/up to (\d+)/)[1])).toBe(captured.props.maxTargets);
 
     // The rest is deferred until the player decides — nothing applied yet
@@ -159,25 +174,41 @@ describe('LongRestButton - click dispatch', () => {
     expect(logService.addEntry).not.toHaveBeenCalled();
   });
 
-  // Drift arms (fix#164 recipe): non-default caps from the rest grant must
-  // flow into the copy verbatim; 5 is the producer-default intact arm.
-  it.each([3, 5])(
-    'description interpolates maxTargets=%i from the grant, matching the picker cap it advertises',
-    async (maxTargets) => {
-      restRules.applyLongRest.mockResolvedValue({ celestialResilienceAllies: { ...celestialData, maxTargets } });
+  // Double-fire detector: the button has NO in-flight latch, so a rapid
+  // second click dispatches a SECOND full rest — double resource refund is
+  // the current honest behavior and is pinned here. If source ever adds a
+  // guard, this pin must flip to a single dispatch.
+  it('dispatches a second rest when clicked again while the first is in flight (no latch)', async () => {
+    let resolveFirst;
+    let resolveSecond;
+    restRules.applyLongRest
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+    const onLongRest = vi.fn();
 
-      render(<LongRestButton {...makeProps({ onLongRest: vi.fn() })} />);
+    render(<LongRestButton {...makeProps({ onLongRest })} />);
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button'));
-      });
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+    fireEvent.click(button);
 
-      await screen.findByTestId('creature-selection-modal');
+    // Both clicks passed through with full args while nothing had resolved.
+    expect(restRules.applyLongRest.mock.calls).toEqual([
+      [basePlayerStats, mockCampaignName],
+      [basePlayerStats, mockCampaignName],
+    ]);
+    expect(onLongRest).not.toHaveBeenCalled();
 
-      // Copy number extracted from prose EQUALS the value passed to the picker.
-      expect(captured.props.maxTargets).toBe(maxTargets);
-      expect(captured.props.description).toBe(`Choose up to ${maxTargets} allies to gain temporary hit points from your Celestial Resilience.`);
-      expect(Number(captured.props.description.match(/up to (\d+)/)[1])).toBe(captured.props.maxTargets);
-    }
-  );
+    await act(async () => {
+      resolveFirst({});
+      resolveSecond({});
+    });
+
+    // Both rests completed: two zero-arg onLongRest calls, and still no
+    // modal and no game-state writes beyond the double completion.
+    expect(onLongRest.mock.calls).toEqual([[], []]);
+    expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
+    expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
+  });
 });

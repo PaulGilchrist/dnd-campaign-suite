@@ -1,24 +1,34 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
-// BA-001 save lane: Dodge's "advantage on Dexterity saving throws" is a
-// 2014-only clause. Under the 2024 ruleset Dodge grants attack-roll
-// disadvantage against the dodger only — a 2024 character (e.g. LFH,
-// rules='2024') taking a DEX save while dodging must roll plain (one d20,
-// no Advantage marker), and 5e targets keep the clause byte-identical.
+// @maintained-by-ai 2026-11-27 — mock keys mirrored to #1935-#1939, phantoms purged, exact-string breakdown pins, findByTestId/exact-copy flushes
+// BA-001 save lane: the 2024-ruleset Dodge gate face at the save-prompt seam
+// (is2024 clause, SavePromptModal.jsx:131). "Advantage on Dexterity saving
+// throws" is a 2014-only Dodge clause — under 2024 Dodge grants attack-roll
+// disadvantage only, so a dodging character whose roster entry carries
+// rules:'2024' must roll a plain single d20. The rules field is read via
+// strict c.name === current.targetName equality and defaults '5e', so every
+// fixture here is a REAL character object (bare strings take wrong lookup
+// branches) and the default legs cover a rules-less entry AND an
+// absent-from-roster target (the ?. leg). The gate must be narrow: an
+// explicit prompt advantage flag survives untouched on a 2024 dodger.
 //
-// Each test walks the full user journey — prompt → Roll Save → result panel
-// → Done — and pins every observable outcome (dice count, kept die, total,
-// UI mode label, submitted payload) so a broken gate fails on the behavior
-// users see, not just a mock call count.
+// Each leg walks prompt → Roll Save → result panel and exact-pins the full
+// .sp-result-breakdown string AND the visible total (#1936 idiom), with dice
+// rigged so a broken gate changes on-screen bytes, not just a die count.
+// The Done-payload pins below are gate projections only (mode/roll/total on
+// THIS fixture) — the submit-flow contract itself is owned by .actions.
 //
-// Covered ELSEWHERE — do not re-add here:
-// - 5e Dodge DEX vs CON normal lane .... bonuses.test.jsx
-// - Hold-until-Done submit flow ........ actions.test.jsx
-// - Zealous Presence blanket advantage . zealous-presence.test.jsx
-// - Conditional frightened/charmed ..... cla034-conditional-save-advantage.test.jsx
+// Owned ELSEWHERE — do not re-add here:
+// - Done payloads, hold-until-Done, rolled Next Save advancement, Apply(0)
+//   presentation gate ................................. .actions.test.jsx (#1935)
+// - 5e Dodge DEX-vs-CON arithmetic, CLA-324
+//   against_spell + lastAttack ........................ .bonuses.test.jsx (#1936)
+// - saveConditions / mod.condition legs ............... .cla034-conditional-save-advantage.test.jsx (#1937)
+// - CLA-211 evasion trigger gate/stamp/skip/Apply ..... .cla211-leading-evasion.test.jsx (#1938)
+// - chooser row tick UX, overlay inertness, confirm-closes-leaves-PENDING,
+//   clear/dismiss advancement ......................... .coverage.test.jsx (#1939)
+// - Zealous Presence blanket advantage ................ zealous-presence.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import SavePromptModal from './SavePromptModal.jsx';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
@@ -40,7 +50,10 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
+// sendSavePrompt is a real graph import (savePrompt.js → this module); it must
+// exist on the mock even though this lane never sends (#1935-#1939 pattern).
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
+  sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
   clearSavePrompt: vi.fn(),
 }));
@@ -54,13 +67,16 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }));
 
+// Graph keys mirrored to the five sibling lanes (#1935-#1939): no
+// useSyncedState/listeners phantoms — this modal never imports them.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => null),
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
+  deleteRuntimeKey: vi.fn(),
+  setRuntimeObject: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -138,7 +154,7 @@ function makeTargetChar(rules) {
 }
 
 /** Open the prompt, roll, wait for the result panel, return its visible text. */
-async function rollWhileDodging(characters, triggerTestId = 'subscriber-trigger-dex') {
+async function rollWhileDodging(characters, expectedCaption, triggerTestId = 'subscriber-trigger-dex') {
   render(
     <SavePromptModal
       campaignName="test-campaign"
@@ -147,13 +163,11 @@ async function rollWhileDodging(characters, triggerTestId = 'subscriber-trigger-
     />
   );
   fireEvent.click(screen.getByTestId(triggerTestId));
-  await waitFor(() => {
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-  });
+  await screen.findByTestId('active-save-prompt');
   fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
-  await waitFor(() => {
-    expect(document.querySelector('.sp-result-total strong')).toBeTruthy();
-  });
+  // The caption and the total/breakdown land in the SAME result render —
+  // flushing on the exact copy (bonuses-lane idiom) needs no DOM polling.
+  await screen.findByText(expectedCaption);
   return {
     total: document.querySelector('.sp-result-total strong').textContent,
     breakdown: document.querySelector('.sp-result-breakdown').textContent,
@@ -177,15 +191,16 @@ describe('BA-001 SavePromptModal — Dodge save-lane ruleset gate', () => {
   it('rolls a plain single d20 for a dodging 2024 target and submits it unmodified', async () => {
     rollD20.mockReturnValue(12);
 
-    const { total, breakdown } = await rollWhileDodging([makeTargetChar('2024')]);
+    const { total, breakdown } = await rollWhileDodging([makeTargetChar('2024')], 'SAVE FAILURE');
 
     expect(rollD20).toHaveBeenCalledTimes(1);
     expect(total).toBe('15'); // 12 + 3 — dodge bought no second die
-    expect(breakdown).toContain('d20 (12)');
-    expect(breakdown).not.toMatch(/Advantage|Disadvantage/);
-    expect(screen.queryByText(/Advantage/)).not.toBeInTheDocument();
-    expect(screen.getByText('SAVE FAILURE')).toBeInTheDocument(); // 15 < DC 17
+    expect(breakdown).toBe('d20 (12) + 3');
+    expect(screen.queryByText(/Advantage|Disadvantage/)).not.toBeInTheDocument();
+    // 15 < DC 17 (flushed by the caption above).
 
+    // Gate projection at the submit seam: mode stays 'normal' — the payload
+    // SHAPE/flow contract is .actions' face, not re-tested here.
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
       mode: 'normal',
@@ -200,13 +215,11 @@ describe('BA-001 SavePromptModal — Dodge save-lane ruleset gate', () => {
     // the die count: normal mode would keep the first die (12 → fail).
     rollD20.mockReturnValueOnce(12).mockReturnValueOnce(17);
 
-    const { total, breakdown } = await rollWhileDodging([makeTargetChar('5e')]);
+    const { total, breakdown } = await rollWhileDodging([makeTargetChar('5e')], 'SAVE SUCCESS');
 
     expect(rollD20).toHaveBeenCalledTimes(2);
     expect(total).toBe('20'); // max(12, 17) + 3
-    expect(breakdown).toContain('d20 (12, 17)');
-    expect(breakdown).toMatch(/\(Advantage\)$/);
-    expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
+    expect(breakdown).toBe('d20 (12, 17) + 3 (Advantage)');
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
@@ -219,30 +232,29 @@ describe('BA-001 SavePromptModal — Dodge save-lane ruleset gate', () => {
   });
 
   it.each`
-    case                                     | characters                                    | expectedTotal
-    ${'target with no rules field'}        | ${[makeTargetChar(undefined)]}            | ${'20'}
-    ${'target absent from the roster'}     | ${[]}                                       | ${'17'}
-  `('defaults $case to the 2014 clause — dodging still rolls advantage', async ({ characters, expectedTotal }) => {
+    case                                   | characters                         | expectedTotal | expectedBreakdown
+    ${'target with no rules field'}        | ${[makeTargetChar(undefined)]}     | ${'20'}       | ${'d20 (12, 17) + 3 (Advantage)'}
+    ${'target absent from the roster'}     | ${[]}                              | ${'17'}       | ${'d20 (12, 17) + 0 (Advantage)'}
+  `('defaults $case to the 2014 clause — dodging still rolls advantage', async ({ characters, expectedTotal, expectedBreakdown }) => {
     rollD20.mockReturnValueOnce(12).mockReturnValueOnce(17);
 
-    const { total, breakdown } = await rollWhileDodging(characters);
+    const { total, breakdown } = await rollWhileDodging(characters, 'SAVE SUCCESS');
 
     expect(rollD20).toHaveBeenCalledTimes(2);
     expect(total).toBe(expectedTotal); // absent roster member has no save bonus (0)
-    expect(breakdown).toMatch(/\(Advantage\)$/);
-    expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
+    expect(breakdown).toBe(expectedBreakdown);
   });
 
   it('does not strip an explicit prompt advantage from a dodging 2024 target', async () => {
     rollD20.mockReturnValueOnce(12).mockReturnValueOnce(17);
 
-    const { total, breakdown } = await rollWhileDodging([makeTargetChar('2024')], 'subscriber-trigger-dex-adv');
+    const { total, breakdown } = await rollWhileDodging(
+      [makeTargetChar('2024')], 'SAVE SUCCESS', 'subscriber-trigger-dex-adv');
 
     // The gate must deny DODGE's bonus only — the prompt's own advantage
     // (advantage: true) still rolls 2d20, keeps the high die, and is labeled.
     expect(rollD20).toHaveBeenCalledTimes(2);
     expect(total).toBe('20');
-    expect(breakdown).toMatch(/\(Advantage\)$/);
-    expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
+    expect(breakdown).toBe('d20 (12, 17) + 3 (Advantage)');
   });
 });

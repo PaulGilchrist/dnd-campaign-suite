@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardStepMagicItems from './WizardStepMagicItems.jsx';
@@ -362,7 +362,8 @@ describe('WizardStepMagicItems', () => {
         .getByText(clickedName)
         .closest('.magic-item')
         .querySelector('.list-item-checkbox-trigger');
-      expect(checkbox.className).toContain(selected.includes(clickedName) ? 'checked' : 'list-item-checkbox');
+      // 'list-item-checkbox' is a static class, so lock the state via 'checked'.
+      expect(checkbox.classList.contains('checked')).toBe(selected.includes(clickedName));
 
       fireEvent.click(checkbox);
       expect(props.onArrayFieldChange).toHaveBeenCalledTimes(1);
@@ -428,7 +429,10 @@ describe('WizardStepMagicItems', () => {
       expect(props.onArrayFieldChange).not.toHaveBeenCalled();
     });
 
-    it('renders a stored custom object as a selected row with badge and Edit, and unticking confirms before removing it', () => {
+    // The untick→confirm→remove lane is locked end-to-end by the sibling
+    // WizardStepMagicItems.custom-untick-guard.test.jsx (arm/cancel/re-tick/
+    // confirm + catalog instant-untick); this row only locks render shape.
+    it('renders a stored custom object as a selected row with custom and attunement badges', () => {
       const props = magicItemsProps({ selected: [STORMCALLER] });
       render(<WizardStepMagicItems {...props} />);
 
@@ -436,11 +440,7 @@ describe('WizardStepMagicItems', () => {
       expect(row.className).toContain('selected');
       expect(within(row).getByText('custom')).toBeInTheDocument();
       expect(within(row).getByText('requires attunement')).toBeInTheDocument();
-
-      // QA improve 2026-11-08 EL: untick arms the DeleteConfirmModal first.
-      fireEvent.click(row.querySelector('.list-item-checkbox-trigger'));
-      fireEvent.click(screen.getByRole('button', { name: 'Yes, Remove' }));
-      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
+      expect(props.onArrayFieldChange).not.toHaveBeenCalled();
     });
 
     // QA improve 2026-11-08: expectation-setting fieldnote + discoverable
@@ -457,48 +457,26 @@ describe('WizardStepMagicItems', () => {
       expect(within(summary).getByRole('button', { name: /Add Custom Magic Item/ })).toBeInTheDocument();
     });
 
-    // QA improve 2026-11-08 EL split: both row kinds still advertise
-    // "Un-tick to remove"; only catalog rows deselect instantly (custom rows
-    // arm the confirm modal — covered in custom-untick-guard).
-    it('selected catalog row carries an "Un-tick to remove" title and unticking deselects it instantly', () => {
-      const props = magicItemsProps({ selected: ['Bag of Holding'], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
-      render(<WizardStepMagicItems {...props} />);
-
-      const checkbox = screen
-        .getByText('Bag of Holding')
-        .closest('.magic-item')
-        .querySelector('.list-item-checkbox-trigger');
-      expect(checkbox).toHaveAttribute('title', 'Un-tick to remove Bag of Holding');
-
-      fireEvent.click(checkbox);
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
-    });
-
-    it('selected custom row advertises "Un-tick to remove" but arms the confirm modal instead of deselecting', () => {
-      const props = magicItemsProps({ selected: [STORMCALLER], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
-      render(<WizardStepMagicItems {...props} />);
-
-      const checkbox = screen
-        .getByText('Stormcaller Blade')
-        .closest('.magic-item')
-        .querySelector('.list-item-checkbox-trigger');
-      expect(checkbox).toHaveAttribute('title', 'Un-tick to remove Stormcaller Blade');
-
-      fireEvent.click(checkbox);
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(props.onArrayFieldChange).not.toHaveBeenCalled();
-    });
-
-    it('unselected rows advertise selection via the checkbox title', () => {
+    // Click behavior is locked elsewhere (catalog instant deselect in the
+    // `selection` describe; custom confirm modal in the sibling
+    // custom-untick-guard file) — this test only locks the checkbox-title
+    // affordance copy for each row kind (QA improve 2026-11-08 EL).
+    it('advertises the checkbox affordance via title on unselected, selected catalog, and selected custom rows', () => {
       render(
         <WizardStepMagicItems
-          {...magicItemsProps({ selected: [], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] })}
+          {...magicItemsProps({ selected: ['Bag of Holding', STORMCALLER] })}
         />
       );
-      expect(
-        screen.getByText('Bag of Holding').closest('.magic-item').querySelector('.list-item-checkbox-trigger')
-      ).toHaveAttribute('title', 'Select Bag of Holding');
+      const titleOf = (name) =>
+        screen
+          .getByText(name)
+          .closest('.magic-item')
+          .querySelector('.list-item-checkbox-trigger')
+          .getAttribute('title');
+
+      expect(titleOf('Bag of Holding')).toBe('Un-tick to remove Bag of Holding');
+      expect(titleOf('Stormcaller Blade')).toBe('Un-tick to remove Stormcaller Blade');
+      expect(titleOf('Amulet of Health')).toBe('Select Amulet of Health');
     });
 
     it('Edit reopens the modal prefilled and saving replaces the entry in place', () => {
@@ -519,7 +497,7 @@ describe('WizardStepMagicItems', () => {
     });
 
     it('counts custom attunement items toward the attunement-limit warning', () => {
-      render(
+      const { unmount } = render(
         <WizardStepMagicItems
           {...magicItemsProps({
             selected: [...names(FOUR_ATTUNED.slice(0, 2)), STORMCALLER],
@@ -530,6 +508,7 @@ describe('WizardStepMagicItems', () => {
       // 3 attuned total — under the base limit of 3, silent.
       expect(screen.queryByText(/requiring attunement, but/)).not.toBeInTheDocument();
 
+      unmount();
       render(
         <WizardStepMagicItems
           {...magicItemsProps({

@@ -1,32 +1,57 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
-/**
- * SavePromptModal — bane attribution & lastAttack/combatSummary persistence.
- *
- * Owned HERE:
- * - Attacker-side bane_penalty die attribution (the "+N [Bane]" token the
- *   target-side lane in bonuses.test.jsx never produces), including proving
- *   attribution by distinct effect-die values in production roll order.
- * - Quick-roll lastAttack persistence (storage.set('lastAttack', …)) with the
- *   full arithmetic payload, MA-0079 saveConditions stamping from the prompt
- *   payload, and the negative path: no combatSummary → nothing persisted.
- * - Reroll submit → combatSummary.lastAttack restamped via
- *   storage.set('combatSummary', …) while non-dice fields merge in.
- *
- * Covered ELSEWHERE — do not re-add here:
- * - Target bane/bless dice, Warding Bond, aura, stacking . bonuses.test.jsx
- * - 2024 Dodge ruleset gate ................ dodge-2024.test.jsx
- * - Beacon of Hope / cosmic omen / evasion  evasion-effects.test.jsx
- * - Zealous Presence ........................ zealous-presence.test.jsx
- * - Holy Aura / Holy Nimbus ............... holy-aura.test.jsx
- * - Conditional frightened/charmed ........ cla034-conditional-save-advantage.test.jsx
- * - Prompt copy (half/none/full notes) .... rendering.test.jsx / infernal-wound.test.jsx
- * - Reroll submit HP restore & wound close  infernal-wound.test.jsx
- * - Reroll availability/resources ......... rerolls.test.jsx, savePromptHandlers.*.test.js
- *
- * History: two near-duplicate quick-roll storage tests were previously
- * consolidated into one (identical storage.set('lastAttack') assertion shape).
- */
+// @maintained-by-ai 2026-11-27
+// SavePromptModal — special save-handler faces: attacker-side bane token and
+// lastAttack/combatSummary persistence at the prompt seam.
+//
+// Owned HERE (rolling #1947 handoff, verbatim: "lastAttack persistence on
+// roll + attacker-side bane +N [Bane] token (delegated by bonuses #1936)";
+// each leg exact-pins the visible total AND the full .sp-result-breakdown
+// string, and every persistence leg exact-pins the FULL written record shape
+// (timestamp: expect.any(Number)), not an objectContaining subset — #1936/
+// #1946 idiom):
+// - Attacker-side bane_penalty die attribution — the '+N [Bane]' token the
+//   target-side lane in bonuses.test.jsx never produces. Attribution proven
+//   by distinct effect-die values in production roll order (target bane,
+//   attacker bane, bless), and by an attacker-only leg proving the
+//   attacker die rolls even when the target itself is not baned.
+//   MUTANT-DISCRIMINATING: target-side token bytes are '-N [Bane]', the
+//   attacker's are '+N [Bane]' — a sign/attribution swap changes both the
+//   bytes and the total.
+// - Quick-roll lastAttack persistence: exact 3-arg storage.set('lastAttack',
+//   <full record>, CAMPAIGN) write pin (bonus = FULL folded bonus, d20 +
+//   bonus === total), including the MA-0079 leg (saveConditions stamped from
+//   the prompt payload, AoE Repulsion-Breath shape) and the negative path:
+//   no combatSummary → nothing persisted (the save itself still resolves).
+// - Reroll submit → combatSummary.lastAttack restamp: the reroll FEATURE
+//   lanes (buttons, tokens, spend writes, availability) belong to #1946/
+//   #1943; HERE the Fanatical Focus button is only the vehicle that reaches
+//   createSubmitSaveResult → applyRerollToCombatSummary. Pins the exact
+//   merged record (dice fields restamped, prior non-dice fields — attacker
+//   name, rollType, rawDamage — merged untouched, saveConditions reset to
+//   []), times(1) on the 'combatSummary' key write. The HP-restore side
+//   effect this submit also fires is #1944's seam, never pinned here.
+//
+// Covered ELSEWHERE — do not re-add here:
+// - Done payloads, hold-until-Done, rolled Next Save advancement ......... .actions.test.jsx (#1935)
+// - Target bane/bless dice stacking, Warding Bond, CLA-324 lastAttack
+//   READ (against_spell), aura fold display ......................... .bonuses.test.jsx (#1936)
+// - saveConditions/mod.condition SAVE-ADVANTAGE legs ..................... .cla034-conditional-save-advantage.test.jsx (#1937)
+// - CLA-211 evasion trigger gate/stamp/skip/Apply ........................ .cla211-leading-evasion.test.jsx (#1938)
+// - chooser row tick UX, overlay inertness, clear/dismiss advancement .... .coverage.test.jsx (#1939)
+// - 2024 Dodge ruleset gate (BA-001) ...................................... .dodge-2024.test.jsx (#1940)
+// - Beacon WIS gate, Cosmic Omen consume, charmed/Otto DEX disadvantage .. .evasion-effects.test.jsx (#1941)
+// - holy_aura te grant + ALL-saves contrast ............................... .holy-aura.test.jsx (#1942)
+// - Indomitable availability matrix / cap ladder, rerollUsedForSave gate .. .indomitable.test.jsx (#1943)
+// - MA-0367 'full'-row copy + reroll-cancel/HP-restore seam .............. .infernal-wound.test.jsx (#1944)
+// - half/none damage-note copy ............................................ .rendering.test.jsx (#1945)
+// - Fanatical Focus / Disciplined Survivor / Living Legend / Guarded Mind
+//   buttons, tokens and spend writes ...................................... .rerolls.test.jsx (#1946)
+// - DC-boundary/min-keeping/both-flags modal face, plain-roll die count,
+//   bonus-source routing (char-over-creature precedence) .................. .rolling.test.jsx (#1947)
+// - Evasion NOTE display branches .......................... .evasion-note-selection.test.jsx
+// - Zealous Presence creature-lookup faces ................... .zealous-presence.test.jsx (queued NEXT)
+//
+// ARITY TRUTH (#1878): getRuntimeValue is a 2-param API — 3rd campaignName
+// args on reads in the module under test are silently ignored; cosmetic.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -49,12 +74,20 @@ vi.mock('../../services/ui/utils.js', () => ({
   },
 }));
 
+// Bare factory (NOT an importOriginal spread, per the #1946/#1947 documented
+// contrast): the only expression evaluator this lane reaches is the
+// bane/bless rollEffectDie lane, and rollExpression itself is the mock — no
+// fixture here needs real parse/roll behavior.
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
   rollExpression: vi.fn(),
 }));
 
+// sendSavePrompt is a real graph import (savePrompt.js → this module); it
+// must exist on the mock or its access throws, even though this lane never
+// sends (#1935-#1947 pattern).
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
+  sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
   clearSavePrompt: vi.fn(),
 }));
@@ -67,13 +100,18 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }));
 
+// Graph keys mirrored to the sibling lanes (#1935-#1947): no
+// useSyncedState/listeners phantoms — this modal never imports them.
+// deleteRuntimeKey/setRuntimeObject/getAllStoreKeys back real graph imports
+// (savePrompt.js, applyDamage.js, infernalWoundService.js store probes).
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => null),
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
+  deleteRuntimeKey: vi.fn(),
+  setRuntimeObject: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -136,11 +174,11 @@ function renderModal(characters = []) {
   );
 }
 
+/** Feed a prompt through the real handleEvent; flush on the ACTIVE-prompt
+ *  testid (never a caption already on screen, #1943-#1947 idiom). */
 async function triggerPrompt(testId = 'subscriber-trigger') {
   fireEvent.click(screen.getByTestId(testId));
-  await waitFor(() => {
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-  });
+  await screen.findByTestId('active-save-prompt');
 }
 
 /** Click Roll Save, wait for the result panel, return its visible totals. */
@@ -162,10 +200,15 @@ function mockCampaignTargetEffects(effects) {
   );
 }
 
-/** The lastAttack payload persisted under the given storage key, or undefined. */
+/** The payload persisted under the given storage key, or undefined. */
 function persisted(key) {
   const call = vi.mocked(storage.set).mock.calls.find(([k]) => k === key);
   return call?.[1];
+}
+
+/** How many storage.set writes went to the given key. */
+function writeCount(key) {
+  return vi.mocked(storage.set).mock.calls.filter(([k]) => k === key).length;
 }
 
 describe('SavePromptModal — Special Handlers', () => {
@@ -200,11 +243,11 @@ describe('SavePromptModal — Special Handlers', () => {
     const { total, breakdown } = await rollSave();
 
     // 15 (d20) + 3 (ability) - 2 (target bane) + 4 (attacker bane) + 3 (bless)
+    // = 23. Full-string pin: an order swap would read '-4 [Bane] +2 [Bane]'
+    // and a sign swap would total 17 — both change bytes here.
     expect(rollExpression).toHaveBeenCalledTimes(3);
+    expect(breakdown).toBe('d20 (15) + 8 -2 [Bane] +4 [Bane] +3 [Bless]');
     expect(total).toBe('23');
-    expect(breakdown).toContain('-2 [Bane]');
-    expect(breakdown).toContain('+4 [Bane]');
-    expect(breakdown).toContain('+3 [Bless]');
     expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
   });
 
@@ -226,25 +269,39 @@ describe('SavePromptModal — Special Handlers', () => {
 
   // ── Quick-roll lastAttack persistence ──
 
-  it('stores the full lastAttack payload when rolling a save with combatSummary present', async () => {
+  it('stores the full lastAttack record when rolling a save with combatSummary present', async () => {
     renderModal([createCharacter(TARGET)]);
     await triggerPrompt();
     const { total } = await rollSave();
 
     expect(total).toBe('18');
-    expect(storage.set).toHaveBeenCalledWith('lastAttack', expect.objectContaining({
-      rollType: 'save',
-      // Prompt carries no attackerName — the target stands in for itself.
+    // Exact 3-arg write pin: key, FULL canonical record, campaign. The
+    // prompt carries no attackerName — the target stands in for itself.
+    // Full-shape (not subset) pin: d20 + bonus === total, and the damage
+    // block stays zeroed for a damage-less prompt; no secondary keys leak in.
+    expect(storage.set).toHaveBeenCalledTimes(1);
+    expect(storage.set).toHaveBeenCalledWith('lastAttack', {
       attackerName: TARGET,
       targetName: TARGET,
       d20: 15,
+      d20Rolls: [15, 15],
       bonus: 3,
       total: 18,
+      rollType: 'save',
       saveType: 'con',
       saveDc: 12,
       saveResult: 'success',
       saveConditions: [],
-    }), CAMPAIGN);
+      damageFormula: null,
+      attackName: null,
+      damageType: null,
+      rawDamage: 0,
+      primaryDamage: 0,
+      primaryDamageType: null,
+      actualDamage: 0,
+      damageApplied: false,
+      timestamp: expect.any(Number),
+    }, CAMPAIGN);
   });
 
   // MA-0079: quick-roll lastAttack keeps the saveConditions carried on the
@@ -256,15 +313,32 @@ describe('SavePromptModal — Special Handlers', () => {
     await triggerPrompt('subscriber-trigger-saveconditions');
     const { total } = await rollSave();
 
-    // 11 + 3 (ability) = 14 < DC 19 — failed save, prone still recorded.
+    // 11 + 3 (ability) = 14 < DC 19 — failed save, prone still recorded,
+    // and the source row lands in attackName.
     expect(total).toBe('14');
-    expect(storage.set).toHaveBeenCalledWith('lastAttack', expect.objectContaining({
+    expect(storage.set).toHaveBeenCalledTimes(1);
+    expect(storage.set).toHaveBeenCalledWith('lastAttack', {
+      attackerName: 'testTarget5',
       targetName: 'testTarget5',
+      d20: 11,
+      d20Rolls: [11, 11],
+      bonus: 3,
+      total: 14,
+      rollType: 'save',
       saveType: 'str',
       saveDc: 19,
       saveResult: 'failure',
       saveConditions: ['prone'],
-    }), CAMPAIGN);
+      damageFormula: null,
+      attackName: 'Adult Bronze Dragon 1',
+      damageType: null,
+      rawDamage: 0,
+      primaryDamage: 0,
+      primaryDamageType: null,
+      actualDamage: 0,
+      damageApplied: false,
+      timestamp: expect.any(Number),
+    }, CAMPAIGN);
   });
 
   it('does not persist lastAttack when no combatSummary exists', async () => {
@@ -281,6 +355,8 @@ describe('SavePromptModal — Special Handlers', () => {
   });
 
   // ── Reroll submit → combatSummary.lastAttack restamp ──
+  // (The reroll feature's button/token/spend faces are #1946's; this leg
+  // pins only the persistence seam the submit reaches.)
 
   it('reroll submit restamps combatSummary.lastAttack with the new dice and result, merging prior fields', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
@@ -308,11 +384,16 @@ describe('SavePromptModal — Special Handlers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reroll Save (+2)' }));
 
     await waitFor(() => {
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.anything(), CAMPAIGN);
+      expect(writeCount('combatSummary')).toBe(1);
     });
     // The rerolled dice and result restamp the existing lastAttack record;
-    // non-dice fields (attackerName/rawDamage) merge in untouched.
-    expect(persisted('combatSummary').lastAttack).toEqual(expect.objectContaining({
+    // non-dice fields (attackerName/rollType/rawDamage) merge in untouched,
+    // saveConditions reset to [], and no secondary-damage block appears.
+    expect(persisted('combatSummary').lastAttack).toEqual({
+      attackerName: 'Fireball',
+      targetName: TARGET,
+      rollType: 'spell-save',
+      rawDamage: 10,
       d20: 15,
       d20Rolls: [15, 15],
       bonus: 5, // 3 (ability) + 2 (Fanatical Focus)
@@ -320,9 +401,9 @@ describe('SavePromptModal — Special Handlers', () => {
       saveType: 'con',
       saveDc: 12,
       saveResult: 'success',
-      attackerName: 'Fireball',
-      targetName: TARGET,
-    }));
+      saveConditions: [],
+      timestamp: expect.any(Number),
+    });
     expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
   });
 });

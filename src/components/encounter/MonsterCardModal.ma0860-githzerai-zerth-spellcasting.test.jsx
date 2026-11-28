@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0860 data lock: Githzerai Zerth Spellcasting row (actions[2]) carried
 // cosmetic spell_save_dc 14 + spellcasting_ability "Wisdom" and the DC only in
 // prose — buildAbilitySaveRollContext (MonsterCardModal.jsx:1329, saveDc =
@@ -13,6 +13,13 @@
 // class by spellcasting.test.jsx:185/:276, spend+refusal class by :282/:508,
 // at-Will advisory class by ma0524:222 — here: BY-name gate map, distinct
 // save_dc/save_type bytes, and the merged PK cast e2e through the fixed seam.
+// Trimmed 2026-11-28: gate-map test merged into the ONE consolidated data-lock
+// it(); spellcasting_ability echo dropped (unread on this lane —
+// isUtilitySpellCastRow short-circuits on the name "Spellcasting"); spell_save_dc
+// pin KEPT — it is read via isSpellOriginAction (MonsterCardModal.jsx:1653) and
+// backs the e2e's isSpellDamage flag (desc matches /spell attack/i nowhere);
+// post-refusal monsterSpellUses byte re-assert dropped (refusal log + no
+// re-roll + post-spend byte already pin the lane).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -40,42 +47,26 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
   const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
 
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
+    setPopupHtml: vi.fn(),
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    rollAbilityCheck: vi.fn(),
     rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
+    rollSkillCheck: vi.fn(),
+    rollInitiative: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
   }));
 
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
-  };
+  return { default: mockHook, _rollSavingThrow };
 });
 
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -115,15 +106,11 @@ function renderZerth() {
 }
 
 describe('MA-0860 monsters.json data lock: Githzerai Zerth Spellcasting row', () => {
-  it('actions[2] Spellcasting authors the trailing save_dc 14 + save_type Wisdom pair — the seam buildAbilitySaveRollContext:1329 reads', () => {
+  it('actions[2] authors the seam-read bytes: trailing save_dc 14 + save_type Wisdom pair, spell_save_dc (isSpellOriginAction → isSpellDamage), and the 1/Day gate map bound to MARKED names with At-Will ungated', () => {
     expect(zerthRow.name).toBe('Spellcasting');
     expect(zerthRow.save_dc).toBe(14);
     expect(zerthRow.save_type).toBe('Wisdom');
     expect(zerthRow.spell_save_dc).toBe(14);
-    expect(zerthRow.spellcasting_ability).toBe('Wisdom');
-  });
-
-  it('extractSpellcastingSpellUses binds the 1/Day gates to MARKED names; At-Will stays ungated', () => {
     expect(extractSpellcastingSpellUses(zerthRow.description)).toEqual({
       'Phantasmal Killer': 1, 'Plane Shift': 1, 'See Invisibility': 1,
     });
@@ -166,6 +153,5 @@ describe('MA-0860 MonsterCardModal Zerth Spellcasting chips', () => {
     const refusal = refusals().find(e => e.abilityName === 'Phantasmal Killer');
     expect(refusal).toBeTruthy();
     expect(refusal.description).toMatch(/already cast Phantasmal Killer today \(1\/Day\)/);
-    expect(runtime.store['Githzerai Zerth 1.monsterSpellUses']).toEqual({ 'Phantasmal Killer': 1 });
   });
 });

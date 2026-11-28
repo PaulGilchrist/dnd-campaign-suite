@@ -1,5 +1,18 @@
-// @maintained-by-ai 2026-10-17
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @maintained-by-ai 2026-11-27
+//
+// MAIN lane for HandOfHealingModal: result-stage rendering via the NON-picker
+// entry (pending:false), Physician's Touch auto-cure/picker/merge semantics,
+// and the condition audit-row funnel (real logService → fetch stub).
+// Owned elsewhere, never restated here: pending picker flow (zero-silence
+// pre-commit, commit→swap payload render, 'Healing failed to resolve.' error
+// copy) — HandOfHealingModal.cla159.test.jsx; honest `Heal self`/`Cancel`
+// labels + zero-spend dismiss — .picker-dismiss.test.jsx; refusalNote copy
+// face — .refusal-note.test.jsx; role="dialog"/aria-modal/aria-labelledby tier
+// + Done→onClose — .dialog-semantics.test.jsx; actualHeal clamp honesty
+// ('0 HP restored' + 'Already at full HP') — .restored-hp-honesty.test.jsx;
+// mid-dwell echo adoption — the live-*-echo lanes. Healing math/spend
+// semantics live in the healingHandler service lanes.
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HandOfHealingModal from './HandOfHealingModal.jsx';
 
@@ -10,6 +23,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../../services/ui/utils.js', () => ({
+  // Mirrors the real utils.getName (services/ui/utils.js:12): 'Unknown' for
+  // non-strings — the name-match legs depend on this exact coercion.
   default: { getName: vi.fn((n) => (!n || typeof n !== 'string' ? 'Unknown' : n)) },
 }));
 
@@ -20,13 +35,18 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as combatData from '../../../../services/encounters/combatData.js';
 
-// Result-stage props only — the pending picker lane is owned by
-// HandOfHealingModal.cla159.test.jsx.
+// Non-picker entry face only (pending omitted → result stage renders the
+// mount-time props directly). Full-shape matches the real
+// healingHandler.performMonkHeal payload (healingHandler.js:354-362:
+// formula/rolls/bonus/healAmount/actualHeal/targetName/targetCurrentHp/
+// targetMaxHp; the component ignores healAmount by design — the clamped
+// actualHeal is the only number it may show, pinned by restored-hp-honesty).
 const baseProps = {
   healName: 'Monk',
   formula: '1d4 + 2',
   rolls: [3, 1],
   bonus: 2,
+  healAmount: 6,
   actualHeal: 6,
   monkName: 'Monk1',
   targetName: 'Goblin',
@@ -41,142 +61,109 @@ function makeProps(overrides) {
   return { ...baseProps, ...(overrides || {}) };
 }
 
+// Full textContent of the arithmetic line is the ledger the player reads:
+// `{formula}: {dice} {+ bonus} = {actualHeal} HP restored`. Exact strings
+// retire the per-span fragment probes; the spaced-operator law (backlog
+// 2026-11-13 EH — `+ 9` / `- 1`, never fused `+9=`) and the zero-bonus
+// omission are censused here in one place.
+function rollDetailsText() {
+  return document.querySelector('.healing-roll-details').textContent;
+}
+
+function logFetchCalls() {
+  return global.fetch.mock.calls.filter((call) => call[0] === '/api/campaigns/test-campaign/log');
+}
+
 describe('HandOfHealingModal', () => {
   beforeEach(() => {
+    // resetAllMocks restores each vi.fn(impl) factory default AND drops any
+    // test-set mockReturnValue/mockImplementation — every overridable stub is
+    // re-baselined here so no row can leak into the next.
     vi.resetAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    combatData.getCombatSummary.mockReturnValue(null);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({}) });
   });
 
-  describe('result rendering', () => {
-    it('renders the overlay, header with healName and icon, and Done button', () => {
+  describe('result-stage rendering (non-picker entry)', () => {
+    it('renders the shell, heal-name header with icon, honest target HP line, and Done button', () => {
       render(<HandOfHealingModal {...makeProps()} />);
       expect(document.querySelector('.short-rest-overlay')).toBeInTheDocument();
       expect(document.querySelector('.short-rest-modal')).toBeInTheDocument();
-      expect(screen.getByText('Monk')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 3, name: 'Monk' })).toBeInTheDocument();
       expect(document.querySelector('.fa-hand-sparkles')).toBeInTheDocument();
+      // Exact full header text pins the em-dash byte (source :276
+      // `Healing{'\u2014'}`) — no spaces around it.
+      expect(screen.getByRole('heading', { level: 4 }).textContent)
+        .toBe('Healing\u2014Goblin (15 / 20 HP)');
       expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
     });
 
-    it('renders the healing section: target HP, formula, dice, bonus sign, and bold total', () => {
-      render(<HandOfHealingModal {...makeProps({ formula: '2d6 + 3', bonus: 2, actualHeal: 8 })} />);
-      const h4 = screen.getByRole('heading', { level: 4 });
-      expect(h4.textContent).toContain('Healing');
-      expect(h4.textContent).toContain('Goblin');
-      expect(h4.textContent).toContain('15');
-      expect(h4.textContent).toContain('20');
-      expect(h4.textContent).toContain('HP');
-      expect(screen.getByText('2d6 + 3:')).toBeInTheDocument();
-      expect(screen.getByText('3 + 1')).toBeInTheDocument();
-      expect(screen.getByText('+ 2')).toBeInTheDocument();
-      const totalEl = document.querySelector('.healing-total');
-      expect(totalEl.textContent).toContain('=');
-      expect(totalEl.textContent).toContain('HP restored');
-      expect(totalEl.querySelector('strong').textContent).toBe('8');
-    });
-
-    // Cosmetic spacing pin (backlog 2026-11-13 EH): operators carry spaces on
-    // both sides — `+ 9` / `- 1`, never the fused `+9=`/`-1` face. Values and
-    // signs are unchanged.
     it.each([
-      ['positive bonus renders a spaced plus', 2, '+ 2'],
-      ['negative bonus renders a spaced minus with the magnitude', -1, '- 1'],
-    ])('%s', (_label, bonus, expectedText) => {
-      render(<HandOfHealingModal {...makeProps({ bonus })} />);
-      expect(screen.getByText(expectedText)).toBeInTheDocument();
-      expect(document.querySelector('.healing-bonus')).toBeInTheDocument();
+      ['multi-dice with a positive bonus', { formula: '2d6 + 3', rolls: [3, 1], bonus: 2, actualHeal: 8 }, '2d6 + 3: 3 + 1 + 2 = 8 HP restored'],
+      ['full-distinctive single-die line', { formula: '1d12 + 7 + 2', rolls: [10], bonus: 9, actualHeal: 19, targetCurrentHp: 41, targetMaxHp: 60 }, '1d12 + 7 + 2: 10 + 9 = 19 HP restored'],
+      ['negative bonus renders a spaced minus with the magnitude', { bonus: -1, actualHeal: 3 }, '1d4 + 2: 3 + 1 - 1 = 3 HP restored'],
+      ['zero bonus omits the bonus span entirely', { bonus: 0 }, '1d4 + 2: 3 + 1 = 6 HP restored'],
+    ])('%s', (_label, overrides, expectedText) => {
+      render(<HandOfHealingModal {...makeProps(overrides)} />);
+      expect(rollDetailsText()).toBe(expectedText);
+      expect(document.querySelector('.healing-total strong').textContent)
+        .toBe(String(overrides.actualHeal ?? baseProps.actualHeal));
     });
 
-    it('renders the full arithmetic line with consistently spaced operators', () => {
-      render(<HandOfHealingModal {...makeProps({ formula: '1d12 + 7 + 2', rolls: [10], bonus: 9, actualHeal: 19, targetCurrentHp: 41, targetMaxHp: 60 })} />);
-      expect(document.querySelector('.healing-roll-details').textContent)
-        .toBe('1d12 + 7 + 2: 10 + 9 = 19 HP restored');
-    });
-
-    it('omits the bonus span when bonus is zero', () => {
-      render(<HandOfHealingModal {...makeProps({ bonus: 0 })} />);
-      expect(document.querySelector('.healing-bonus')).not.toBeInTheDocument();
-    });
-
-    it.each([
-      ['undefined', undefined],
-      ['null', null],
-      ['empty array', []],
-    ])('renders the modal with an empty dice list when rolls is %s', async (_label, rolls) => {
-      render(<HandOfHealingModal {...makeProps({ rolls })} />);
-      expect(document.querySelector('.short-rest-modal')).toBeInTheDocument();
-      expect(document.querySelector('.healing-dice-rolled').textContent).toBe('');
-      expect(document.querySelector('.healing-total').textContent).toContain('6');
-    });
-
-    it('renders zero heal amount and empty formula without crashing', () => {
-      render(<HandOfHealingModal {...makeProps({ formula: '', actualHeal: 0, rolls: [] })} />);
-      expect(document.querySelector('.healing-total').textContent).toContain('0 HP restored');
-      expect(document.querySelector('.healing-total').textContent).toContain('Already at full HP');
-    });
-
-    it.each([
-      ['Escape key', () => fireEvent.keyDown(document, { key: 'Escape' })],
-      ['Done button', () => fireEvent.click(screen.getByRole('button', { name: /Done/ }))],
-    ])('closes via %s', (_label, action) => {
-      const onClose = vi.fn();
-      render(<HandOfHealingModal {...makeProps({ onClose })} />);
-      action();
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when the overlay background or modal content is clicked', () => {
+    it('closes via Escape, and never via an overlay-background or modal-content click', () => {
       const onClose = vi.fn();
       render(<HandOfHealingModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.short-rest-overlay'));
       fireEvent.click(document.querySelector('.short-rest-modal'));
       expect(onClose).not.toHaveBeenCalled();
       expect(document.querySelector('.short-rest-modal')).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Physicians Touch inactive', () => {
+  describe('Physician\u2019s Touch inactive — full zero-silence', () => {
     it.each([
       ['feature off even with a cureable condition', ['blinded'], false],
       ['no conditions', [], true],
-      ['only blank/whitespace entries', ['', '  '], true],
-      ['only null entries', [null], true],
-      ['only undefined entries', [undefined], true],
-      ['only object entries', [{ name: 'blinded' }], true],
+      ['runtime value is null', null, true],
+      ['only blank/null/undefined/object entries', [null, undefined, '  ', { name: 'blinded' }], true],
       ['runtime value is a non-array string', 'blinded', true],
     ])('cures nothing and renders no section when conditions are %s', (_label, runtimeValue, hasPhysiciansTouch) => {
       useRuntimeState.getRuntimeValue.mockReturnValue(runtimeValue);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch })} />);
-      expect(screen.queryByText(/Physician/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Condition Cleared/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Physician|Condition Cleared|Select one/i)).not.toBeInTheDocument();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
-  describe('Physicians Touch auto-cure (single cureable condition)', () => {
+  describe('Physician\u2019s Touch mount-law auto-cure (single cureable condition)', () => {
     it.each([
       ['lowercase input cures and stores an empty list', 'Blinded', ['blinded'], []],
-      ['UPPERCASE input is matched case-insensitively', 'Blinded', ['BLINDED'], []],
-      ['padded input is trimmed before matching', 'Blinded', ['  Blinded  '], []],
+      ['mixed case and padded input match case-insensitively', 'Blinded', ['  BLINDED  '], []],
       ['preserves unrelated conditions in stored state', 'Blinded', ['frightened', 'Blinded'], ['frightened']],
       ['ignores invalid mixed entries while curing', 'Stunned', ['stunned', null, undefined, '  '], [null, undefined, '  ']],
-    ])('%s', async (_label, canonical, conditions, expectedStored) => {
+    ])('%s', (_label, canonical, conditions, expectedStored) => {
       useRuntimeState.getRuntimeValue.mockReturnValue(conditions);
+      // Auto-cure runs in the mount effect, flushed synchronously by render's
+      // act() — direct assertions, no waitFor.
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
-      await waitFor(() => {
-        expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
-      });
       // Message always shows the canonical condition name from CUREABLE_CONDITIONS.
-      expect(screen.getByText(new RegExp(`${canonical} removed from Goblin \\(Physician`))).toBeInTheDocument();
-      // Exactly once — pins the mount-only auto-cure guard against re-curing.
+      expect(screen.getByText(`${canonical} removed from Goblin (Physician's Touch)`)).toBeInTheDocument();
+      // Exactly once — pins the mount-only auto-cure guard against re-curing,
+      // and the one paired audit POST against double-logging.
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin', 'activeConditions', expectedStored, 'test-campaign'
       );
+      expect(logFetchCalls()).toHaveLength(1);
       expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
     });
   });
 
-  describe('Physicians Touch picker (multiple cureable conditions)', () => {
+  describe('Physician\u2019s Touch picker (multiple cureable conditions)', () => {
     it('lists a button per cureable condition, excludes non-cureable ones, and auto-cures nothing', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([
         'blinded', 'deafened', 'frightened', 'paralyzed', 'poisoned', 'stunned',
@@ -188,18 +175,19 @@ describe('HandOfHealingModal', () => {
       }
       expect(screen.queryByRole('button', { name: /Remove Frightened/ })).not.toBeInTheDocument();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('removes only the picked condition, stores the rest with original casing, and shows the canonical cured message', async () => {
+    it('removes only the picked condition, stores the rest with original casing, and retires the picker', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(['Blinded', 'POISONED']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+      // removeCondition is a synchronous click handler — no waitFor.
       fireEvent.click(screen.getByRole('button', { name: /Remove Poisoned/ }));
-      await waitFor(() => {
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Goblin', 'activeConditions', ['Blinded'], 'test-campaign'
-        );
-        expect(screen.getByText(/Poisoned removed from Goblin \(Physician/)).toBeInTheDocument();
-      });
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin', 'activeConditions', ['Blinded'], 'test-campaign'
+      );
+      expect(screen.getByText(/Poisoned removed from Goblin \(Physician/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Remove Blinded/ })).not.toBeInTheDocument();
       expect(screen.queryByText(/Select one to remove/)).not.toBeInTheDocument();
     });
@@ -217,16 +205,18 @@ describe('HandOfHealingModal', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('deduplicates the same condition across sources into a single auto-cure', async () => {
+    it('deduplicates the same condition across sources into a single auto-cure', () => {
       combatData.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Goblin', conditions: [{ key: 'Blinded' }] }],
       });
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
-      await waitFor(() => {
-        expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
-      });
+      expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
       expect(document.querySelectorAll('.healing-cured-condition')).toHaveLength(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin', 'activeConditions', [], 'test-campaign'
+      );
     });
 
     it.each([
@@ -236,35 +226,33 @@ describe('HandOfHealingModal', () => {
       ['ignores conditions on a differently-named creature',
         [{ name: 'Orc', conditions: [{ key: 'blinded' }] }],
         null],
-    ])('%s', async (_label, creatures, expectedCure) => {
+    ])('%s', (_label, creatures, expectedCure) => {
       combatData.getCombatSummary.mockReturnValue({ creatures });
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
       if (expectedCure) {
-        await waitFor(() => {
-          expect(screen.getByText(expectedCure)).toBeInTheDocument();
-        });
+        expect(screen.getByText(expectedCure)).toBeInTheDocument();
       } else {
         expect(screen.queryByText(/Physician|Condition Cleared|Select one/i)).not.toBeInTheDocument();
         expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
       }
     });
 
+    // One row per malformed-summary branch in getCombatSummaryConditionKeys:
+    // missing board (optional chain), non-array creature.conditions
+    // (Array.isArray guard), and a throwing summary read (catch). The runtime
+    // cure must survive all three.
     it.each([
       ['summary missing creatures entirely', () => ({})],
-      ['creatures is null', () => ({ creatures: null })],
-      ['a creature entry is null', () => ({ creatures: [null] })],
-      ['creature.conditions is null', () => ({ creatures: [{ name: 'Goblin', conditions: null }] })],
-      ['creature.conditions is undefined', () => ({ creatures: [{ name: 'Goblin', conditions: undefined }] })],
       ['creature.conditions is a non-array string', () => ({ creatures: [{ name: 'Goblin', conditions: 'stunned' }] })],
       ['getCombatSummary throws', () => { throw new Error('boom'); }],
-    ])('still auto-cures the runtime condition when %s', async (_label, summary) => {
+    ])('still auto-cures the runtime condition when %s', (_label, summary) => {
       combatData.getCombatSummary.mockImplementation(summary);
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
-      await waitFor(() => {
-        expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
-      });
+      expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin', 'activeConditions', [], 'test-campaign'
       );
@@ -272,14 +260,11 @@ describe('HandOfHealingModal', () => {
   });
 
   describe('condition log entry', () => {
-    it('posts a condition log entry with the display label and complete sourceName label', async () => {
+    it('posts a condition audit row through the real logService funnel with the display label and sourceName', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+      // addEntry fires its fetch synchronously inside the mount effect.
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
-      await waitFor(() => {
-        const logCalls = global.fetch.mock.calls.filter((call) => call[0] === '/api/campaigns/test-campaign/log');
-        expect(logCalls.length).toBeGreaterThan(0);
-      });
-      const [url, init] = global.fetch.mock.calls.find((call) => call[0] === '/api/campaigns/test-campaign/log');
+      const [url, init] = logFetchCalls()[0];
       expect(url).toBe(`/api/campaigns/${encodeURIComponent('test-campaign')}/log`);
       expect(init.method).toBe('POST');
       expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
@@ -298,9 +283,7 @@ describe('HandOfHealingModal', () => {
       global.fetch.mockRejectedValue(new Error('network error'));
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
-      await waitFor(() => {
-        expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
-      });
+      expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
     });
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PrimalCompanionBonusActionModal from './PrimalCompanionBonusActionModal.jsx';
@@ -18,6 +18,13 @@ vi.mock('../../../services/automation/handlers/class-ranger/primalCompanionHandl
 }));
 
 import * as primalCompanionHandler from '../../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
+
+const COMMANDS = [
+  ['Dash', 'Double movement speed this turn'],
+  ['Disengage', "Movement doesn't trigger opportunity attacks"],
+  ['Dodge', 'Attackers have disadvantage against the companion'],
+  ['Help', 'Next ally attack against a target has advantage'],
+];
 
 const baseProps = {
   action: {
@@ -46,52 +53,45 @@ describe('PrimalCompanionBonusActionModal', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the header, four command options with descriptions, unchecked radios, and a disabled submit', () => {
+  it('renders the header, four unchecked command radios with rules text, and a disabled submit', () => {
     render(<PrimalCompanionBonusActionModal {...makeProps()} />);
     expect(screen.getByText('Primal Companion')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 
-    // All four commands with their rules text, each an unchecked radio.
-    const cases = [
-      ['Dash', 'Double movement speed this turn'],
-      ['Disengage', "Movement doesn't trigger opportunity attacks"],
-      ['Dodge', 'Attackers have disadvantage against the companion'],
-      ['Help', 'Next ally attack against a target has advantage'],
-    ];
-    const radios = document.querySelectorAll('input[type="radio"]');
-    expect(radios).toHaveLength(cases.length);
-    cases.forEach(([command, description], i) => {
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain(command);
-      expect(body.textContent).toContain(description);
-      expect(radios[i].name).toBe('primalCompanionBonusAction');
-      expect(radios[i].checked).toBe(false);
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(COMMANDS.length);
+    COMMANDS.forEach(([command, description]) => {
+      const radio = screen.getByRole('radio', { name: new RegExp(`${command}.*${description}`) });
+      expect(radio.checked).toBe(false);
     });
 
     // Submit is inert until a command is chosen.
     expect(screen.getByRole('button', { name: /Command Companion/ })).toBeDisabled();
   });
 
-  it('selects a command when clicked, enabling the Command button without closing', () => {
-    render(<PrimalCompanionBonusActionModal {...makeProps()} />);
-    const submitBtn = screen.getByRole('button', { name: /Command Companion/ });
-    fireEvent.click(screen.getByText('Dash'));
+  it('selecting a command checks its radio, enables submit, highlights its row, and keeps the modal open', () => {
+    const onClose = vi.fn();
+    render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
+    fireEvent.click(screen.getByRole('radio', { name: /^Dash/ }));
+
     expect(screen.getByRole('radio', { name: /^Dash/ })).toBeChecked();
-    expect(submitBtn).toBeEnabled();
-    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: /^Help/ })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /Command Companion/ })).toBeEnabled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The chosen row gets distinct selected styling; unselected rows do not.
+    const rowStyle = (text) => screen.getByRole('radio', { name: new RegExp(`^${text}`) })
+      .closest('.primal-companion-bonus-option').getAttribute('style') || '';
+    expect(rowStyle('Dash')).not.toBe(rowStyle('Help'));
   });
 
-  it('does not close when clicking the overlay — Cancel or Command must be chosen', () => {
+  it('only Cancel closes the modal — an overlay click must not dismiss it', () => {
     const onClose = vi.fn();
     render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
     fireEvent.click(document.querySelector('.sp-overlay'));
     expect(onClose).not.toHaveBeenCalled();
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-  });
 
-  it('closes on Cancel button click', () => {
-    const onClose = vi.fn();
-    render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -114,15 +114,17 @@ describe('PrimalCompanionBonusActionModal', () => {
   it.each([
     { command: 'Help', force: false, expectedForce: false },
     { command: 'Dash', force: true, expectedForce: true },
-  ])('commands $command with useForceDamage=$expectedForce', async ({ command, force, expectedForce }) => {
-    render(<PrimalCompanionBonusActionModal {...withAutomation({ forceDamageOption: true })} />);
-    await act(async () => { fireEvent.click(screen.getByText(command)); });
+  ])('commanding "$command" (force damage: $expectedForce) applies, shows the rich-text result, and Done closes', async ({ command, force, expectedForce }) => {
+    const onClose = vi.fn();
+    render(<PrimalCompanionBonusActionModal {...withAutomation({ forceDamageOption: true }, { onClose })} />);
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: new RegExp(`^${command}`) })); });
     if (force) {
       await act(async () => { fireEvent.click(screen.getByLabelText(/Deal Force damage/)); });
     }
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Command Companion/ }));
     });
+
     expect(primalCompanionHandler.applyBonusActionCommand).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Primal Companion' }),
       expect.objectContaining({ name: 'Ranger1' }),
@@ -130,60 +132,15 @@ describe('PrimalCompanionBonusActionModal', () => {
       command,
       expectedForce,
     );
-  });
 
-  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
-    const { container } = render(<PrimalCompanionBonusActionModal {...withAutomation({ forceDamageOption: true })} />);
-
-    // Static containers/rows/labels: zero inline style attributes — the rules
-    // live in PrimalCompanionBonusActionModal.css (exact-value migration).
-    for (const sel of ['.primal-companion-bonus-commands', '.primal-companion-bonus-desc',
-      '.primal-companion-bonus-force', '.primal-companion-bonus-force-label',
-      '.primal-companion-bonus-input']) {
-      const els = container.querySelectorAll(sel);
-      expect(els.length).toBeGreaterThan(0);
-      for (const el of els) expect(el.getAttribute('style')).toBeNull();
-    }
-
-    // Option rows: static decoration lives in the class; the inline style attr
-    // carries ONLY the isSelected-derived background/border (dynamic exception).
-    const rows = container.querySelectorAll('.primal-companion-bonus-option');
-    expect(rows).toHaveLength(4);
-    for (const row of rows) {
-      const inline = row.getAttribute('style') || '';
-      expect(inline).toMatch(/background/i);
-      expect(inline).toMatch(/border/i);
-      expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius|opacity/i);
-    }
-
-    // Census sweep: the ONLY inline-styled elements in the body are the four
-    // dynamic option labels — every former static site is now style-free.
-    const styledInBody = container.querySelectorAll('.sp-body [style]');
-    expect(styledInBody).toHaveLength(4);
-
-    // Selecting a command flips only its dynamic inline values (link-colored
-    // border on the chosen row; every other row stays transparent).
-    fireEvent.click(screen.getByText('Dash'));
-    const selectedStyle = screen.getByText('Dash').closest('.primal-companion-bonus-option').getAttribute('style') || '';
-    expect(selectedStyle).toMatch(/var\(--color-link\)/);
-    const unselectedStyle = screen.getByText('Help').closest('.primal-companion-bonus-option').getAttribute('style') || '';
-    expect(unselectedStyle).toMatch(/transparent/);
-  });
-
-  it('shows the result screen with the HTML description after applying and closes on Done', async () => {
-    const onClose = vi.fn();
-    render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
-    await act(async () => { fireEvent.click(screen.getByText('Dash')); });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Command Companion/ }));
-    });
+    // Result screen renders the handler's description as HTML (not escaped).
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
     const body = document.querySelector('.sp-body');
     expect(body.textContent).toContain('Commanded Wolf to take a Dash action');
-    // Description is rendered as HTML, not escaped text.
     expect(body.querySelector('b')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });

@@ -1,18 +1,20 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0024 modal lane ONLY. Data locks, clickable/affordance classification,
-// per-monster lair parse/te/condition-extraction census, and resolveLairRow
-// handler routing (incl. every young-*/adult-*/mummy-lord chip press cited
-// here) are owned by src/services/encounters/monsterLairActions.test.js —
-// see its MA-0024 :63-124, MA-0041 :126, MA-1207/:4643, MA-1208/:4720,
-// MA-1209/:4812 (+ press :4852), MA-1747/:4976, MA-1753/:5180 (+ press
-// :5218), MA-1760/:5370, MA-1761/:5462. This file pins ONLY the seams the
-// service lane cannot reach: MonsterLairAction's chip-vs-static render
-// branches (MonsterCardBody.jsx:384-419), the chip→handleLairRow click
-// threading with modal-derived ctx identity (attackerName = creatureName,
-// targetName = attacker.targetName, saveDc/saveType from the row), the
-// advisory ability_use record at the modal seam, and the attackerCannotAct
-// inert-gate on lair chips (MonsterCardBody.jsx:403) — previously unpinned
-// in any test.
+// the whole-DB lair census, resolveLairRow handler routing, and the advisory
+// record's description bytes are owned by
+// src/services/encounters/monsterLairActions.test.js — see its describes
+// "MA-0024 classification contract", "resolveLairRow — one click, one
+// adjudicated effect" (advisory/refusal arms), and "monsters.json lair
+// census — whole-DB tripwires" (references by describe/function, not line
+// numbers — the lane was consolidated and per-ticket locks folded into the
+// census). This file pins ONLY the seams the service lane cannot reach:
+// MonsterLairAction's chip-vs-static render branches and its inert
+// clickable-gate (MonsterCardBody.jsx, function MonsterLairAction), the
+// chip→handleLairRow click threading with modal-derived ctx identity
+// (attackerName = creatureName, targetName = attacker.targetName,
+// saveDc/saveType from the row), the advisory press reaching the REAL
+// (default-deps) addEntry import exactly once with no save prompt, and the
+// attackerCannotAct inert-gate on lair chips.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -137,16 +139,20 @@ describe('MA-0024 MonsterCardModal lair rows — modal seams', () => {
     expect(call[2]).toMatchObject({ attackerName: 'Aboleth 1', targetName: 'TestPC', ...expected });
   });
 
-  it('advisory row press logs ONE ability_use record with GM-enforced initiative-20 note, opens no save prompt', async () => {
+  it('advisory chip press reaches the real addEntry import with the modal campaign, logs ONE ability_use record, opens no save prompt', async () => {
     renderAboleth();
     fireEvent.click(lairLinkWithName('Phantasmal Force'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    // Modal-seam-specific: handleLairRow runs resolveLairRow WITHOUT deps
+    // override, so the record must flow through the module-level addEntry
+    // import carrying the modal's campaignName. Record description bytes
+    // (initiative-20/GM-enforced note, spell name, 24h clause) are locked
+    // by monsterLairActions.test.js "advisory row" — not re-pinned here.
+    expect(addEntry.mock.calls[0][0]).toBe('test-campaign');
     const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
     expect(entries).toHaveLength(1);
     expect(entries[0].abilityName).toBe('Phantasmal Force');
-    expect(entries[0].description).toMatch(/phantasmal force/i);
     expect(entries[0].description).toMatch(/initiative 20/);
-    expect(entries[0].description).toMatch(/GM-enforced/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 

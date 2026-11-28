@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ElementalAttunementModal — ERROR-HANDLING lane.
  *
@@ -6,29 +6,34 @@
  * - .elemental-data.test.jsx  — ELEMENT_DATA/ELEMENT_DESCRIPTIONS as rendered, non-mutation.
  * - .phase-flow.test.jsx      — element→targets→processing→summary transitions, DC math,
  *                                map-overlay happy-path loading, overlay click-to-close guard.
- * - .npc-save.test.jsx        — NPC save resolution math, condition log CONTENT, persistAndNotify
- *                                (NOTE: NPC push math exists but is unreachable — see dead-code flag).
+ * - .npc-save.test.jsx        — NPC save resolution math INCLUDING the Thunder dead-code pin
+ *                                (:212-224: damage routes through the damage branch, no
+ *                                'targetEffects' cell, zero store writes — push silently dropped),
+ *                                condition log CONTENT, persistAndNotify.
  * - .player-save.test.jsx     — save prompts, save-result event handling INCLUDING the player
- *                                addEntry rejection logs (:290-340 there: 'Error logging player
+ *                                addEntry rejection logs ('Error logging player
  *                                save:'/'Error logging player effect:' and pending-prompt removal
  *                                when logging fails) and malformed/unknown-promptId junk events.
  * - .summary.test.jsx         — onClose invocation, expiration log DESCRIPTION text variants.
  * - .deactivation.test.jsx    — handleResultsClose commit payloads, §39 single-clock order,
- *                                double-commit defect pin, inertness.
+ *                                double-commit defect pin, mid-processing unmount inertness.
  * This lane owns ONLY failure behavior: every in-flight addEntry .catch lane the component can
  * actually reach (NPC save / speed reduction / expiration) proves the caught log rejection never
- * strands or rolls back the game-state commit; the unreachable Thunder push lane pinned inert;
- * the loadMapData catch's stranded inert view; and
- * the PINNED unhandled-rejection behavior of the unguarded .then at jsx:482-485 (a future fix
+ * strands or rolls back the game-state commit; the loadMapData catch's stranded inert view; and
+ * the PINNED unhandled-rejection behavior of the unguarded .then at jsx:477-480 (a future fix
  * adding .catch there flips these pins).
  *
- * DELETED (subsumed here): the prior single mega-test "handles logging, map loading, and
+ * DELETED (subsumed elsewhere): the prior single mega-test "handles logging, map loading, and
  * expiration errors without crashing" — its speed-reduction case is subsumed by the parameterised
  * NPC log-rejection lane (Fire arm also covers the previously untested 'Error logging NPC save:'
  * catch), its expiration case by the dedicated expiration lane (now also asserting the commit
  * survives through the LIVE store, which the mega-test never checked), and its map case by the
  * map lane (now pinning the stranded null render + no-retry + zero-partial-writes that the
- * mega-test skipped). All three shared one test, so a mid-test consoleSpy/mock bleed could mask
+ * mega-test skipped). Also DELETED: the Thunder log-rejection arm — under a rejected log Thunder
+ * takes the byte-identical Fire path (elementData.damage → resolveNpcDamageResult → the same
+ * 'Error logging NPC save:' catch), and the Thunder push-drop dead-code pin it also carried
+ * already lives in its strongest form in .npc-save.test.jsx (:212-224, happy-path store
+ * evidence). Two prior lanes shared one test, so a mid-test consoleSpy/mock bleed could mask
  * regressions; each lane now runs with its own fresh mocks and its own rejection guard.
  *
  * Anti-vacuity: live runtime store (writes land, cells inspected directly — a rolled-back or
@@ -37,24 +42,24 @@
  * asserted with its exact full-line prefix AND the exact rejected Error instance (identity, not
  * expect.any); role-scoped queries; no bare setTimeout.
  *
- * FLAG (component, not fixed here):
- * - ElementalAttunementModal.jsx:430-450 — unguarded async IIFE (map path): the catch logs and
- *   abandons. Phase stays 'targets', which renders null — the user gets NO error feedback, NO
- *   retry, and no way out except remount. Pinned as current behavior. Product fix: surface an
- *   error screen with Retry/Cancel.
- * - ElementalAttunementModal.jsx:482-485 — unguarded .then(setResults): ANY throw inside
+ * FLAG (component, not fixed here; push dead-code pin lives in .npc-save.test.jsx):
+ * - ElementalAttunementModal.jsx:425-445 — unguarded async IIFE (map path): the catch (:442-444)
+ *   logs and abandons. Phase stays 'targets', which renders null — the user gets NO error
+ *   feedback, NO retry, and no way out except remount. Pinned as current behavior. Product fix:
+ *   surface an error screen with Retry/Cancel.
+ * - ElementalAttunementModal.jsx:477-480 — unguarded .then(setResults): ANY throw inside
  *   resolveAllSavesAndDamage rejects unhandled and strands the 'Resolving…' processing view
  *   forever (no Close, no results). Pinned via the Promise.prototype.then rejection guard
  *   (below) on the dice lane and the persist lane; persist also shows the silent data-loss
  *   window (in-memory damage applied, persist skipped). Product fix: .catch → console.error + error phase.
- * - ElementalAttunementModal.jsx:482 — even when the dice lane had a guard, results/persist are
- *   not atomic: applyDamageToTarget mutates the summary before persistAndNotify runs, so a
- *   persist failure loses HP silently.
- * - ElementalAttunementModal.jsx:152-156,172-219 — DEAD CODE (found live): resolveAllSavesAndDamage
- *   (:404-409) routes every element WITH damage — including Thunder, which carries effect:'push' —
- *   through resolveNpcDamageResult, so resolveNpcPushResult/applyNpcPush never run for NPCs and
- *   the 'Error logging Thunder save:' console lane can never fire. Thunder push is silently lost
- *   on NPC targets. Pinned by the Thunder arm below. Product fix: dispatch on `effect` first
+ * - ElementalAttunementModal.jsx:477 — even when the dice lane had a guard, results/persist are
+ *   not atomic: applyDamageToTarget mutates the summary (:86) before persistAndNotify (:411)
+ *   runs, so a persist failure loses HP silently.
+ * - ElementalAttunementModal.jsx:147-153,161-222 — DEAD CODE (found live): resolveAllSavesAndDamage
+ *   (:399-404) routes every element WITH damage — including Thunder, which carries effect:'push' —
+ *   through resolveNpcDamageResult, so resolveNpcPushResult/applyNpcPush/resolveNpcPushDamage and
+ *   the 'Error logging Thunder save:' catch (:207) never run for NPCs. Thunder push is silently
+ *   lost on NPC targets. Pinned in .npc-save.test.jsx. Product fix: dispatch on `effect` first
  *   (or compose push with damage) instead of `damage` first.
  */
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
@@ -202,15 +207,15 @@ function seedOverlayCombat(fixture) {
     aoeService.getAffectedCreatures.mockReturnValue(fixture.creatures.map(c => ({ creature: c })));
 }
 
-// ── Rejection guard for the pins (see header :482-485 flag).
+// ── Rejection guard for the pins (see header :477-480 flag).
 //    Vitest 4 runs tests in a separate realm: process/window 'unhandledrejection'
 //    listeners registered from test code never fire (verified live), and any truly
 //    unhandled rejection fails the whole run at vitest's collector. So the guard is
 //    a scope-limited Promise.prototype.then patch, armed ONLY around the pinned clicks:
-//    chains that pass NO rejection handler — exactly jsx:482 — get a recording no-op
+//    chains that pass NO rejection handler — exactly jsx:477 — get a recording no-op
 //    injected (component behavior byte-identical: setResults still never runs, the view
 //    still strands), while the exact stranded reason is captured. The component's own
-//    .catch lanes pass through untouched. A future fix adding a real .catch at :482
+//    .catch lanes pass through untouched. A future fix adding a real .catch at :477
 //    means the guard sees nothing and these pins flip. ──
 
 let rejections;
@@ -284,22 +289,10 @@ describe('ElementalAttunementModal — error handling', () => {
                     expect(cells.get('Goblin1|activeConditions')).toEqual(['speed_reduction']);
                 },
             },
-            {
-                element: 'Thunder',
-                // PINNED dead-code behavior: Thunder carries effect:'push' but the damage branch
-                // claims it (jsx:404), so the log lane is the generic NPC-save one — the component's
-                // dedicated 'Error logging Thunder save:' catch (jsx:203) is UNREACHABLE dead code.
-                consoleMessage: '[ElementalAttunementModal] Error logging NPC save:',
-                assertCommitSurvived: () => {
-                    expect(applyDamageToTarget).toHaveBeenCalledWith(combatNpc, 'Goblin1', 5, ['thunder'], {
-                        campaignName: CAMPAIGN, characters: [], ignoreResistance: false, attackerName: PLAYER, suppressHpLog: false,
-                    });
-                    // FLAG (header): the failed CON save still owes a 10 ft push — applyNpcPush
-                    // never runs, so the live store proves the push was silently dropped.
-                    expect(cells.has('Goblin1|targetEffects')).toBe(false);
-                    expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
-                },
-            },
+            // Thunder deliberately NOT an arm: under a rejected log it takes the byte-identical
+            // Fire path (elementData.damage → resolveNpcDamageResult → the same 'Error logging
+            // NPC save:' catch), and its push-drop dead-code pin lives in .npc-save.test.jsx
+            // (:212-224). A third arm here would duplicate both.
         ])('$element: a rejected log logs the exact one-line error, then resolution commits and summary opens', async ({ element, consoleMessage, assertCommitSurvived }) => {
             const err = new Error('log-service down');
             logService.addEntry.mockRejectedValue(err);
@@ -354,13 +347,13 @@ describe('ElementalAttunementModal — error handling', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
 
         await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('[ElementalAttunementModal] Error loading map data:', err));
-        // The console identity proves the try/catch at jsx:447-449 claimed it — had it not,
+        // The console identity proves the try/catch at jsx:426-444 claimed it — had it not,
         // vitest 4 would fail this whole run with an unhandled rejection at its collector.
         // Exactly ONE attempt with exact args: the catch never re-arms (deps unchanged) —
         // no invented retry, and no way for the user to trigger one.
         expect(mapsService.loadMapData).toHaveBeenCalledTimes(1);
         expect(mapsService.loadMapData).toHaveBeenCalledWith(CAMPAIGN, 'test-map');
-        // DEFECT (jsx:430-450): the catch logs and abandons — phase stays 'targets',
+        // DEFECT (jsx:425-445): the catch logs and abandons — phase stays 'targets',
         // which renders null. Stranded invisible view, pinned as current behavior.
         expect(container.firstChild).toBeNull();
         expect(screen.queryByRole('button', { name: /Close/ })).not.toBeInTheDocument();
@@ -372,20 +365,20 @@ describe('ElementalAttunementModal — error handling', () => {
         expect(cells.size).toBe(0);
     });
 
-    describe('FLAG pinned: unguarded .then(setResults) (jsx:482-485) — a rejecting resolve strands the processing view', () => {
+    describe('FLAG pinned: unguarded .then(setResults) (jsx:477-480) — a rejecting resolve strands the processing view', () => {
         it('dice rejection before the first target write: no partial writes, exact reason strands UNHANDLED, view stuck on Resolving…', async () => {
             const diceErr = new Error('dice service unavailable');
             diceRoller.rollExpression.mockImplementationOnce(() => { throw diceErr; });
             seedOverlayCombat(combatNpc);
 
             render(<ElementalAttunementModal {...makeProps({ activeOverlay: OVERLAY })} />);
-            // Guard armed only across the click window: the effect's .then at :482 (no rejection
+            // Guard armed only across the click window: the effect's .then at :477 (no rejection
             // handler) gets the recording no-op; every .catch lane inside passes through.
             armUnguardedThenGuard();
             try {
                 fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
                 // PIN: exact reason strands on a handler-less chain. A fix adding .catch at
-                // :482-485 routes it back into the component and empties this — flipping the pin.
+                // :477-480 routes it back into the component and empties this — flipping the pin.
                 await waitFor(() => expect(rejections).toEqual([diceErr]));
                 expect(rejections[0]).toBe(diceErr);
                 // Stranded forever: results never commit, auto-summary never fires, no Close.

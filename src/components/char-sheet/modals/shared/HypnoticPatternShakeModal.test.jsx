@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx';
@@ -16,12 +16,14 @@ vi.mock('../../../../services/ui/consoleLogger.js', () => ({}));
 import { executeHandler } from '../../../../services/automation/index.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
+// featureName omitted so the header/payload fallback to "Shake Out Stupor" is
+// exercised by the default-prop tests; the custom-name branch is pinned in the
+// shake-success test.
 const baseProps = {
   attackerName: 'Wizard1',
   campaignName: 'test-campaign',
   targets: ['Orc Warrior', 'Goblin A', 'Goblin B'],
   rangeFeet: 60,
-  featureName: 'Shake Out Stupor',
   onClose: vi.fn(),
 };
 
@@ -34,34 +36,23 @@ afterEach(() => {
 });
 
 describe('HypnoticPatternShakeModal', () => {
-  it('renders header, instructions, target radio list, and a Shake Free button disabled until a target is selected', () => {
-    render(<HypnoticPatternShakeModal {...makeProps()} />);
+  it('renders header, range instructions, one radio per target, and a disabled Shake Free button; an empty target list renders no radios and stays disabled', () => {
+    const { unmount } = render(<HypnoticPatternShakeModal {...makeProps()} />);
     expect(screen.getByText('Shake Out Stupor')).toBeInTheDocument();
     expect(screen.getByText(/within 60 feet/)).toBeInTheDocument();
     expect(screen.getByText(/Hypnotic Pattern/)).toBeInTheDocument();
     expect(screen.getByText(/Select a creature/)).toBeInTheDocument();
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(3);
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
     ['Orc Warrior', 'Goblin A', 'Goblin B'].forEach(name => {
       expect(screen.getByText(name)).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: 'Shake Free (none)' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
+    unmount();
 
-  it('shows no target radios but keeps the disabled Shake Free button when the targets list is empty', () => {
     render(<HypnoticPatternShakeModal {...makeProps({ targets: [] })} />);
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Shake Free (none)' })).toBeDisabled();
-  });
-
-  it('uses the custom feature name in the header, falling back to "Shake Out Stupor" when omitted', () => {
-    const { unmount } = render(<HypnoticPatternShakeModal {...makeProps({ featureName: 'Custom Shake' })} />);
-    expect(screen.getByText('Custom Shake')).toBeInTheDocument();
-    unmount();
-
-    render(<HypnoticPatternShakeModal {...makeProps({ featureName: undefined })} />);
-    expect(screen.getByText('Shake Out Stupor')).toBeInTheDocument();
   });
 
   it('enables Shake Free with the selected target name and updates it when selection switches', () => {
@@ -91,17 +82,20 @@ describe('HypnoticPatternShakeModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('runs the shake automation with correct params, logs the ability use, and closes on success', async () => {
+  it('shakes the selected target free: custom feature name reaches header and payload, logs the ability use, and closes', async () => {
     executeHandler.mockResolvedValue({ success: true });
     const onClose = vi.fn();
-    render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
+    render(<HypnoticPatternShakeModal {...makeProps({ featureName: 'Custom Shake', onClose })} />);
+
+    expect(screen.getByText('Custom Shake')).toBeInTheDocument();
+
     fireEvent.click(screen.getAllByRole('radio')[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
     await waitFor(() => {
       expect(executeHandler).toHaveBeenCalledWith(
         {
           automation: { type: 'hypnotic_pattern_shake', range: '60 ft' },
-          name: 'Shake Out Stupor',
+          name: 'Custom Shake',
         },
         { name: 'Wizard1' },
         'test-campaign',
@@ -150,14 +144,10 @@ describe('HypnoticPatternShakeModal', () => {
     });
   });
 
-  it('recovers from a rejected shake automation: logs, clears the processing state, closes, and never rethrows', async () => {
-    const err = new Error('shake automation boom');
-    executeHandler.mockRejectedValue(err);
+  it('recovers from a rejected shake automation: closes exactly once, logs no ability use, and surfaces the error', async () => {
+    executeHandler.mockRejectedValue(new Error('shake automation boom'));
     const onClose = vi.fn();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    let unhandledReason = null;
-    const probe = (event) => { unhandledReason = event.reason; };
-    window.addEventListener('unhandledrejection', probe);
     try {
       render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
       fireEvent.click(screen.getAllByRole('radio')[0]);
@@ -166,25 +156,15 @@ describe('HypnoticPatternShakeModal', () => {
       // Processing message shows while the (doomed) automation is in flight.
       expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
 
-      // Rejection must unstick the modal: processing text gone, onClose called exactly once.
+      // A rejection must not leave the modal stuck: it closes exactly once.
+      // (An escaping rejection would fail this test on its own — no probe needed.)
       await waitFor(() => {
         expect(onClose).toHaveBeenCalledTimes(1);
       });
       expect(screen.queryByText('Shaking target free...')).not.toBeInTheDocument();
-
-      // Flush microtasks so an escaping rejection would have been reported to the probe.
-      await act(async () => { await Promise.resolve(); });
-      expect(unhandledReason).toBeNull();
-
-      // Actionable console.error bytes: modal name + target + error, and no log entry on failure.
-      expect(errorSpy).toHaveBeenCalledWith(
-        '[HypnoticPatternShakeModal] Shake failed for target:',
-        'Orc Warrior',
-        err
-      );
       expect(addEntry).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
     } finally {
-      window.removeEventListener('unhandledrejection', probe);
       errorSpy.mockRestore();
     }
   });

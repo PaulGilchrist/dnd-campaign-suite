@@ -1,10 +1,12 @@
-// @maintained-by-ai 2026-10-17
-// Unit tests for the handleAttackClick lane of useCharActionsAttackHandlers.
+// @maintained-by-ai 2026-11-27
+// Unit tests for the handleAttackClick press lane of useCharActionsAttackHandlers.
 // Scope note: confirm/cancel chooser handlers are covered by
 // useCharActionsAttackHandlers-2.test.js and .brutalGate.test.js; CLA-143 /
 // CLA-274 / CLA-405 latch lanes by the cla143-stamp / psychicBlade /
-// fleetStep suites; rider selection & sorting by .improvedBrutalStrike.test.js
-// — this file deliberately does not re-test those.
+// fleetStep suites; rider selection & sorting by .improvedBrutalStrike.test.js;
+// the no-target refusal face by .no-target-refusal.test.js; the Extra Attack
+// chain seam + exhaustion subtraction (rollWeaponSwing penalty) by
+// .extraAttack.test.js — this file deliberately does not re-test those.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useCharActionsAttackHandlers from './useCharActionsAttackHandlers.js';
 
@@ -117,10 +119,20 @@ function lastModal(deps) {
     return deps.setModalState.mock.calls.at(-1)?.[0]?.recklessAttackModal;
 }
 
+/**
+ * Deterministically drain the real promise chain (press → runAttackClick →
+ * stageAttackRoll → buildCtx().then → rollAttack, plus the extra LoS-consult
+ * tick). No wall-clock polling: roll resolution is turn-seam state.
+ */
+async function flushRoll() {
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+}
+
 describe('useCharActionsAttackHandlers — handleAttackClick', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        // Re-arm defaults so per-test overrides can never leak sideways.
+        // Re-arm defaults so per-test overrides can never leak sideways
+        // (clearAllMocks alone keeps mockReturnValue — re-baseline every stub).
         assertCanActModule.assertCanAct.mockReturnValue({ allowed: true });
         lineOfSightGate.isLineOfSightEnforced.mockReturnValue(false);
         coverService.isCoverEnforced.mockReturnValue(false);
@@ -140,10 +152,15 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(makeAttack());
 
+            // Full zero-silence contract: every channel the press could
+            // touch stays untouched (the popup face belongs to assertCanAct).
             expect(deps.setModalState).not.toHaveBeenCalled();
             expect(deps.buildCtx).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
             expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            expect(logService.addEntry).not.toHaveBeenCalled();
+            expect(lineOfSightGate.checkLineOfSight).not.toHaveBeenCalled();
             expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
             expect(invisibilityService.endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         });
@@ -158,13 +175,21 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(makeAttack({ name: 'Longbow' }));
 
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            // Exact log row + byte-exact popup copy (the hook lane is the
+            // only owner of this refusal face).
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'automation blocked',
                 characterName: playerName,
                 abilityName: 'Longbow',
-            }));
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Stinking Cloud'));
+                description: `${playerName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — attack refused.`,
+                timestamp: expect.any(Number),
+            });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith('<b>Stinking Cloud</b><br/>You are Poisoned by Stinking Cloud and can\'t take an Action or a Bonus Action until the end of your current turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            // Zero spend: nothing rolled, stamped, or chooser-opened.
             expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.setModalState).not.toHaveBeenCalled();
         });
 
         it('routes a non-cloud cannotAct press through the assertCanAct popup lane (RB-1115)', () => {
@@ -182,11 +207,17 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             // RB-1115: the non-cloud cannotAct face no longer returns silently —
             // it feeds cannotAct + the popup sink into assertCanAct (the shared
             // lane renders the canTakeAction copy; asserted in assertCanAct.test.js).
-            expect(assertCanActModule.assertCanAct).toHaveBeenCalledWith(expect.objectContaining({
+            // Exact args pin the REFUSAL shape: no charge key — a denied press
+            // must never spend the action bucket.
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledTimes(1);
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledWith({
+                campaignName,
+                creatureName: playerName,
+                bucket: 'action',
                 cannotAct: true,
                 setPopupHtml: deps.setPopupHtml,
                 source: 'useCharActionsAttackHandlers',
-            }));
+            });
         });
 
         it('stops before rolling when the action economy denies the click', () => {
@@ -198,26 +229,33 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             expect(deps.rollAttack).not.toHaveBeenCalled();
             expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.setModalState).not.toHaveBeenCalled();
             // A denied shot must not break invisible/Friends concentration.
             expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
             expect(invisibilityService.endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         });
 
-        it('charges the bonusAction bucket for Bonus Action rows and action otherwise', () => {
+        it('charges the action bucket for weapon rows, bonusAction for Bonus Action rows (ordered census)', () => {
             const deps = createDeps();
             const handlers = useCharActionsAttackHandlers(deps);
 
             handlers.handleAttackClick(makeAttack());
-            expect(assertCanActModule.assertCanAct).toHaveBeenCalledWith(expect.objectContaining({
+            handlers.handleAttackClick(makeAttack({ type: 'Bonus Action', name: 'Handaxe' }));
+
+            // Charge-on-allow with exact first-call args (feedCannotAct +
+            // source + charge present — contrast the refusal lane above).
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledTimes(2);
+            expect(assertCanActModule.assertCanAct).toHaveBeenNthCalledWith(1, {
+                campaignName,
                 creatureName: playerName,
                 bucket: 'action',
+                cannotAct: false,
+                setPopupHtml: deps.setPopupHtml,
+                source: 'useCharActionsAttackHandlers',
                 charge: true,
-            }));
-
-            handlers.handleAttackClick(makeAttack({ type: 'Bonus Action', name: 'Handaxe' }));
-            expect(assertCanActModule.assertCanAct).toHaveBeenLastCalledWith(expect.objectContaining({
-                bucket: 'bonusAction',
-            }));
+            });
+            expect(assertCanActModule.assertCanAct.mock.calls.map(([arg]) => arg.bucket))
+                .toEqual(['action', 'bonusAction']);
         });
 
         it('defers the roll to the line-of-sight consult when enforcement is on', async () => {
@@ -225,22 +263,29 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             const deps = createDeps();
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = makeAttack({ range: '20/60' });
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack({ range: '20/60' }));
 
-            expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalledWith(expect.objectContaining({
+            // Synchronous facts first: consult fires with the sheet-arm args and
+            // the whole continuation (gate, stamps, roll) waits on its verdict.
+            expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalledWith({
                 campaignName,
                 attackerName: playerName,
                 targetName: 'Goblin',
+                range: '20/60',
+                setPopupHtml: deps.setPopupHtml,
                 source: 'attack-row',
-            }));
+            });
+            expect(assertCanActModule.assertCanAct).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
 
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+            await flushRoll();
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledTimes(1);
+            expect(deps.rollAttack).toHaveBeenCalledTimes(1);
+            expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, { hitBonus: 9 });
         });
 
-        it('never rolls a shot the line-of-sight consult denies', async () => {
+        it('never rolls a shot the line-of-sight consult denies, and charges no slot', async () => {
             lineOfSightGate.isLineOfSightEnforced.mockReturnValue(true);
             damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             lineOfSightGate.checkLineOfSight.mockResolvedValue({ allowed: false });
@@ -249,9 +294,14 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(makeAttack({ range: '20/60' }));
 
-            await vi.waitFor(() => expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalled());
+            await flushRoll();
+            // L5-003 §7.2 semantics: the denial lands BEFORE assertCanAct, so
+            // a blocked shot never charges its slot or stamps anything.
+            expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalledTimes(1);
+            expect(assertCanActModule.assertCanAct).not.toHaveBeenCalled();
             expect(deps.buildCtx).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
             expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
         });
     });
@@ -275,6 +325,9 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             handlers.handleAttackClick(makeAttack());
 
             expect(getRuntimeValue).toHaveBeenCalledWith(playerName, 'activeBuffs', campaignName);
+            // CLA-044: the offered-latch creature comparison reads
+            // activeCreatureName top-level (campaign-scoped), not the cs mirror.
+            expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'activeCreatureName', campaignName);
         });
     });
 
@@ -286,13 +339,18 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(attack);
 
-            expect(lastModal(deps)).toEqual(expect.objectContaining({
+            // Exact envelope: with no riders the offer defaults are
+            // maxEffects 1 / riderName 'Brutal Strike'.
+            expect(deps.setModalState).toHaveBeenCalledTimes(1);
+            expect(lastModal(deps)).toEqual({
                 attack,
                 mode: 'full',
                 hasBrutalStrike: false,
                 brutalStrikeOptions: [],
+                maxEffects: 1,
                 riderName: 'Brutal Strike',
-            }));
+            });
+            // The chooser consumes the click before any roll.
             expect(deps.buildCtx).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
         });
@@ -309,7 +367,8 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             handlers.handleAttackClick(makeAttack());
 
             expect(deps.setModalState).not.toHaveBeenCalled();
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+            await flushRoll();
+            expect(deps.rollAttack).toHaveBeenCalledTimes(1);
         });
 
         it('still offers the chooser when the offered latch belongs to another creature', () => {
@@ -323,6 +382,7 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(makeAttack());
 
+            expect(deps.setModalState).toHaveBeenCalledTimes(1);
             expect(lastModal(deps)).toMatchObject({ mode: 'full' });
         });
 
@@ -343,10 +403,11 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             // Sharpened from objectContaining (fix#246 fold, fix#274 seam
             // standard): exact envelope + zero-side-effect counts, but kept as
             // the base lane's OWN route-level proof — this is the only lane that
-            // arms source :216 through the REAL selectBrutalStrikeRiders with a
-            // string-options rider (brutalGate mocks the selector; improvedBrutal
-            // Strike runs it real only on the 'full' route). Gate latch semantics
-            // belong to .brutalGate.test.js — not re-proved here.
+            // arms the brutalOnly setModalState (source :267) through the REAL
+            // selectBrutalStrikeRiders with a string-options rider (brutalGate
+            // mocks the selector; improvedBrutalStrike runs it real only on the
+            // 'full' route). Gate latch semantics belong to .brutalGate.test.js
+            // — not re-proved here.
             expect(deps.setModalState).toHaveBeenCalledTimes(1);
             expect(deps.setModalState).toHaveBeenCalledWith({
                 recklessAttackModal: {
@@ -376,7 +437,12 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             handlers.handleAttackClick(makeAttack());
 
             expect(deps.setModalState).not.toHaveBeenCalled();
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+            await flushRoll();
+            // Distinctive values: ctx hitBonus 9 vs row hitBonus 7 — a
+            // hardcoded row bonus dies here, so the roll-resolution lane below
+            // only needs the ctx-fallback leg.
+            expect(deps.rollAttack).toHaveBeenCalledTimes(1);
+            expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, { hitBonus: 9 });
         });
 
         it.each([
@@ -388,43 +454,24 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             expect(() => handlers.handleAttackClick(makeAttack())).not.toThrow();
             expect(deps.setModalState).not.toHaveBeenCalled();
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+            await flushRoll();
+            expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, { hitBonus: 9 });
         });
     });
 
-    describe('attack roll resolution', () => {
+    describe('attack roll resolution (via real rollWeaponSwing)', () => {
         it.each([
-            ['ctx.hitBonus wins over the row value', { hitBonus: 10 }, 10],
-            ['ctx without hitBonus falls back to the row', {}, 7],
-            ['null ctx falls back to the row', null, 7],
-        ])('%s', async (_label, ctx, expected) => {
+            ['ctx without hitBonus', {}],
+            ['null ctx', null],
+            ['undefined ctx', undefined],
+        ])('falls back to the row hit bonus when %s', async (_label, ctx) => {
             const deps = createDeps({ buildCtx: vi.fn(() => Promise.resolve(ctx)) });
             const handlers = useCharActionsAttackHandlers(deps);
 
             handlers.handleAttackClick(makeAttack());
 
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', expected, ctx));
-        });
-
-        it('rolls with the row hit bonus when buildCtx resolves undefined', async () => {
-            const deps = createDeps({ buildCtx: vi.fn(() => Promise.resolve(undefined)) });
-            const handlers = useCharActionsAttackHandlers(deps);
-
-            handlers.handleAttackClick(makeAttack());
-
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7, undefined));
-        });
-
-        it('subtracts the exhaustion penalty from the effective hit bonus', async () => {
-            const deps = createDeps({
-                buildCtx: vi.fn(() => Promise.resolve({ hitBonus: 6 })),
-                exhaustionPenalty: 2,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-
-            handlers.handleAttackClick(makeAttack());
-
-            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 4, expect.any(Object)));
+            await flushRoll();
+            expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7, ctx);
         });
 
         it('logs the error and rolls nothing when buildCtx rejects', async () => {

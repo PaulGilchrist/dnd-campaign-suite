@@ -1,5 +1,5 @@
-// @maintained-by-ai 2026-10-17
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+// @maintained-by-ai 2026-11-27
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MassHealModal from './MassHealModal.jsx';
 
@@ -123,31 +123,36 @@ describe('MassHealModal', () => {
     expect(screen.getByText(`Allocated: ${expected} / 10`)).toBeInTheDocument();
   });
 
-  it('totals allocations across targets and warns about unallocated HP', async () => {
-    render(<MassHealModal {...makeProps({ pool: 30 })} />);
-    await selectTarget(0);
-    await selectTarget(1);
-    await setAllocation(0, 5);
-    await setAllocation(1, 10);
+  // DELETED "totals allocations across targets and warns about unallocated HP":
+  // fully redundant with the pre-deselect phase of the deselection test below,
+  // which holds two selected allocations (10+5) and asserts the same exact
+  // multi-target sum ("Allocated: 15 / 20") plus the "15 HP unallocated" hint.
 
-    expect(screen.getByText(/Allocated: 15 \/ 30/)).toBeInTheDocument();
-    expect(screen.getByText(/15 HP unallocated/)).toBeInTheDocument();
-  });
-
-  it('burst fills a target to its missing HP', async () => {
+  it('burst caps at missing HP, at the remaining pool, and defaults to the whole pool without HP info', async () => {
     mockGetRuntimeValue.mockImplementation((name, key) =>
       name === 'Ally1' && key === 'currentHitPoints' ? 10 :
       name === 'Ally1' && key === 'hitPoints' ? 30 : null);
-    render(<MassHealModal {...makeProps({
+    const { unmount } = render(<MassHealModal {...makeProps({
       pool: 50,
       combatSummary: { creatures: [{ name: 'Ally1', type: 'player', currentHp: 10, maxHp: 30 }] },
     })} />);
     await selectTarget(0);
     await act(async () => fireEvent.click(burstButtons()[0]));
 
-    // Missing = 30 - 10 = 20, well under the 50 HP pool.
+    // Need-cap arm: Missing = 30 - 10 = 20, well under the 50 HP pool.
     expect(numberInputs()[0].value).toBe('20');
     expect(screen.getByText(/Allocated: 20 \/ 50/)).toBeInTheDocument();
+    unmount();
+
+    // Fallback arm: no combatSummary → no HP info → burst dumps the FULL
+    // pool onto the single target (component's `: pool` branch).
+    render(<MassHealModal {...makeProps({ pool: 8 })} />);
+    await selectTarget(0);
+    await act(async () => fireEvent.click(burstButtons()[0]));
+
+    expect(numberInputs()[0].value).toBe('8');
+    expect(screen.getByText(/Allocated: 8 \/ 8/)).toBeInTheDocument();
+    expect(screen.queryByText(/unallocated/)).not.toBeInTheDocument();
   });
 
   it('burst is capped by the remaining pool when other targets hold allocations', async () => {
@@ -227,9 +232,10 @@ describe('MassHealModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Heal \(2\)/ }));
 
-    await waitFor(() => {
-      expect(mockOnConfirm).toHaveBeenCalledWith({ Ally2: 10 });
-    });
+    // handleConfirm commits synchronously — direct assert, no waitFor.
+    // times(1) is the double-commit detector: a second call = double pool drain.
+    expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+    expect(mockOnConfirm).toHaveBeenCalledWith({ Ally2: 10 });
     expect(mockOnSkip).not.toHaveBeenCalled();
   });
 
@@ -256,9 +262,8 @@ describe('MassHealModal', () => {
     expect(screen.getByRole('button', { name: /Heal \(1\)/ })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: /Heal \(1\)/ }));
 
-    await waitFor(() => {
-      expect(mockOnConfirm).toHaveBeenCalledWith({ Ally2: 5 });
-    });
+    expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+    expect(mockOnConfirm).toHaveBeenCalledWith({ Ally2: 5 });
   });
 
   it('re-selecting a deselected target starts from 0 — stale kept allocation never resurfaces in the header', async () => {

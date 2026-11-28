@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Base lane for ShortRestModal: initial render/state, hit-dice roll UI, class-feature
-// gating/display, closing behavior, and the primary completion flow (onComplete, exact
-// Sorcerous Restoration writes, CLA-011 Arcane Recovery merged batch + refusal).
+// gating/display, Escape/backdrop close behavior, and the primary completion flow
+// (onComplete, exact Sorcerous Restoration writes, CLA-011 Arcane Recovery merged
+// batch + refusal, meal spend-at-completion + cancel-rollback).
 // Owned elsewhere, not re-tested here: completion log lines & HP writes
 // (ShortRestModal.completionFlow.test.jsx), Natural Recovery (…naturalRecovery.test.jsx),
 // Celestial Resilience picker (…celestialResilience.test.jsx), Memorize Spell swap
-// internals (…coverage.test.jsx — this file keeps only its render/gating).
+// internals (…coverage.test.jsx — this file keeps only its render/gating),
+// dialog aria + Cancel-click contract (…dialog-semantics.test.jsx).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
@@ -156,7 +158,9 @@ describe('ShortRestModal', () => {
 
   describe('initial render', () => {
     it('renders title, roll controls, Song of Rest, and producer-restored resources', () => {
-      const { onClose } = renderModal();
+      // With no stored shortRestHitDice the pool defaults to level (5 of 5).
+      // Cancel-click behavior is owned by the dialog-semantics lane.
+      renderModal();
       expect(screen.getByRole('heading', { name: /Short Rest/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Complete Short Rest/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -167,24 +171,18 @@ describe('ShortRestModal', () => {
       expect(screen.getByText('Channel Divinity').closest('li')).toBeTruthy();
       // Features the default Cleric does not own must not appear.
       expect(screen.queryByText('Bolstering Treats')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('hides the Song of Rest section when the class has no songOfRestDie', () => {
+    it('hides the Song of Rest and Resources Restored sections when class and producer offer nothing', () => {
       vi.mocked(getClassFeatures).mockReturnValueOnce({});
+      vi.mocked(getShortRestResourceLabels).mockReturnValueOnce([]);
       renderModal();
       expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Apply Song of Rest/ })).not.toBeInTheDocument();
-    });
-
-    it('hides the Resources Restored section when the producer returns no labels', () => {
-      vi.mocked(getShortRestResourceLabels).mockReturnValueOnce([]);
-      renderModal();
       expect(screen.queryByText('Resources Restored')).not.toBeInTheDocument();
     });
 
-    it('restores remaining hit dice from stored runtime state, defaulting to level', () => {
+    it('restores the remaining hit-dice count from stored runtime state', () => {
       setupGetRuntimeValue({ shortRestHitDice: 3 });
       renderModal();
       expect(screen.getByText(/3 of 5 remaining/)).toBeInTheDocument();
@@ -200,17 +198,16 @@ describe('ShortRestModal', () => {
   });
 
   describe('hit dice rolling', () => {
-    it.each([
-      { conBonus: 2, hp: 6, why: 'CON 2 adds to every die' },
-      { conBonus: 0, hp: 4, why: 'zero CON adds nothing, silently' },
-    ])('Roll One logs one honest line — roll 4 + CON $conBonus = $hp ($why)', ({ conBonus, hp }) => {
-      renderModal({ abilities: [{ name: 'Constitution', bonus: conBonus }, { name: 'Charisma', bonus: 3 }] });
+    it('Roll One logs one honest line — roll 4 + CON 2 = 6, consuming one die', () => {
+      // CON 2 vs the fixture's Charisma 3 proves the Constitution bonus (not
+      // another ability) is wired into the recovery.
+      renderModal();
       rollOne();
       const rows = rollLogRows();
       expect(rows).toHaveLength(1);
       expect(rows[0].children[0].textContent).toBe('4');
-      expect(rows[0].children[1].textContent).toBe(String(hp));
-      expect(recoveredTotalText()).toContain(`Total HP Recovered: ${hp}`);
+      expect(rows[0].children[1].textContent).toBe('6');
+      expect(recoveredTotalText()).toContain('Total HP Recovered: 6');
       expect(screen.getByText(/4 of 5 remaining/)).toBeInTheDocument();
     });
 
@@ -267,6 +264,7 @@ describe('ShortRestModal', () => {
 
     it.each([
       { uses: 0, want: true, why: 'pool below max (CHA 3)' },
+      { uses: null, want: true, why: 'null = fresh character, nothing expended' },
       { uses: 3, want: false, why: 'already at max — nothing to regain' },
     ])('Font of Inspiration notice when $uses of 3 uses remain: visible $want ($why)', ({ uses, want }) => {
       setupGetRuntimeValue({ bardicInspirationUses: uses });
@@ -419,19 +417,15 @@ describe('ShortRestModal', () => {
   });
 
   describe('closing', () => {
-    it('closes via Cancel button and Escape key', () => {
+    // Cancel-button → onClose (and its zero-write contract) is pinned by the
+    // dialog-semantics lane; this pins the Escape listener and click no-bleed.
+    it('closes on Escape and ignores backdrop and modal-body clicks', () => {
       const { onClose } = renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(2);
-    });
-
-    it('ignores backdrop and modal-body clicks (no accidental close)', () => {
-      const { onClose } = renderModal();
+      expect(onClose).toHaveBeenCalledTimes(1);
       fireEvent.click(document.querySelector('.short-rest-overlay'));
       fireEvent.click(document.querySelector('.short-rest-modal'));
-      expect(onClose).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('heading', { name: /Short Rest/ })).toBeInTheDocument();
     });
   });

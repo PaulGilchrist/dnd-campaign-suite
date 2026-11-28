@@ -1,18 +1,20 @@
-// @maintained-by-ai 2026-10-18
-// MA-0300 component lane: the Counterspell reaction rows (REAL monsters.json
-// "At Will" + uses:999 sentinel shape) must expose exactly one gated-reaction chip whose
-// label carries NO counter (At Will sentinel → monsterReactionUsesRemaining null,
-// improve `at-will-reaction-chip-999`) while the row keeps the honest "(At Will)"
-// usage echo, and NEVER marks spent pre-sentinel (RAW-unlimited,
-// unlinked to 1/Day). Press truth-table (open/consumed/closed attackerCannotAct #289) is
-// owned by MonsterAction.gated-reaction.test.jsx; data shape is data-locked by
-// MonsterCardHelpers.ma{0300,0305,1120}-counterspell.test.js — never restated here.
-// Trigger identity, round latch and spend arithmetic live in the helper lanes.
+// @maintained-by-ai 2026-11-28
+// MA-0300 component lane: the three REAL monsters.json Counterspell reaction rows
+// ("At Will" + uses:999 sentinel) must each arm exactly one gated-reaction chip whose
+// label is registry-exact and carries NO counter (sentinel → monsterReactionUsesRemaining
+// null, improve `at-will-reaction-chip-999`), while the row keeps the honest "(At Will)"
+// usage echo and clicking forwards THAT row's action object once.
+// Owned elsewhere, never restated: press truth-table (open/consumed/closed
+// attackerCannotAct #289) → MonsterAction.gated-reaction.test.jsx; the at-will
+// partial-spend non-revival branch (sentinel short-circuits BEFORE the ledger read, so
+// per-monster ledger keys add no branch) → MonsterAction.at-will-chip.test.jsx; data
+// shape → MonsterCardHelpers.ma{0300,0305,1120}-counterspell.test.js; trigger identity,
+// round latch and spend arithmetic → the helper lanes.
 // Folded #421-rec: ex-twins MonsterAction.ma0305-arch-hag-chip +
-// MonsterAction.ma1120-mage-chip (byte-twins modulo monster/spend tokens;
-// retired #422) — one it.each now spans all 3 disk rows here. Chip label/icon
-// come from the registry per row (getGatedMonsterReaction keys off
-// automation.effect only), so per-monster renders are registry-identical.
+// MonsterAction.ma1120-mage-chip (retired #422) — one it.each spans all 3 disk rows.
+// Chip label/icon come from the registry per row (getGatedMonsterReaction keys off
+// automation.effect only), so per-monster renders are registry-identical; the sweep's
+// unique value is the per-row ARMING wiring + correct-action dispatch.
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
@@ -27,34 +29,25 @@ const DISK_ROWS = ['arcanaloth', 'arch-hag', 'mage'].map(index => {
   return { index, action, def: getGatedMonsterReaction(action) };
 });
 
-function renderRow(action, overrides = {}) {
-  const onGatedReaction = vi.fn();
-  const utils = render(
-    <MonsterAction
-      action={action}
-      index={0}
-      attackerCannotAct={false}
-      onAttack={vi.fn()}
-      onDamage={vi.fn()}
-      onSaveRoll={vi.fn()}
-      onSpellCast={vi.fn()}
-      reactionUsesUsed={{}}
-      onGatedReaction={onGatedReaction}
-      {...overrides}
-    />
-  );
-  return { ...utils, onGatedReaction };
-}
-
 describe('MA-0300 MonsterAction Counterspell chip — At Will sentinel (3 disk rows)', () => {
-  it.each(
-    DISK_ROWS.flatMap(({ index, action, def }) => [
-      [index, 'fresh row prints NO 999 counter — the honest "At Will" echo is the only usage text', action, def, {}],
-      [index, 'partial spends still print no counter (RAW-unlimited label stays clean)', action, def, { reactionUsesUsed: { counterspell: 3 } }],
-    ])
-  )('%s %s — one chip, click dispatches the disk row once', (_index, _case, action, def, overrides) => {
-    const { onGatedReaction } = renderRow(action, overrides);
-    // getByRole single-match pins exactly one press surface (MA-1488 sole-press).
+  it.each(DISK_ROWS)('$index — one counter-free chip, click dispatches the disk row once', ({ action, def }) => {
+    const onGatedReaction = vi.fn();
+    render(
+      <MonsterAction
+        action={action}
+        index={0}
+        attackerCannotAct={false}
+        onAttack={vi.fn()}
+        onDamage={vi.fn()}
+        onSaveRoll={vi.fn()}
+        onSpellCast={vi.fn()}
+        reactionUsesUsed={{}}
+        onGatedReaction={onGatedReaction}
+      />
+    );
+    // getByRole single-match pins exactly one press surface (MA-1488 sole-press);
+    // a broken sentinel would print "(999 left)" and trip both the exact-label and
+    // no-digit pins here, so the spent/ledger legs need no per-row restatement.
     const chip = screen.getByRole('button', { name: new RegExp(`^${def.label}`) });
     expect(chip.textContent.trim()).toBe(def.label);
     expect(chip.textContent).not.toMatch(/left|\d/);

@@ -1,25 +1,30 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // EncounterBuilder lane: residual interaction wiring NOT owned by sibling files.
-// This lane uniquely owns: the Join-button selection gate (visibility only — the Join
-// dispatch with exact log/initiative payloads is #399 additional-interactions), the
-// generator modal open → Apply → close wiring (handleApplySuggestion + showGenerator
-// seam), and selected-monster preservation in the table when filters exclude them.
+// This lane uniquely owns: the Join-button selection gate both directions (open on
+// first select, close on deselect — toolbar-labels pins only the appearance half;
+// the Join dispatch with exact log/initiative payloads is #399 additional-
+// interactions), the generator modal open → Apply → close wiring with the
+// empty-vs-non-empty-draft toast legs (handleApplySuggestion + showGenerator
+// seam), selected-monster preservation in the table when filters exclude them,
+// and the default header chrome incl. the party member-tag display (no sibling
+// asserts names+levels render).
 // Owned elsewhere — do NOT duplicate: row qty/remove/Clear All/monster-card byte
 // canon (#406 panel-interactions), sort/Join dispatch/save-modal commit/thresholds
 // (#399 additional-interactions — its save flow subsumes the old openSaveModal spy
 // test here), XP summary (#400 gameplay-flows), localStorage/filter/bands (#401
 // helpers), load hydrate/reconcile (#403 load-encounter), reset (#405 reset-encounter),
-// delete/rename confirmations (uncovered-handlers), modal-null render (rendering
-// lane deleted fix#261 f59d311cd — retired citation, pass #406 stale-byte note),
-// PreviewToggle edit/onChange behavior (PreviewToggle.test.jsx — subsumes the old
-// mocked-textarea description test here).
+// delete/rename confirmations (uncovered-handlers), zero-characters party hint
+// copy/class (kit-classes), PreviewToggle edit/onChange behavior (PreviewToggle.
+// test.jsx — subsumes the old mocked-textarea description test here). The former
+// empty/null-characters it.each was cut (#407 pass): [] duplicates kit-classes'
+// hint test and null is unreachable — App's characters state is useState([]).
 // Runs the REAL filter/summary/table/selected panels, PreviewToggle, and pure
 // encounterGenerator/encountersService math; only hooks, network, and heavy modals
 // are stubbed at the seam. The former hand-written panel-replica mock block was
 // deleted (#406 pattern) — it re-implemented panel logic inside the test and could
 // never fail when the real panels broke.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({
   useMonstersData: vi.fn(),
@@ -75,7 +80,7 @@ const ORC = { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5, type: '
 const MONSTERS = [GOBLIN, ORC, { index: 'dragon', name: 'Young Dragon', xp: 120, challenge_rating: 2, type: 'dragon', environments: ['underground'] }];
 const CHARACTERS = [{ name: 'Thorin', level: 5 }, { name: 'Elara', level: 3 }];
 
-function mountBuilder({ characters = CHARACTERS } = {}) {
+function mountBuilder() {
   // Fresh deep-copied props per render so mutations never bleed between tests.
   const freshMonsters = MONSTERS.map((m) => ({ ...m, environments: [...m.environments] }));
   useMonstersData.mockReturnValue({ monsters: freshMonsters, loading: false });
@@ -96,7 +101,7 @@ function mountBuilder({ characters = CHARACTERS } = {}) {
   return render(
     <EncounterBuilder
       campaignName={CAMPAIGN}
-      characters={characters ? characters.map((c) => ({ ...c })) : characters}
+      characters={CHARACTERS.map((c) => ({ ...c }))}
       onJoinEncounter={vi.fn()}
     />
   );
@@ -182,30 +187,24 @@ describe('EncounterBuilder - residual interactions', () => {
     expect(rowFor(container, 'Orc')).toBeUndefined();
   });
 
-  it('renders default header chrome: title, Save/Load/Generate actions, no Reset, and the party summary', () => {
+  it('renders default header chrome: title, Save/Load/Generate actions, no Reset, and one name+level tag per party member', () => {
     mountBuilder();
 
     expect(screen.getByRole('heading', { level: 2, name: 'Encounter Builder' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toHaveTextContent('Save');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument();
+    // Reset is armed only once a saved encounter is loaded (reset-encounter lane).
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
 
     const party = document.querySelector('.party-summary');
     expect(party).toBeTruthy();
-    expect(within(party).getByText('Thorin')).toBeInTheDocument();
-    expect(within(party).getByText('Lv5')).toBeInTheDocument();
-    expect(within(party).getByText('Elara')).toBeInTheDocument();
-    expect(within(party).getByText('Lv3')).toBeInTheDocument();
-  });
-
-  it.each([
-    ['empty', []],
-    ['null', null],
-  ])('shows the no-characters notice when characters is %s', (_label, characters) => {
-    mountBuilder({ characters });
-    expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
-    expect(document.querySelectorAll('.party-member-tag')).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    // Exactly one tag per mounted character — none dropped, none fabricated.
+    const tags = party.querySelectorAll('.party-member-tag');
+    expect(tags).toHaveLength(CHARACTERS.length);
+    expect(tags[0]).toHaveTextContent('Thorin');
+    expect(tags[0]).toHaveTextContent('Lv5');
+    expect(tags[1]).toHaveTextContent('Elara');
+    expect(tags[1]).toHaveTextContent('Lv3');
   });
 });

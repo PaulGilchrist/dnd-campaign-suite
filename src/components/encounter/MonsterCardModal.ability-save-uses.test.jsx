@@ -1,3 +1,4 @@
+// @maintained-by-ai 2026-11-28
 // MA-0020 modal-lane owner: Aboleth "Dominate Mind (2/Day)" save-row gate as
 // rendered/clicked in MonsterCardModal. Rides the REAL monsters.json row (data
 // pin via literal assertions). Distinct seams, one render per state:
@@ -5,13 +6,16 @@
 //           spend marker + until-clause durationNote (ungated rows: no counter, no marker)
 //   partial → live '(2/Day · 1 left)', still arms
 //   exhausted → refusal popup + dominate_mind_refused log, zero prompts, spent class.
-// Cite-skip owners: gate arithmetic services/encounters/monsterAbilityUses.test.js:105-127
-// (truth-table; ranges refreshed fix#363 #1082); refusal wording #829 block :129-145;
-// spend-at-confirm cycle :146-204 and consumer
-// saveProcessing.failed-save-conditions.test.js; usage-string format
-// MonsterCardHelpers.usage.test.js (#571); generic gated reactions
-// MonsterAction.gated-reaction.test.jsx. No At Will save rows exist in this lane,
-// so the MonsterCardHelpers.js:3022-3027 '999/Day' cosmetic sentinel never surfaces here.
+// Cite-skip owners (describe refs, line drift-tolerant): gate arithmetic
+// services/encounters/monsterAbilityUses.test.js 'MA-0020 gate ladder
+// truth-table'; refusal wording 'MA-0020 refusal notice canonical shape —
+// pinned ONCE (#829)' (exact popup/log bytes pinned THERE, only wiring
+// here); spend-at-confirm cycle 'MA-0020 spend at prompt-confirm' and
+// consumer saveProcessing.failed-save-conditions.test.js; usage-string
+// format MonsterCardHelpers.usage.test.js (#571); generic gated reactions
+// MonsterAction.gated-reaction.test.jsx. No At Will save rows exist in
+// this lane, so the MonsterCardHelpers '999/Day' cosmetic sentinel never
+// surfaces here.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -149,13 +153,16 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
     expect(rollSavingThrow.mock.calls[1][2].monsterAbilityUse).toBeUndefined();
   });
 
-  it('one use spent: live counter shows 1 left, click still arms the save', () => {
+  it('one use spent: live counter shows 1 left, click still arms with the spend marker attached', () => {
     renderAboleth({ 'Dominate Mind': 1 });
     const link = saveLink('Dominate Mind');
     expect(link.textContent).toMatch(/\(2\/Day · 1 left\)/);
     expect(link.className).not.toContain('mc-dice-link-spell-spent');
     fireEvent.click(link);
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);
+    // Partial state must NOT degrade to a free cast: marker still armed.
+    expect(rollSavingThrow.mock.calls[0][2].monsterAbilityUse)
+      .toEqual({ useKey: 'Dominate Mind', maxUses: 2, actionName: 'Dominate Mind (2/Day)' });
   });
 
   it('exhausted (2/2): popup + dominate_mind_refused log, zero save prompts, counter 0 left + spent class', () => {
@@ -171,8 +178,6 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
     const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'dominate_mind_refused');
     expect(refusal).toBeTruthy();
     expect(refusal.characterName).toBe('Aboleth 1');
-    expect(refusal.description).toMatch(/already used Dominate Mind today \(2\/Day\)/);
+    // refusal description bytes are pinned ONCE in #829; wiring only here.
   });
 });
-
-// @maintained-by-ai 2026-10-18

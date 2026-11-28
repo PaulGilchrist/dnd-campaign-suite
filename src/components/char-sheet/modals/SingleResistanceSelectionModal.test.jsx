@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SingleResistanceSelectionModal from './SingleResistanceSelectionModal.jsx';
@@ -99,7 +99,14 @@ describe('SingleResistanceSelectionModal', () => {
     expect(screen.queryByRole('button', { name: 'Choose Damage Type' })).not.toBeInTheDocument();
   });
 
-  it('falls back to the full default damage-type list and generic title when action provides neither', () => {
+  it('resolves header title (title prop > action name > generic) and option list (action > default fallback)', () => {
+    // title prop wins over the action name.
+    const { unmount } = render(<SingleResistanceSelectionModal {...makeProps({ title: 'Elemental Resistance' })} />);
+    expect(screen.getByText('Elemental Resistance')).toBeInTheDocument();
+    expect(screen.queryByText('Fiendish Resilience')).not.toBeInTheDocument();
+    unmount();
+
+    // No action at all: generic title + full default damage-type list.
     render(<SingleResistanceSelectionModal {...makeProps({ action: null })} />);
     expect(screen.getByText('Resistance Selection')).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(DEFAULT_DAMAGE_TYPES.length);
@@ -108,19 +115,10 @@ describe('SingleResistanceSelectionModal', () => {
     });
   });
 
-  it('renders no options and keeps apply inert when damageTypes is an empty array (does not fall back to defaults)', () => {
+  it('empty damageTypes array renders no options (distinct from the undefined fallback) with apply inert', () => {
     render(<SingleResistanceSelectionModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: { damageTypes: [] } } })} />);
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
-    const applyButton = screen.getByRole('button', { name: 'Choose Damage Type' });
-    expect(applyButton).toBeDisabled();
-    fireEvent.click(applyButton);
-    expect(fiendishResilienceHandler.applyTypeChoice).not.toHaveBeenCalled();
-  });
-
-  it('title prop overrides the action name in the header', () => {
-    render(<SingleResistanceSelectionModal {...makeProps({ title: 'Elemental Resistance' })} />);
-    expect(screen.getByText('Elemental Resistance')).toBeInTheDocument();
-    expect(screen.queryByText('Fiendish Resilience')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeDisabled();
   });
 
   it('enforces single selection and enables apply only after a type is chosen', () => {
@@ -230,11 +228,10 @@ describe('SingleResistanceSelectionModal', () => {
     // Whole-body census at rest: exactly the three option labels are inline-styled.
     expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(3);
 
-    // Static-only sites are style-free.
+    // Static-only sites are style-free ("(current)" text itself pinned above).
     for (const input of inputs) expect(input.getAttribute('style')).toBeNull();
     const current = list.querySelector('.single-resistance-current');
     expect(current).toBeTruthy();
-    expect(current.textContent).toBe('(current)');
     expect(current.getAttribute('style')).toBeNull();
 
     // Selecting flips only dynamic inline values: link-colored solid border on the

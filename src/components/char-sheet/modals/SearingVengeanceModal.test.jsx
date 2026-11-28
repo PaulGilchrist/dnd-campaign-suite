@@ -1,12 +1,12 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // SearingVengeanceModal is a thin props adapter over shared/CreatureSelectionModal.jsx
-// (selection, gating, and map-overlay behavior are covered by shared/CreatureSelectionModal.test.jsx).
-// This file pins what is unique to this seam: the hardcoded Searing Vengeance copy (verified
-// against public/data/2024/classes.json), the `creatureTargets || []` guard, and the confirm/skip
-// payloads emitted through the REAL shared modal — this lane real-mounts the modal with no vi.mock
-// (render(<SearingVengeanceModal .../>) at :36 et al. drives the actual CreatureSelectionModal DOM).
-// NOT "ZealousPresenceModal precedent" (that cite was stale): the sibling ZealousPresenceModal.test.jsx
-// MOCKS CreatureSelectionModal (:19-24) and captures props — it never renders the shared modal.
+// (selection toggling, empty/disabled gating, confirm ordering, and overlay behavior are covered
+// by shared/CreatureSelectionModal.test.jsx — do not re-add those here). This file pins only what
+// is unique to this seam: the hardcoded Searing Vengeance copy (30 ft, 2d8 + CHA Radiant, Blinded —
+// matching the automation metadata in public/data/2024/classes.json "Searing Vengeance"), the
+// `creatureTargets || []` guard, and that the creatureTargets/onConfirm/onSkip props wire into the
+// REAL shared modal (this lane real-mounts with no vi.mock). The CharReactions.* siblings all
+// vi.mock this modal, so nothing here is duplicated elsewhere.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SearingVengeanceModal from './SearingVengeanceModal';
@@ -39,7 +39,8 @@ describe('SearingVengeanceModal', () => {
     const { container } = render(<SearingVengeanceModal {...props} />);
 
     expect(screen.getByText('Searing Vengeance')).toBeInTheDocument();
-    expect(container.querySelector('.sp-header i.fa-solid.fa-fire')).toBeInTheDocument();
+    // Pin only the adapter-chosen icon token; header markup placement belongs to the shared modal.
+    expect(container.querySelector('i.fa-fire')).toBeInTheDocument();
     expect(screen.getByText(
       'Select creatures within 30 feet to unleash radiant energy upon.'
     )).toBeInTheDocument();

@@ -1,11 +1,10 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — action-handler wiring lane: popup-confirm dispatch args, SoF cast threading, prepared-spell cap writes, latch-reset gate, sheet event listeners
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import rulesFactory from '../../services/rules/rulesFactory.js';
-import { activateWildShape } from '../../services/automation/handlers/class-druid/wildShapeCreatureBuilder.js';
 import { confirmPolymorphTransform } from '../../services/automation/handlers/spells/polymorphService.js';
 import { confirmShapechangeTransform } from '../../services/automation/handlers/spells/shapechangeService.js';
 import { applyAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js';
@@ -219,7 +218,6 @@ vi.mock('../../hooks/combat/useSharedPopup.js', () => {
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => mockStore),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn((key, prop, _camp) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
@@ -256,6 +254,11 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 const CAMPAIGN = 'test-campaign';
 const CHARACTER = 'Test Character';
 const BEAST = { name: 'Giant Eagle', cr: 1 };
+// Deliberately NOT equal to CAMPAIGN: popup-threaded handlers receive the
+// popup's campaignName while props-threaded handlers (Animal Shapes, Shield of
+// Faith) receive the component's. Identical values would let a mutant swap the
+// two sources silently.
+const POPUP_CAMPAIGN = 'popup-campaign';
 
 let stats;
 let props;
@@ -278,6 +281,9 @@ beforeEach(() => {
   mockStore.clear();
   stats = createMockPlayerStats();
   vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
+  // resetTestState's clearAllMocks keeps mockReturnValue/mockResolvedValue
+  // (leak class): re-baseline every mid-test-overridable stub here.
+  vi.mocked(applyShieldOfFaith).mockResolvedValue(null);
   props = createDefaultProps();
 });
 
@@ -286,31 +292,10 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('shape-change popup confirms dispatch to their services', () => {
+  // Wild Shape confirm is NOT restated here — CharSheet.wild-shape-chooser.test.jsx
+  // owns it stronger (exact shape_shift buff stamp + these same
+  // activateWildShape args + popup close).
   it.each([
-    {
-      label: 'Wild Shape',
-      popupHtml: {
-        type: 'wild_shape_select',
-        // Production shape: the payload echoes the sheet row, which always carries
-        // its automation (confirm stamps the shape_shift buff from these bytes).
-        action: {
-          name: 'Wild Shape',
-          automation: {
-            type: 'temp_buff',
-            effect: 'shape_shift',
-            action: 'bonus_action',
-            duration: 'half_druid_level_hours',
-            casting_time: '1 bonus action',
-            blocksSpellcasting: true,
-          },
-        },
-        playerStats: { name: CHARACTER },
-        campaignName: CAMPAIGN,
-      },
-      service: activateWildShape,
-      // Wild Shape forwards popupHtml.playerStats (the sheet copy), not component state.
-      expectedArgs: () => [CHARACTER, BEAST, { name: CHARACTER }, CAMPAIGN],
-    },
     {
       label: 'Polymorph',
       popupHtml: {
@@ -320,7 +305,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
         casterName: CHARACTER,
         spell: { name: 'Polymorph' },
         spellLevel: 5,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
       },
       service: confirmPolymorphTransform,
       expectedArgs: () => [{
@@ -330,7 +315,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
         spell: { name: 'Polymorph' },
         spellLevel: 5,
         playerStats: stats,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
       }],
     },
     {
@@ -343,7 +328,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
         spell: { name: 'Shapechange' },
         spellLevel: 9,
         formChange: true,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
       },
       service: confirmShapechangeTransform,
       expectedArgs: () => [{
@@ -353,8 +338,33 @@ describe('shape-change popup confirms dispatch to their services', () => {
         spell: { name: 'Shapechange' },
         spellLevel: 9,
         playerStats: stats,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
         formChange: true,
+      }],
+    },
+    {
+      // Negative leg of the !! coercion: a popup without formChange must
+      // forward false, not true/undefined.
+      label: 'Shapechange without formChange',
+      popupHtml: {
+        type: 'shapechange_select',
+        maxCR: 9,
+        targetName: 'Ally One',
+        casterName: CHARACTER,
+        spell: { name: 'Shapechange' },
+        spellLevel: 9,
+        campaignName: POPUP_CAMPAIGN,
+      },
+      service: confirmShapechangeTransform,
+      expectedArgs: () => [{
+        targetName: 'Ally One',
+        form: BEAST,
+        casterName: CHARACTER,
+        spell: { name: 'Shapechange' },
+        spellLevel: 9,
+        playerStats: stats,
+        campaignName: POPUP_CAMPAIGN,
+        formChange: false,
       }],
     },
     {
@@ -366,7 +376,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
         casterName: CHARACTER,
         spell: { name: 'True Polymorph' },
         spellLevel: 9,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
       },
       service: confirmTruePolymorphTransform,
       // Default mode when the popup carries none.
@@ -377,11 +387,11 @@ describe('shape-change popup confirms dispatch to their services', () => {
         spell: { name: 'True Polymorph' },
         spellLevel: 9,
         playerStats: stats,
-        campaignName: CAMPAIGN,
+        campaignName: POPUP_CAMPAIGN,
         mode: 'creature_to_creature',
       }],
     },
-  ])('confirming $label closes the popup and calls the transform service', async ({ popupHtml, service, expectedArgs }) => {
+  ])('confirming $label closes the popup once and calls the transform service', async ({ popupHtml, service, expectedArgs }) => {
     setPopup(sharedPopupReturnValue, popupHtml);
     await renderSheet();
 
@@ -390,16 +400,19 @@ describe('shape-change popup confirms dispatch to their services', () => {
 
     expect(service).toHaveBeenCalledTimes(1);
     expect(service).toHaveBeenCalledWith(...expectedArgs());
+    expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledTimes(1);
     expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledWith(null);
   });
 
   it('confirming Animal Shapes clears the popup and applies the target-beast map', async () => {
     const targetBeastMap = { 'Ally One': BEAST };
+    // The popup carries its own campaignName, but this handler threads the
+    // COMPONENT's campaign prop — the distinct POPUP_CAMPAIGN value proves it.
     setPopup(sharedPopupReturnValue, {
       type: 'animal_shapes_target_selection',
       targets: [{ name: 'Ally One' }],
       maxCR: 4,
-      campaignName: CAMPAIGN,
+      campaignName: POPUP_CAMPAIGN,
     });
     await renderSheet();
 
@@ -414,6 +427,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
       playerStats: stats,
       campaignName: CAMPAIGN,
     });
+    expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledTimes(1);
     expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledWith(null);
   });
 
@@ -424,7 +438,7 @@ describe('shape-change popup confirms dispatch to their services', () => {
       type: 'true_polymorph_object',
       casterName: CHARACTER,
       spell,
-      campaignName: CAMPAIGN,
+      campaignName: POPUP_CAMPAIGN,
     });
     await renderSheet();
 
@@ -437,9 +451,10 @@ describe('shape-change popup confirms dispatch to their services', () => {
       objectType: 'statue',
       casterName: CHARACTER,
       spell,
-      campaignName: CAMPAIGN,
+      campaignName: POPUP_CAMPAIGN,
       playerStats: stats,
     });
+    expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledWith(null);
   });
 });
 
@@ -449,6 +464,10 @@ describe('shape-change popup confirms dispatch to their services', () => {
 
 describe('Shield of Faith target selection', () => {
   it('casts on the selected target and shows the result popup, closing when the cast fails', async () => {
+    // The cast threads the COMPONENT's campaign prop (the popup payload
+    // carries none) — a value distinct from CAMPAIGN proves that source.
+    const SOF_CAMPAIGN = 'sheet-campaign';
+    props = createDefaultProps({ campaignName: SOF_CAMPAIGN });
     const popupHtml = {
       type: 'shield_of_faith_target_selection',
       creatureTargets: ['Ally One', 'Ally Two'],
@@ -463,16 +482,23 @@ describe('Shield of Faith target selection', () => {
     const modalProps = await lastModalProps('./modals/shared/SecondaryTargetModal.jsx');
     await act(async () => { await modalProps.onTargetSelected('Ally One'); });
 
+    expect(applyShieldOfFaith).toHaveBeenCalledTimes(1);
     expect(applyShieldOfFaith).toHaveBeenCalledWith({
       name: 'Shield of Faith',
       spell: { duration: popupHtml.duration, range: popupHtml.range },
       automation: { type: 'shield_of_faith' },
-    }, stats, CAMPAIGN, null, ['Ally One']);
-    expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenCalledWith(resultPayload);
+    }, stats, SOF_CAMPAIGN, null, ['Ally One']);
+    expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenLastCalledWith(resultPayload);
 
     // Failed cast (no result) closes the popup instead of showing a payload.
     vi.mocked(applyShieldOfFaith).mockResolvedValue(null);
     await act(async () => { await modalProps.onTargetSelected('Ally Two'); });
+    expect(applyShieldOfFaith).toHaveBeenCalledTimes(2);
+    expect(applyShieldOfFaith).toHaveBeenLastCalledWith({
+      name: 'Shield of Faith',
+      spell: { duration: popupHtml.duration, range: popupHtml.range },
+      automation: { type: 'shield_of_faith' },
+    }, stats, SOF_CAMPAIGN, null, ['Ally Two']);
     expect(sharedPopupReturnValue.setPopupHtml).toHaveBeenLastCalledWith(null);
   });
 });
@@ -516,6 +542,15 @@ describe('handleTogglePreparedSpells', () => {
     await toggle('Fireball');
     expect(mockStore.get(`${CHARACTER}:preparedSpells`)).toEqual(['Fireball']);
     expect((await passedSpells()).find(s => s.name === 'Fireball').prepared).toBe('Prepared');
+    // Mock store keys ignore campaignName, and the hitPoints publish effect
+    // re-fires on every stats change — census the preparedSpells writes only,
+    // with full 4-arg shape.
+    const preparedWrites = vi.mocked(setRuntimeValue).mock.calls.filter(([, prop]) => prop === 'preparedSpells');
+    expect(preparedWrites).toEqual([
+      [CHARACTER, 'preparedSpells', ['Shield'], CAMPAIGN],
+      [CHARACTER, 'preparedSpells', [], CAMPAIGN],
+      [CHARACTER, 'preparedSpells', ['Fireball'], CAMPAIGN],
+    ]);
   });
 });
 
@@ -530,6 +565,8 @@ describe('runtime sync on load', () => {
     await waitFor(() => {
       expect(mockStore.get(`${CHARACTER}:hitPoints`)).toEqual({ current: 40, max: 40 });
     });
+    // Store keys ignore campaignName — pin the full 4-arg publish call.
+    expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'hitPoints', { current: 40, max: 40 }, CAMPAIGN);
     // Write-only-if-changed gate: absence already means "latch unused" to every
     // reader, so opening a fresh sheet must NOT seed the paladin-flavored key
     // into the bucket (the old unconditional false POST ghosted it onto every
@@ -595,11 +632,12 @@ describe('counterspell and dispel magic save-result events', () => {
         counterspellResult: 'counterspell fails',
       },
     }));
-    expect(setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
+    // Full-shape pins: exactly {type, name, description} — no extra/missing keys.
+    expect(setPopupHtml).toHaveBeenLastCalledWith({
       type: 'automation_info',
       name: 'Counterspell',
-    }));
-    expect(setPopupHtml.mock.calls.at(-1)[0].description).toContain("Goblin Boss's 'Fireball' counterspell fails — Goblin Boss fails their CON save (DC 15).");
+      description: "Goblin Boss's 'Fireball' counterspell fails — Goblin Boss fails their CON save (DC 15).",
+    });
 
     // Events missing required fields or aimed at another caster must not touch the popup.
     const callsWithoutPopup = setPopupHtml.mock.calls.length;
@@ -614,15 +652,21 @@ describe('counterspell and dispel magic save-result events', () => {
     window.dispatchEvent(new CustomEvent('spell-result', {
       detail: { casterName: CHARACTER, targetName: 'Goblin Boss', checkBonus: 7, targetDC: 13, total: 15, checkFailed: false },
     }));
-    expect(setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
+    expect(setPopupHtml).toHaveBeenLastCalledWith({
       type: 'automation_info',
       name: 'Dispel Magic',
-    }));
-    expect(setPopupHtml.mock.calls.at(-1)[0].description).toContain('Goblin Boss: ability check 15 (+7) vs DC 13 — spell ended.');
+      description: 'Goblin Boss: ability check 15 (+7) vs DC 13 — spell ended.',
+    });
 
+    // CLA-322 negative leg: a failed check flips both the total/sign math and
+    // the outcome phrase.
     window.dispatchEvent(new CustomEvent('spell-result', {
       detail: { casterName: CHARACTER, targetName: 'Goblin Boss', checkBonus: 1, targetDC: 18, total: 11, checkFailed: true },
     }));
-    expect(setPopupHtml.mock.calls.at(-1)[0].description).toContain('failed, spell not stopped');
+    expect(setPopupHtml).toHaveBeenLastCalledWith({
+      type: 'automation_info',
+      name: 'Dispel Magic',
+      description: 'Goblin Boss: ability check 11 (+1) vs DC 18 — failed, spell not stopped.',
+    });
   });
 });

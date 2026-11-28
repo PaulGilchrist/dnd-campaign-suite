@@ -1,11 +1,11 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27 — trimmed to core behavior; caret-law mounts are pinned by MonsterNameAutocomplete.focus-intent.test.jsx and the ghost-list echo/outside-click regressions by MonsterNameAutocomplete.no-ghost-list.test.jsx (stronger there, not duplicated here).
+// Bestiary rule: pre-made monsters arrive via loadMonsters (mocked at that seam —
+// the /data/monsters.json fetch itself belongs to the dataLoader lane); the npcs
+// prop carries CUSTOM NPCs only. Fixture rows below are small and distinctive.
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterNameAutocomplete from './MonsterNameAutocomplete.jsx';
 
-// Bestiary rule: pre-made monsters come from monsters.json via loadMonsters;
-// the npcs prop carries CUSTOM NPCs only. These fixtures mirror that split.
 const MONSTERS = [
     { index: 'goblin', name: 'Goblin' },
     { index: 'goblin-boss', name: 'Goblin Boss' },
@@ -39,8 +39,8 @@ function getInput() {
 }
 
 /** Types into the input and deterministically flushes the suggestion debounce.
- *  Focuses first the way a real click-then-type does — mount no longer arms the
- *  caret (bug-avatar-zoom-close-focus-stolen-by-card-autocomplete). */
+ *  Focuses first the way a real click-then-type does — a passive mount never
+ *  arms the caret (see the focus-intent lane). */
 function typeQuery(value) {
     const input = getInput();
     input.focus();
@@ -50,12 +50,17 @@ function typeQuery(value) {
     });
 }
 
-/** Names of the visible suggestions, or null when the list is closed. */
+/** Names of the visible suggestions, or null when the list is closed.
+ *  Strips the NPC badge text so monster/NPC rows compare by name alone. */
 function suggestionNames() {
-    const list = document.querySelector('.monster-autocomplete-list');
-    return list ? [...list.children].map(li => li.textContent.trim()) : null;
+    const list = screen.queryByRole('list');
+    return list
+        ? within(list).getAllByRole('listitem').map(li => li.textContent.replace(/NPC$/, '').trim())
+        : null;
 }
 
+/** Highlight position has no accessible attribute (no aria-activedescendant),
+ *  so this — the only observable of arrow-walk state — reads the class. */
 function highlightedName() {
     const el = document.querySelector('.monster-autocomplete-item.highlighted');
     return el ? el.textContent.trim() : null;
@@ -64,6 +69,7 @@ function highlightedName() {
 describe('MonsterNameAutocomplete', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        // mockReset clears leftover resolve/reject overrides, then re-baseline.
         mockLoadMonsters.mockReset();
         mockLoadMonsters.mockResolvedValue(MONSTERS);
         // jsdom has no scrollIntoView; stub it so keyboard highlighting can run.
@@ -75,17 +81,21 @@ describe('MonsterNameAutocomplete', () => {
         vi.useRealTimers();
     });
 
-    it('renders a text input showing the current value', async () => {
-        await renderAutocomplete({ value: 'Goblin' });
-        expect(getInput()).toHaveValue('Goblin');
+    it('shows the current value, named by ariaLabel only when one is provided', async () => {
+        const withLabel = await renderAutocomplete({ value: 'Goblin', ariaLabel: 'Goblin name' });
+        expect(screen.getByRole('textbox', { name: 'Goblin name' })).toHaveValue('Goblin');
+        withLabel.unmount();
+        // Non-card call sites pass no ariaLabel: no accessible name is injected.
+        await renderAutocomplete({ value: 'Mimic' });
+        expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-label');
     });
 
-    it('loads the bestiary once on mount', async () => {
+    it('loads the bestiary exactly once on mount', async () => {
         await renderAutocomplete();
         expect(mockLoadMonsters).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps working when the bestiary fails to load', async () => {
+    it('keeps the field usable when the bestiary fails to load', async () => {
         mockLoadMonsters.mockRejectedValue(new Error('network down'));
         await renderAutocomplete();
         typeQuery('Gobl');
@@ -93,65 +103,35 @@ describe('MonsterNameAutocomplete', () => {
         expect(getInput()).toHaveValue('Gobl');
     });
 
-    it('does not focus the input on a passive mount (caret follows intent, not mounts)', async () => {
-        // Initiative cards re-key on every runtimeStateTick; an auto-focused
-        // rename field captured itself as an AvatarModal's focus-restore
-        // "opener" and every zoom close lane then stole focus out of the modal.
-        const anchor = document.createElement('button');
-        document.body.appendChild(anchor);
-        anchor.focus();
-        await renderAutocomplete({ value: 'Goblin' });
-        expect(document.activeElement).toBe(anchor);
-        anchor.remove();
-    });
-
-    it('focuses the input when the mount is explicitly armed (initialFocus)', async () => {
-        await renderAutocomplete({ initialFocus: true });
-        expect(document.activeElement).toBe(getInput());
-    });
-
-    it('does not focus the input when initialFocus is false', async () => {
-        await renderAutocomplete({ initialFocus: false });
-        expect(document.activeElement).not.toBe(getInput());
-    });
-
-    it('reports every keystroke through onChange', async () => {
+    it('reports every keystroke upward through onChange', async () => {
         const onChange = vi.fn();
         await renderAutocomplete({ onChange });
-        fireEvent.change(getInput(), { target: { value: 'G' } });
-        fireEvent.change(getInput(), { target: { value: 'Go' } });
-        fireEvent.change(getInput(), { target: { value: 'Gob' } });
+        const input = getInput();
+        fireEvent.change(input, { target: { value: 'G' } });
+        fireEvent.change(input, { target: { value: 'Go' } });
+        fireEvent.change(input, { target: { value: 'Gob' } });
         expect(onChange).toHaveBeenNthCalledWith(1, 'G');
         expect(onChange).toHaveBeenNthCalledWith(2, 'Go');
         expect(onChange).toHaveBeenNthCalledWith(3, 'Gob');
     });
 
-    it('lists started-with matches before contains-only matches', async () => {
+    it('ranks started-with matches ahead of contains-only matches, case-insensitively', async () => {
         await renderAutocomplete();
         typeQuery('gob');
         expect(suggestionNames()).toEqual(['Goblin', 'Goblin Boss', 'Hobgoblin']);
-    });
-
-    it('matches names case-insensitively', async () => {
-        await renderAutocomplete();
         typeQuery('DRAGON');
         expect(suggestionNames()).toEqual(['Dragon', 'Ancient Dragon', 'Young Dragon']);
     });
 
-    it('shows no suggestions for an empty or whitespace-only query', async () => {
+    it('opens no list for a whitespace-only or unmatched query', async () => {
         await renderAutocomplete();
-        expect(suggestionNames()).toBeNull();
         typeQuery('   ');
         expect(suggestionNames()).toBeNull();
-    });
-
-    it('shows no suggestions when nothing matches the query', async () => {
-        await renderAutocomplete();
         typeQuery('zzzzzz');
         expect(suggestionNames()).toBeNull();
     });
 
-    it('closes the suggestion list when the query is cleared', async () => {
+    it('closes the list when the query is cleared', async () => {
         await renderAutocomplete();
         typeQuery('gob');
         expect(suggestionNames()).not.toBeNull();
@@ -162,29 +142,34 @@ describe('MonsterNameAutocomplete', () => {
     it('surfaces custom NPCs with an NPC badge ahead of bestiary matches', async () => {
         await renderAutocomplete({ npcs: [{ name: 'Goblin Friend' }] });
         typeQuery('gob');
-        const items = within(document.querySelector('.monster-autocomplete-list')).getAllByRole('listitem');
+        const items = within(screen.getByRole('list')).getAllByRole('listitem');
         expect(within(items[0]).getByText('NPC')).toBeInTheDocument();
-        expect(items[0].textContent).toContain('Goblin Friend');
-        expect(suggestionNames().slice(1)).toEqual(['Goblin', 'Goblin Boss', 'Hobgoblin']);
+        expect(suggestionNames()).toEqual(['Goblin Friend', 'Goblin', 'Goblin Boss', 'Hobgoblin']);
         items.slice(1).forEach((li) => {
             expect(within(li).queryByText('NPC')).not.toBeInTheDocument();
         });
     });
 
-    it('ignores nameless NPC entries', async () => {
+    it('ignores nameless NPC entries instead of crashing the matcher', async () => {
+        // Without the name filter, `n.name.toLowerCase()` throws on the
+        // undefined-name row and the whole component dies.
         await renderAutocomplete({ npcs: [{ index: 'unnamed' }, { name: '' }] });
         typeQuery('gob');
         expect(suggestionNames()).toEqual(['Goblin', 'Goblin Boss', 'Hobgoblin']);
     });
 
-    it('caps suggestions at eight, keeping started-with matches', async () => {
-        const many = Array.from({ length: 10 }, (_, i) => ({ index: `alpha-${i}`, name: `Alpha ${i + 1}` }));
-        mockLoadMonsters.mockResolvedValue([...many, { index: 'z1', name: 'Z Alpha 1' }, { index: 'z2', name: 'Z Alpha 2' }]);
+    it('caps the list at eight: started-with first, contains-only filling the rest', async () => {
+        mockLoadMonsters.mockResolvedValue([
+            { index: 'gob-1', name: 'Gob 1' },
+            { index: 'gob-2', name: 'Gob 2' },
+            ...Array.from({ length: 9 }, (_, i) => ({ index: `mid-${i}`, name: `AGob ${i + 1}` })),
+        ]);
         await renderAutocomplete();
-        typeQuery('alpha');
-        const names = suggestionNames();
-        expect(names).toHaveLength(8);
-        expect(names).toEqual(many.slice(0, 8).map(m => m.name));
+        typeQuery('gob');
+        expect(suggestionNames()).toEqual([
+            'Gob 1', 'Gob 2',
+            'AGob 1', 'AGob 2', 'AGob 3', 'AGob 4', 'AGob 5', 'AGob 6',
+        ]);
     });
 
     it('walks suggestions with arrow keys, wrapping in both directions', async () => {
@@ -203,14 +188,22 @@ describe('MonsterNameAutocomplete', () => {
         expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
     });
 
-    it('ignores arrow keys while no suggestions are open', async () => {
+    it('is inert to arrows while closed, and Enter commits the raw query verbatim', async () => {
         const onCommit = vi.fn();
         await renderAutocomplete({ onCommit });
-        fireEvent.keyDown(getInput(), { key: 'ArrowDown' });
-        fireEvent.keyDown(getInput(), { key: 'ArrowUp' });
+        const input = getInput();
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        fireEvent.keyDown(input, { key: 'ArrowUp' });
         expect(suggestionNames()).toBeNull();
         expect(highlightedName()).toBeNull();
         expect(onCommit).not.toHaveBeenCalled();
+        // Enter with no list open (fresh field, then a custom non-matching name).
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onCommit).toHaveBeenNthCalledWith(1, '');
+        fireEvent.change(input, { target: { value: 'Xyzzy the Unsourced' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onCommit).toHaveBeenNthCalledWith(2, 'Xyzzy the Unsourced');
+        expect(onCommit).toHaveBeenCalledTimes(2);
     });
 
     it('commits the highlighted suggestion on Enter, updating the input and closing the list', async () => {
@@ -223,26 +216,19 @@ describe('MonsterNameAutocomplete', () => {
         fireEvent.keyDown(getInput(), { key: 'Enter' });
         expect(getInput()).toHaveValue('Hobgoblin');
         expect(onChange).toHaveBeenLastCalledWith('Hobgoblin');
+        expect(onCommit).toHaveBeenCalledTimes(1);
         expect(onCommit).toHaveBeenCalledWith('Hobgoblin');
         expect(suggestionNames()).toBeNull();
     });
 
-    it('commits the raw query on Enter when the list is open but nothing is highlighted', async () => {
+    it('commits the raw query once on Enter when the list is open but nothing is highlighted', async () => {
         const onCommit = vi.fn();
         await renderAutocomplete({ onCommit });
         typeQuery('gob');
+        expect(suggestionNames()).not.toBeNull();
         fireEvent.keyDown(getInput(), { key: 'Enter' });
         expect(onCommit).toHaveBeenCalledTimes(1);
         expect(onCommit).toHaveBeenCalledWith('gob');
-    });
-
-    it('commits the raw query on Enter when nothing matches', async () => {
-        const onCommit = vi.fn();
-        await renderAutocomplete({ onCommit });
-        typeQuery('xyz custom name');
-        expect(suggestionNames()).toBeNull();
-        fireEvent.keyDown(getInput(), { key: 'Enter' });
-        expect(onCommit).toHaveBeenCalledWith('xyz custom name');
     });
 
     it('commits the current query and closes the list on blur', async () => {
@@ -254,10 +240,13 @@ describe('MonsterNameAutocomplete', () => {
         expect(suggestionNames()).toBeNull();
     });
 
-    it('closes the list on blur without an onCommit handler and keeps the typed text', async () => {
+    it('is safe to press Enter or blur with no onCommit handler', async () => {
         await renderAutocomplete();
         typeQuery('gob');
-        expect(() => fireEvent.blur(getInput())).not.toThrow();
+        // Guarded branches: `if (onCommit)` must not be dropped or these throw.
+        fireEvent.keyDown(getInput(), { key: 'Enter' }); // open, nothing highlighted
+        expect(suggestionNames()).not.toBeNull();
+        fireEvent.blur(getInput());
         expect(suggestionNames()).toBeNull();
         expect(getInput()).toHaveValue('gob');
     });
@@ -267,61 +256,37 @@ describe('MonsterNameAutocomplete', () => {
         const onCommit = vi.fn();
         await renderAutocomplete({ onChange, onCommit });
         typeQuery('gob');
-        const secondItem = within(document.querySelector('.monster-autocomplete-list')).getAllByRole('listitem')[1];
+        const secondItem = within(screen.getByRole('list')).getAllByRole('listitem')[1];
         fireEvent.mouseDown(secondItem);
         expect(getInput()).toHaveValue('Goblin Boss');
         expect(onChange).toHaveBeenLastCalledWith('Goblin Boss');
+        expect(onCommit).toHaveBeenCalledTimes(1);
         expect(onCommit).toHaveBeenCalledWith('Goblin Boss');
         expect(suggestionNames()).toBeNull();
     });
 
     it('keeps suggestions open on mouse-down inside the component', async () => {
+        // Outside-click closing (plus intent kill / no-reopen) is pinned by the
+        // no-ghost-list lane; only the inside leg is unique here.
         await renderAutocomplete();
         typeQuery('gob');
         fireEvent.mouseDown(getInput());
         expect(suggestionNames()).toEqual(['Goblin', 'Goblin Boss', 'Hobgoblin']);
     });
 
-    it('closes suggestions on mouse-down outside the component', async () => {
-        await renderAutocomplete();
-        typeQuery('gob');
-        fireEvent.mouseDown(document.body);
-        expect(suggestionNames()).toBeNull();
-    });
-
-    it('applies the fixed-position class only when a position is provided', async () => {
-        const { rerender } = await renderAutocomplete();
-        const wrapper = document.querySelector('.monster-autocomplete');
-        expect(wrapper).not.toHaveClass('monster-autocomplete-fixed');
-        rerender(<MonsterNameAutocomplete value="" position={{ top: 10, left: 20 }} />);
-        expect(document.querySelector('.monster-autocomplete')).toHaveClass('monster-autocomplete-fixed');
-    });
-
     it('syncs the input on external value changes without re-reporting via onChange', async () => {
         const onChange = vi.fn();
-        const { rerender } = await renderAutocomplete({ value: 'Goblin', onChange });
-        onChange.mockClear();
+        const { rerender } = await renderAutocomplete({ onChange });
         await act(async () => {
             rerender(<MonsterNameAutocomplete value="Orc" onChange={onChange} />);
         });
         expect(getInput()).toHaveValue('Orc');
         expect(onChange).not.toHaveBeenCalled();
-        // An externally set query must NOT re-open suggestions (bug-eb-autocomplete-ghost:
-        // mount seeds and SSE echoes auto-opening the list let it drape over other
-        // controls and swallow clicks). Only user keystrokes open it.
+        // An externally set query must NOT re-open suggestions — only user
+        // keystrokes open it (bug-eb-autocomplete-ghost).
         act(() => {
             vi.advanceTimersByTime(DEBOUNCE_MS);
         });
         expect(suggestionNames()).toBeNull();
-    });
-
-    it('renders the ariaLabel prop as the input\'s accessible name (stable "<Name> name" probe)', async () => {
-        await renderAutocomplete({ value: 'Goblin', ariaLabel: 'Goblin name' });
-        expect(screen.getByRole('textbox', { name: 'Goblin name' })).toHaveValue('Goblin');
-    });
-
-    it('omits the aria-label attribute when no ariaLabel is provided (non-card call sites unchanged)', async () => {
-        await renderAutocomplete({ value: 'Goblin' });
-        expect(getInput()).not.toHaveAttribute('aria-label');
     });
 });

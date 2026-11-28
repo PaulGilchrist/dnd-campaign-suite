@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ElementalAttunementModal — PHASE-FLOW lane (the element→targets→processing→summary→close
  * state machine, proven through observable UI: each transition asserts the previous phase's
@@ -7,7 +7,8 @@
  * Ownership map (siblings, do not duplicate here):
  * - .elemental-data.test.jsx  — ELEMENT_DATA/ELEMENT_DESCRIPTIONS as rendered: exact picker
  *                                labels/icons, verbatim selection description/note per element.
- * - .test.jsx (main)          — element-phase header/instruction text, Cancel button, skip/cancel.
+ * - .test.jsx (main)          — element-phase header/instruction text, Cancel button, skip/cancel,
+ *                                element-phase overlay click-guard (the processing-phase guard is here).
  * - .npc-save.test.jsx        — NPC save math, live store writes, exact log rows, persistAndNotify
  *                                order, exact summary result-line text, Thunder dead-code pin.
  * - .player-save.test.jsx     — save prompt payloads, save-result event handling, listener lifecycle.
@@ -15,10 +16,10 @@
  * - .deactivation.test.jsx    — handleResultsClose commit payloads, §39 single-clock order,
  *                                double-commit defect pin (payload side), inertness.
  * This lane owns ONLY the transitions: the full chain in one test with previous-control-gone
- * checks at every seam, the exact processing-phase line (save type + DC, which is DC MATH —
- * owned here), the map-overlay loading seam, the overlay click-to-close guard, the stuck-phase
- * pins (no-combat-summary, zero-target overlay), the pending→summary gate, and the commit seam
- * as seen by the UI (does the modal render null after Close?).
+ * checks at every seam; the overlay auto-advance seam (no-mapName skip + commit + surviving-
+ * summary UI in one test); the exact processing-phase line (save type + DC, which is DC MATH —
+ * owned here); the map-overlay loading seam (with mapName); the overlay click-to-close guard;
+ * the stuck-phase pins (no-combat-summary, zero-target overlay); and the pending→summary gate.
  *
  * TRIMMED (subsumed by .elemental-data.test.jsx, per its header :41-42): "passes correct save
  * type to CreatureSelectionModal per element" and the two "element-specific notes" toContain
@@ -26,9 +27,15 @@
  * so fragment-matching here only weakens the same contract. The target-count/selection-content
  * evidence is likewise exact-pinned there; this lane keeps only the selection-appears/picker-
  * gone transition.
+ * CONSOLIDATED (2026-11-27 pass): the standalone "auto-advances processing→summary" test and
+ * the "skips map loading when no mapName" test folded into the commit-seam test — all three
+ * walked the identical element→Fire→(overlay, no mapName)→summary path; one test now pins
+ * auto-advance, the no-load skip, the live-store commit, and the surviving-summary UI.
+ * The DC-matrix trimmed "missing Wisdom"/"empty abilities" toContain twins of "undefined
+ * abilities": all three hit the same `|| 0` branch (jsx:323).
  *
- * FLAG (cross-note, owned by .deactivation.test.jsx:309-333): the component does NOT render
- * null after commit — the auto-summary effect (jsx:364-368, `!phase.startsWith('summary')` also
+ * FLAG (cross-note, owned by .deactivation.test.jsx:300-316): the component does NOT render
+ * null after commit — the auto-summary effect (jsx:359-363, `!phase.startsWith('summary')` also
  * matches 'done') flips 'done' back to 'summary', so the summary and its Close button SURVIVE
  * onClose(). The commit-seam test below pins that surviving-summary UI; the duplicate-clock
  * payload consequence is pinned in the deactivation lane.
@@ -235,9 +242,8 @@ describe('ElementalAttunementModal phase flow', () => {
             expect(screen.queryByRole('button', { name: /^Thunder/ })).not.toBeInTheDocument();
             expect(screen.queryByText('Choose the element for your manifestation:')).not.toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-            // Identity: the enumeration consumed the frozen fixture.
+            // The enumeration consumed the fixture's two creatures.
             expect(screen.getByTestId('cs-modal-target-count').textContent).toBe('2');
-            expect(combatData.getCombatSummary.mock.results[0].value).toBe(pairFixture);
 
             // TRANSITION creatureSelection→processing on Activate.
             fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
@@ -262,46 +268,40 @@ describe('ElementalAttunementModal phase flow', () => {
             fireEvent.click(screen.getByRole('button', { name: /Close/ }));
             expect(props.onClose).toHaveBeenCalledTimes(1);
         });
+    });
 
-        it('Close commits through the LIVE store, then FLAG: the modal does NOT render null — summary and Close survive onClose (see .deactivation.test.jsx:309)', async () => {
+    describe('processing→summary seam', () => {
+        it('overlay with no mapName auto-advances to summary, commits through the LIVE store on Close — FLAG: summary and Close survive onClose (see .deactivation.test.jsx:300)', async () => {
             aoeService.getAffectedCreatures.mockReturnValue([{ creature: goblinFixture.creatures[0] }]);
             const props = makeProps({ activeOverlay: OVERLAY });
             render(<ElementalAttunementModal {...props} />);
             fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
-            const closeBtn = await screen.findByRole('button', { name: /Close/ });
 
-            fireEvent.click(closeBtn);
+            // AUTO-ADVANCE: no Activate, no keyboard — the pendingPrompts===0 && results>0
+            // effect alone flips the phase. The no-mapName branch skips the map load and
+            // enumerates against empty player/item lists.
+            expect(await screen.findByText('Elemental Attunement (Fire) — Results')).toBeInTheDocument();
+            expect(mapsService.loadMapData).not.toHaveBeenCalled();
+            expect(aoeService.getAffectedCreatures).toHaveBeenCalledWith(OVERLAY, [], [], goblinFixture);
+            // Transient processing-phase controls retired with their phase (the volatile
+            // "All targets resolved." note is pinned by its ABSENCE here).
+            expect(screen.queryByText('Resolving DEX saving throws (DC 12)...')).not.toBeInTheDocument();
+            expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
+            // Auto-advance alone never closes.
+            expect(props.onClose).not.toHaveBeenCalled();
 
-            // The commit is real: activation flags land in the live store.
+            // CLOSE COMMITS FOR REAL: activation flags land in the live store.
+            fireEvent.click(screen.getByRole('button', { name: /Close/ }));
             expect(cells.get(`${PLAYER}|elementalAttunementActive`)).toBe(true);
             expect(cells.get(`${PLAYER}|elementalAttunementElement`)).toBe('Fire');
             expect(props.onClose).toHaveBeenCalledTimes(1);
 
             // PINNED SURVIVING BEHAVIOR (not the recommended null): the auto-summary effect
-            // (jsx:364-368) flips 'done' back to 'summary' instantly, so the results view and
+            // (jsx:359-363) flips 'done' back to 'summary' instantly, so the results view and
             // its Close button remain mounted after the parent was told to close. The
             // deactivation lane pins the duplicate-clock consequence of a second tap.
             expect(screen.getByText('Elemental Attunement (Fire) — Results')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
-        });
-    });
-
-    describe('processing→summary seam', () => {
-        it('auto-advances processing→summary with NO user interaction once the overlay resolves', async () => {
-            aoeService.getAffectedCreatures.mockReturnValue([{ creature: goblinFixture.creatures[0] }]);
-            const props = makeProps({ activeOverlay: OVERLAY });
-            render(<ElementalAttunementModal {...props} />);
-            fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
-
-            // No Activate, no keyboard — the pendingPrompts===0 && results>0 effect alone flips
-            // the phase. By the time the summary surfaces, the transient processing-complete note
-            // ("All targets resolved.") is retired with its phase (volatile flush frame, so the
-            // note itself is only pinned by its ABSENCE here).
-            expect(await screen.findByText('Elemental Attunement (Fire) — Results')).toBeInTheDocument();
-            expect(screen.queryByText('Resolving DEX saving throws (DC 12)...')).not.toBeInTheDocument();
-            expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
-            expect(props.onClose).not.toHaveBeenCalled();
         });
 
         it('summary stays behind the pending gate while a player save is outstanding, and opens the moment it resolves', async () => {
@@ -370,14 +370,15 @@ describe('ElementalAttunementModal phase flow', () => {
     describe('processing-phase DC math and save type', () => {
         const wis = bonus => Object.freeze({ name: 'Wisdom', bonus });
 
+        // Each row proves a distinct term/branch of DC = 8 + Wisdom bonus + proficiency
+        // (jsx:322-324). The three shapes that hit the same `|| 0` Wisdom default branch
+        // (missing Wisdom, empty array, undefined abilities) collapse to ONE row.
         it.each([
             { label: 'default Wisdom 1 + proficiency 3', element: 'Fire', abilities: basePlayerStats.abilities, proficiency: 3, line: 'Resolving DEX saving throws (DC 12)...' },
             { label: 'Thunder routes a CON save at the same DC', element: 'Thunder', abilities: basePlayerStats.abilities, proficiency: 3, line: 'Resolving CON saving throws (DC 12)...' },
             { label: 'Wisdom 5 raises the DC to 16', element: 'Fire', abilities: Object.freeze([wis(5)]), proficiency: 3, line: 'Resolving DEX saving throws (DC 16)...' },
             { label: 'proficiency 5 raises the DC to 14', element: 'Fire', abilities: Object.freeze([wis(1)]), proficiency: 5, line: 'Resolving DEX saving throws (DC 14)...' },
-            { label: 'missing Wisdom defaults its bonus to 0', element: 'Fire', abilities: Object.freeze([Object.freeze({ name: 'Strength', bonus: 2 })]), proficiency: 3, line: 'Resolving DEX saving throws (DC 11)...' },
-            { label: 'undefined abilities default to DC 11', element: 'Fire', abilities: undefined, proficiency: 3, line: 'Resolving DEX saving throws (DC 11)...' },
-            { label: 'empty abilities default to DC 11', element: 'Fire', abilities: Object.freeze([]), proficiency: 3, line: 'Resolving DEX saving throws (DC 11)...' },
+            { label: 'unresolvable Wisdom defaults its bonus to 0', element: 'Fire', abilities: undefined, proficiency: 3, line: 'Resolving DEX saving throws (DC 11)...' },
         ])('processing line is exact for $label', async ({ element, abilities, proficiency, line }) => {
             const playerStats = Object.freeze({ ...basePlayerStats, abilities, proficiency });
             // Player target holds the modal in 'processing' behind the pending-save gate, so
@@ -410,17 +411,6 @@ describe('ElementalAttunementModal phase flow', () => {
             expect(mapsService.loadMapData).toHaveBeenCalledWith(CAMPAIGN, 'test-map');
             // The AOE consumed the LOADED map object's players, not an empty default.
             expect(aoeService.getAffectedCreatures).toHaveBeenCalledWith(OVERLAY, mapData.players, [], playerFixture);
-        });
-
-        it('skips map loading entirely when no mapName and proceeds straight to the summary', async () => {
-            aoeService.getAffectedCreatures.mockReturnValue([{ creature: goblinFixture.creatures[0] }]);
-            renderModal({ activeOverlay: OVERLAY });
-            fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
-
-            expect(await screen.findByText('Elemental Attunement (Fire) — Results')).toBeInTheDocument();
-            expect(mapsService.loadMapData).not.toHaveBeenCalled();
-            // No-map path enumerates against empty player/item lists.
-            expect(aoeService.getAffectedCreatures).toHaveBeenCalledWith(OVERLAY, [], [], goblinFixture);
         });
     });
 

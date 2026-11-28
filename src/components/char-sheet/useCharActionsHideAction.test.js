@@ -1,6 +1,7 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Base Hide lane for handleHideAction (useCharActionsBaseActions): cannotAct gate,
-// already-hidden refusal (case-insensitive), the success/failure channel with
+// L5-002 action-slot charge (fires only when the roll does — refusals never
+// charge), already-hidden refusal (case-insensitive), the success/failure channel with
 // byte-exact popup/log canon and Invisible + advantage_on_stealth stamping
 // (+ dedupe/preserve), checkContext channel resolution (dis/hex/advantage/peerless
 // precedence, Skulker gate), Stealth bonus arithmetic (exhaustion, Pass Without
@@ -11,8 +12,15 @@
 // wiring is owned by CharActions.baseActionsHide.test.jsx — not restated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
+import { chargeSlot } from '../../services/combat/chargeEconomy.js';
 import { createHooks, mockSetPopupHtml, mockRollSkillCheck, mockAddEntry, campaignName, basePlayerStats } from './useCharActionsBaseActions.test-utils.js';
 import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
+
+// Pin the L5-002 seam the same way the Dodge (#2066) and Grapple (#2067) sites
+// do: a live-returning stub so charge/never-charge is observable.
+vi.mock('../../services/combat/chargeEconomy.js', () => ({
+    chargeSlot: vi.fn(() => true),
+}));
 
 // Fresh channels stub per test (no fixture aliasing between mounts).
 function grv({ conditions = [], lastAttack = null, buffs = [] } = {}) {
@@ -39,16 +47,20 @@ function stealthAbilities(bonus) {
 
 describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () => {
     beforeEach(() => {
+        // clearAllMocks clears call history but NOT the factory-provided
+        // chargeSlot implementation (#2065 trap) — intended, it stays live.
         vi.clearAllMocks();
     });
 
-    it('cannotAct gate refuses without reading state, rolling, writing, or logging — and pops the shared reason (RB-1115)', async () => {
+    it('cannotAct gate refuses without reading state, charging, rolling, writing, or logging — and pops the shared reason (RB-1115)', async () => {
         const hooks = createHooks({ cannotAct: true });
         await useCharActionsBaseActions(hooks).handleHideAction();
 
         expect(hooks.getRuntimeValue).not.toHaveBeenCalled();
         expect(hooks.setRuntimeValue).not.toHaveBeenCalled();
         expect(mockRollSkillCheck).not.toHaveBeenCalled();
+        // L5-002: the gate refuses before the action is taken — no charge.
+        expect(chargeSlot).not.toHaveBeenCalled();
         // RB-1115: silent gate → assertCanAct reason popup (UI-only feedback).
         expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
         expect(mockAddEntry).not.toHaveBeenCalled();
@@ -57,12 +69,14 @@ describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () =
     it.each([
         { name: 'exact lowercase', condition: 'invisible' },
         { name: 'uppercase (case-insensitive match)', condition: 'INVISIBLE' },
-    ])('refuses with the already-hidden popup when the condition is $name — no roll, write, or log', async ({ condition }) => {
+    ])('refuses with the already-hidden popup when the condition is $name — no charge, roll, write, or log', async ({ condition }) => {
         const srw = vi.fn().mockResolvedValue(undefined);
         const hooks = createHooks({ getRuntimeValue: grv({ conditions: [condition] }), setRuntimeValue: srw });
         await useCharActionsBaseActions(hooks).handleHideAction();
 
         expect(mockRollSkillCheck).not.toHaveBeenCalled();
+        // L5-002 deferral: the refusal must not consume the action slot.
+        expect(chargeSlot).not.toHaveBeenCalled();
         expect(srw).not.toHaveBeenCalled();
         expect(mockAddEntry).not.toHaveBeenCalled();
         expect(mockSetPopupHtml).toHaveBeenCalledWith({
@@ -100,6 +114,10 @@ describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () =
         const hooks = createHooks({ getRuntimeValue: grv({ lastAttack }), setRuntimeValue: srw });
         await useCharActionsBaseActions(hooks).handleHideAction();
 
+        // L5-002: once the roll fires the action is taken — exactly one charge,
+        // whatever the outcome (a failed Hide still consumed the action).
+        expect(chargeSlot).toHaveBeenCalledTimes(1);
+        expect(chargeSlot).toHaveBeenCalledWith({ creatureName: 'TestFighter', bucket: 'action', campaignName });
         expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, {});
         const conditionWrites = srw.mock.calls.filter(c => c[1] === 'activeConditions');
         const buffWrites = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
@@ -213,35 +231,26 @@ describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () =
         expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expected, {});
     });
 
-    // Exhaustion x listed-bonus combination matrix (2024 PHB Exhaustion: "When you
-    // make a D20 Test, the roll is reduced by 2 times your Exhaustion level",
-    // public/data/conditions.json; penalty produced at CharSheet.conditionEffects.js:277
-    // `exhausted = 2 * exhaustionLevel`). The exhaustionPenalty term must apply in
-    // EVERY branch — including when a listed abilities[].skills Stealth bonus exists
-    // (canonical combine mirrored from computeGrappleCheckBonus's `checkBonus -=
-    // exhaustionPenalty` after listed-or-fallback selection). basePlayerStats carries
-    // NO abilities[].skills Stealth entry, so every row above is bonus-absent; these
-    // rows are mutually distinguishable across (listed bonus, penalty):
-    // both-present, bonus-zero, bonus-negative, penalty-dominant, and
-    // listed-bonus-intact control.
+    // Exhaustion x listed-bonus combine (2024 PHB Exhaustion: "When you make a
+    // D20 Test, the roll is reduced by 2 times your Exhaustion level",
+    // public/data/conditions.json; penalty produced at CharSheet.conditionEffects.js
+    // `exhausted = 2 * exhaustionLevel`). computeStealthBonus is one linear
+    // expression — `(listed ?? 0) - exhaustionPenalty` — so rows are picked by
+    // distinguishable guard-mutation classes, not value permutations (the
+    // bonus-absent controls are already pinned by the canonical rows above):
+    // both-present subtraction, listed-intact zero-penalty control, and
+    // listed-ZERO-still-penalized (kills a truthiness-skip `if (stealthSkill?.bonus)`
+    // regression that would silently drop the penalty at listed 0).
     it.each([
         { name: 'listed bonus minus penalty (5 - 2)', listed: 5, exhaustionPenalty: 2, expected: 3 },
         { name: 'listed bonus intact at zero penalty (5 - 0)', listed: 5, exhaustionPenalty: 0, expected: 5 },
         { name: 'listed ZERO bonus still pays the penalty (0 - 2)', listed: 0, exhaustionPenalty: 2, expected: -2 },
-        { name: 'listed ZERO bonus at zero penalty stays zero (0 - 0)', listed: 0, exhaustionPenalty: 0, expected: 0 },
-        { name: 'listed negative bonus stacks with the penalty (-1 - 2)', listed: -1, exhaustionPenalty: 2, expected: -3 },
-        { name: 'penalty outweighs listed bonus into negative territory (2 - 4)', listed: 2, exhaustionPenalty: 4, expected: -2 },
-        { name: 'listed high bonus at max penalty (11 - 12)', listed: 11, exhaustionPenalty: 12, expected: -1 },
-        { name: 'bonus absent and penalty absent is zero (no listed skill)', listed: null, exhaustionPenalty: 0, expected: 0 },
     ])(
         'listed Stealth bonus and exhaustion penalty combine: $name',
         async ({ listed, exhaustionPenalty, expected }) => {
-            const stats = listed === null
-                ? { ...basePlayerStats, abilities: basePlayerStats.abilities.map(a => ({ ...a, skills: [] })), skills: [] }
-                : { ...basePlayerStats, abilities: stealthAbilities(listed) };
             const hooks = createHooks({
                 getRuntimeValue: grv({ lastAttack: { total: 18, d20: 12 } }),
-                playerStats: stats,
+                playerStats: { ...basePlayerStats, abilities: stealthAbilities(listed) },
                 exhaustionPenalty,
             });
             await useCharActionsBaseActions(hooks).handleHideAction();

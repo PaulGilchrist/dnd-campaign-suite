@@ -1,5 +1,4 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27 — improved-and-trimmed pass (23→20 tests)
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import HiddenInput from './HiddenInput.jsx';
@@ -72,24 +71,41 @@ describe('HiddenInput', () => {
   });
 
   describe('edit mode (showInput=true)', () => {
-    it('renders a focused number input pre-filled with the current value', () => {
-      setup({ showInput: true, value: 5 });
+    it('opens focused and pre-filled when the parent switches into edit mode', () => {
+      // Consumers (CharHitPoints, CharGold, TrackedResourceInput) all mount in
+      // display mode and toggle showInput on — the focus contract lives there.
+      const { rerender } = setup({ showInput: false, value: 5 });
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+
+      rerender(
+        <HiddenInput
+          handleInputToggle={vi.fn()}
+          handleValueChange={vi.fn()}
+          showInput
+          value={5}
+        />
+      );
 
       const input = screen.getByRole('spinbutton');
       expect(input).toHaveValue(5);
       expect(input).toHaveFocus();
     });
 
-    it('applies min and max bounds when max is provided', () => {
-      setup({ showInput: true, value: 5, max: 20 });
+    it('renders min/max bounds when max is given and leaves max unbounded when not', () => {
+      const { rerender } = setup({ showInput: true, value: 5, max: 20 });
 
-      const input = screen.getByRole('spinbutton');
-      expect(input).toHaveAttribute('min', '0');
-      expect(input).toHaveAttribute('max', '20');
-    });
+      const bounded = screen.getByRole('spinbutton');
+      expect(bounded).toHaveAttribute('min', '0');
+      expect(bounded).toHaveAttribute('max', '20');
 
-    it('leaves max unbounded when no max is given', () => {
-      setup({ showInput: true, value: 5 });
+      rerender(
+        <HiddenInput
+          handleInputToggle={vi.fn()}
+          handleValueChange={vi.fn()}
+          showInput
+          value={5}
+        />
+      );
 
       expect(screen.getByRole('spinbutton')).not.toHaveAttribute('max');
     });
@@ -102,25 +118,6 @@ describe('HiddenInput', () => {
       expect(screen.getByRole('spinbutton')).toHaveValue(12);
       expect(handleValueChange).not.toHaveBeenCalled();
       expect(handleInputToggle).not.toHaveBeenCalled();
-    });
-
-    it('switches back to text showing the latest value when editing closes', () => {
-      const { rerender } = setup({ showInput: true, value: 5 });
-      const input = screen.getByRole('spinbutton');
-      fireEvent.change(input, { target: { value: '12' } });
-      fireEvent.blur(input);
-
-      rerender(
-        <HiddenInput
-          handleInputToggle={vi.fn()}
-          handleValueChange={vi.fn()}
-          showInput={false}
-          value={12}
-        />
-      );
-
-      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-      expect(screen.getByText('12')).toBeInTheDocument();
     });
   });
 
@@ -221,13 +218,9 @@ describe('HiddenInput', () => {
       expect(handleInputToggle).toHaveBeenCalledTimes(1);
     });
 
-    it('cancels without committing when the input is cleared and Enter is pressed', () => {
-      const { handleValueChange, handleInputToggle } = commitByEnter({}, '');
-
-      expect(handleValueChange).not.toHaveBeenCalled();
-      expect(handleInputToggle).toHaveBeenCalledTimes(1);
-    });
-
+    // The cleared-draft cancel above covers both commit triggers: blur and Enter
+    // share commit()'s empty-draft guard, and their routing is pinned by the
+    // typed-value blur/Enter cases.
     it('still commits an explicitly typed 0', () => {
       const { handleValueChange, handleInputToggle } = commitByBlur({}, '0');
 

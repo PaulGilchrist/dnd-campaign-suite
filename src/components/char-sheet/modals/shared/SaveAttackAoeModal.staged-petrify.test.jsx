@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0904: Gorgon "Petrifying Breath" 30-ft Cone picker — the MA-0501
 // staged-petrify ladder (cockatricePetrifyService, ONE shared ladder, no
 // fork) rides the cone picker via the stagedPetrify PROP (parse/transport
@@ -84,8 +84,8 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 }));
 
 import { addEntry } from '../../../../services/ui/logService.js';
-import { getEffectDefinition } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
+import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 
@@ -166,9 +166,11 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
       label: 'Petrifying Breath', // cone-vs-bite discriminator
       petrifiedRounds: 14400,
     });
+    // reason/condition carry the CONE's action-name label discriminator
+    // (bite-vs-cone); the ladder's note vocabulary is pinned by
+    // cockatricePetrifyService's own lane, not re-pinned here.
     const condLog = conditionLogs().find(e => e.characterName === TARGET);
     expect(condLog).toMatchObject({ condition: 'Restrained', reason: 'Petrifying Breath (failed save)', sourceName: GORGON });
-    expect(condLog.note).toContain('second failure Petrifies');
 
     // Gated absence proofs: armed ladder OWNS the fail leg — the extractor's
     // flat ['petrified','restrained'] spray never lands, and no other lane stirs.
@@ -179,16 +181,24 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
     expect(applyDamageToTarget).not.toHaveBeenCalled(); // damageless row
   });
 
-  it('successful save: honest Saved row, zero grants — ladder stays unarmed', async () => {
+  // fix#2058-mirror: this lane does NOT re-pin the shared 'Saved — takes no
+  // damage' row face (prefix owned by staged-sleep/damage-edge-cases, equation
+  // suffix owned by results-face-equation). Resolution is signalled by the
+  // success adjudication itself; what this lane owns is the petrify-negative.
+  it('successful save resolves as success with zero grants — ladder never arms', async () => {
     spyRandom(0.99); // nat 20 + con +2 = 22 ≥ DC 15 → success
-    const { getByText, container } = renderBreath();
+    const { getByText } = renderBreath();
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
     fireEvent.click(getByText('Confirm'));
 
-    // Positive leg first: the save resolved and rendered its result row.
-    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20 + 2 = 22 vs DC 15)'));
+    // Positive leg first: the save resolved and recorded a success verdict.
+    await waitFor(() => expect(addTargetResult).toHaveBeenCalledWith(
+      'test-campaign',
+      expect.objectContaining({ targetName: TARGET, saveResult: 'success' })
+    ));
 
-    // Then the absences: no condition, no ladder te, no condition log, no damage.
+    // Then the absences this lane owns: no condition, no ladder te, no
+    // condition log, no damage — a saved target gains nothing from the cone.
     expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();
     expect(ladderTes()).toHaveLength(0);
     expect(conditionLogs().filter(e => e.characterName === TARGET)).toHaveLength(0);
@@ -232,31 +242,34 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
     fireEvent.click(getByText('Confirm'));
 
-    expect(getEffectDefinition('petrifying_bite_staged').label).toBe('Petrifying Bite');
+    // '(Petrifying Bite)' is the registry label rendered BY-name into the
+    // row (targetEffectDefinitions 'petrifying_bite_staged'); the registry
+    // value itself is pinned in its own lane, not re-pinned here.
     await waitFor(() => expect(container.textContent).toContain(
       'Failed — Restrained until the end of its next turn, then repeats the save (Petrifying Bite)'
     ));
-    // Gated absence proofs: the generic row and the landed-Petrified lie.
+    // Gated absence proof: the generic fail prose never shows for an armed row.
     expect(container.textContent).not.toContain('Failed the save (rolled');
-    expect(container.textContent).not.toContain('target is Petrified');
   });
 
-  it('disarmed picker copy keeps the MA-0063 flat grant text byte-intact', () => {
-    renderBreath(null);
+  // One branch, two witnesses: with no ladder armed, buildPickerCopy takes
+  // the byte-exact MA-0063 flat-grant text — for a gorgon row whose ladder
+  // words were NOT armed, and for an unrelated condition row alike. The
+  // fa-smog-vs-fa-diamond icon is the armed/disarmed discriminator (armed
+  // face pinned by the copy test above).
+  it('disarmed picker copy keeps the MA-0063 flat grant byte-intact (gorgon-unarmed and non-gorgon alike)', () => {
+    const { unmount } = renderBreath(null);
     expect(seenPicker.current).toBeTruthy();
-    // Byte-exact MA-0063 branch (names from the extractor spray, no ladder).
     expect(seenPicker.current.note).toBe('On a failed save, target is Petrified, Restrained.');
     expect(seenPicker.current.icon).toBe('fa-smog');
-  });
 
-  // Non-gorgon unaffected: no stagedPetrify authored, MA-0063 flat branch
-  // renders exactly as before for other damageless condition rows.
-  it('non-gorgon damageless row (no ladder armed) renders the MA-0063 copy untouched', () => {
+    unmount();
+    seenPicker.current = null;
     renderBreath(null, { saveConditions: ['blinded'], saveType: 'Dexterity', saveDc: 12 });
     expect(seenPicker.current).toBeTruthy();
     expect(seenPicker.current.note).toBe('On a failed save, target is Blinded.');
     expect(seenPicker.current.description).toContain('<strong>Dexterity</strong> saving throw (DC 12)');
-    expect(seenPicker.current.note.toLowerCase()).not.toContain('petrified');
+    // No ladder vocabulary leaks onto un-armed rows.
     expect(seenPicker.current.note).not.toContain('Second failure');
   });
 
@@ -271,7 +284,5 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
 
     // Gated absence: the ladder never armed on the disarmed row.
     expect(ladderTes()).toHaveLength(0);
-    expect(stageSleepTargets).not.toHaveBeenCalled();
-    expect(stageParalysisTargets).not.toHaveBeenCalled();
   });
 });

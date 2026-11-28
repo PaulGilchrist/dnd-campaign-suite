@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // NoUses lane: exhausted-uses gating (newCount: 0, unlimited unset) for the
 // normal-mode chooser — the "No uses remaining" copy, four inert step options
 // (clicks never advance, nothing dispatches), and the free-cast Skip that stays
@@ -13,30 +13,28 @@ import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 // Honest savePrompt mock of the REAL contract (savePrompt.js:105-145):
 // createSaveListener(campaignName, config) => { promptId, promise } — and
 // NOTHING else. The real promptId is utils.guid() (name-agnostic, unique per
-// mint), never a prompt-<targetName> string (shared name-based ids
-// latent-collide: two listeners on one id means resolving one misroutes the
-// other — fix#1426/#1431 family). The promise resolves with event.detail via
-// a one-shot 'save-result' listener routed BY its own minted id (the real
-// bytes: savePrompt.js:121-131). This lane never dispatches saves (pinned
-// below); the capture records any accidental dispatch.
-const saveState = vi.hoisted(() => ({ calls: [], n: 0 }));
+// mint), never a prompt-<targetName> string (fix#1426/#1431 family). This
+// lane never dispatches saves (pinned below: createSaveListener not called),
+// so the promise routing exists only to honor the contract shape.
+const saveState = vi.hoisted(() => ({ n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
   // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
   logSaveDismissed: vi.fn(() => Promise.resolve()),
-    createSaveListener: vi.fn((campaignName, config) => {
-        const promptId = `save-guid-${++saveState.n}`;
-        saveState.calls.push({ campaignName, ...config, promptId });
-        const promise = new Promise((resolve) => {
-            const handleSaveResult = (event) => {
-                if (event.detail.promptId !== promptId) return;
-                window.removeEventListener('save-result', handleSaveResult);
-                resolve(event.detail);
-            };
-            window.addEventListener('save-result', handleSaveResult);
-        });
-        return { promptId, promise };
-    }),
+  // Real signature is createSaveListener(campaignName, config); unused here
+  // because this lane never reaches the save-dispatch path.
+  createSaveListener: vi.fn(() => {
+    const promptId = `save-guid-${++saveState.n}`;
+    const promise = new Promise((resolve) => {
+      const handleSaveResult = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-result', handleSaveResult);
+        resolve(event.detail);
+      };
+      window.addEventListener('save-result', handleSaveResult);
+    });
+    return { promptId, promise };
+  }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -91,7 +89,6 @@ function makeProps(overrides) {
 describe('StepsOfTheFeyTauntModal - No Uses (newCount: 0)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        saveState.calls.length = 0;
     });
 
     it('gates every step: shows the long-rest copy and keeps all four options inert — no advance, no dispatch', () => {
@@ -107,7 +104,6 @@ describe('StepsOfTheFeyTauntModal - No Uses (newCount: 0)', () => {
         }
         expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
         expect(createSaveListener).not.toHaveBeenCalled();
-        expect(saveState.calls).toHaveLength(0);
         expect(addEntry).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(setTempHp).not.toHaveBeenCalled();

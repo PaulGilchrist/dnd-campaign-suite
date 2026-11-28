@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 
 // MA-0639: Drow Hand Crossbow fail-margin rider — parseSaveMarginClause unit
 // contract (source: MonsterCardHelpers.js). STRUCTURED-KEY-ONLY arm
 // (MA-0501/MA-0367 precedent, playbook §5): arms solely on the
 // { save_margin: { fails_by, also } } dict — prose never arms it, so rows
 // without the key stay byte-inert (null). Parser does NO clamping/band math:
-// fails_by passes through as Number() un-bounded; the margin bands
+// fails_by passes through as Number() un-bounded; it DOES harvest the
+// "for N rounds|minutes|hours" duration, save_effect taking precedence over
+// description (both branches unit-pinned in the truth table below). The margin bands
 // (fail-by-4 vs fail-by-5) live in the failed-save consumer
 // (src/hooks/combat/saveProcessing.js, forwarded via buildSaveOptions at
 // MonsterCardModal.jsx save seams) — pinned there by
@@ -25,10 +27,18 @@ const handCrossbow = () =>
     monstersData.find(m => m.name === 'Drow').actions.find(a => a.name === 'Hand Crossbow');
 
 describe('MA-0639 parseSaveMarginClause', () => {
-    it('branch truth table: arms on structured {fails_by, also} with normalization, un-clamped numbers pass through, null on every other shape (prose included)', () => {
-        // arms + normalization: also lowercased, numeric-string fails_by coerced
+    it('branch truth table: arms on structured {fails_by, also} with normalization, un-clamped numbers pass through, "for N units" duration harvested save_effect-first, null on every other shape (prose included)', () => {
+        // arms + normalization: also lowercased, numeric-string fails_by coerced;
+        // no duration clause anywhere → NO duration key (strict toEqual)
         expect(parseSaveMarginClause({ save_margin: { fails_by: 5, also: 'Unconscious' } })).toEqual({ failsBy: 5, also: 'unconscious' });
         expect(parseSaveMarginClause({ save_margin: { fails_by: '5', also: 'stunned' } })).toEqual({ failsBy: 5, also: 'stunned' });
+        // duration lane: harvested from save_effect...
+        expect(parseSaveMarginClause({ save_margin: { fails_by: 5, also: 'stunned' }, save_effect: 'Failure: stunned for 1 minute.' })).toEqual({ failsBy: 5, also: 'stunned', duration: '1 minute' });
+        // ...falling back to description when save_effect carries none (Homunculus
+        // disk row rides this branch via ma1000; pinned at unit level here)
+        expect(parseSaveMarginClause({ save_margin: { fails_by: 5, also: 'paralyzed' }, save_effect: 'Failure: be paralyzed.', description: 'The target is paralyzed for 2 rounds.' })).toEqual({ failsBy: 5, also: 'paralyzed', duration: '2 rounds' });
+        // precedence: both carry a duration → save_effect wins
+        expect(parseSaveMarginClause({ save_margin: { fails_by: 5, also: 'stunned' }, save_effect: 'Failure: stunned for 1 minute.', description: '... stunned for 2 rounds.' })).toEqual({ failsBy: 5, also: 'stunned', duration: '1 minute' });
         // no clamp / band math here: 0 and negatives forward untouched
         expect(parseSaveMarginClause({ save_margin: { fails_by: 0, also: 'prone' } })).toEqual({ failsBy: 0, also: 'prone' });
         expect(parseSaveMarginClause({ save_margin: { fails_by: -5, also: 'prone' } })).toEqual({ failsBy: -5, also: 'prone' });

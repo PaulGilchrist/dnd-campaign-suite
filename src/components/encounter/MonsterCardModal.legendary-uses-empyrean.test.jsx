@@ -1,41 +1,50 @@
-// @maintained-by-ai 2026-10-18 — MA-0694 empyrean lane, trimmed to empyrean-distinct
+// @maintained-by-ai 2026-11-28 — MA-0694 empyrean lane, trimmed to empyrean-distinct
 // seams: BY-name data lock (header uses:1 + Bolster self-buff automation +
-// Shockwave numeric DC 23 save + Smite→Divine Ray delegate) + the LIVE
-// modal-only lanes: header/"(1 left)" render with the swallowed-header
-// symptom dead, ONE gated Expend chip (ungated SelfBuffLink suppressed on
-// gated children, MonsterAction.jsx), Bolster click → spend → THP 10
-// replace-if-larger → te `bolstered` + `bolster_advantage` self+allies
-// (gridless §42 lenient, PC excluded) → ONE merged rounds:2 clock → spend +
-// grant logs, then refire refused BEFORE spend (modal glue
-// legendarySelfBuffActiveRefusal, MonsterCardModal.jsx :795-919 — the only
-// modal-level already-bolstered guard), Smite delegated attack ctx once,
-// and the bolster_advantage POSITIVE consumer leg (forced advantage on
-// save/ability chips) — owned HERE: hasBolsterAdvantageOn/
-// bolsterAdvantageContext at MonsterCardModal.jsx :1519-1524, cited live at
-// #590 + damage-and-ability-checks.test.jsx:18 ("positive leg owned by
-// legendary-uses-empyrean.test.jsx").
+// Shockwave numeric DC 23 save + Smite→Divine Ray delegate, derived attack
+// name included) and the LIVE modal-only lanes: header/"(1 left)" render with
+// the swallowed-header symptom dead + Bolster arming exactly ONE gated chip,
+// Bolster click → spend → THP 10 replace-if-larger → te `bolstered` +
+// `bolster_advantage` self+allies (gridless §42 lenient, PC excluded) → ONE
+// merged rounds:2 clock → spend + grant logs, then refire refused BEFORE
+// spend (modal glue legendarySelfBuffActiveRefusal in MonsterCardModal.jsx —
+// the only modal-level already-bolstered guard), and the bolster_advantage
+// POSITIVE consumer leg (forced advantage on save/ability chips via
+// hasBolsterAdvantageOn/bolsterAdvantageContext, consumed by handleSaveThrow
+// + the ability-check handler in MonsterCardModal.jsx) — owned HERE: cited
+// live at #590 and by the MonsterCardModal.damage-and-ability-checks.test.jsx
+// header ("positive leg owned by legendary-uses-empyrean.test.jsx").
 //
-// Cite-skipped generics (covered by owners — verified):
-// - BY-name data-shape units + grant-flow internals + already-bolstered
-//   refusal inside the shared service handler:
-//   src/services/encounters/monsterSelfBuff.bolster.test.js :76-105, :128, :180-194
+// Cite-skipped generics (covered by owners — verified 2026-11-28):
+// - Bolster data-shape unit + grant-flow internals + service-side
+//   already_bolstered refusal: monsterSelfBuff.bolster.test.js describes
+//   "MA-0694 Bolster disk row (by name) + inert helpers" and "MA-0694 Bolster
+//   press path" (incl. "honest double press replaces-not-stacks").
 // - gate spend / turn-latch / own-turn / exhausted units:
-//   src/services/encounters/monsterLegendaryUses.test.js :93-96 (own-turn), :278
-// - modal exhausted refusal (the ONE exhausted sibling):
-//   MonsterCardModal.legendary-uses-beholder.test.jsx :213-223
-// - own numeric-save child gated click + save ctx through the shared gate
-//   (§110/§166, Shockwave's shape): MonsterCardModal.legendary-uses.test.jsx :397, :690
-// - byte-inert save ctx without a bolster te on the holder (exact
-//   undefined, same handleSaveThrow :2458 channel):
-//   MonsterCardModal.interaction.test.jsx :173-180
+//   monsterLegendaryUses.test.js "MA-0021 expend / refuse / regain lifecycle".
+// - modal exhausted refusal: MonsterCardModal.legendary-uses-beholder.test.jsx
+//   "exhausted (3/3): chip clicks refuse".
+// - gated delegated-attack click (this lane shed its Smite runtime leg):
+//   MonsterCardModal.legendary-uses.test.jsx "clicking Pounce spends 1,
+//   delegates to Rend" (×5 dragons), beholder "Chomp gated click spends 1",
+//   monsterLegendaryUses.test.js MA-0022 "press with the delegate label
+//   spends 1"; the empyrean "Smite (Divine Ray attack)" name is pinned by the
+//   data-lock test here via legendaryDelegateAttackName.
+// - numeric-save chip render (this lane shed its Shockwave render leg): main
+//   lane "Mind Invasion renders numeric save chips" / "renders the DC 20
+//   Wisdom save chip"; Shockwave's DC 23 / CON / 6d8 Force bytes are pinned
+//   by the data-lock test here.
+// - ungated self-buff chip suppression on gated children (MonsterAction.jsx):
+//   MonsterAction.self-buff.test.jsx "arms no self-buff chip: legendary gated
+//   self-buff row" — the here length-1 gate-chip check subsumes it live.
+// - byte-inert save ctx without a bolster te on the holder (exact undefined,
+//   same handleSaveThrow channel): MonsterCardModal.interaction.test.jsx
+//   describe "save modifier dice links".
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import {
-  legendaryHeaderAction, legendaryDelegateAction, legendaryDelegateAttackName,
-} from '../../services/encounters/monsterLegendaryUses.js';
+import { legendaryHeaderAction, legendaryDelegateAttackName } from '../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -124,7 +133,7 @@ const emp = () => monstersData.find(m => m.index === 'empyrean');
 const row = (name) => emp().legendary_actions.find(a => a.name === name);
 
 describe('MA-0694 monsters.json data: empyrean legendary rows by-name locks', () => {
-  it('header uses:1 resolves via legendaryHeaderAction (Bolster child no longer swallowed); Bolster authors the self-buff automation (no own uses); Shockwave keeps numeric DC 23 CON 6d8 Force; Smite delegates_to Divine Ray (+15)', () => {
+  it('header uses:1 resolves via legendaryHeaderAction (Bolster child no longer swallowed); Bolster authors the self-buff automation (no own uses); Shockwave keeps numeric DC 23 CON 6d8 Force; Smite delegates_to Divine Ray (+15) with the derived attack name', () => {
     const header = emp().legendary_actions[0];
     expect(header.name).toBe('Legendary Action Uses: 1');
     expect(header.uses).toBe(1);
@@ -143,7 +152,6 @@ describe('MA-0694 monsters.json data: empyrean legendary rows by-name locks', ()
     const smite = row('Smite');
     expect(smite.delegates_to).toBe('Divine Ray');
     const ray = emp().actions.find(a => a.name === 'Divine Ray');
-    expect(legendaryDelegateAction(emp(), smite)).toBe(ray);
     expect(ray.attack_bonus).toBe(15);
     expect(legendaryDelegateAttackName(smite, ray)).toBe('Smite (Divine Ray attack)');
   });
@@ -176,22 +184,19 @@ describe('MA-0694 MonsterCardModal empyrean gated legendary seam', () => {
     return actionRow(name)?.querySelector('.mc-dice-link') || null;
   }
 
-  it('header row shows "Legendary Action Uses: 1 (1 left)" with Bolster NOT swallowed; Bolster arms exactly ONE gated chip (ungated self-buff chip suppressed); Shockwave renders its numeric DC 23 save chip riding the gate', () => {
+  it('header renders "Legendary Action Uses: 1 (1 left)" with Bolster NOT swallowed and arming exactly ONE gated chip; clicking it spends 1 via the shared gate, grants THP 10 + te bolstered/bolster_advantage on self + allied NPCs (PC excluded), ONE merged rounds:2 clock, spend + grant logs; refire refused BEFORE spend (already_bolstered, counter + THP held, zero extra clock)', async () => {
     renderEmpyrean({ max: 1, used: 0 });
     const header = document.querySelector('.mc-legendary-header-row');
     expect(header.textContent).toContain('Legendary Action Uses: 1');
     expect(header.textContent).not.toContain('Bolster');
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(1 left)');
+    // ONE gated Expend chip — a resurrected ungated SelfBuffLink would make 2
+    // (ungated suppression itself owned by MonsterAction.self-buff.test.jsx).
     const links = actionRow('Bolster').querySelectorAll('.mc-dice-link');
     expect(links).toHaveLength(1);
     expect(links[0].className).toContain('mc-dice-link-legendary');
-    expect(links[0].className).not.toContain('mc-dice-link-selfbuff');
-    expect(actionRow('Shockwave of Glory')?.querySelector('.mc-dice-link-save-clickable')?.textContent).toContain('DC 23');
-  });
 
-  it('Bolster click spends 1 via the shared gate, grants THP 10 + te bolstered/bolster_advantage on self + allied NPCs (PC excluded), ONE merged rounds:2 clock, spend + grant logs; refire refused BEFORE spend (already_bolstered, counter + THP held, zero extra clock)', async () => {
-    renderEmpyrean({ max: 1, used: 0 });
-    fireEvent.click(legendaryRowLink('Bolster'));
+    fireEvent.click(links[0]);
     await waitFor(() => expect(setPopupHtml.mock.calls.some(c => /Bolstered/.test(String(c[0] ?? '')))).toBe(true));
     expect(runtime.store['Empyrean 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 });
     expect(runtime.store['Empyrean 1.tempHp']).toBe(10);
@@ -211,8 +216,9 @@ describe('MA-0694 MonsterCardModal empyrean gated legendary seam', () => {
     expect(entries.some(e => e.automationType === 'bolstered_granted')).toBe(true);
     expect(entries.some(e => e.automationType === 'bolster_advantage_granted' && /Bandit 1, Bandit 2/.test(e.description))).toBe(true);
 
-    // modal-level already-active guard (:795/:919) — refusal BEFORE spend,
-    // service-internal twin cite-skipped to monsterSelfBuff.bolster :180
+    // modal-level already-active guard (legendarySelfBuffActiveRefusal) —
+    // refusal BEFORE spend; service-internal twin cite-skipped to
+    // monsterSelfBuff.bolster.test.js "honest double press replaces-not-stacks".
     setPopupHtml.mockClear();
     addEntry.mockClear();
     fireEvent.click(legendaryRowLink('Bolster'));
@@ -225,17 +231,7 @@ describe('MA-0694 MonsterCardModal empyrean gated legendary seam', () => {
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 
-  it('Smite gated click spends 1 and rolls the delegated +15 Divine Ray attack ctx, zero console burn', async () => {
-    renderEmpyrean({ max: 1, used: 0 });
-    fireEvent.click(legendaryRowLink('Smite'));
-    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
-    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Smite (Divine Ray attack)');
-    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(15);
-    expect(runtime.store['Empyrean 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 });
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('te consumer positive leg (:1519-1524): with bolster_advantage on the card holder, save + ability-check chips roll at forced advantage mode', () => {
+  it('te consumer positive leg: with bolster_advantage on the card holder, save + ability-check chips roll at forced advantage mode', () => {
     runtime.store['campaign.targetEffects'] = [{ target: 'Empyrean 1', effect: 'bolster_advantage', source: 'Empyrean 1' }];
     renderEmpyrean({ max: 1, used: 0 });
     ROLLERS.rollSavingThrow.mockClear();
@@ -248,5 +244,6 @@ describe('MA-0694 MonsterCardModal empyrean gated legendary seam', () => {
     fireEvent.click(document.querySelector('.mc-ability-mod.mc-dice-link'));
     expect(ROLLERS.rollAbilityCheck).toHaveBeenCalled();
     expect(ROLLERS.rollAbilityCheck.mock.calls.at(-1)[2]?.forcedMode).toBe('advantage');
+    expect(consoleSpy).not.toHaveBeenCalled();
   });
 });

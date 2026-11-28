@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Lane: Disappearing Step mode-specific render + accept dispatch exact payloads.
 // Consolidated 3 tests → 2: the free-cast decrement test shared the same click
 // path as the accept test (decrementCount() runs inside applyDisappearingStep),
@@ -6,7 +6,8 @@
 // test pins the real branch (no activeConditions rewrite) instead of a bare
 // addExpiration toHaveBeenCalled. Cancel no-op is covered by the shared
 // handleCancel in refreshingStep.test.jsx; overlay/close seams live in
-// integration.test.jsx; choice-step copy in render.test.jsx.
+// integration.test.jsx; choice-step copy in render.test.jsx; the moved-token
+// log clause in tokenMove.test.jsx.
 // Regression: both accept branches now log the resolution to the campaign log
 // exactly once with full bytes (previously unlogged — app rule violation).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -16,31 +17,12 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../../services/ui/logService.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 
-const promptState = vi.hoisted(() => ({ n: 0 }));
-
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
-  logSaveDismissed: vi.fn(() => Promise.resolve()),
-    // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
-    // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
-    // the FIRST arg (campaignName), yielding prompt-undefined-<ts> — the class-
-    // wide arg-destructure dishonesty (fix#215). Returns exactly
-    // { promptId, promise } with a name-agnostic unique-per-mint id (mirrors
-    // utils.guid(); prompt-<targetName> ids latent-collide — fix#1426/#1431)
-    // and a promise routed BY its own promptId on a one-shot 'save-result'
-    // listener (savePrompt.js:121-131). This lane rolls no saves.
-    createSaveListener: vi.fn((_campaignName, _config) => {
-        const promptId = `save-guid-${++promptState.n}`;
-        const promise = new Promise((resolve) => {
-            const handleSaveResult = (event) => {
-                if (event.detail.promptId !== promptId) return;
-                window.removeEventListener('save-result', handleSaveResult);
-                resolve(event.detail);
-            };
-            window.addEventListener('save-result', handleSaveResult);
-        });
-        return { promptId, promise };
-    }),
+    logSaveDismissed: vi.fn(() => Promise.resolve()),
+    // This lane rolls no saves: createSaveListener is only reachable from the
+    // taunting/dreadful save flows, so a valid-shape inert stub suffices (the
+    // save-listener routing contract itself is pinned in saveListenerCleanup.test.jsx).
+    createSaveListener: vi.fn(() => ({ promptId: 'unused', promise: Promise.resolve({}) })),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -120,8 +102,8 @@ function openDisappearingConfirm(props) {
 
 describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
     beforeEach(() => {
+        // clearAllMocks wipes call history but keeps factory implementations.
         vi.clearAllMocks();
-        localStorage.clear();
     });
 
     it('shows the Disappearing Step confirmation, stays inert, then writes exact condition, expiration, and decrement payloads on accept', async () => {

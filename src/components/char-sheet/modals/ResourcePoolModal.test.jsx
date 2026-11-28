@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
@@ -186,11 +186,16 @@ describe('ResourcePoolModal forward conversion', () => {
       }),
       'test-campaign'
     );
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({ type: 'ability_use', characterName: 'Druid1', abilityName: 'Wild Resurgence' })
-    );
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'Druid1',
+      abilityName: 'Wild Resurgence',
+      description: 'Druid1 expended a level 1 spell slot to regain one use of Wild Shape.',
+      timestamp: expect.any(Number),
+    });
     expect(handleClose).toHaveBeenCalled();
+    // Campaign is threaded into the round lookup that gates once-per-round reuse.
+    expect(combatData.getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
   });
 
   it('refuses a second forward conversion in the same round it was used, then re-arms the next round', () => {
@@ -237,9 +242,9 @@ describe('ResourcePoolModal archdruid conversion', () => {
     expect(getSlotRows().length).toBe(4);
   });
 
-  it('converts one use into a level 2 slot (from the runtime value), spends the use, logs Nature Magician, and closes', () => {
+  it('converts uses into slots from runtime values, logging singular/plural use counts, and closes', () => {
     setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_2: 1 });
-    const { handleClose } = renderModal(makePlayerStats(), ARCH);
+    const single = renderModal(makePlayerStats(), ARCH);
 
     fireEvent.click(screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 2 Slot/i }));
 
@@ -259,16 +264,13 @@ describe('ResourcePoolModal archdruid conversion', () => {
       description: 'Druid1 expended 1 Wild Shape use to regain a level 2 spell slot.',
       timestamp: expect.any(Number),
     });
-    expect(handleClose).toHaveBeenCalled();
-  });
+    expect(single.handleClose).toHaveBeenCalled();
+    single.unmount();
 
-  it('logs the plural use count when converting more than one Wild Shape use', () => {
-    setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_2: 1, spell_slots_level_4: 1 });
+    // Two uses convert into a level 4 slot; the log description goes plural.
+    setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_4: 1 });
     const stats = makePlayerStats({
-      spellAbilities: {
-        ...makePlayerStats().spellAbilities,
-        spell_slots_level_4: 1,
-      },
+      spellAbilities: { ...makePlayerStats().spellAbilities, spell_slots_level_4: 1 },
     });
     renderModal(stats, ARCH);
 
@@ -276,6 +278,14 @@ describe('ResourcePoolModal archdruid conversion', () => {
     fireEvent.click(row2.querySelector('input[type="radio"]'));
     fireEvent.click(screen.getByRole('button', { name: /Convert 2 Wild Shape.*Level 4 Slot/i }));
 
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Druid1',
+      expect.objectContaining({
+        wildShapeUses: 0,
+        spell_slots_level_4: 1, // runtime 1 + 1, capped at max 1
+      }),
+      'test-campaign'
+    );
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
       type: 'ability_use',
       characterName: 'Druid1',
@@ -320,10 +330,13 @@ describe('ResourcePoolModal reverse conversion', () => {
       }),
       'test-campaign'
     );
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({ type: 'ability_use', characterName: 'Druid1', abilityName: 'Wild Resurgence' })
-    );
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'Druid1',
+      abilityName: 'Wild Resurgence',
+      description: 'Druid1 expended one use of Wild Shape to regain a level 1 spell slot.',
+      timestamp: expect.any(Number),
+    });
     expect(normal.handleClose).toHaveBeenCalled();
     normal.unmount();
 
@@ -362,13 +375,14 @@ describe('ResourcePoolModal reverse conversion', () => {
 // ── Data integrity ──
 
 describe('ResourcePoolModal data integrity', () => {
-  it('clamps runtime slot values to the maximum slots', () => {
+  it('derives slot counts defensively: clamps oversized runtime values, zeroes missing data', () => {
     setupRuntimeMock({ wildShapeUses: 0, spell_slots_level_1: 100 });
-    renderModal(makePlayerStats(), FWD);
+    const clamped = renderModal(makePlayerStats(), FWD);
     expect(findRowByCell(0, 1).children[1].textContent).toBe('4 / 4');
-  });
+    clamped.unmount();
 
-  it('renders safely with missing spellAbilities and tracked resources — zeroed, fully disabled', () => {
+    // Missing spellAbilities and tracked resources render as 0 / 0, fully disabled.
+    setupRuntimeMock({});
     const stats = makePlayerStats({ spellAbilities: undefined, _trackedResources: undefined });
     const { handleClose } = renderModal(stats, FWD);
 
@@ -382,10 +396,5 @@ describe('ResourcePoolModal data integrity', () => {
     fireEvent.click(screen.getByRole('button', { name: /Expend Level 1 Slot/i }));
     expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
     expect(handleClose).not.toHaveBeenCalled();
-  });
-
-  it('threads campaignName into the combat round lookup', () => {
-    renderModal(makePlayerStats(), FWD);
-    expect(combatData.getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
   });
 });

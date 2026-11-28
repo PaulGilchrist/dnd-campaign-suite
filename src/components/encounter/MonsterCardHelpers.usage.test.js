@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0049: structured `usage` objects must render human text, never
 // "[object Object]" (MV-26). OWNER lane: the formatActionUsage full branch
 // truth table lives here — ma1120:12 and ma0305:14 delegate their "At Will"
@@ -6,11 +6,14 @@
 // arithmetic is owned by gated-reaction.test.js:62-69 (#517) — no
 // arithmetic legs here. d6-recharge shapes → null (RechargeNote owns the
 // label); flat strings (incl. "At Will" sentinel) verbatim; "per day" →
-// "N/Day"; unknown shapes console.error → null, never silent. Plus the
-// no-target save-row refusal builders (sole pins suite-wide; the only
-// consumer is MonsterCardModal.jsx). FIXED pass#336T: buildCounterspellMessage
-// now prints "At Will" on 999-sentinels (finite limits keep "N/Day") —
-// codified by the direct-call pin below.
+// "N/Day"; unknown shapes console.error → null, never silent.
+// No-target refusal: builders moved to services/combat/noTargetRefusal.js
+// and are re-exported here for the MonsterCardModal chip lane. The byte-
+// exact popup/log default templates are OWNED by noTargetRefusal.test.js:19-29
+// and :75-85 (direct import, maintained 2026-11-18) — this lane pins only the
+// re-export wiring plus the slug-normalization branches (sole pins suite-
+// wide). buildCounterspellMessage: "At Will" on 999-sentinels, finite limits
+// keep "N/Day" (pass#336T) — sole direct-call pin of that label branch.
 import { describe, it, expect, vi } from 'vitest';
 import { formatActionUsage, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, buildCounterspellMessage } from './MonsterCardHelpers.js';
 
@@ -19,9 +22,7 @@ describe('MA-0049 formatActionUsage — owner truth table', () => {
     ['absent null → null', null, null],
     ['absent undefined → null', undefined, null],
     ['"At Will" sentinel passthrough verbatim (#530, delegated from ma1120)', 'At Will', 'At Will'],
-    ['flat string verbatim', '1/Day', '1/Day'],
     ['d6 recharge → null (RechargeNote owns the label)', { type: 'recharge on roll', dice: '1d6', min_value: 5 }, null],
-    ['rest recharge → null', { type: 'recharge after rest', rest_types: ['short', 'long'] }, null],
     ['recharge match is case-insensitive', { type: 'Recharge on a 6' }, null],
     ['per day object → "N/Day"', { type: 'per day', times: 3 }, '3/Day'],
     ['primitive coerced to string, never [object Object]', 3, '3'],
@@ -38,28 +39,22 @@ describe('MA-0049 formatActionUsage — owner truth table', () => {
   });
 });
 
-describe('MA-0049 no-target refusal builders', () => {
-  it('popup names monster/action verbatim and states nothing rolled — exact template', () => {
-    expect(buildNoTargetRefusalPopup({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Frightful Presence' })).toBe(
-      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Adult Blue Dracolich 1 cannot use Frightful Presence — no target is armed on Adult Blue Dracolich 1\'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card) (AoE rows pick their own area targets). No save rolled, nothing spent.</p></div>'
-    );
-  });
+describe('MA-0049 no-target refusal — MonsterCardModal re-export lane', () => {
+  // Templates byte-pinned at the single owner (noTargetRefusal.test.js); the
+  // unique risk here is the re-export breaking the chip consumer's import.
+  it('popup and log ride the re-export: save refusal names monster/action, states nothing rolled, logs <slug>_refused', () => {
+    const popup = buildNoTargetRefusalPopup({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Frightful Presence' });
+    expect(popup).toContain('mc-no-target-refusal');
+    expect(popup).toContain('Adult Blue Dracolich 1 cannot use Frightful Presence');
+    expect(popup).toContain('No save rolled, nothing spent.');
 
-  it('attack-noun copy (TA-1116): same lane, "No attack rolled", no save-lane AoE parenthetical', () => {
-    expect(buildNoTargetRefusalPopup({ monsterName: 'Goblin 1', actionName: 'Scimitar', rollNoun: 'attack' })).toBe(
-      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Goblin 1 cannot use Scimitar — no target is armed on Goblin 1\'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card). No attack rolled, nothing spent.</p></div>'
-    );
-  });
-
-  it('log is <action-slug>_refused — exact shape, "(no target)" zero-spend description', () => {
     const { timestamp, ...log } = buildNoTargetRefusalLog({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Frightful Presence' });
     expect(timestamp).toEqual(expect.any(Number));
-    expect(log).toEqual({
+    expect(log).toMatchObject({
       type: 'automation',
       automationType: 'frightful_presence_refused',
       characterName: 'Adult Blue Dracolich 1',
       abilityName: 'Frightful Presence',
-      description: 'Adult Blue Dracolich 1 Frightful Presence refused (no target) — no armed target on the initiative card, no self-resolve. Zero spend, no save prompt.',
     });
   });
 

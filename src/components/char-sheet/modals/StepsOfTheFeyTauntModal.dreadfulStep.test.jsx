@@ -1,10 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Dreadful Step lane only: subview copy + confirm gating, exact save-dispatch
-// payloads (incl. saveDc/featureName pass-through), and the save-resolution
-// damage seam — owned solely here (no sibling dispatches save-result or
-// touches applyDamageToTarget). Choice-step copy lives in render.test.jsx,
-// overlay/close seams and the free-cast skip in integration.test.jsx, no-uses
-// blocking in noUses.test.jsx.
+// payloads (incl. saveDc/featureName pass-through), the skip result copy, and
+// the save-resolution damage seam — owned solely here (no sibling dispatches
+// save-result or touches applyDamageToTarget). Choice-step copy lives in
+// render.test.jsx, overlay/close seams and the free-cast skip in
+// integration.test.jsx, no-uses blocking in noUses.test.jsx, unmount drain in
+// saveListenerCleanup.test.jsx, dismiss routing in save-dismissed.test.jsx,
+// moved-clause prose in tokenMove.test.jsx.
 // handleSkip derives its modeLabel from the user's choice (fix: was derived
 // from the modal's mode, mislabeling this lane "Taunting Step" in normal
 // mode); the skip result copy is pinned here to exact bytes.
@@ -124,7 +126,7 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
         expect(createSaveListener).not.toHaveBeenCalled();
     });
 
-    it('skip resolves to the no-targets result without dispatching saves and leaves uses intact', async () => {
+    it('skip resolves to the no-targets result without dispatching saves or logs and leaves uses intact', async () => {
         render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3 })} />);
         openDreadfulSelection();
         fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
@@ -141,12 +143,22 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
         expect(body.innerHTML).toBe(
             'Steps of the Fey: Cast Misty Step without expending a spell slot (3 remaining).<br><br><b>Dreadful Step:</b> No targets selected.'
         );
+        // "Leaves uses intact" backed by real writes, not just the (3) text:
+        // no save dispatched, no log row, no counter decrement.
         expect(createSaveListener).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('confirming dispatches an exact WIS save prompt and ability_use log per target, waiting indefinitely for saves', async () => {
+    it('confirming dispatches exact WIS save prompts per target, waits indefinitely, then damages only failures and summarizes with a decremented count', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5); // each d10 rolls 6 → failed target takes 12
         const onClose = vi.fn();
-        render(<StepsOfTheFeyTauntModal {...makeProps({ saveDc: 18, featureName: 'Fey Trickery', onClose })} />);
+        // Custom saveDc/featureName differ from every default so each payload
+        // pin proves prop pass-through, never a hardcoded echo. freeCastCountKey
+        // supplied so the '(2 remaining)' summary mirrors an ACTUAL decrement
+        // write (matches tauntingStep:113 / disappearingStep:89 sibling lanes;
+        // pass #258 text-vs-write honesty).
+        render(<StepsOfTheFeyTauntModal {...makeProps({ saveDc: 18, featureName: 'Fey Trickery', newCount: 3, freeCastCountKey: 'stepsRemaining', onClose })} />);
         openDreadfulSelection();
         checkTarget('Goblin1');
         checkTarget('Orc1');
@@ -177,25 +189,6 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
         expect(onClose).not.toHaveBeenCalled();
 
-        // Answer the saves so this render's listeners are unhooked.
-        await act(async () => {
-            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: goblinPrompt, success: true } }));
-            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: orcPrompt, success: true } }));
-        });
-    });
-
-    it('resolved saves apply 2d10 Psychic damage only to failures and summarize with a decremented count', async () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.5); // each d10 rolls 6 → failed target takes 12
-        // freeCastCountKey supplied so the '(2 remaining)' summary below mirrors
-        // an ACTUAL decrement write (matches tauntingStep:113 / disappearingStep:89
-        // sibling lanes; pass #258 text-vs-write honesty).
-        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3, freeCastCountKey: 'stepsRemaining' })} />);
-        openDreadfulSelection();
-        checkTarget('Goblin1');
-        checkTarget('Orc1');
-        await act(async () => { fireEvent.click(getDreadfulButton()); });
-
-        const [goblinPrompt, orcPrompt] = createSaveListener.mock.results.map(r => r.value.promptId);
         await act(async () => {
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: goblinPrompt, success: true } }));
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: orcPrompt, success: false } }));
@@ -221,17 +214,17 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
             characterName: 'FeyTrickster',
             rollType: 'save-class_feature',
             targetName: 'Goblin1',
-            saveDc: 14,
+            saveDc: 18,
             saveType: 'WIS',
             success: true,
-            description: 'Goblin1 succeeded on WIS save from Steps of the Fey. No effect.',
+            description: 'Goblin1 succeeded on WIS save from Fey Trickery. No effect.',
         });
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'save_result',
             characterName: 'FeyTrickster',
             rollType: 'save-class_feature',
             targetName: 'Orc1',
-            saveDc: 14,
+            saveDc: 18,
             saveType: 'WIS',
             success: false,
             description: 'Orc1 failed WIS save. Orc1 takes 12 Psychic damage.',

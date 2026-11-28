@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Integration lane: genuine cross-step seams only — overlay-click close behavior
 // spanning choice→result (non-interactive copy hosts are asserted, never clicked —
 // pass #261 rec), the null freeCastCountKey guard on the decrement lane (text renders
-// no count when no write lands — pass #258), the mistyEscape free-cast skip log/result
-// seam, and the taunting chooser→skip→result flow.
+// no count when no write lands — pass #258), and the taunting chooser→skip→result
+// flow (skip bytes; the dreadful twin lives in dreadfulStep.test.jsx).
+// The mistyEscape free-cast skip seam is NOT re-pinned here: handleFreeCastSkip is
+// mode-agnostic (only the caller's label differs) — resolution + exact log are owned
+// by noUses.test.jsx's zero-use Skip test, mode→label rendering by render.test.jsx.
 // Copy is owned by render.test.jsx; exact step payloads by refreshingStep,
 // disappearingStep (#256), dreadfulStep (#257), and bewitching (#254).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -138,25 +141,7 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
         expect(body.textContent).not.toContain('remaining');
     });
 
-    it('free-cast skip in mistyEscape mode logs the free cast, shows the remaining count, and consumes no uses', async () => {
-        render(<StepsOfTheFeyTauntModal {...makeProps({ mode: 'mistyEscape', newCount: 3 })} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Misty Step only (free cast)' }));
-
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-        });
-        expect(screen.getByText(/3 remaining/)).toBeInTheDocument();
-
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'FeyTrickster',
-            abilityName: 'Steps of the Fey',
-            description: expect.stringContaining('cast Misty Step for free'),
-        }));
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('skip from the taunting chooser resolves to a no-targets Taunting result without dispatching saves or writes', async () => {
+    it('skip from the taunting chooser resolves to a no-targets Taunting result without dispatching saves, writes, or logs', async () => {
         render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 5 })} />);
 
         // Cross-step seam: choice → taunting target chooser.
@@ -179,5 +164,9 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
         );
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        // The chooser-skip is a pure result-text resolution (handleSkip,
+        // StepsOfTheFeyTauntModal.jsx:217-224): unlike handleFreeCastSkip it logs
+        // nothing — pinned so a future edit cannot silently start double-logging.
+        expect(addEntry).not.toHaveBeenCalled();
     });
 });

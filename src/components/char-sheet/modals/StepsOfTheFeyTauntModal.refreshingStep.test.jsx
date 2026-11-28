@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Refreshing Step lane: confirmation copy + Cancel round-trip (chooser restored,
 // inert until confirmed) and the accept dispatch with Math.random pinned — exact
 // setTempHp payload (d10 bounds), exact decrement write with freeCastCountKey
@@ -104,7 +104,7 @@ describe('StepsOfTheFeyTauntModal - Refreshing Step', () => {
         render(<StepsOfTheFeyTauntModal {...makeProps()} />);
         clickRefreshingOption();
 
-        expect(screen.getByText('Refreshing Step')).toBeInTheDocument();
+        // Confirm view open (the click above already proved the chooser card).
         expect(screen.getByText(/gain 1d10 Temporary Hit Points/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();

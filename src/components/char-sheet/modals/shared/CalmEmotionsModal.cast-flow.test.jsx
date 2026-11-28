@@ -1,4 +1,8 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
+// Cast-flow lane: cast preamble logging, per-target effect routing, heighten
+// disadvantage, Careful protection, and player save-prompt resolution.
+// Render/interaction faces live in CalmEmotionsModal.test.jsx; the
+// save-dismissed drain lives in CalmEmotionsModal.save-dismissed.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CalmEmotionsModal from './CalmEmotionsModal.jsx';
@@ -147,12 +151,16 @@ afterEach(() => {
 });
 
 describe('CalmEmotionsModal - Cast Flow', () => {
-    it('cast with successful saves: logs use, stores rollback, registers duration, prompts players, applies nothing', async () => {
-        // Every roll is a natural 20 — SP-020 B1: everyone saves, no effects land.
-        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    it('cast logs use, stores rollback, registers duration, prompts players; failed NPC saves apply each target\'s own chosen effect', async () => {
+        // Constant low roll: Goblin (cha +0) and Orc (cha +2) both fail DC 14.
+        vi.spyOn(Math, 'random').mockReturnValue(0.01);
         render(<CalmEmotionsModal {...makeProps()} />);
+
+        await setChoice('Orc', 1); // Become Indifferent; Goblin keeps default immunity
         await castAll();
 
+        // Cast preamble is outcome-independent: use logged, rollback stored,
+        // SP-020 B5/B2: duration clock registered and eligibility outcome recorded.
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'ability_use',
             characterName: 'Wizard1',
@@ -166,34 +174,11 @@ describe('CalmEmotionsModal - Cast Flow', () => {
             saveDc: 14,
             attackScope: 'aoe',
         });
-        // SP-020 B5/B2: duration clock registered and eligibility outcome recorded.
         expect(registerCalmEmotionsExpiration).toHaveBeenCalledWith({ casterName: 'Wizard1', campaignName });
         expect(logCalmEmotionsEligibility).toHaveBeenCalledWith(expect.objectContaining({
             casterName: 'Wizard1',
             campaignName,
         }));
-        // Successful saves — no effect applied to anyone, but every NPC save is logged.
-        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
-        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
-        expect(saveResultCalls('Goblin')[0][1].success).toBe(true);
-        expect(saveResultCalls('Orc')[0][1].success).toBe(true);
-        // Players are prompted (even with the default immunity choice) instead of rolled here.
-        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            targetName: 'PlayerAlly',
-            saveType: 'CHA',
-            saveDc: 14,
-            sourceName: 'Wizard1',
-        }));
-        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
-    });
-
-    it('failed NPC saves apply the per-target chosen effect and log failures', async () => {
-        // Constant low roll: Goblin (cha +0) and Orc (cha +2) both fail DC 14.
-        vi.spyOn(Math, 'random').mockReturnValue(0.01);
-        render(<CalmEmotionsModal {...makeProps()} />);
-
-        await setChoice('Orc', 1); // Become Indifferent; Goblin keeps default immunity
-        await castAll();
 
         await waitFor(() => {
             expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
@@ -208,9 +193,17 @@ describe('CalmEmotionsModal - Cast Flow', () => {
         expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
         expect(saveResultCalls('Goblin')[0][1].success).toBe(false);
         expect(saveResultCalls('Orc')[0][1].success).toBe(false);
-        // Player lane waits for its own prompt response.
+        // Players are prompted (even with the default immunity choice) instead of
+        // rolled here, and nothing applies until their own response arrives.
+        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'PlayerAlly',
+            saveType: 'CHA',
+            saveDc: 14,
+            sourceName: 'Wizard1',
+        }));
         expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'PlayerAlly' }));
         expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'PlayerAlly' }));
+        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
     });
 
     it('heightened target saves at disadvantage and still fails on a high first draw', async () => {
@@ -236,8 +229,11 @@ describe('CalmEmotionsModal - Cast Flow', () => {
                 targetName: 'Orc', casterName: 'Wizard1', campaignName, dc: 14,
             }));
         });
-        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
+        // SP-020 B6: both save lanes log their row; the successful Goblin is
+        // logged as a success and receives no effect.
+        expect(saveResultCalls('Goblin')[0][1].success).toBe(true);
         expect(saveResultCalls('Orc')[0][1].success).toBe(false);
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
     });
 
     it('Careful Spell auto-succeeds protected NPC and player while unprotected targets still suffer', async () => {

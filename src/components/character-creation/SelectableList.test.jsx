@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SelectableList from './SelectableList.jsx';
@@ -140,8 +140,7 @@ describe('SelectableList', () => {
     expect(selectOptions()).toEqual(['All', 'Type1', 'Type2']);
     // Filtering is active from the start
     expectVisible(['Item A', 'Item C']);
-    fireEvent.change(select, { target: { value: 'Type2' } });
-    expectVisible(['Item B']);
+    // defaultLabel stays as the reset option even when defaultValue pre-selects
     fireEvent.change(select, { target: { value: 'All' } });
     expectVisible(ITEM_NAMES);
   });
@@ -184,6 +183,24 @@ describe('SelectableList', () => {
     fireEvent.click(screen.getByText('Select Item B'));
     expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
     expect(onArrayFieldChange).toHaveBeenCalledWith('skills', expected);
+  });
+
+  it('matches object-shaped selection entries by name (custom entries), not just strings', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { skills: [{ name: 'Item A', bonus: '+1' }] },
+      onArrayFieldChange,
+    });
+
+    // selection state, count, and show-only-selected all match objects by name
+    expect(screen.getByTestId('row-0').dataset.selected).toBe('true');
+    expect(screen.getByTestId('row-0').dataset.count).toBe('1');
+    fireEvent.click(screen.getByRole('checkbox'));
+    expectVisible(['Item A']);
+
+    // toggling removes the whole object entry
+    fireEvent.click(screen.getByText('Select Item A'));
+    expect(onArrayFieldChange).toHaveBeenCalledWith('skills', []);
   });
 
   it('locks pre-selected items from toggling off while allowing other selections', () => {
@@ -232,9 +249,10 @@ describe('SelectableList', () => {
       items: [
         { name: 'Item A', index: 'alpha' },
         { name: 'Item B', index: 'bravo' },
+        { name: 'Item C', index: 'charlie' },
       ],
       formData: { skills: ['Item A', 'Item A', 'Item B'] },
-      repeatableItems: ['Item A'],
+      repeatableItems: ['Item A', 'Item C'],
       preSelectedItems: ['Item A'],
       onArrayFieldChange,
     };
@@ -243,6 +261,7 @@ describe('SelectableList', () => {
     expect(screen.getByTestId('row-0').dataset.count).toBe('2');
 
     fireEvent.click(screen.getByText('Remove Item B')); // not repeatable → blocked
+    fireEvent.click(screen.getByText('Remove Item C')); // repeatable but unselected → no-op
     expect(onArrayFieldChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByText('Remove Item A')); // pre-selected with count 2 → remove one

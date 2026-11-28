@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // MA-0115 ac-penalty lane: Adult Green Dragon Noxious Miasma sphere picker
 // (CON DC 17, 2d6 Poison, dcSuccess none) grants the authored "−2 penalty to
 // AC until the end of its next turn" clause as the registered ac_penalty te
@@ -127,7 +127,9 @@ describe('MA-0115 Noxious Miasma ac_penalty grant', () => {
     renderMiasma();
     await confirmThugTarget();
 
-    const te = (runtime.store['campaign.targetEffects'] || []).find(t => t.effect === 'ac_penalty' && t.target === 'Thug 1');
+    const grants = (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'ac_penalty' && t.target === 'Thug 1');
+    expect(grants).toHaveLength(1); // one grant per failed save, never a double-apply
+    const te = grants[0];
     expect(te).toMatchObject({
       source: 'Adult Green Dragon 1',
       duration: 'until_end_of_next_turn',
@@ -138,7 +140,8 @@ describe('MA-0115 Noxious Miasma ac_penalty grant', () => {
     expect(expirations.current.some(x =>
       x.rounds === 2
       && x.targetName === 'Thug 1'
-      && x.effects.some(e => e.type === 'remove_target_effect' && e.effectKey === 'ac_penalty'))).toBe(true);
+      && x.effects.some(e => e.type === 'remove_target_effect' && e.effectKey === 'ac_penalty'
+        && e.source === 'Adult Green Dragon 1' && e.target === 'Thug 1'))).toBe(true);
 
     const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'AC Penalty');
     expect(log).toMatchObject({ characterName: 'Thug 1', sourceName: 'Adult Green Dragon 1' });

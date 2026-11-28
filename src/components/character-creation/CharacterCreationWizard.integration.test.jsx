@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * Integration lane for CharacterCreationWizard.
  *
@@ -10,11 +10,21 @@
  *
  * Lane partition (do not restate here):
  *  - per-step field behavior -> WizardStep*.test.jsx lanes
+ *    (step-1 hint DISPLAY table -> WizardStepRules.test.jsx;
+ *     Basic-step field payloads/blur signal -> WizardStepBasic.test.jsx)
  *  - footer/header/sidebar/progress unit details -> their own test files
  *  - submit handler wiring with mocked validators -> submission.test.jsx
+ *    (which DEFERS the real-validator edit payload to this lane)
  *  - navigation hook contract -> useWizardNavigation.test.js
  * This file pins only the flow glue: step order, blocked/advance gates,
- * the live duplicate-name guard, and the exact submitted payload.
+ * the live duplicate-name guard, the exact submitted payload, and the
+ * quick-build WHEN-of-call seam.
+ *
+ * Consolidation log (2026-11-28): the two create-flow gate tests (walk +
+ * step-1 hard-gate) merged into one walk; the two edit tests (name-gate
+ * reaction + exact payload) merged into one edit flow; the two create-flow
+ * name-hint touch-semantics tests merged into one. Same assertions, fewer
+ * full-wizard renders.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -106,41 +116,21 @@ function renderWizard(props = {}) {
   return { onComplete };
 }
 
+const nextButton = () => screen.getByRole('button', { name: 'Next' });
+
 describe('CharacterCreationWizard - Integration', () => {
-  it('walks the create flow: ruleset selection enters step 2, Next stays blocked without a name and advances to Race once valid', async () => {
+  // One continuous create-flow gate walk (merges the former step-1 hard-gate
+  // test and the step-2 walk test — same execution path, one render).
+  // A fresh create has NO ruleset (useState seeds from characterData?.rules =
+  // null even though formData.rules defaults to '5e'), so step 1 shows the
+  // inline hint with Next, later sidebar tabs, and Save all locked
+  // (hint DISPLAY table itself -> WizardStepRules.test.jsx).
+  it('create flow: step 1 hard-gates until a ruleset is picked, step 2 gates on a name, and Next lands exactly on Race', async () => {
     renderWizard();
 
-    // Step 1 is the ruleset chooser; step 2 renders only after selecting.
-    expect(screen.getByText('Select Rules System')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('rules-option-5e'));
-    expect(await screen.findByText('Step 2: Basic Information')).toBeInTheDocument();
-
-    // Real basics validator: default empty name blocks Next.
-    const next = () => screen.getByRole('button', { name: 'Next' });
-    await waitFor(() => expect(next()).toBeDisabled());
-
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Aragorn' } });
-
-    await waitFor(() => expect(next()).toBeEnabled());
-    fireEvent.click(next());
-
-    // Step order glue: step 2 walks to step 3 (Race), not any other step.
-    expect(await screen.findByText('Step 3: Race')).toBeInTheDocument();
-    expect(screen.queryByText('Step 2: Basic Information')).not.toBeInTheDocument();
-  });
-
-  // Step-1 ruleset gate (parity with the step-2 name gate, backlog 2026-10-28-P):
-  // a fresh create has NO ruleset (useState seeds from characterData?.rules =
-  // null even though formData.rules defaults to '5e'), so the step itself shows
-  // the inline hint and Next is disabled; sidebar tabs + Save stay locked.
-  it('create flow: ruleset step hard-gates Next with an inline hint until a card is picked', async () => {
-    renderWizard();
-    const next = () => screen.getByRole('button', { name: 'Next' });
-
+    // Step 1 locked: blocker hint visible, Next + sidebar lane disabled.
     expect(await screen.findByText(RULESET_REQUIRED_ERROR)).toBeInTheDocument();
-    await waitFor(() => expect(next()).toBeDisabled());
-    // Sidebar lane (already gated via step1Valid — pinned so it cannot regress):
-    // later tabs and Save stay locked with no ruleset.
+    await waitFor(() => expect(nextButton()).toBeDisabled());
     expect(screen.getByRole('button', { name: /Basic Information/ })).toBeDisabled();
     expect(document.querySelector('.sidebar-save')).toBeDisabled();
 
@@ -149,13 +139,26 @@ describe('CharacterCreationWizard - Integration', () => {
     expect(await screen.findByText('Step 2: Basic Information')).toBeInTheDocument();
     expect(screen.queryByText(RULESET_REQUIRED_ERROR)).not.toBeInTheDocument();
 
-    // Back on step 1 with the ruleset chosen: hint gone, Next re-enabled,
-    // sidebar unlocked.
+    // Real basics validator: default empty name blocks Next.
+    await waitFor(() => expect(nextButton()).toBeDisabled());
+
+    // Back on step 1 with the ruleset chosen: hint stays gone, Next and the
+    // sidebar lane re-arm (selection persists across navigation).
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
     expect(screen.getByText('Select Rules System')).toBeInTheDocument();
     expect(screen.queryByText(RULESET_REQUIRED_ERROR)).not.toBeInTheDocument();
-    await waitFor(() => expect(next()).toBeEnabled());
+    await waitFor(() => expect(nextButton()).toBeEnabled());
     expect(screen.getByRole('button', { name: /Basic Information/ })).toBeEnabled();
+
+    // Forward again; a valid name unlocks Next and step order glue sends the
+    // flow to step 3 (Race), not any other step.
+    fireEvent.click(nextButton());
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Aragorn' } });
+    await waitFor(() => expect(nextButton()).toBeEnabled());
+    fireEvent.click(nextButton());
+
+    expect(await screen.findByText('Step 3: Race')).toBeInTheDocument();
+    expect(screen.queryByText('Step 2: Basic Information')).not.toBeInTheDocument();
   });
 
   it('live duplicate-name guard blocks advancement with the collision error while the name still collides', async () => {
@@ -170,67 +173,37 @@ describe('CharacterCreationWizard - Integration', () => {
     // Visible-text oracle: exact error from utils surfaces inline, and the
     // gate stays shut (assert disabled state — never click a disabled Next).
     expect(await screen.findByText(DUPLICATE_CHARACTER_NAME_ERROR)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(nextButton()).toBeDisabled();
     expect(screen.queryByText('Step 3: Race')).not.toBeInTheDocument();
   });
 
-  it('edit flow submits the exact merged payload once every prior step is valid', async () => {
+  // One continuous edit-flow test (merges the former live-name-gate test and
+  // the exact-payload test — same prefilled render, one walk). Submission
+  // lane defers the real-validator byte-exact payload pin to this test.
+  it('edit flow: sidebar unlocks on the validity prefix, the name gate reacts live, and the last step submits the exact merged payload', async () => {
     const characterData = {
       ...cloneDeep(DEFAULT_FORM_DATA),
       id: 'edgin-1',
       name: 'Edgin',
       rules: '5e',
     };
-    const { onComplete } = renderWizard({
-      characterData,
-      isEditing: true,
-    });
+    const { onComplete } = renderWizard({ characterData, isEditing: true });
 
-    // Sidebar jumps to the last visible step only after the full validity
-    // prefix passes (real getStepEnabled / isSaveEnabled wiring).
-    const specialTab = await screen.findByRole('button', { name: /Special Actions/ });
-    await waitFor(() => expect(specialTab).toBeEnabled());
-
-    // Non-last edit steps carry NO submit in the footer — neither the
-    // edit-mode Save Changes nor the create-mode Create Character.
-    expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Create Character' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
-
-    fireEvent.click(specialTab);
-
-    // Reaching canonical step 17 flips the footer to the submit button —
-    // the edit-mode twin of create-mode's Create Character, enabled exactly
-    // while the sidebar ✓ Save is.
-    const save = await screen.findByRole('button', { name: 'Save Changes' });
-    expect(save).toBeEnabled();
-    expect(document.querySelector('.sidebar-save')).toBeEnabled();
-    fireEvent.click(save);
-
-    // Exact payload, byte-for-byte: the full merged form state, untouched
-    // by navigation, including the passed-through id.
-    const expected = cloneDeep(characterData);
-    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
-    expect(onComplete).toHaveBeenCalledWith(expected);
-  });
-
-  it('edit flow: clearing the name shows a live inline required-hint and keeps ✓ Save disabled until a valid name is typed', async () => {
-    const characterData = {
-      ...cloneDeep(DEFAULT_FORM_DATA),
-      id: 'edgin-1',
-      name: 'Edgin',
-      rules: '5e',
-    };
-    renderWizard({ characterData, isEditing: true });
-
-    // Open prefilled: no hint, sidebar ✓ Save enabled.
+    // Open prefilled: no hint, sidebar ✓ Save enabled (real
+    // getStepEnabled / isSaveEnabled wiring over the full validity prefix).
     const nameInput = await screen.findByDisplayValue('Edgin');
     const saveBtn = () => document.querySelector('.sidebar-save');
     await waitFor(() => expect(saveBtn()).toBeEnabled());
     expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
 
+    // Non-last steps carry NO submit in the footer — neither the edit-mode
+    // Save Changes nor the create-mode Create Character.
+    expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create Character' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+
     // Whitespace-only counts as empty: hint appears next to the input,
-    // Save stays disabled (existing gate, unchanged).
+    // Save loses its arm (live cross-cutting gate: step field -> sidebar).
     fireEvent.change(nameInput, { target: { value: '   ' } });
     expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
     expect(nameInput.closest('.form-group').querySelector('.error-message')).toHaveTextContent(CHARACTER_NAME_REQUIRED_ERROR);
@@ -240,14 +213,31 @@ describe('CharacterCreationWizard - Integration', () => {
     fireEvent.change(nameInput, { target: { value: 'Edgin' } });
     await waitFor(() => expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument());
     await waitFor(() => expect(saveBtn()).toBeEnabled());
+
+    // Sidebar jump to the last visible step.
+    fireEvent.click(await screen.findByRole('button', { name: /Special Actions/ }));
+
+    // Reaching canonical step 17 flips the footer to the submit button —
+    // the edit-mode twin of create-mode's Create Character, enabled exactly
+    // while the sidebar ✓ Save is.
+    const save = await screen.findByRole('button', { name: 'Save Changes' });
+    expect(save).toBeEnabled();
+    expect(saveBtn()).toBeEnabled();
+    fireEvent.click(save);
+
+    // Exact payload, byte-for-byte: the full merged form state, untouched
+    // by navigation and the name round-trip, including the passed-through id.
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(onComplete).toHaveBeenCalledWith(cloneDeep(characterData));
   });
 
-  it('create flow: pristine empty name on the Basic step shows NO error until first touch', async () => {
+  // Touch semantics for the create-flow name hint (merges the former
+  // pristine-until-touched test and the type-then-clear test).
+  it('create flow: the name hint stays silent until first touch, then tracks the field live', async () => {
     renderWizard();
 
     fireEvent.click(screen.getByTestId('rules-option-5e'));
     const nameInput = await screen.findByRole('textbox');
-    const next = () => screen.getByRole('button', { name: 'Next' });
 
     // Arrival at Step 2 with an untouched empty name: no red hint, no error
     // styling. The retired eager-validations self-fired the required error
@@ -257,31 +247,24 @@ describe('CharacterCreationWizard - Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
     // Advancement is still hard-gated (unchanged lane, just silent).
-    await waitFor(() => expect(next()).toBeDisabled());
+    await waitFor(() => expect(nextButton()).toBeDisabled());
 
     // First blur with the field still empty arms the hint; Next stays shut.
     fireEvent.blur(nameInput);
     expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
     expect(nameInput.closest('.form-group').querySelector('.error-message')).toHaveTextContent(CHARACTER_NAME_REQUIRED_ERROR);
     expect(nameInput).toHaveClass('error');
-    expect(next()).toBeDisabled();
-  });
+    expect(nextButton()).toBeDisabled();
 
-  it('create flow: typing then clearing the name shows the required hint, a valid name clears it', async () => {
-    renderWizard();
-
-    fireEvent.click(screen.getByTestId('rules-option-5e'));
-    const nameInput = await screen.findByRole('textbox');
-    const next = () => screen.getByRole('button', { name: 'Next' });
-
+    // A valid name clears the hint and unlocks advancement immediately.
     fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
-    await waitFor(() => expect(next()).toBeEnabled());
+    await waitFor(() => expect(nextButton()).toBeEnabled());
     expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
 
     // Clearing after interaction re-arms the required hint immediately.
     fireEvent.change(nameInput, { target: { value: '' } });
     expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
-    await waitFor(() => expect(next()).toBeDisabled());
+    await waitFor(() => expect(nextButton()).toBeDisabled());
   });
 });
 

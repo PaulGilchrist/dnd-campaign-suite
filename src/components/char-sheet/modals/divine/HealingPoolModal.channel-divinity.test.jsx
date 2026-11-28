@@ -1,37 +1,56 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 channel-divinity lane: distinct-value store/fallback fixtures + ordered commit census
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HealingPoolModal from './HealingPoolModal.jsx';
 
 // ── Ownership ──
 // This file owns the CHANNEL DIVINITY seam only: consumeChannelDivinity's
-// gating (resourceCost === 'channel_divinity', once-per-mount ref latch),
-// charge resolution via resolveChannelDivinityCharges (runtime store first,
-// class_levels fallback), the exact channelDivinityCharges write payloads and
-// state transitions in the live store, the exact ability_use log payload,
-// zero-charge console.error behavior, and charge inertness when no CD
-// action has been taken (close/Escape/overlay) or the feature is non-CD.
+// gating (resourceCost === 'channel_divinity', once-per-mount ref latch — the
+// classic double-channel detector), charge resolution through the REAL
+// resolveChannelDivinityCharges (healingPoolHandler.js is deliberately NOT
+// mocked; runtime-store-first read of the 'channelDivinityCharges' key with
+// the class_levels[level-1].channel_divinity fallback). The store fixture is
+// deliberately DISTINCT from the class max (store 1 vs class_levels[16] = 3)
+// so a mutant that resolves from the fallback while the store has a value
+// writes 2/(2/3) instead of the pinned 0/(0/3) — and the fallback leg (store
+// key deleted, class max 3 ≠ hardcoded default 2) kills a
+// hardcoded-fallback mutant the reverse way. Also owns the exact ordered
+// commit census (charge write + ability_use row land BEFORE the pool write
+// and the healing_pool row — the heal row is asserted only as the ordering
+// witness; its payload shape is healing.test.jsx's), the exact ability_use
+// payload under frozen Date.now, zero-silence on charges exhausted (no
+// charge write, no ability_use row, console.error), and charge inertness for
+// non-CD features and closes with no CD action.
 // Deferred to owners:
 // - HealingPoolModal.bloodied.test.jsx — bloodied gating/badge/restriction
-//   note, gate-blocked inertness.
+//   note, gate-blocked inertness (this lane must NOT re-pin).
 // - HealingPoolModal.healing.test.jsx — general applyHeal plumbing,
-//   applyHealingToTarget args, pool deduction, healing_pool log payloads.
-// - HealingPoolModal.curing.test.jsx — condition-cure mechanics.
+//   applyHealingToTarget args, pool deduction, healing_pool log payload
+//   shape (incl. the exact self-heal currentHitPoints write/pool/log row),
+//   generic close-inertness plumbing.
+// - HealingPoolModal.curing.test.jsx — condition-cure mechanics (write
+//   payloads, condition-log rows, gating) — this lane pins only the CD
+//   spend triggered through those lanes' first action.
 // - HealingPoolModal.dice.test.jsx — dice accumulation/close-heal mechanics.
 // - HealingPoolModal.test.jsx — loading state, display strings, target
-//   selection, Done/Escape plumbing (generic).
-// (Subsumes this file's former separate "logs an ability_use entry" case —
-// the log is asserted alongside the exact consume payload of the same action.
-// Also drops the former pool-mechanics assertion count on updateFn — pool
-// deduction belongs to healing.test.jsx; here pool movement is only
-// negative-control evidence that a gated action did or did not run.)
+//   selection, Done/Escape/overlay close plumbing (generic — including that
+//   an overlay click never closes: the component has no overlay click
+//   handler, so the former overlay leg here was base plumbing, purged).
 
 // ── Mocked modules ──
+// Keys mirror ONLY what the loaded render graph imports: HealingPoolModal.jsx
+// itself, SecondaryTargetModal.jsx (real component, its own deps load for
+// real), and healingPoolHandler.js's own imports (damageUtils getCombatContext,
+// useRuntimeState getRuntimeValue, logService addEntry). Former phantom keys
+// getTargetFromAttacker, addStorageChangeListener and the unused
+// services/ui/storage.js mock are purged (nothing in the graph imports them —
+// same purge the bloodied lane applied). conditionUtils is a pure data
+// module — the 4-of-15 CONDITIONS mirror-fixture mock is retired in favor of
+// the real catalog ('Poisoned' resolves against it).
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
-  addStorageChangeListener: vi.fn(() => () => {}),
   useRuntimeValue: vi.fn(() => null), // display-echo subscription seam (return value unused by the heal modals)
 }));
 
@@ -39,16 +58,11 @@ vi.mock('../../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../../../services/ui/storage.js', () => ({
-  default: { set: vi.fn() },
-}));
-
 vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
-  getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
@@ -58,15 +72,6 @@ vi.mock('../../../../services/rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../../../services/ui/utils.js', () => ({
   default: { getName: vi.fn((n) => n?.toLowerCase().trim()) },
-}));
-
-vi.mock('../../../../services/combat/conditions/conditionUtils.js', () => ({
-  CONDITIONS: [
-    { key: 'blinded', label: 'Blinded' },
-    { key: 'charmed', label: 'Charmed' },
-    { key: 'poisoned', label: 'Poisoned' },
-    { key: 'frightened', label: 'Frightened' },
-  ],
 }));
 
 // ── Re-import mocked modules ──
@@ -83,8 +88,10 @@ const CAMPAIGN = 'test-campaign';
 const CLERIC = 'Divine_Cleric';
 const FIXED_TS = 1750000000000; // deterministic timestamp for exact log payloads
 
-// Level-17 cleric: class_levels[16].channel_divinity = 3 (max charges source
-// for resolveChannelDivinityCharges when the runtime store is empty).
+// Level-17 cleric: class_levels[16].channel_divinity = 3 — the class max
+// resolveChannelDivinityCharges falls back to ONLY when the store key is
+// absent. Distinct from the live store value (1 charge) so the store-first
+// read and the fallback leg cannot be swapped by a mutant unnoticed.
 const clericStats = {
   name: CLERIC,
   level: 17,
@@ -142,33 +149,36 @@ function setHealAmount(value) {
   fireEvent.change(screen.getByRole('spinbutton'), { target: { value: String(value) } });
 }
 
-function cdWrites() {
-  return useRuntimeState.setRuntimeValue.mock.calls.filter(
-    ([, key]) => key === 'channelDivinityCharges',
-  );
-}
-
-function abilityUseLogs() {
-  return logService.addEntry.mock.calls.filter(([, entry]) => entry.type === 'ability_use');
-}
-
-function expectedAbilityLog(remaining) {
+function expectedAbilityLog(remaining, max = 3) {
   return {
     type: 'ability_use',
     characterName: CLERIC,
     abilityName: 'Preserve Life',
-    description: `${CLERIC} expended 1 Channel Divinity to use Preserve Life (${remaining}/3 remaining).`,
+    description: `${CLERIC} expended 1 Channel Divinity to use Preserve Life (${remaining}/${max} remaining).`,
     timestamp: FIXED_TS,
+  };
+}
+
+function healLog(amount, poolAfter) {
+  return {
+    type: 'healing_pool',
+    sourceName: CLERIC,
+    featureName: 'Preserve Life',
+    targetName: CLERIC,
+    amount,
+    poolAfter,
   };
 }
 
 // NOTE — flagged component defects (not fixed here):
 // 1. The amount input and dice roll-details block use inline styles
-//    (also flagged in bloodied lane).
+//    (also flagged in bloodied/healing/curing/dice lanes).
 // 2. With zero CD charges, applyHeal still heals and drains the pool — it
 //    only skips the charge spend (console.error). healingPoolHandler returns
 //    a blocking popup in the same situation; the modal does not. Asserted
 //    as-is below.
+// 3. HealingPoolModal.jsx renders `noHealCapacity={noHealCapacity}` twice on
+//    HealingPoolMain (duplicate JSX prop, byte-identical — harmless, flagged).
 
 // ── Tests ──
 
@@ -178,11 +188,13 @@ describe('HealingPoolModal - Channel Divinity', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     poolUpdate = vi.fn((v) => { poolStore.current = v; });
     setupPoolStore();
+    // 1 live charge vs class max 3 — see fixture note: the two resolution
+    // legs must never be interchangeable without the pins below noticing.
     hpStore = {
       [CLERIC]: {
         currentHitPoints: 10,
         hitPoints: 90,
-        channelDivinityCharges: 3,
+        channelDivinityCharges: 1,
         activeConditions: ['poisoned'],
       },
     };
@@ -195,10 +207,12 @@ describe('HealingPoolModal - Channel Divinity', () => {
       entry[key] = value;
     });
     damageUtils.getCombatContext.mockResolvedValue(combatSummary);
+    // Real applyHealing.js return shape: { actualHeal, oldHp, newHp, maxHp }.
     applyHealingService.applyHealingToTarget.mockImplementation((cs, name, amount) => ({
       actualHeal: amount,
       oldHp: 10,
       newHp: 10 + amount,
+      maxHp: 90,
     }));
   });
 
@@ -207,26 +221,42 @@ describe('HealingPoolModal - Channel Divinity', () => {
     useRuntimeState.setRuntimeValue.mockReset();
     useTrackedResource.mockReset();
     damageUtils.getCombatContext.mockReset();
-    damageUtils.getTargetFromAttacker.mockReset();
     applyHealingService.applyHealingToTarget.mockReset();
     logService.addEntry.mockReset();
     dateNowSpy.mockRestore();
     consoleErrorSpy.mockRestore();
   });
 
-  // ── First CD action: exact spend + exact log ──
+  // ── First CD action: runtime-store-first resolution + full ordered census ──
 
-  it('expend exactly one charge on first Apply Heal and logs the matching ability_use entry', async () => {
+  it('expends exactly one store-resolved charge on first Apply Heal, before the pool write and both exact log rows', async () => {
     await renderModal();
     setHealAmount(5);
     fireEvent.click(healBtn());
 
-    expect(cdWrites()).toEqual([[CLERIC, 'channelDivinityCharges', 2, CAMPAIGN]]);
-    expect(hpStore[CLERIC].channelDivinityCharges).toBe(2);
-    expect(abilityUseLogs()).toEqual([[CAMPAIGN, expectedAbilityLog(2)]]);
+    // Read-side arity truth: resolveChannelDivinityCharges reads the store
+    // key with the 2-param getRuntimeValue contract (no campaignName arg).
+    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(CLERIC, 'channelDivinityCharges');
+    // Store-first: live charge count is 1 while the class max is 3, so
+    // 0/(0/3) can only come from (store=1, fallback max=3) — a fallback-read
+    // mutant would write 2/(2/3).
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [CLERIC, 'channelDivinityCharges', 0, CAMPAIGN],
+    ]);
+    expect(hpStore[CLERIC].channelDivinityCharges).toBe(0);
+    // Ordered commit census: the ability_use row is the FIRST addEntry call,
+    // ahead of the healing_pool row (whose payload shape healing.test.jsx
+    // owns — pinned here only as the ordering witness). The combat lane
+    // writes no HP bucket itself (the engine owns that).
+    expect(logService.addEntry.mock.calls).toEqual([
+      [CAMPAIGN, expectedAbilityLog(0)],
+      [CAMPAIGN, healLog(5, 7)],
+    ]);
+    expect(poolUpdate.mock.calls).toEqual([[7]]);
+    expect(poolStore.current).toBe(7);
   });
 
-  // ── Once-per-mount latch across actions and lanes ──
+  // ── Once-per-mount latch: the double-channel detector ──
 
   it('does not expend additional charges on subsequent heals in the same session', async () => {
     await renderModal();
@@ -238,13 +268,19 @@ describe('HealingPoolModal - Channel Divinity', () => {
     setHealAmount(4);
     fireEvent.click(healBtn());
 
-    expect(cdWrites()).toEqual([[CLERIC, 'channelDivinityCharges', 2, CAMPAIGN]]);
-    expect(abilityUseLogs()).toHaveLength(1);
+    // Exactly one charge write across three heals — channel divinity is
+    // 1/short rest; a latch regression shows up as a second tuple here.
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [CLERIC, 'channelDivinityCharges', 0, CAMPAIGN],
+    ]);
+    expect(logService.addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use')).toHaveLength(1);
     // Negative control: all three heals ran (pool drained 12 → 0), the latch
     // only suppressed charges.
     expect(poolUpdate.mock.calls.map(([v]) => v)).toEqual([7, 4, 0]);
     expect(poolStore.current).toBe(0);
   });
+
+  // ── First action of a fresh mount on every CD lane ──
 
   it.each([
     {
@@ -272,22 +308,33 @@ describe('HealingPoolModal - Channel Divinity', () => {
     await renderModal(props, findButton);
     perform();
 
-    expect(cdWrites()).toEqual([[CLERIC, 'channelDivinityCharges', 2, CAMPAIGN]]);
-    expect(hpStore[CLERIC].channelDivinityCharges).toBe(2);
-    expect(abilityUseLogs()).toEqual([[CAMPAIGN, expectedAbilityLog(2)]]);
+    expect(useRuntimeState.setRuntimeValue.mock.calls.filter(([, key]) => key === 'channelDivinityCharges')).toEqual([
+      [CLERIC, 'channelDivinityCharges', 0, CAMPAIGN],
+    ]);
+    expect(hpStore[CLERIC].channelDivinityCharges).toBe(0);
+    expect(logService.addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use')).toEqual([
+      [CAMPAIGN, expectedAbilityLog(0)],
+    ]);
   });
 
-  // ── Charge resolution fallback ──
+  // ── Fallback leg: distinct from the hardcoded default (2) ──
 
-  it('resolves charges from class_levels when the runtime store is empty, spending down from max', async () => {
+  it('resolves charges from class_levels when the runtime store is empty, spending down from max 3', async () => {
     delete hpStore[CLERIC].channelDivinityCharges;
 
     await renderModal();
     setHealAmount(5);
     fireEvent.click(healBtn());
 
-    expect(cdWrites()).toEqual([[CLERIC, 'channelDivinityCharges', 2, CAMPAIGN]]);
-    expect(abilityUseLogs()).toEqual([[CAMPAIGN, expectedAbilityLog(2)]]);
+    // Class max is 3 (class_levels[16]), NOT the hardcoded 2 fallback-of-
+    // fallback: a mutant ignoring class_levels would write 1/(1/2).
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+      [CLERIC, 'channelDivinityCharges', 2, CAMPAIGN],
+    ]);
+    expect(logService.addEntry.mock.calls).toEqual([
+      [CAMPAIGN, expectedAbilityLog(2)],
+      [CAMPAIGN, healLog(5, 7)],
+    ]);
   });
 
   // ── Exhausted charges: gated out of the spend, heal still proceeds ──
@@ -302,8 +349,9 @@ describe('HealingPoolModal - Channel Divinity', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       `[HealingPoolModal] ${CLERIC} has no Channel Divinity charges to expend for Preserve Life.`,
     );
-    expect(cdWrites()).toEqual([]);
-    expect(abilityUseLogs()).toEqual([]);
+    // Zero-silence on the CD seam: no charge write, no ability_use row.
+    expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([]);
+    expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, healLog(5, 7)]]);
     // Flagged behavior (see header): the heal itself is not blocked.
     expect(poolUpdate).toHaveBeenCalledWith(7);
     expect(poolStore.current).toBe(7);
@@ -329,8 +377,12 @@ describe('HealingPoolModal - Channel Divinity', () => {
     await renderModal({ name: 'Lay On Hands', resourceCost: '', ...props });
     perform();
 
-    expect(cdWrites()).toEqual([]);
-    expect(abilityUseLogs()).toEqual([]);
+    // CD-seam scoped: the cure leg still writes activeConditions (curing
+    // lane's own mechanics) — only the charge seam must stay untouched.
+    expect(
+      useRuntimeState.setRuntimeValue.mock.calls.filter(([, key]) => key === 'channelDivinityCharges'),
+    ).toEqual([]);
+    expect(logService.addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use')).toEqual([]);
     // Negative control: the action itself ran — pool deducted, no spend.
     expect(poolUpdate).toHaveBeenCalledWith(7);
     expect(poolStore.current).toBe(7);
@@ -338,22 +390,22 @@ describe('HealingPoolModal - Channel Divinity', () => {
 
   // ── Inertness without a CD action ──
 
-  it('closing via overlay, Escape, or Done without healing expends no charges and logs nothing', async () => {
+  it('closing via Escape or Done without a CD action expends no charges and logs nothing', async () => {
     const onClose = vi.fn();
     await renderModal({ onClose });
     setHealAmount(5);
 
-    fireEvent.click(document.querySelector('.short-rest-overlay'));
-    expect(onClose).not.toHaveBeenCalled();
-
+    // Escape and Done fire the close lanes (overlay clicks never close — the
+    // component has no overlay handler; base.test.jsx owns that plumbing).
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(2);
 
-    expect(cdWrites()).toEqual([]);
-    expect(hpStore[CLERIC].channelDivinityCharges).toBe(3);
+    // Full zero-silence: nothing was written or logged anywhere.
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(hpStore[CLERIC].channelDivinityCharges).toBe(1);
     expect(poolUpdate).not.toHaveBeenCalled();
     expect(poolStore.current).toBe(12);
     expect(logService.addEntry).not.toHaveBeenCalled();

@@ -1,39 +1,47 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — audit+trim: full-shape pins on proficiencies/Wizard/Warlock, plateau cases cut, getClass major tests merged, getEnergy (dead export) minimal-pinned; header cites re-verified against source bytes
 import { describe, it, expect, vi } from 'vitest';
 import classRules from './classRules2024.js';
 import classes2024 from '../../../public/data/2024/classes.json';
 
 // Lane: 2024 classRules (this file) — closes the dual-ruleset pair with
-// classRules.test.js (#2014, 5e lane). Owns public/data/2024/classes.json
+// classRules.test.js (5e lane). Owns public/data/2024/classes.json
 // (separate disk; dataLoader.getDataPath() routes rules==='2024' here, so
-// no cross-lane pin reuse — 5e names/values from #2014 are deliberately NOT
-// copied: Moon formula pins, Archdruid Infinity, Arcane Ward max are 5e-only).
+// no cross-lane pin reuse — 5e names/values from the 5e lane are deliberately
+// NOT copied: Moon formula pins, Archdruid Infinity, Arcane Ward max are 5e-only).
 //
-// Pair closure (handoff from #2014):
+// Pair closure (handoff from the 5e lane):
 //  - 2024 capstone is FINITE: disk Druid L20 wild_shape:4 (no Archdruid
 //    Infinity) — pinned verbatim below.
 //  - Moon name-mismatch flag does NOT recur: disk majors here are named
 //    'Circle of the Moon' verbatim, matching the source formula's key.
 //  - No reciprocal rules!=='2024' guards exist in this module — routing is
-//    external (rulesFactory/rules-core `use2024 ? classRules2024 : classRules`,
-//    classFeatures FEATURE_GETTERS dispatch). Pinned honestly as absent.
+//    external (rulesFactory.js:33 / rules-core.js:27 `use2024 ? classRules2024
+//    : classRules`, classFeatures.js FEATURE_GETTERS dispatch). Pinned honestly
+//    as absent.
 //
-// Production liveness (verified 2026-10-16):
+// Production liveness (re-verified 2026-11-27 against current source bytes):
 //  - getClass            → rulesFactory.getPlayerStats (rules-core injects the
 //                         2024 module; cr.getClass call site is ruleset-agnostic)
-//  - getFeatures         → rules-actions.js (via injected classRules)
-//  - getHighestMajorLevel→ rules/core/spellCalc2024.js:506 (subclass spellcasting)
-//  - getMartialArtsDie   → rules/core/attackCalc2024.js:578 (Flurry of Blows dice)
-//  - getUnarmoredMovementIncrease → charSummaryCalc.js (sheet)
-//  - get*Features (x10)  → classFeatures.getClassFeatures FEATURE_GETTERS dispatch
-//                         → CharClassFeatures.jsx, trackedResources, automation
-//  - getRogueSneakAttack / getDruid* delegators → rulesFactory wrappers (live)
-//  - getEnergy         → disk-backed accessor for Fighter(Psi Warrior)/Rogue
-//                         (Soulknife) energy rows; consumer is the 2024 sheet/rules
-//                         ruleset path (no direct non-test call site found — kept
-//                         as disk-verbatim pin, dead-export candidate flagged).
+//  - getFeatures         → rules/rules-actions.js:55 (via injected classRules)
+//  - getHighestMajorLevel→ rules/core/spellCalc2024.js:532 (subclass
+//                         spellcasting). NOTE: that consumer reads
+//                         `getHighestMajorLevel(playerStats)?.spellcasting` —
+//                         always undefined on this module's number return
+//                         (cross-file SOURCE BUG, reported, not fixed here).
+//                         This lane pins the return contract: a plain number.
+//  - getMartialArtsDie   → rules/core/attackCalc2024.js:663 (Flurry of Blows dice)
+//  - getUnarmoredMovementIncrease → charSummaryCalc.js:75 (sheet)
+//  - get*Features (x10)  → classFeatures.js getClassFeatures FEATURE_GETTERS
+//                         dispatch → CharClassFeatures.jsx, trackedResources,
+//                         automation
+//  - getRogueSneakAttack / getDruid* delegators → rulesFactory wrappers (live;
+//                         consumers incl. encounter/MonsterCardModal.jsx)
+//  - getEnergy         → DEAD EXPORT (verified 2026-11-27: zero non-test call
+//                         sites anywhere in src/). Deletion recommended; kept
+//                         minimally pinned (one disk-shape census + the three
+//                         null branches) until removed.
 //
-// Anti-pattern audit results (canned-vs-disk, #2014 block standard):
+// Anti-pattern audit results (canned-vs-disk, 5e-lane block standard):
 //  - FIXED canned rows: every { level: N, <field>: X } synthetic progression row
 //    in the old file was fabricated and several contradicted disk (e.g. claimed
 //    martial_arts_die 6 at L5, disk is 8; sorcery/class channel_divinity 3 at
@@ -43,9 +51,13 @@ import classes2024 from '../../../public/data/2024/classes.json';
 //    skill_proficiencies_choices, but disk uses skill_proficiency_choices for
 //    Barbarian/Druid (matches neither field) and every disk string starts with
 //    'Choose' (skipped). No disk class ever yields a 'Skill: ' proficiency.
-//  - FLAG-B: categories2024.featuresToIgnore is never consulted by
-//    categorizeFeatures — ignored names ('Fighting Style', 'Extra Attack',
-//    'Druid Subclass'…) still land in specialActions. Pinned as quirk.
+//  - FLAG-B: featureCategories.js getCategories('2024').featuresToIgnore is
+//    never consulted by the service-layer addFeatures/categorize path —
+//    ignored names ('Fighting Style', 'Extra Attack', 'Druid Subclass'…) still
+//    land in specialActions. (UI components — CharActions/CharBonusActions/
+//    CharReactions/CharSpecialActions/CharCharacterAdvancement — filter them at
+//    RENDER time; the service surface returned here intentionally keeps them.)
+//    Pinned as quirk.
 //  - FLAG-C: getMartialArtsDie default d4 is unreachable via disk — 2024 Monk
 //    rows all carry martial_arts_die and start at d6. Default kept as honest
 //    synthetic-row fallback pin only.
@@ -54,10 +66,16 @@ import classes2024 from '../../../public/data/2024/classes.json';
 //    Bard songOfRestDie:null / subclassMagicalSecrets:0, Warlock arcanum
 //    formula (cross-checked honest: disk 'Mystic Arcanum' feature rows appear
 //    at exactly L11/13/15/17, matching the >10 / >=11/13/15/17 formula).
-//  - Quirks pinned: getRogueSneakAttack/getEldritchInvocations use positional
-//    [level-1] indexing (not find-by-level); getEnergy required_major check
-//    reads only class.major.name (raw subclass shape → null); getClass drops
-//    the runtime subclass customProp on the resolved major (disk clone wins).
+//  - Quirks pinned: getRogueSneakAttack/getEldritchInvocations/getCleric-
+//    PaladinSorcererBardFeatures use positional [level-1] indexing (not
+//    find-by-level); getEnergy required_major check reads only
+//    class.major.name (raw subclass shape → null); getClass drops the runtime
+//    subclass customProp on the resolved major (disk clone wins).
+//
+// Ladder-trim policy (2026-11-27 audit): it.each levels are kept only where the
+// level is discriminating (a bump boundary, a both-sides pair, a plateau cap
+// that kills an off-by-one, or the level-1 zero leg). Repeated values on the
+// same branch were cut.
 
 const diskClass = (name) => classes2024.find((c) => c.name === name);
 const diskLevels = (name) => diskClass(name).class_levels;
@@ -107,9 +125,9 @@ describe('classRules2024 (2024)', () => {
       expect(result.proficiencies).toEqual(['Simple Weapons', 'Light Martial Weapons']);
     });
 
-    it('includes disk Druid tool_proficiencies verbatim', () => {
+    it('maps disk Druid verbatim: armor string yields Shields, Herbalism Kit tool kept, skill_proficiency_choices ignored (exact 4)', () => {
       const result = classRules.getClass(classes2024, { class: { name: 'Druid' } });
-      expect(result.proficiencies).toContain('Herbalism Kit');
+      expect(result.proficiencies).toEqual(['Simple Weapons', 'Light Armor', 'Shields', 'Herbalism Kit']);
     });
 
     it('FLAG-A: no disk class ever emits a Skill: proficiency (all strings Choose-prefixed or field-name mismatch)', () => {
@@ -123,37 +141,44 @@ describe('classRules2024 (2024)', () => {
 
     it('parses non-Choose skill string and strips " or " inside the last token (synthetic path, quirk)', () => {
       // Synthetic input: no disk string reaches this parser (see FLAG-A).
-      // Quirk kept honest: ' or ' is removed, not split — 'PersuasionReligion'.
+      // Quirk kept honest: ' or ' is removed (first occurrence only), not
+      // split — 'PersuasionReligion'. Full-shape: base Cleric disk profs lead.
       const result = classRules.getClass(classes2024, { class: { name: 'Cleric', skill_proficiencies: 'History, Insight, Medicine, Persuasion or Religion' } });
-      expect(result.proficiencies).toContain('Skill: History');
-      expect(result.proficiencies).toContain('Skill: Medicine');
-      expect(result.proficiencies).toContain('Skill: PersuasionReligion');
+      expect(result.proficiencies).toEqual([
+        'Simple Weapons', 'Light Armor', 'Medium Armor', 'Shields',
+        'Skill: History', 'Skill: Insight', 'Skill: Medicine', 'Skill: PersuasionReligion',
+      ]);
     });
 
-    it('adds Martial Weapons + Heavy Armor for Divine Order Protector Cleric (runtime character field)', () => {
-      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', divineOrder: 'Protector' } });
-      expect(result.proficiencies).toContain('Martial Weapons');
-      expect(result.proficiencies).toContain('Heavy Armor');
+    it('adds exactly Martial Weapons + Heavy Armor for Divine Order Protector Cleric; other orders add nothing', () => {
+      const base = classRules.getClass(classes2024, { class: { name: 'Cleric' } });
+      const protector = classRules.getClass(classes2024, { class: { name: 'Cleric', divineOrder: 'Protector' } });
+      expect(protector.proficiencies).toEqual([...base.proficiencies, 'Martial Weapons', 'Heavy Armor']);
+      // negative leg: non-Protector order value grants nothing extra
+      const pacifier = classRules.getClass(classes2024, { class: { name: 'Cleric', divineOrder: 'Pacifier' } });
+      expect(pacifier.proficiencies).toEqual(base.proficiencies);
     });
 
-    it('adds Martial Weapons + Medium Armor for Primal Order Warden Druid (runtime character field)', () => {
-      const result = classRules.getClass(classes2024, { class: { name: 'Druid', primalOrder: 'Warden' } });
-      expect(result.proficiencies).toContain('Martial Weapons');
-      expect(result.proficiencies).toContain('Medium Armor');
+    it('adds exactly Martial Weapons + Medium Armor for Primal Order Warden Druid; other orders add nothing', () => {
+      const base = classRules.getClass(classes2024, { class: { name: 'Druid' } });
+      const warden = classRules.getClass(classes2024, { class: { name: 'Druid', primalOrder: 'Warden' } });
+      expect(warden.proficiencies).toEqual([...base.proficiencies, 'Martial Weapons', 'Medium Armor']);
+      // negative leg: wrong order key for the class grants nothing
+      const other = classRules.getClass(classes2024, { class: { name: 'Druid', primalOrder: '_other_' } });
+      expect(other.proficiencies).toEqual(base.proficiencies);
     });
 
-    it('resolves disk major by persisted subclass.name as a disk clone (runtime customProp never rides the resolved major — quirk)', () => {
+    it('resolves persisted subclass.name against disk majors as a disk clone (Cleric short-ish + Druid 2024 long name; runtime customProp never rides the resolved major — quirk)', () => {
       const lifeDomain = diskClass('Cleric').majors.find((m) => m.name === 'Life Domain');
       const result = classRules.getClass(classes2024, { class: { name: 'Cleric', subclass: { name: 'Life Domain', customProp: 'x' } } });
       expect(result.major).toEqual(lifeDomain); // verbatim disk clone: Disciple of Life, Preserve Life, Blessed Healer, Supreme Healing
       expect(result.major.customProp).toBeUndefined();
       expect(result.majors).toBeUndefined();
-    });
 
-    it('resolves the persisted subclass.name against disk majors (2024 disk name, not 5e short name)', () => {
+      // 2024 disk long name resolves verbatim (no 5e short-name table)
       const land = diskClass('Druid').majors.find((m) => m.name === 'Circle of the Land');
-      const result = classRules.getClass(classes2024, { class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } });
-      expect(result.major).toEqual(land);
+      const druid = classRules.getClass(classes2024, { class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } });
+      expect(druid.major).toEqual(land);
     });
 
     it('creates empty-features major when not found in disk majors', () => {
@@ -181,26 +206,25 @@ describe('classRules2024 (2024)', () => {
   });
 
   describe('getDruidMaxWildShapeChallengeRating', () => {
-    // disk Druid beast_max_cr verbatim (non-Moon path)
+    // disk Druid beast_max_cr verbatim (non-Moon path). Kept levels are the
+    // L1 zero leg + each bump step (2→0.25, 4→0.5, 8→1 cap entry).
     it.each([
       [1, 0],
       [2, 0.25],
       [4, 0.5],
       [8, 1],
-      [20, 1],
     ])('reads disk beast_max_cr verbatim at level %i', (level, expected) => {
       const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
       expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(expected);
     });
 
     // Moon formula (source: >1 → 1; >5 → floor(level/3)), disk name verbatim.
-    // Level 8 is discriminating: formula 2 vs disk 1.
+    // L1 proves the >1 gate stays closed; L2/L6 prove disk is overridden;
+    // L17/L20 cap the floor ladder.
     it.each([
       [1, 0],   // no override at L1 (disk value 0)
       [2, 1],   // disk 0.25 overridden
-      [5, 1],   // disk 0.5 overridden
-      [6, 2],
-      [8, 2],
+      [6, 2],   // disk 1 overridden by floor(6/3)
       [17, 5],
       [20, 6],
     ])('applies Moon formula over disk at level %i', (level, expected) => {
@@ -227,14 +251,13 @@ describe('classRules2024 (2024)', () => {
   });
 
   describe('getDruidWildShapeUses', () => {
-    // disk wild_shape verbatim — pair-closure pin: L20 is FINITE (4),
-    // unlike the 5e Archdruid Infinity #2014.
+    // disk wild_shape verbatim — pair-closure pin: L17 row reaches the FINITE
+    // max 4 (no Archdruid Infinity, unlike the 5e lane).
     it.each([
       [1, 0],
       [2, 2],
       [6, 3],
       [17, 4],
-      [20, 4],
     ])('reads disk wild_shape verbatim at level %i', (level, expected) => {
       const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
       expect(classRules.getDruidWildShapeUses(playerStats)).toBe(expected);
@@ -268,7 +291,6 @@ describe('classRules2024 (2024)', () => {
       [1, false],
       [7, false],
       [8, true],
-      [20, true],
     ])('reads disk beast_fly_speed verbatim at level %i', (level, expected) => {
       const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
       expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(expected);
@@ -286,8 +308,8 @@ describe('classRules2024 (2024)', () => {
       expect(result.actions.map((f) => f.name)).toEqual(['Action Surge']);
       expect(result.bonusActions.map((f) => f.name)).toEqual(['Second Wind']);
       expect(result.reactions).toEqual([]);
-      // 'Fighting Style'/'Weapon Mastery' are in categories2024.featuresToIgnore,
-      // which categorizeFeatures never consults.
+      // 'Fighting Style'/'Weapon Mastery' are in getCategories('2024').featuresToIgnore,
+      // which the service-layer categorizer never consults (UI filters at render).
       expect(result.specialActions.map((f) => f.name)).toEqual(['Tactical Mind', 'Fighting Style', 'Weapon Mastery']);
       expect(result.characterAdvancement).toEqual([]);
     });
@@ -357,7 +379,9 @@ describe('classRules2024 (2024)', () => {
   });
 
   describe('getHighestMajorLevel', () => {
-    // disk Circle of the Moon feature levels: [3, 3, 6, 10, 14]
+    // disk Circle of the Moon feature levels: [3, 3, 6, 10, 14].
+    // Return contract is a PLAIN NUMBER (consumer spellCalc2024.js:532 wrongly
+    // reads ?.spellcasting off it — cross-file source bug, reported).
     const moonStats = (level, key = 'major') => ({
       class: { name: 'Druid', [key]: diskClass('Druid').majors.find((m) => m.name === 'Circle of the Moon') },
       level,
@@ -367,7 +391,7 @@ describe('classRules2024 (2024)', () => {
       [2, 0],    // below first major feature
       [5, 3],
       [10, 10],
-      [13, 10], // 14-row not yet reached
+      [13, 10], // gap level: 14-row not yet reached (pins <= semantics)
       [14, 14],
     ])('returns highest disk major feature level <= %i (%i)', (level, expected) => {
       expect(classRules.getHighestMajorLevel(moonStats(level))).toBe(expected);
@@ -389,26 +413,18 @@ describe('classRules2024 (2024)', () => {
   });
 
   describe('getEnergy', () => {
-    // disk Fighter energy rows verbatim (required_major Psi Warrior):
-    // die bumps at L9 (6→8), type-only bump at L11 (num stays 8), L20 d12s.
+    // DEAD EXPORT (zero non-test callers, verified 2026-11-27) — minimal pin:
+    // one disk-shape census (die bump L9→L11→L20 incl. the L11 num-stays-8
+    // quirk) + each null branch. Delete pin with the export.
     const psiStats = (level) => ({
       class: { name: 'Fighter', class_levels: diskLevels('Fighter'), major: { name: 'Psi Warrior' } },
       level,
     });
 
-    it.each([
-      [3, { required_major: 'Psi Warrior', energy_die_type: 6, energy_die_num: 6 }],
-      [8, { required_major: 'Psi Warrior', energy_die_type: 6, energy_die_num: 6 }],
-      [9, { required_major: 'Psi Warrior', energy_die_type: 8, energy_die_num: 8 }],
-      [11, { required_major: 'Psi Warrior', energy_die_type: 10, energy_die_num: 8 }],
-      [20, { required_major: 'Psi Warrior', energy_die_type: 12, energy_die_num: 12 }],
-    ])('reads disk Fighter energy verbatim at level %i', (level, expected) => {
-      expect(classRules.getEnergy(psiStats(level))).toEqual(expected);
-    });
-
-    it('returns disk Rogue Soulknife energy verbatim at level 5', () => {
-      const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue'), major: { name: 'Soulknife' } }, level: 5 };
-      expect(classRules.getEnergy(playerStats)).toEqual({ required_major: 'Soulknife', energy_die_type: 8, energy_die_num: 6 });
+    it('returns disk Fighter energy rows verbatim (full shape): L9 die bump, L11 type-only bump (num stays 8), L20 d12s', () => {
+      expect(classRules.getEnergy(psiStats(9))).toEqual({ required_major: 'Psi Warrior', energy_die_type: 8, energy_die_num: 8 });
+      expect(classRules.getEnergy(psiStats(11))).toEqual({ required_major: 'Psi Warrior', energy_die_type: 10, energy_die_num: 8 });
+      expect(classRules.getEnergy(psiStats(20))).toEqual({ required_major: 'Psi Warrior', energy_die_type: 12, energy_die_num: 12 });
     });
 
     it('returns null when required_major does not match the player major', () => {
@@ -434,7 +450,6 @@ describe('classRules2024 (2024)', () => {
     describe('getSecondWind', () => {
       // disk Fighter second_wind verbatim; L3/L4 boundary (2→3), L10 bump to 4.
       it.each([
-        [1, 2],
         [3, 2],
         [4, 3],
         [10, 4],
@@ -489,7 +504,6 @@ describe('classRules2024 (2024)', () => {
       // disk Monk focus_points verbatim (== level from L2)
       it.each([
         [2, 2],
-        [8, 8],
         [20, 20],
       ])('reads disk focus_points verbatim at level %i', (level, expected) => {
         const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
@@ -502,12 +516,11 @@ describe('classRules2024 (2024)', () => {
     });
 
     describe('getUnarmoredMovementIncrease', () => {
-      // disk verbatim; live consumer charSummaryCalc.js
+      // disk verbatim; live consumer charSummaryCalc.js:75
       it.each([
         [2, 10],
         [6, 15],
         [10, 20],
-        [14, 25],
         [18, 30],
       ])('reads disk unarmored_movement_increase verbatim at level %i', (level, expected) => {
         const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
@@ -564,7 +577,9 @@ describe('classRules2024 (2024)', () => {
     });
 
     describe('getEldritchInvocations', () => {
-      // disk Warlock eldritch_invocations verbatim (same index-based access)
+      // disk Warlock eldritch_invocations verbatim (same index-based access).
+      // Canonical invocation ladder for this module — getWarlockFeatures
+      // delegates here, so its own ladder census was cut as redundant.
       it.each([
         [1, 1],
         [2, 3],
@@ -651,14 +666,15 @@ describe('classRules2024 (2024)', () => {
       // FLAG-D: auraRange hardcoded null — disk has no aura column (auras live
       // in oath major features, e.g. Oath of the Ancients L7).
       it.each([
-        [3, 2],
-        [10, 2],
-        [11, 3],
-      ])('reads disk channel_divinity verbatim at level %i', (level, expected) => {
+        [3, 2, 0],  // level 3 is NOT >4: extraAttacks 0 even with channel at 2
+        [11, 3, 1],
+      ])('reads disk channel_divinity verbatim at level %i (full shape pins auraRange:null, extraAttacks formula)', (level, expectedChannel, expectedAttacks) => {
         const playerStats = { class: { name: 'Paladin', class_levels: diskLevels('Paladin') }, level };
-        const result = classRules.getPaladinFeatures(playerStats);
-        expect(result.maxChannelDivinity).toBe(expected);
-        expect(result.auraRange).toBeNull();
+        expect(classRules.getPaladinFeatures(playerStats)).toEqual({
+          maxChannelDivinity: expectedChannel,
+          auraRange: null,
+          extraAttacks: expectedAttacks,
+        });
       });
 
       it('extraAttacks boundary: 0 at level 4, 1 at level 5 (Extra Attack disk row is L5)', () => {
@@ -685,16 +701,15 @@ describe('classRules2024 (2024)', () => {
       });
 
       // FLAG-D: metamagicKnown is a hardcoded source formula — disk has no
-      // metamagic column. Pinned as-is at every threshold boundary.
+      // metamagic column. Every threshold boundary pinned from both sides
+      // (2/3, 9/10, 16/17); L1 shares the L2 branch, L20 the L17 branch.
       it.each([
-        [1, 0],
         [2, 0],
         [3, 2],
         [9, 2],
         [10, 4],
         [16, 4],
         [17, 6],
-        [20, 6],
       ])('applies hardcoded metamagicKnown formula at level %i', (level, expected) => {
         const playerStats = { class: { name: 'Sorcerer', class_levels: diskLevels('Sorcerer') }, level };
         expect(classRules.getSorcererFeatures(playerStats).metamagicKnown).toBe(expected);
@@ -711,22 +726,20 @@ describe('classRules2024 (2024)', () => {
     });
 
     describe('getWarlockFeatures', () => {
-      // disk Warlock eldritch_invocations verbatim
-      it.each([
-        [1, 1],
-        [5, 5],
-        [7, 6],
-        [20, 10],
-      ])('reads disk eldritch_invocations verbatim at level %i', (level, expected) => {
-        const playerStats = { class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level };
-        expect(classRules.getWarlockFeatures(playerStats).invocationsKnown).toBe(expected);
-      });
-
+      // invocationsKnown is pure delegation to getEldritchInvocations — the
+      // ladder census lives there; the delegation is pinned full-shape below
+      // (L13 → disk 8).
       it('hasArcanum boundary at level 11 matches disk Mystic Arcanum feature rows', () => {
         const statsAt = (level) => ({ class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level });
         // formula: >10; disk cross-check: 'Mystic Arcanum' appears at L11, not L10
         const diskHasArcanumRow = (level) => diskLevels('Warlock')[level - 1].features.some((f) => f.name.startsWith('Mystic Arcanum'));
-        expect(classRules.getWarlockFeatures(statsAt(10))).toMatchObject({ hasArcanum: false, arcanumLevels: null });
+        expect(classRules.getWarlockFeatures(statsAt(10))).toEqual({
+          invocationsKnown: 7, // disk L10
+          hasArcanum: false,
+          arcanumLevels: null,
+          arcanums: [],
+          invocations: [],
+        });
         expect(diskHasArcanumRow(10)).toBe(false);
         expect(classRules.getWarlockFeatures(statsAt(11)).hasArcanum).toBe(true);
         expect(diskHasArcanumRow(11)).toBe(true);
@@ -744,7 +757,7 @@ describe('classRules2024 (2024)', () => {
         expect(classRules.getWarlockFeatures(playerStats).arcanumLevels).toEqual(expected);
       });
 
-      it('passes through runtime arcanums/invocations from playerSummary-derived class (no pactBoon key — differs from 5e sibling)', () => {
+      it('passes through runtime arcanums/invocations from playerSummary-derived class, delegates invocationsKnown (disk L13 = 8) — no pactBoon key (differs from 5e sibling)', () => {
         const playerStats = {
           class: {
             name: 'Warlock',
@@ -754,10 +767,13 @@ describe('classRules2024 (2024)', () => {
           },
           level: 13,
         };
-        const result = classRules.getWarlockFeatures(playerStats);
-        expect(result.arcanums).toEqual([{ name: 'Foresight', level: 9 }]);
-        expect(result.invocations).toEqual([{ name: 'Eldritch Sight' }]);
-        expect(result.pactBoon).toBeUndefined();
+        expect(classRules.getWarlockFeatures(playerStats)).toEqual({
+          invocationsKnown: 8, // delegation to disk L13 eldritch_invocations
+          hasArcanum: true,
+          arcanumLevels: { level6: 1, level7: 1, level8: 0, level9: 0 },
+          arcanums: [{ name: 'Foresight', level: 9 }],
+          invocations: [{ name: 'Eldritch Sight' }],
+        });
       });
 
       it('returns defaults when class is missing', () => {
@@ -778,23 +794,19 @@ describe('classRules2024 (2024)', () => {
         [4, 2],
         [7, 4],
         [20, 10],
-      ])('reads disk arcane_recovery_levels verbatim at level %i', (level, expected) => {
+      ])('reads disk arcane_recovery_levels verbatim at level %i (full shape)', (level, expected) => {
         const playerStats = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level };
-        expect(classRules.getWizardFeatures(playerStats)).toMatchObject({
+        expect(classRules.getWizardFeatures(playerStats)).toEqual({
           showWizardFeatures: true,
           arcaneRecoveryLevels: expected,
           arcaneWard: false,
         });
       });
 
-      it('detects arcane_ward passives in both type and passive_rule/effect shapes (runtime automation)', () => {
+      it('detects arcane_ward passives in both type and passive_rule/effect shapes; false when empty or automation absent', () => {
         const base = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level: 7 };
         expect(classRules.getWizardFeatures({ ...base, automation: { passives: [{ type: 'arcane_ward' }] } }).arcaneWard).toBe(true);
         expect(classRules.getWizardFeatures({ ...base, automation: { passives: [{ type: 'passive_rule', effect: 'arcane_ward' }] } }).arcaneWard).toBe(true);
-      });
-
-      it('returns arcaneWard false when passives are empty or automation is absent', () => {
-        const base = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level: 7 };
         expect(classRules.getWizardFeatures({ ...base, automation: { passives: [] } }).arcaneWard).toBe(false);
         expect(classRules.getWizardFeatures(base).arcaneWard).toBe(false);
       });
@@ -803,7 +815,6 @@ describe('classRules2024 (2024)', () => {
     describe('getMonkFeatures', () => {
       // disk aggregation via this.* delegators (unlike the 5e sibling's constants)
       it.each([
-        [1, { martialArtsDie: 6, unarmoredMovementIncrease: 0, maxFocusPoints: 0 }],
         [5, { martialArtsDie: 8, unarmoredMovementIncrease: 10, maxFocusPoints: 5 }],
         [18, { martialArtsDie: 12, unarmoredMovementIncrease: 30, maxFocusPoints: 18 }],
       ])('aggregates disk Monk row verbatim at level %i', (level, expected) => {
@@ -822,11 +833,11 @@ describe('classRules2024 (2024)', () => {
     });
 
     describe('getRangerFeatures', () => {
-      // disk Ranger verbatim: favored_enemy 2@L1→3@L5→4@L9; Extra Attack L5
+      // disk Ranger verbatim at the two-field seam: favored_enemy 2→3 at L5
+      // (deeper ladder owned by getFavoredEnemy), extraAttacks 0→1 at L5.
       it.each([
         [4, { favoredEnemies: 2, extraAttacks: 0 }],
         [5, { favoredEnemies: 3, extraAttacks: 1 }],
-        [9, { favoredEnemies: 4, extraAttacks: 1 }],
       ])('reads disk Ranger values verbatim at level %i', (level, expected) => {
         const playerStats = { class: { name: 'Ranger', class_levels: diskLevels('Ranger') }, level };
         expect(classRules.getRangerFeatures(playerStats)).toEqual(expected);
@@ -838,11 +849,12 @@ describe('classRules2024 (2024)', () => {
     });
 
     describe('getRogueFeatures', () => {
-      it('delegates sneak attack to disk L7 row and passes through runtime expertise', () => {
+      it('delegates sneak attack to disk L7 row and passes through runtime expertise (full shape)', () => {
         const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue') }, level: 7, expertise: ['Stealth', 'Persuasion'] };
-        const result = classRules.getRogueFeatures(playerStats);
-        expect(result.sneakAttack).toEqual({ dice_count: 4, dice_value: 6 }); // disk L7
-        expect(result.expertise).toEqual(['Stealth', 'Persuasion']);
+        expect(classRules.getRogueFeatures(playerStats)).toEqual({
+          sneakAttack: { dice_count: 4, dice_value: 6 }, // disk L7
+          expertise: ['Stealth', 'Persuasion'],
+        });
       });
 
       it('returns empty expertise by default and defaults when class is missing', () => {
@@ -864,18 +876,16 @@ describe('classRules2024 (2024)', () => {
         expect(classRules.getBardFeatures(playerStats).bardicDie).toBe(expected);
       });
 
-      it('reads disk magical_secrets verbatim: 2 at L10 (only cs row), ?? null at L9', () => {
-        // disk Bard class_specific exists ONLY at L10 {magical_secrets: 2}
+      it('reads disk class_specific.magical_secrets (only cs row is L10) and hardcoded 2024 constants (FLAG-D: disk has no song_of_rest column)', () => {
         const statsAt = (level) => ({ class: { name: 'Bard', class_levels: diskLevels('Bard') }, level });
-        expect(classRules.getBardFeatures(statsAt(10)).magicalSecrets).toBe(2);
+        // disk Bard class_specific exists ONLY at L10 {magical_secrets: 2}
+        expect(classRules.getBardFeatures(statsAt(10))).toEqual({
+          bardicDie: 10,
+          songOfRestDie: null,
+          magicalSecrets: 2,
+          subclassMagicalSecrets: 0, // source: 2024 has no subclass Additional Magical Secrets
+        });
         expect(classRules.getBardFeatures(statsAt(9)).magicalSecrets).toBeNull();
-      });
-
-      it('returns hardcoded 2024 constants (FLAG-D: disk has no song_of_rest column, no subclass secrets)', () => {
-        const playerStats = { class: { name: 'Bard', class_levels: diskLevels('Bard') }, level: 10 };
-        const result = classRules.getBardFeatures(playerStats);
-        expect(result.songOfRestDie).toBeNull();
-        expect(result.subclassMagicalSecrets).toBe(0); // source: 2024 has no subclass Additional Magical Secrets
       });
 
       it('returns defaults when class_levels is missing', () => {

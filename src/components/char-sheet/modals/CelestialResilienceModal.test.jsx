@@ -1,21 +1,22 @@
-// @maintained-by-ai 2026-10-17
-// CelestialResilienceModal — thin wrapper over shared/CreatureSelectionModal.jsx.
+// @maintained-by-ai 2026-11-27
+// CelestialResilienceModal — thin prop-binding wrapper over shared/CreatureSelectionModal.jsx.
 //
-// Caller seams (deferred, NOT covered here):
-//   - LongRestButton (and ShortRestModal / CharSpecialActionsModals inline lanes) own
-//     modal open/props — celestialResilienceModal state, target loading, close wiring.
-//   - Handler lanes (useCelestialResilienceHandlers in CharSpecialActions.jsx, covered
-//     by CharActionModals.*.test.jsx) own the confirm write contract downstream:
-//     per-target setTempHp POSTs and campaign-log entries.
-// This file owns the modal's own rendering: hardcoded title/description/confirm copy,
-// temp-HP note interpolation, checkbox selection, maxTargets gating, and the exact
-// confirm/skip payloads emitted at THIS seam (array of selected name strings).
-//
-// Icon note: the `fa-shield-hart` → `fa-shield-heart` typo was fixed at the product
-// level here (LongRestButton lane precedent); icons are pinned below. The sibling
-// inline Celestial lanes (ShortRestModal.jsx, CharSpecialActionsModals.jsx) were
-// fixed and pinned in CharSpecialActions.modalsInline.test.jsx /
-// ShortRestModal.celestialResilience.test.jsx (bug-shortrest-celestial-icon-typo).
+// Lane split (verified against sibling headers 2026-11-27):
+//   - shared/CreatureSelectionModal.test.jsx (component-seam lane) owns the picker
+//     INTERNALS stronger than any re-pin here could: row toggle/highlight/Confirm
+//     count, maxTargets cap semantics (disable + click-rejection + re-enable on
+//     deselect), confirm selection-order + disabled/confirmDisabled inertness,
+//     onSkip fired only from the Skip button (overlay/body clicks inert), and
+//     overlay/distance lookup gating on campaignName/attackerName.
+//   - CharSpecialActions.modalsInline.test.jsx owns the HOST-side dispatch and the
+//     confirm-path addEntry/setTempHp writes through useCelestialResilienceHandlers.
+//   - LongRestButton lanes own their direct CreatureSelectionModal mount (a separate
+//     render site that interpolates maxTargets into its own description copy).
+// This file owns ONLY the wrapper's open-props contract and callback bindings:
+// hardcoded title/description/confirm copy + fa-shield-heart icons (typo regression
+// pin, bug-shortrest-celestial-icon-typo), self/ally temp-HP note interpolation,
+// creatureTargets/maxTargets/onConfirm/onSkip passthrough, and the fact that no
+// campaignName/attackerName is threaded (map lookups must never fire here).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -39,11 +40,16 @@ import CelestialResilienceModal from './CelestialResilienceModal.jsx';
 
 // ── Fixtures ──
 
+// Player rows resolve their HP affordance from character buckets (absent in this
+// lane → no chip), so their checkbox name is the bare name. The npc row keeps the
+// combatSummary pair it arrives with → a '(100% HP)' chip joins its accessible
+// name (shared-lane HP law; pinned here only so the exact-matchers can match).
 const TARGETS = [
     { name: 'Ally1', type: 'player', currentHp: 20, maxHp: 30 },
     { name: 'Ally2', type: 'player', currentHp: 15, maxHp: 25 },
     { name: 'Ally3', type: 'npc', currentHp: 50, maxHp: 50 },
 ];
+const ALLY3 = 'Ally3(100% HP)';
 
 // Fresh callbacks per call — tests assert on the props object they pass in.
 function makeProps(overrides) {
@@ -65,144 +71,72 @@ afterEach(() => {
     mockGetTargetMapStatuses.mockReset();
 });
 
-const checkbox = (name) => screen.getByRole('checkbox', { name: new RegExp(name) });
-const confirmBtn = () => screen.getByRole('button', { name: /Grant Resilience/ });
+const checkbox = (name) => screen.getByRole('checkbox', { name });
+const confirmBtn = (count) => screen.getByRole('button', { name: `Grant Resilience (${count})` });
 
 // ── Tests ──
 
 describe('CelestialResilienceModal', () => {
-    describe('hardcoded copy and icons', () => {
-        it('renders title, description, and both action buttons', () => {
-            render(<CelestialResilienceModal {...makeProps()} />);
-            expect(screen.getByText('Celestial Resilience')).toBeInTheDocument();
-            expect(screen.getByText(
-                'Choose up to 5 allies to gain temporary hit points from your Celestial Resilience.'
-            )).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-        });
-
-        it('uses fa-shield-heart in header and confirm button (typo regression pin)', () => {
-            const { container } = render(<CelestialResilienceModal {...makeProps()} />);
-            expect(container.querySelector('.sp-header i.fa-solid.fa-shield-heart')).toBeInTheDocument();
-            expect(confirmBtn().querySelector('i.fa-solid.fa-shield-heart')).toBeInTheDocument();
-            expect(container.querySelector('.fa-shield-hart')).toBeNull();
-        });
-
-        it('renders all target names and never triggers campaign-gated map lookups', () => {
-            render(<CelestialResilienceModal {...makeProps()} />);
-            expect(checkbox('Ally1')).toBeInTheDocument();
-            expect(checkbox('Ally2')).toBeInTheDocument();
-            expect(checkbox('Ally3')).toBeInTheDocument();
-            expect(mockGetCurrentOverlayTarget).not.toHaveBeenCalled();
-            expect(mockGetCreaturesInsideOverlay).not.toHaveBeenCalled();
-            expect(mockGetTargetMapStatuses).not.toHaveBeenCalled();
-        });
+    it('opens with the exact prop face: title, description, note, disabled confirm, Skip, target rows', () => {
+        render(<CelestialResilienceModal {...makeProps()} />);
+        expect(screen.getByText('Celestial Resilience')).toBeInTheDocument();
+        expect(screen.getByText(
+            'Choose up to 5 allies to gain temporary hit points from your Celestial Resilience.'
+        )).toBeInTheDocument();
+        expect(screen.getByText(
+            'You gain 7 temporary hit points. Each selected ally gains 3 temporary hit points.'
+        )).toBeInTheDocument();
+        expect(confirmBtn(0)).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+        // creatureTargets → targets binding: every candidate row renders.
+        expect(checkbox('Ally1')).toBeInTheDocument();
+        expect(checkbox('Ally2')).toBeInTheDocument();
+        expect(checkbox(ALLY3)).toBeInTheDocument();
     });
 
-    describe('note interpolation', () => {
-        it.each([
-            ['default self and ally values', 7, 3],
-            ['custom self temp HP', 10, 3],
-            ['custom ally temp HP', 7, 5],
-            ['zero temp HP values', 0, 0],
-            ['large temp HP values', 200, 100],
-        ])('renders the full note verbatim with %s', (_case, selfTempHp, allyTempHp) => {
-            render(<CelestialResilienceModal {...makeProps({ selfTempHp, allyTempHp })} />);
-            expect(screen.getByText(
-                `You gain ${selfTempHp} temporary hit points. Each selected ally gains ${allyTempHp} temporary hit points.`
-            )).toBeInTheDocument();
-        });
+    it('uses fa-shield-heart in header and confirm button (typo regression pin)', () => {
+        const { container } = render(<CelestialResilienceModal {...makeProps()} />);
+        expect(container.querySelector('.sp-header i.fa-solid.fa-shield-heart')).toBeInTheDocument();
+        expect(confirmBtn(0).querySelector('i.fa-solid.fa-shield-heart')).toBeInTheDocument();
+        expect(container.querySelector('.fa-shield-hart')).toBeNull();
     });
 
-    describe('selection gating', () => {
-        it('disables confirm at zero selection and stays inert when clicked', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            const confirm = screen.getByRole('button', { name: 'Grant Resilience (0)' });
-            expect(confirm).toBeDisabled();
-            fireEvent.click(confirm);
-            expect(props.onConfirm).not.toHaveBeenCalled();
-        });
-
-        it('ticks checkboxes and updates the confirm count as targets are selected', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(checkbox('Ally2'));
-            expect(checkbox('Ally1')).toBeChecked();
-            expect(checkbox('Ally2')).toBeChecked();
-            expect(checkbox('Ally3')).not.toBeChecked();
-            expect(screen.getByRole('button', { name: 'Grant Resilience (2)' })).toBeEnabled();
-        });
-
-        it('caps selection at maxTargets — the next checkbox is disabled and clicks are ignored', () => {
-            const props = makeProps({ maxTargets: 2 });
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(checkbox('Ally2'));
-            const third = checkbox('Ally3');
-            expect(third).toBeDisabled();
-            fireEvent.click(third);
-            expect(third).not.toBeChecked();
-            fireEvent.click(screen.getByRole('button', { name: 'Grant Resilience (2)' }));
-            expect(props.onConfirm).toHaveBeenCalledTimes(1);
-            expect(props.onConfirm).toHaveBeenCalledWith(['Ally1', 'Ally2']);
-        });
-
-        it('re-gates confirm to disabled after deselecting the only target', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            expect(checkbox('Ally1')).toBeChecked();
-            fireEvent.click(checkbox('Ally1'));
-            expect(checkbox('Ally1')).not.toBeChecked();
-            expect(screen.getByRole('button', { name: 'Grant Resilience (0)' })).toBeDisabled();
-            fireEvent.click(confirmBtn());
-            expect(props.onConfirm).not.toHaveBeenCalled();
-        });
+    it.each([
+        ['distinct values guard self/ally template swap', 4, 9],
+        ['zero temp HP values', 0, 0],
+    ])('interpolates the note verbatim with %s', (_case, selfTempHp, allyTempHp) => {
+        render(<CelestialResilienceModal {...makeProps({ selfTempHp, allyTempHp })} />);
+        expect(screen.getByText(
+            `You gain ${selfTempHp} temporary hit points. Each selected ally gains ${allyTempHp} temporary hit points.`
+        )).toBeInTheDocument();
     });
 
-    describe('confirm payload contract', () => {
-        it('emits exactly one array of the selected name strings, in selection order', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(checkbox('Ally3'));
-            fireEvent.click(screen.getByRole('button', { name: 'Grant Resilience (2)' }));
-            expect(props.onConfirm).toHaveBeenCalledTimes(1);
-            expect(props.onConfirm).toHaveBeenCalledWith(['Ally1', 'Ally3']);
-            expect(props.onSkip).not.toHaveBeenCalled();
-        });
-
-        it('reflects deselect-then-confirm with the remaining names only', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(checkbox('Ally2'));
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(screen.getByRole('button', { name: 'Grant Resilience (1)' }));
-            expect(props.onConfirm).toHaveBeenCalledTimes(1);
-            expect(props.onConfirm).toHaveBeenCalledWith(['Ally2']);
-        });
+    it('binds maxTargets and onConfirm: caps the third row, emits the selection once, never onSkip', () => {
+        const props = makeProps({ maxTargets: 2 });
+        render(<CelestialResilienceModal {...props} />);
+        fireEvent.click(checkbox('Ally1'));
+        fireEvent.click(checkbox('Ally2'));
+        // maxTargets passthrough binding: at cap the unselected row is disabled.
+        expect(checkbox(ALLY3)).toBeDisabled();
+        fireEvent.click(confirmBtn(2));
+        expect(props.onConfirm).toHaveBeenCalledTimes(1);
+        expect(props.onConfirm).toHaveBeenCalledWith(['Ally1', 'Ally2']);
+        expect(props.onSkip).not.toHaveBeenCalled();
     });
 
-    describe('cancel, skip, and overlay inertness', () => {
-        it('Skip fires onSkip once with the click event only, never onConfirm', () => {
-            const props = makeProps();
-            render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(checkbox('Ally1'));
-            fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-            expect(props.onSkip).toHaveBeenCalledTimes(1);
-            expect(props.onSkip.mock.calls[0][0]).toMatchObject({ type: 'click' });
-            expect(props.onConfirm).not.toHaveBeenCalled();
-        });
+    it('routes Skip to onSkip once even with a selection made, never onConfirm', () => {
+        const props = makeProps();
+        render(<CelestialResilienceModal {...props} />);
+        fireEvent.click(checkbox('Ally1'));
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+        expect(props.onSkip).toHaveBeenCalledTimes(1);
+        expect(props.onConfirm).not.toHaveBeenCalled();
+    });
 
-        it('overlay background click is inert — neither callback fires', () => {
-            const props = makeProps();
-            const { container } = render(<CelestialResilienceModal {...props} />);
-            fireEvent.click(container.querySelector('.sp-overlay'));
-            expect(props.onConfirm).not.toHaveBeenCalled();
-            expect(props.onSkip).not.toHaveBeenCalled();
-        });
+    it('threads no campaignName/attackerName — campaign-gated map lookups never fire', () => {
+        render(<CelestialResilienceModal {...makeProps()} />);
+        expect(mockGetCurrentOverlayTarget).not.toHaveBeenCalled();
+        expect(mockGetCreaturesInsideOverlay).not.toHaveBeenCalled();
+        expect(mockGetTargetMapStatuses).not.toHaveBeenCalled();
     });
 });

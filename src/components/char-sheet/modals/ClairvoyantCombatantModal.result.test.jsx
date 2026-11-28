@@ -1,42 +1,59 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ClairvoyantCombatantModal — RESULT lane (result-view rendering/UI + save_result log content).
  *
  * Ownership map (siblings, do not duplicate here):
  * - .test.jsx       — info-screen text (incl. pact-variant copy), custom action name, Cancel → onClose
- * - .confirm.jsx    — 12 tests: button gating, exact te write + ONE merged write on EMPTY stores,
- *                     createSaveListener args, ability_use payload, listener lifecycle (foreign
- *                     promptId ignore + detach on same identity), Pact Magic, addEntry rejection
- * - .edgeCases.jsx  — 5 tests: NON-EMPTY stores, foreign te/buff preservation at arm,
- *                     triple-specific te filtering on success, buff filtering, queue preservation
- * - .expiration.jsx — 6 tests: armed-clock queue byte shape (rounds=10, anchorless, trio),
- *                     cancel-to-empty, foreign-target clock trim (flagged), non-array queue
+ * - .confirm.jsx    — 9 tests (re-verified 2026-11-27): button gating, exact te write + ONE merged write
+ *                     on EMPTY stores, createSaveListener args, ability_use payload, listener lifecycle
+ *                     (foreign promptId ignore + detach on same identity), Pact Magic, addEntry rejection
+ * - .edgeCases.jsx  — 3 tests (re-verified 2026-11-27): NON-EMPTY stores, foreign te/buff preservation
+ *                     at arm, triple-specific te filtering on success, buff filtering, queue preservation
+ * - .expiration.jsx — 6 tests (re-verified 2026-11-27: it.each 2 cases + 4 its): armed-clock queue byte
+ *                     shape (rounds=10, anchorless, trio), cancel-to-empty, foreign-target clock trim
+ *                     (flagged), non-array queue
+ * - .save-dismissed.jsx — dismissed result view (component :256-257 copy) + save_dismissed row + the
+ *                     pre-resolve null-render gap; never save_result content
  * This lane owns ONLY the result screen: exact full-line result copy per branch, the exact
  * save_result log payload (confirm lane pins lifecycle COUNT only, never content), and the
  * close contract — overlay/modal clicks inert, Done closes exactly once, result action set
- * is Done alone.
+ * is Done alone (Cancel absence pinned via query).
  *
- * Trimmed since last maintenance (subsumed by siblings, noted here):
+ * Trimmed since last maintenance (subsumed by siblings or consolidated here, noted):
  * - foreign-promptId gating and post-detach inertness → .confirm.jsx listener lifecycle.
  * - success-branch store writes (te filter, buff/queue cancel) → .edgeCases/.expiration lanes;
  *   this lane verifies only that the result screen RENDERS after those flows.
  * - "does not close on modal content" was a near-duplicate of overlay inertness — consolidated
- *   into one parameterised close-contract test.
+ *   into the single close-contract test.
+ * - 2026-11-27 pass: copy/log it.each 4→2 cases — result copy and save_result description are
+ *   pure prop templates (targetName/saveType/saveDc/roll/total/success), so the default-prop
+ *   variants were same-branch duplicates of the distinct-prop ones (which additionally pin prop
+ *   flow); default-props copy stays witnessed by the close-contract test. Close-contract it.each
+ *   2→1 — the result DOM (:264-277) is branch-invariant (only the description template differs,
+ *   pinned by the copy test); one branch exercises inertness + Done once. Phantom mock keys
+ *   getCombatSummary/loadCombatSummary/clearRuntimeState purged (component imports jsx:2-7 never
+ *   reference them). Stale line refs fixed: result copy :230/:232→:259/:261, log copy
+ *   :119/:158→:163/:179.
  *
  * Adopted from sibling recommendation: captured-listener dispatch (spy → direct call), NEVER
- * window.dispatchEvent, with unique promptId per test — leaked unmount-less listeners from
- * other tests can never fire into these assertions.
+ * window.dispatchEvent, with unique promptId per test — leaked unmount-less listeners (the
+ * component adds window listeners at :202-203 and never removes them on unmount — family-flagged
+ * defect, listener lifecycle owned by .confirm.jsx) can never fire into these assertions.
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import ClairvoyantCombatantModal from './ClairvoyantCombatantModal.jsx';
 
-// ── Mocked modules ──
+// Unique promptId per mint: leaked unmount-less listeners from earlier tests can
+// never hijack anything in this lane.
+let promptCounter = 0;
+
+// ── Mocked modules (keys = exactly what the component imports, jsx:2-7) ──
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
   // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
   logSaveDismissed: vi.fn(() => Promise.resolve()),
-  createSaveListener: vi.fn(() => ({ promptId: 'factory-default' })),
+  createSaveListener: vi.fn(() => ({ promptId: `cla-result-prompt-${++promptCounter}` })),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -44,19 +61,16 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../services/rules/effects/expirations.js', () => ({
-  KEY: 'pendingExpirations',
+  KEY: 'pendingExpirations', // matches disk: barrel re-export of turnStartEffects.js const KEY
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 1),
-  getCombatSummary: vi.fn(() => null),
-  loadCombatSummary: vi.fn(async () => null),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
-  clearRuntimeState: vi.fn(),
   setRuntimeObject: vi.fn(),
 }));
 
@@ -90,14 +104,14 @@ function makeProps(overrides = {}) {
   };
 }
 
-// Exact result-screen copy the component renders per branch (component :230/:232).
+// Exact result-screen copy the component renders per branch (component :259/:261).
 function screenCopy({ targetName = TARGET, saveType = 'Wisdom' } = {}, success) {
   return success
     ? `${targetName} succeeded on ${saveType} save — Clairvoyant Combatant has no effect.`
     : `${targetName} failed ${saveType} save — Clairvoyant Combatant active. ${targetName} has Disadvantage on attacks against you, you have Advantage on attacks against ${targetName}.`;
 }
 
-// Exact save_result log payload the component commits per branch (component :119/:158).
+// Exact save_result log payload the component commits per branch (descriptions :163/:179).
 function exactSaveResult({ targetName = TARGET, saveType = 'Wisdom', saveDc = 13 } = {}, success, roll, total) {
   return {
     type: 'save_result',
@@ -114,10 +128,6 @@ function exactSaveResult({ targetName = TARGET, saveType = 'Wisdom', saveDc = 13
     timestamp: expect.any(Number),
   };
 }
-
-// Unique promptId per test so stale window listeners from earlier tests (the component never
-// removes listeners on unmount) can never hijack anything in this lane.
-let promptCounter = 0;
 
 // House rule: mockReset (not clearAllMocks — it keeps mockResolvedValue/impl), then re-arm
 // the default implementations the component needs to function.
@@ -159,26 +169,13 @@ async function arm(props = {}) {
 // ── Result lane ──
 
 describe('ClairvoyantCombatantModal - result screen', () => {
-  // ── Result screen: exact copy + exact save_result log per branch ──
+  // ── Result screen: exact copy + exact save_result log per branch.
+  //    Both branches ride DISTINCT handler-voice props — result copy and log description are
+  //    pure prop templates, so distinct-prop cases strictly subsume the default-prop ones
+  //    (Goblin1/Wisdom/13 rendering stays witnessed by the close-contract test below). ──
 
   it.each([
     {
-      label: 'failed save',
-      success: false,
-      roll: 5,
-      total: 10,
-      props: {},
-    },
-    {
-      label: 'successful save',
-      success: true,
-      roll: 10,
-      total: 15,
-      props: {},
-    },
-    {
-      // Handler-voice props distinct from the default fixture — result copy must carry
-      // the live props, not echo Goblin1/Wisdom/13.
       label: 'failed save, distinct target/save props',
       success: false,
       roll: 3,
@@ -212,31 +209,33 @@ describe('ClairvoyantCombatantModal - result screen', () => {
     expect(addEntry).toHaveBeenLastCalledWith(CAMPAIGN, exactSaveResult(ctx, t.success, t.roll, t.total));
   });
 
-  // ── Close contract: overlay + modal clicks inert, Done closes exactly once ──
+  // ── Close contract: overlay + modal clicks inert, Done closes exactly once.
+  //    The result DOM (:264-277) is branch-invariant — only the description template differs
+  //    and is pinned above — so one branch (default props) exercises the whole contract. ──
 
-  it.each([false, true])(
-    'result screen ($%s → resolved): overlay and modal clicks inert, Done is the only action and closes exactly once',
-    async (success) => {
-      const { onClose, resolveSave } = await arm();
-      await resolveSave(success, success ? 10 : 5, success ? 15 : 10);
+  it('result screen (failed save → resolved): overlay and modal clicks inert, Done is the only action and closes exactly once', async () => {
+    const { onClose, resolveSave } = await arm();
+    await resolveSave(false, 5, 10);
 
-      const body = screen.getByText(screenCopy({}, success));
+    const body = screen.getByText(screenCopy({}, false));
 
-      // Inert: clicks on the overlay and bubbling from the modal never close the modal.
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      fireEvent.click(document.querySelector('.sp-modal'));
-      fireEvent.click(body);
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByText(screenCopy({}, success))).toBeInTheDocument();
+    // Inert: clicks on the overlay and bubbling from the modal never close the modal.
+    fireEvent.click(document.querySelector('.sp-overlay'));
+    fireEvent.click(document.querySelector('.sp-modal'));
+    fireEvent.click(body);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(screenCopy({}, false))).toBeInTheDocument();
 
-      // Done: exact accessible name, sole button in the action bar, closes exactly once.
-      const done = screen.getByRole('button', { name: 'Done' });
-      expect(screen.getAllByRole('button')).toEqual([done]);
-      expect(done).toHaveClass('sp-roll-btn');
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    // Done: exact accessible name, sole button in the action bar, closes exactly once.
+    // Cancel absence pinned via query — the info screen's exhausted branch (:238-244) has
+    // no Cancel at all (family-flagged defect, .confirm/.test lanes own it); here it must
+    // never appear on the resolved screen.
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(screen.getAllByRole('button')).toEqual([done]);
+    expect(done).toHaveClass('sp-roll-btn');
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
 
-      fireEvent.click(done);
-      expect(onClose).toHaveBeenCalledTimes(1);
-    },
-  );
+    fireEvent.click(done);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

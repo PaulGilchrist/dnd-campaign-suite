@@ -1,11 +1,10 @@
-// @maintained-by-ai 2026-10-18
-// Salvaged from the deprecated gameplay-flows tombstone: the XP recomputation
-// chain (select → increase qty → deselect drives Total XP, Monster Count,
-// Multiplier, and Effective XP). The remaining.test.jsx citations in the old
-// tombstone no longer exist there (interactions.test.jsx is itself a
-// placeholder), so this is the sole coverage for that behavior. Runs the REAL
-// EncounterBuilder with REAL child panels/table and the REAL encounterGenerator
-// multiplier math (party of Thorin 5 + Elara 3, partySize 2: 1 goblin qty 1
+// @maintained-by-ai 2026-11-28
+// Sole builder-lane coverage of the XP recomputation chain with the REAL
+// encounterGenerator multiplier math: select → increase → decrease → deselect
+// drives Total XP, Monster Count, Multiplier, and Effective XP. The sibling
+// load/reset/helpers lanes mock calculateDifficultyMultiplier, so the ×1/×1.5
+// tiering is exercised only here. Real EncounterBuilder, real child
+// panels/table (party of Thorin 5 + Elara 3, partySize 2: 1 goblin qty 1
 // → ratio 0.5 → ×1 → eff 50; qty 2 → ratio 1 → ×1.5 → eff 150).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -115,6 +114,7 @@ describe('EncounterBuilder XP recomputation (salvaged)', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
     expect(summaryValue('Total XP')).toBe('0');
     expect(summaryValue('Monster Count')).toBe('0');
+    expect(summaryValue('Multiplier')).toBe('\u00d71');
     expect(summaryValue('Effective XP')).toBe('0');
   });
 });

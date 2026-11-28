@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1212/1217/1220: Myconid rapport family (Adult actions[2] / Sovereign
 // actions[4] / Sprout actions[1]) — save-less telepathy-grant zone rows.
 // Authored junk attack_bonus:0 rolled bogus "+0" to-hit attacks (live
@@ -18,6 +18,10 @@
 //  - breathAoeShape save_dc:0 → null → MonsterCardModal.save-variant-shape.test.jsx:59-61
 //  - rapport_spores te registry → services/combat/conditions/targetEffectDefinitions.test.js:124
 //  - sovereign Animating Spores summon lane → services/encounters/monsterSummon.test.js:716
+//  - darkmantle aura chip render + click routing → MonsterCardModal.darkmantle-aura.test.jsx
+//  - djinni whirlwind row: sole owner → MonsterCardModal.whirlwind-zone.test.jsx
+//    (their no-zone-chip negatives stay in the isZonePickerRow census below —
+//    render-level re-proves of the same predicate were trimmed)
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -107,9 +111,15 @@ describe('MA-1212 isZonePickerRow: narrowly arms the zone picker chip', () => {
 });
 
 describe('MA-1212 render: zone picker chip arms, bogus attack chip is gone', () => {
-  it('rapport row: NO "+0" attack chip, exactly one "30-ft Zone" chip; press dispatches the raw disk row to onZonePickerRow, zero attack/save calls', () => {
+  it('rapport row: the ONLY chip is one "30-ft Zone" (no "+0"/save/aura cross-wire); press dispatches the raw disk row to onZonePickerRow, zero attack/save calls', () => {
     const { container, onAttack, onSaveRoll, onZonePickerRow } = renderRow(RAPPORT);
     expect(container.textContent).not.toContain('+0');
+    // Anti-cross-wire: every chip on the row is the zone lane — the pre-fix
+    // bogus attack chip and the DC0 save shell can no longer ride this row,
+    // and the self-aura chip is not stolen from the darkmantle lane.
+    const chips = Array.from(container.querySelectorAll('.mc-dice-link'));
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chips.every((el) => el.classList.contains('mc-dice-link-zone'))).toBe(true);
     const zoneChips = container.querySelectorAll('.mc-dice-link-zone');
     expect(zoneChips.length).toBe(1);
     expect(zoneChips[0].textContent).toContain('30-ft Zone');
@@ -119,16 +129,6 @@ describe('MA-1212 render: zone picker chip arms, bogus attack chip is gone', () 
     expect(onZonePickerRow.mock.calls[0][0]).toBe(RAPPORT);
     expect(onAttack).not.toHaveBeenCalled();
     expect(onSaveRoll).not.toHaveBeenCalled();
-  });
-
-  it('darkmantle self-aura + djinni save-zone twins gain NO zone picker chip — their own lanes byte-intact (MA-0554 aura chip, save shell)', () => {
-    const dark = renderRow(DARKMANTLE_AURA);
-    expect(dark.container.querySelectorAll('.mc-dice-link-zone').length).toBe(0);
-    expect(dark.container.querySelectorAll('.mc-dice-link-aura').length).toBe(1);
-    fireEvent.click(dark.container.querySelector('.mc-dice-link-aura'));
-    expect(dark.onZonePickerRow).not.toHaveBeenCalled();
-    const djinni = renderRow(DJINNI_WHIRLWIND);
-    expect(djinni.container.querySelectorAll('.mc-dice-link-zone').length).toBe(0);
   });
 
   it('incapacitated attacker: zone chip renders inert (no click route)', () => {

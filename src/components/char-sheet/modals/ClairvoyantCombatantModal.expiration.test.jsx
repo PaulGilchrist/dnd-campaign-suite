@@ -1,41 +1,53 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ClairvoyantCombatantModal — EXPIRATION lane (clock queue depth + round-seam semantics).
+ * 6 tests (re-verified 2026-11-27: it.each 2 cases + 4 its).
  *
  * Ownership map (siblings, do not duplicate here):
- * - .test.jsx       — info-screen text (incl. pact-variant copy), custom action name, Cancel → onClose
- * - .confirm.jsx    — button gating, exact te write + ONE merged write on EMPTY stores; there the clock
- *                     queue presence is pinned only as key-set + length-1 — depth/shape deferred TO this lane.
- *                     Also createSaveListener args, ability_use payload, listener lifecycle, Pact Magic,
- *                     addEntry rejection
- * - .edgeCases.jsx  — NON-EMPTY stores: foreign targetEffects/buffs preserved at arm, triple-specific te
- *                     filtering on success, foreign activeBuff filtering, unrelated (foreign-buff) queue
- *                     entries preserved through the arm→cancel cycle
- * - .result.jsx     — result-screen UI, Done/overlay clicks, save_result log content
+ * - .test.jsx        — info-screen text (incl. pact-variant copy), custom action name, Cancel → onClose,
+ *                      mount purity
+ * - .confirm.jsx     — 9 tests (re-verified 2026-11-27): button gating, exact te write + ONE merged write
+ *                      on EMPTY stores; there the clock queue presence is pinned only as key-set +
+ *                      length-1 — depth/shape deferred TO this lane. Also createSaveListener args,
+ *                      ability_use payload, listener lifecycle, Pact Magic, addEntry rejection
+ * - .edgeCases.jsx   — NON-EMPTY stores: foreign targetEffects/buffs preserved at arm, triple-specific
+ *                      te filtering on success, foreign activeBuff filtering, and an UNRELATED clock
+ *                      (no remove_target_effect clause) surviving the arm→cancel cycle. Malformed
+ *                      non-array activeBuffs face. Queue entries sharing this feature's
+ *                      effectKey+source clause are NOT seeded there — the trim-filter clauses live here.
+ * - .result.jsx      — result-screen UI, Done/overlay clicks, save_result log content
  * This lane owns ONLY the expiration queue: exact armed-entry byte shape (expiryRounds=10 — the 1_minute
  * duration converted to ROUNDS per §5; appliedRound is a snapshot of getCurrentCombatRound, i.e. a round
  * counter matured at initiative seams, never wall-clock — no-timers architecture; anchorless per §38; the
  * ordered removal-effects trio), the clock-queue presence contract of the merged writes (the key rides the
  * arm write and the success-cancel write when the queue is an array; it is never fabricated when it is
- * not), and exact removal behavior: save-success trims ONLY this feature's effectKey+source queue entry,
- * save-failure leaves the armed clock in place untouched.
+ * not), and exact removal behavior: save-success trims ONLY this feature's en.target+effectKey+source
+ * queue entries, save-failure leaves the armed clock in place untouched.
  *
- * FLAG (component, not fixed here):
- * - ClairvoyantCombatantModal.jsx:143-144 — the success-cancel filter matches effectKey + source but
- *   IGNORES the removal-effect's target: a cla clock armed against a DIFFERENT target is trimmed alongside
- *   this activation's. Pinned below as current behavior; product fix would add `ef.target === targetName`.
- * - Inline style :212 — flagged in .confirm/.edgeCases lanes, not repeated here.
+ * Defect disposition (component, not fixed here — queue-filter target verdict, resolved 2026-11-27):
+ * - ClairvoyantCombatantModal.jsx:127-129 — the success-cancel queue filter keys on
+ *   en.target + effectKey + source and IGNORES the removal-effect's own target: a cla clock armed
+ *   against a DIFFERENT target (same en.target/source) is trimmed alongside this activation's, while
+ *   the SIBLING te filter (:120) and buff filter (:135) both honor target (edgeCases lane proved
+ *   foreign-target survives in te/buffs). The asymmetry is pinned below as current behavior; a
+ *   product fix would add `ef.target === targetName` to :129.
+ * - Inline style :239 — flagged in .confirm/.edgeCases lanes, not repeated here.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import ClairvoyantCombatantModal from './ClairvoyantCombatantModal.jsx';
 
-// ── Mocked modules ──
+// Unique promptId per mint: the component never removes listeners on unmount
+// (jsx:202-203, family-flagged), so leaked listeners from earlier tests can
+// never hijack anything in this lane.
+let promptCounter = 0;
+
+// ── Mocked modules (keys = exactly what the component imports, jsx:2-7;
+// phantoms getCombatSummary/loadCombatSummary/clearRuntimeState purged 2026-11-27) ──
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
   logSaveDismissed: vi.fn(() => Promise.resolve()),
-  createSaveListener: vi.fn(() => ({ promptId: 'factory-default' })),
+  createSaveListener: vi.fn(() => ({ promptId: `cla-exp-prompt-${++promptCounter}` })),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -43,19 +55,16 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../services/rules/effects/expirations.js', () => ({
-  KEY: 'pendingExpirations',
+  KEY: 'pendingExpirations', // matches disk: barrel re-export of turnStartEffects.js const KEY
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 1),
-  getCombatSummary: vi.fn(() => null),
-  loadCombatSummary: vi.fn(async () => null),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
-  clearRuntimeState: vi.fn(),
   setRuntimeObject: vi.fn(),
 }));
 
@@ -93,8 +102,9 @@ function makeProps(overrides = {}) {
 // Byte-exact armed queue entry (expirationQueue addExpiration shape folded into
 // the merged write). expiryRounds=10 is the §5 minutes→rounds conversion — the
 // NO-TIMERS architecture: the clock is a round counter matured at initiative
-// seams, never a setTimeout/wall-clock deadline. appliedRound snapshots whatever
-// getCurrentCombatRound reports at arm time.
+// seams, never a setTimeout/wall-clock deadline, and the entry carries no
+// Date.now() stamp. appliedRound snapshots whatever getCurrentCombatRound
+// reports at arm time.
 function exactArmedEntry(round) {
   return {
     target: PLAYER,
@@ -109,8 +119,12 @@ function exactArmedEntry(round) {
   };
 }
 
-// Queue-level cancel precision seeds (mirrors the te-triplet precision of the edge
-// lane at QUEUE level): foreign source survives; foreign target does NOT (flagged).
+// Trim-filter seeds exercising each clause of the :127-129 filter. The filter
+// keeps an entry when en.target ≠ playerName, or no removal-effect row matches
+// effectKey+source. Foreign SOURCE survives; the OTHER-CREATURE clock survives
+// via the en.target clause; the foreign-TARGET cla clock shares all three
+// matched clauses (the row's own target is ignored) and is over-trimmed —
+// pinned as current behavior, flagged in the header.
 const foreignSourceClock = {
   target: PLAYER,
   effects: [
@@ -128,10 +142,13 @@ const foreignTargetClock = {
   expiryRounds: 10,
   expireOnCreatureName: null,
 };
-
-// Unique promptId per test so stale window listeners from earlier tests (the component never
-// removes listeners on unmount) can never hijack dispatched save-result events in this lane.
-let promptCounter = 0;
+const otherCreatureClock = {
+  target: 'Ranger2',
+  effects: [{ type: 'remove_target_effect', effectKey: 'clairvoyant_combatant', source: FEATURE, target: TARGET }],
+  appliedRound: 3,
+  expiryRounds: 10,
+  expireOnCreatureName: null,
+};
 
 // House rule: mockReset (not clearAllMocks — it keeps mockResolvedValue/impl), then re-arm
 // the default implementations the component needs to function.
@@ -190,14 +207,9 @@ async function arm(props = {}) {
 describe('ClairvoyantCombatantModal - expiration clock queue', () => {
   // ── Arm: exact queue entry byte shape, anchored to the combat round counter ──
 
-  it.each([
-    { round: 1 },
-    { round: 7, label: 'mid-combat' },
-  ])('arms exactly ONE queue entry with the exact byte shape, appliedRound anchored to round $round ($label)', async ({ round }) => {
+  it.each([1, 7])('arms exactly ONE queue entry with the exact byte shape, appliedRound anchored to round %i', async (round) => {
     getCurrentCombatRound.mockReturnValue(round);
-    const stores = liveStores();
-    const { dispatchSuccess } = await arm();
-    void dispatchSuccess; // this case never resolves the save
+    await arm();
 
     // Round anchor: the seam counter, called exactly once with this campaign —
     // a wall-clock timestamp (Date.now()) would not equal the mocked round.
@@ -208,12 +220,9 @@ describe('ClairvoyantCombatantModal - expiration clock queue', () => {
     expect(playerName).toBe(PLAYER);
     expect(campaign).toBe(CAMPAIGN);
     // Exact depth AND shape — ordered removal-effects trio, 1_minute→10-round
-    // conversion (§5), anchorless (§38). toEqual on the whole array pins all of it.
+    // conversion (§5), anchorless (§38), numeric appliedRound = the live round.
+    // toEqual on the whole array pins all of it.
     expect(payload[KEY]).toEqual([exactArmedEntry(round)]);
-    expect(typeof payload[KEY][0].appliedRound).toBe('number');
-    // The live queue now holds exactly this armed entry.
-    expect(stores.queue).toHaveLength(1);
-    expect(stores.queue[0]).toEqual(exactArmedEntry(round));
   });
 
   // ── Save-success: exact removal against the live store ──
@@ -242,28 +251,33 @@ describe('ClairvoyantCombatantModal - expiration clock queue', () => {
     expect(stores.buffs).toEqual([]);
   });
 
-  it('save-success cancel matches effectKey+source at queue level — foreign source survives, foreign target also trimmed (flagged)', async () => {
-    // Live queue seeded with two clocks predating this arm: the removal filter must
-    // keep only the foreign-SOURCE clock. The foreign-TARGET cla clock shares this
-    // feature's effectKey+source, so the component trims it too (jsx:143-144 ignores
-    // ef.target) — pinned as current behavior, flagged in the header for a product fix.
-    const stores = liveStores({ queue: [foreignSourceClock, foreignTargetClock] });
+  it('save-success queue trim keys on en.target+effectKey+source and IGNORES the removal-effect target — foreign-source and other-creature clocks survive, foreign-target clock also trimmed (flagged)', async () => {
+    // Live queue seeded with three clocks predating this arm. The :127-129 filter
+    // must keep the foreign-SOURCE clock (no matching effectKey+source row) and the
+    // OTHER-CREATURE clock (en.target ≠ player). The foreign-TARGET cla clock shares
+    // all three matched clauses — ef.target is never consulted (jsx:129) — so the
+    // component trims it too. Pinned as current behavior; flagged in the header for
+    // a product fix (contrast: te filter :120 and buff filter :135 DO honor target,
+    // proven surviving in the .edgeCases lane).
+    const stores = liveStores({ queue: [foreignSourceClock, foreignTargetClock, otherCreatureClock] });
     const { dispatchSuccess } = await arm();
 
-    // Arm appended its clock after both seeds, foreign entries same-object.
+    // Arm appended its clock after all three seeds, foreign entries same-object.
     const armedQueue = runtime.setRuntimeObject.mock.calls[0][1][KEY];
-    expect(armedQueue).toHaveLength(3);
+    expect(armedQueue).toHaveLength(4);
+    expect(armedQueue.slice(0, 3)).toEqual([foreignSourceClock, foreignTargetClock, otherCreatureClock]);
     expect(armedQueue[0]).toBe(foreignSourceClock);
-    expect(armedQueue[1]).toBe(foreignTargetClock);
+    expect(armedQueue[2]).toBe(otherCreatureClock);
 
     dispatchSuccess();
     await screen.findByText(/succeeded on Wisdom save/);
 
     const cancelQueue = runtime.setRuntimeObject.mock.calls[1][1][KEY];
-    expect(cancelQueue).toEqual([foreignSourceClock]);
+    expect(cancelQueue).toEqual([foreignSourceClock, otherCreatureClock]);
     expect(cancelQueue[0]).toBe(foreignSourceClock); // survives untouched
+    expect(cancelQueue[1]).toBe(otherCreatureClock); // survives via en.target clause
     expect(cancelQueue).not.toContain(foreignTargetClock); // over-trim: flagged
-    expect(stores.queue).toEqual([foreignSourceClock]);
+    expect(stores.queue).toEqual([foreignSourceClock, otherCreatureClock]);
   });
 
   // ── Save-failure: the armed clock survives ──

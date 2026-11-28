@@ -1,4 +1,15 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
+// MoonlightStepResourceModal — the resource-POOL conversion modal mounted by
+// CharActionModals.jsx:143 (spell slot → Moonlight Step uses). Distinct from the
+// modalsInline/combatHandlers "Moonlight slot fallback" lane (run2#1966), which
+// pins the HOST-side no-uses-remaining prompt that routes through
+// confirmTeleport — that prompt never opens this component; no overlap here.
+// Imports-first audit vs MoonlightStepResourceModal.jsx:1-4 — exactly
+// getRuntimeValue, setRuntimeBatch (useRuntimeState.js:63/:296) and addEntry
+// (logService.js:274, async → Promise.resolve stub so handleConvert's .catch
+// at :73 stays honest). No applyDamage/combatData carriers. Family ledger note:
+// this modal has NO allocation/footer-math — it converts one slot per confirm
+// and closes, so the MassHeal selected-only display asymmetry does not apply.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MoonlightStepResourceModal from './MoonlightStepResourceModal.jsx';
@@ -34,12 +45,10 @@ const makePlayerStats = (overrides = {}) => ({
   ...overrides,
 });
 
-const makeProps = (overrides = {}) => ({
-  playerStats: makePlayerStats(overrides.playerStatsOverrides),
+const makeProps = ({ stats = {}, onClose = vi.fn() } = {}) => ({
+  playerStats: makePlayerStats(stats),
   campaignName: 'test-campaign',
-  // automation.conversionRate no longer read: disk authors only 'level_2_plus'
-  // and the fantasy all-levels fallback was deleted (test-maintain 🗑 #145).
-  onClose: overrides.onClose || vi.fn(),
+  onClose,
 });
 
 function getRadios() {
@@ -71,29 +80,39 @@ describe('MoonlightStepResourceModal', () => {
     expect(screen.getByRole('button', { name: 'Expend Level 2 Slot' })).toBeInTheDocument();
   });
 
-  it('reads spell slots from runtime, overriding stored counts and clamping at max', () => {
+  it('renders an exact census of levels 2-9 with runtime overrides clamped to stored max — never level 1', () => {
+    // Consolidated (was two tests): the level census and the override/clamp math
+    // read the SAME rows and cannot diverge. Character holds 4 level-1 slots;
+    // a level-1 row would mean the deleted all-levels fantasy path leaked back
+    // (disk authors only 'level_2_plus' — test-maintain 🗑 #145).
     useRuntimeState.getRuntimeValue.mockImplementation((charKey, prop) => {
       if (prop === 'spell_slots_level_2') return '1';
       if (prop === 'spell_slots_level_3') return '999';
       return null;
     });
     render(<MoonlightStepResourceModal {...makeProps()} />);
-    const rows = getSlotRows();
-    // Rows render levels 2-9 in order; available / max.
-    expect(rows[0].textContent).toContain('1 / 3'); // runtime override
-    expect(rows[1].textContent).toContain('3 / 3'); // clamped from 999
-    expect(rows[4].textContent).toContain('0 / 0'); // untouched empty level
+    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_2');
+    // Full-text row census: `${level}${available} / ${max}`. Level 2 is the
+    // runtime override ('1'), level 3 the 999→max clamp, level 4/5 pass-through
+    // stored, 6-9 untouched empties. Ordering + count pin the 2-9 range.
+    expect(getSlotRows().map((row) => row.textContent)).toEqual([
+      '21 / 3',
+      '33 / 3',
+      '41 / 1',
+      '51 / 1',
+      '60 / 0',
+      '70 / 0',
+      '80 / 0',
+      '90 / 0',
+    ]);
+    // Availability truth: exactly the funded levels are selectable.
+    const radios = getRadios();
+    expect(Array.from(radios).map((r) => r.disabled)).toEqual([
+      false, false, false, false, true, true, true, true,
+    ]);
   });
 
-  it('renders rows for exactly levels 2-9 driven by availableSlots — never level 1 (disk conversionRate level_2_plus)', () => {
-    // Character holds 4 level-1 slots in makePlayerStats; a level-1 row would
-    // mean the deleted all-levels fantasy path leaked back into the display.
-    render(<MoonlightStepResourceModal {...makeProps()} />);
-    const levels = getSlotRows().map(row => row.cells[0].textContent);
-    expect(levels).toEqual(['2', '3', '4', '5', '6', '7', '8', '9']);
-  });
-
-  it('selecting a level updates the button label and expends that level on convert', () => {
+  it('defaults to level 2, relabels the button on selection, and expends exactly the selected level', () => {
     const onClose = vi.fn();
     render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
     const radios = getRadios();
@@ -101,18 +120,19 @@ describe('MoonlightStepResourceModal', () => {
     fireEvent.click(radios[2]); // level 4
     expect(getConvertBtn()).toHaveTextContent('Expend Level 4 Slot');
     fireEvent.click(getConvertBtn());
-    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-      'TestCleric',
-      expect.objectContaining({ spell_slots_level_4: 0 }),
-      'test-campaign'
-    );
+    // Full-shape payload: exactly two writes, nothing else.
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('TestCleric', {
+      spell_slots_level_4: 0,
+      moonlightStepUses: 2, // already at max 2 — restore clamps, never overflows
+    }, 'test-campaign');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('clamps a stale over-max runtime uses count at display (stored 5 > max 2 renders 2/2, never 5/2)', () => {
-    // writers census: no writer exceeds max at write time, but max is dynamic
+    // Writers census: no writer exceeds max at write time, but max is dynamic
     // (wisGatedPool over WIS) — a WIS drop can leave stored > max transiently.
-    // display must never render the nonsense uses>max shape (:28-31-era defect).
+    // Display must never render the nonsense uses>max shape.
     useRuntimeState.getRuntimeValue.mockImplementation((charKey, prop) =>
       prop === 'moonlightStepUses' ? '5' : null
     );
@@ -121,7 +141,7 @@ describe('MoonlightStepResourceModal', () => {
     expect(screen.queryByText(/Current uses: 5\/2/)).not.toBeInTheDocument();
   });
 
-  it('converting spends the level 2 slot, restores one use from runtime state, logs, and closes', () => {
+  it('converting spends the level 2 slot, restores one use, logs the exact sentence, and closes', () => {
     const onClose = vi.fn();
     // Runtime shows 1/2 uses consumed; converting restores it to the max of 2.
     useRuntimeState.getRuntimeValue.mockImplementation((charKey, prop) =>
@@ -130,45 +150,72 @@ describe('MoonlightStepResourceModal', () => {
     render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
     expect(screen.getByText(/Current uses: 1\/2/)).toBeInTheDocument();
     fireEvent.click(getConvertBtn());
-    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-      'TestCleric',
-      expect.objectContaining({
-        moonlightStepUses: 2,
-        spell_slots_level_2: 2,
-      }),
-      'test-campaign'
-    );
-    expect(addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestCleric',
-        abilityName: 'Moonlight Step',
-        description: expect.stringContaining('expended a level 2 spell slot to restore 1 use of Moonlight Step (2/2)'),
-      })
-    );
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1); // double-spend detector
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('TestCleric', {
+      spell_slots_level_2: 2,
+      moonlightStepUses: 2,
+    }, 'test-campaign');
+    // Full-shape log entry with exact interpolated sentence (#1966 idiom).
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'TestCleric',
+      abilityName: 'Moonlight Step',
+      description:
+        'TestCleric expended a level 2 spell slot to restore 1 use of Moonlight Step (2/2).',
+      timestamp: expect.any(Number),
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('never restores uses above maxUses', () => {
-    render(
-      <MoonlightStepResourceModal
-        {...makeProps({
-          playerStatsOverrides: makePlayerStats({
-            _trackedResources: { moonlightStepUses: { max: 1 } },
-          }),
-        })}
-      />
-    );
+  it('never restores uses above maxUses (max 1, already full: payload stays 1)', () => {
+    render(<MoonlightStepResourceModal {...makeProps({
+      stats: { _trackedResources: { moonlightStepUses: { max: 1 } } },
+    })} />);
     fireEvent.click(getConvertBtn());
-    const updates = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
-    expect(updates.moonlightStepUses).toBe(1); // 1 current + 1 restored, capped at max 1
-    expect(updates.spell_slots_level_2).toBe(2); // slot still spent
+    // Full-shape payload: the cap is the only difference from a normal spend.
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('TestCleric', {
+      spell_slots_level_2: 2, // slot still spent even though uses cannot rise
+      moonlightStepUses: 1, // 1 current + 1 restored, capped at max 1
+    }, 'test-campaign');
   });
 
-  it('closes on Escape and Cancel but not on overlay click', () => {
+  it('opens inert on the checked-but-unfunded default when level 2 is exhausted, then converts from a funded level', () => {
+    // selectedLevel is hardcoded 2 (:46) regardless of funding — the modal must
+    // open disabled-and-selected on level 2 and only arm once a funded radio wins.
     const onClose = vi.fn();
-    const { container } = render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
+    render(<MoonlightStepResourceModal {...makeProps({
+      onClose,
+      stats: { spellAbilities: {
+        spell_slots_level_1: 4,
+        spell_slots_level_2: 0, // exhausted — the hardcoded default selection
+        spell_slots_level_3: 3,
+        spell_slots_level_4: 1,
+        spell_slots_level_5: 1,
+        spell_slots_level_6: 0,
+        spell_slots_level_7: 0,
+        spell_slots_level_8: 0,
+        spell_slots_level_9: 0,
+      } },
+    })} />);
+    const radios = getRadios();
+    expect(radios[0]).toBeDisabled();
+    expect(radios[0]).toBeChecked();
+    const convertBtn = getConvertBtn();
+    expect(convertBtn).toHaveTextContent('Expend Level 2 Slot');
+    expect(convertBtn).toBeDisabled();
+    fireEvent.click(radios[1]); // level 3 is funded (3/3)
+    expect(getConvertBtn()).toHaveTextContent('Expend Level 3 Slot');
+    fireEvent.click(getConvertBtn());
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('TestCleric', {
+      spell_slots_level_3: 2,
+      moonlightStepUses: 2,
+    }, 'test-campaign');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on Escape and Cancel, not on overlay click, and detaches the key listener on unmount', () => {
+    const onClose = vi.fn();
+    const { container, unmount } = render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
     fireEvent.click(container.querySelector('.resource-pool-overlay'));
     expect(onClose).not.toHaveBeenCalled();
     expect(container.querySelector('.resource-pool-modal')).toBeInTheDocument();
@@ -176,28 +223,20 @@ describe('MoonlightStepResourceModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+    unmount();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(2); // cleanup at :80 removed the listener
   });
 
-  it('disables every selection and stays inert when optional slot/resource data is missing', () => {
-    const onClose = vi.fn();
-    render(
-      <MoonlightStepResourceModal
-        {...makeProps({
-          onClose,
-          playerStatsOverrides: makePlayerStats({
-            spellAbilities: undefined,
-            _trackedResources: undefined,
-          }),
-        })}
-      />
-    );
+  it('renders a zeroed, fully disabled table when optional slot/resource data is missing', () => {
+    // #1920: no forced click on disabled controls — the disabled/checked
+    // attributes ARE the observable inertness; handleConvert's guard is
+    // unreachable through the UI from here.
+    render(<MoonlightStepResourceModal {...makeProps({
+      stats: { spellAbilities: undefined, _trackedResources: undefined },
+    })} />);
     expect(screen.getByText(/Current uses: 0\/0/)).toBeInTheDocument();
     getRadios().forEach((radio) => expect(radio).toBeDisabled());
-    const convertBtn = getConvertBtn();
-    expect(convertBtn).toBeDisabled();
-    fireEvent.click(convertBtn);
-    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onClose).not.toHaveBeenCalled();
+    expect(getConvertBtn()).toBeDisabled();
   });
 });

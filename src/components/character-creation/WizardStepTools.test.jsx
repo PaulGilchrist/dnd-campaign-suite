@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // WizardStepTools component lane: disk-faithful tool grid (equipment.json Tools rows are
 // imported VERBATIM and served through the getToolsByCategory seam exactly as prod filters
 // them — 33 rows across the 4 wizard categories, every row has an `ability`, so empty-grid
@@ -172,38 +172,31 @@ describe('WizardStepTools', () => {
     expect(props.onToolToggle).toHaveBeenLastCalledWith('Dice Set');
   });
 
-  it('shows granted choice limits and exact selection counts in the rules panel, hidden until limits load', async () => {
+  it('rules panel: hidden while limits are null, choice sentence only with positive entries, exact selection counts', async () => {
     const { rerender } = await renderStep({ toolLimits: null });
 
-    // useWizardConfig slot starts null -> no rules panel at all.
+    // Face 1 — useWizardConfig slot starts null -> no rules panel at all.
     expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
 
+    // Face 2 — granted limits: insertion order preserved in the choice sentence
+    // (background grant before class grant) and exact pre-selected/chosen split.
     rerender(<WizardStepTools {...makeProps({
       toolLimits: BARD_SOLDIER_LIMITS({ preSelected: ["Cook's Utensils"] }),
       preSelectedTools: ["Cook's Utensils"],
       formData: { toolProficiencies: ["Cook's Utensils", 'Bagpipes', 'Dice Set'] },
     })} />);
-
-    // Insertion order preserved in the choice sentence (background grant before class grant).
-    expect(screen.getByText(/You may choose 1 Gaming Sets, 3 Musical Instrument\./)).toBeInTheDocument();
+    expect(screen.getByText('You may choose 1 Gaming Sets, 3 Musical Instrument.')).toBeInTheDocument();
     expect(screen.getByText(/You have selected 3 tool proficiency\/ies \(1 pre-selected, 2 chosen\)/)).toBeInTheDocument();
-  });
 
-  it('hides the choice sentence when categoryLimits carries no positive entries (level-1 Fighter)', async () => {
-    // Empty Map is the reachable no-grants face (useWizardTools.integration.test.js
-    // pins categoryLimits.size === 0); it must not dangle as "You may choose ."
-    const { rerender } = await renderStep({
+    // Face 3 — empty Map is the reachable no-grants face (useWizardTools.integration.test.js
+    // pins categoryLimits.size === 0); the sentence must not dangle as "You may choose ."
+    // while the rest of the panel is unchanged.
+    rerender(<WizardStepTools {...makeProps({
       toolLimits: BARD_SOLDIER_LIMITS({ categoryLimits: new Map() }),
-    });
-
+    })} />);
     expect(screen.queryByText(/You may choose/)).not.toBeInTheDocument();
-    // The rest of the rules panel is unchanged.
     expect(screen.getByText(/Rules:/)).toBeInTheDocument();
     expect(screen.getByText(/You have selected 0 tool proficiency\/ies/)).toBeInTheDocument();
-
-    // Positive entries re-appear with the exact same copy and join formatting.
-    rerender(<WizardStepTools {...makeProps()} />);
-    expect(screen.getByText('You may choose 1 Gaming Sets, 3 Musical Instrument.')).toBeInTheDocument();
   });
 
   it('shows the Skilled pool row only when skilledUsesAvailable > 0', async () => {

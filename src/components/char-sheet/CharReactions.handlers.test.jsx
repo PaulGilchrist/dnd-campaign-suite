@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 CharReactions Stand-row dispatch: ordered chargeSlot→writes census, exact popup copy, RB-1115 zero-write denial; phantom hasTacticalShift mock key purged.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -70,9 +70,16 @@ vi.mock('../../services/combat/baseCombatActions.js', () => ({
     MELEE_REACH_FEET: 5,
 }));
 vi.mock('../../services/combat/automation/automationService.js', () => ({
+    // CharReactions.jsx:23 imports exactly these two; hasTacticalShift was a
+    // phantom key (on disk, never imported by this component).
     hasAutomation: vi.fn(() => false),
-    hasTacticalShift: vi.fn(() => false),
     hasSpeedyOpportunityDisadvantage: vi.fn(() => false),
+}));
+vi.mock('../../services/combat/chargeEconomy.js', () => ({
+    // Real module returns false with zero writes when enforcement is off, but
+    // mocking lets this lane pin the L5-002 dispatch itself: chargeSlot's
+    // exact args and its ORDER in the click sequence.
+    chargeSlot: vi.fn(() => false),
 }));
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
@@ -138,6 +145,8 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
 
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { chargeSlot } from '../../services/combat/chargeEconomy.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const campaignName = 'test-campaign';
@@ -183,23 +192,38 @@ function runtimeWith(overrides = {}) {
         key in overrides ? overrides[key] : []);
 }
 
+// Exact confirmation copy from CharReactions.jsx:580 (stand lane, non-OA popup).
+const STAND_POPUP_HTML =
+    '<b>Stand (Power Word Heal)</b><br/>You used your Reaction to stand up.';
+
 // Stand (Power Word Heal) click lane — this file owns the handleReactionClick
 // dispatch for this row. Row assembly/dedup lives in CharReactions.edgeCases.
-// test.jsx; the OA roll lane lives in CharReactions.opportunityAttack.test.jsx.
+// test.jsx; the OA roll lane lives in CharReactions.opportunityAttack.test.jsx
+// and the pending-marker precedence lane in ...opportunityAttackTriggered.
 describe('CharReactions - Stand (Power Word Heal) click', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockSetPopupHtml.mockReset();
+        // clearAllMocks keeps mockReturnValue/mockImplementation (leak class) —
+        // re-baseline EVERY overridable stub.
+        runtimeWith();
+        getRuntimeValue.mockReturnValue(null);
         useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
+        chargeSlot.mockReturnValue(false); // honest enforcement-off value
     });
 
-    // [label, activeConditions, expected written conditions | null = no write expected]
+    // [label, activeConditions, ordered setRuntimeValue census expected]
     it.each([
-        ['removes Prone and preserves other conditions', ['Prone', 'Poisoned'], ['Poisoned']],
-        ['matches lowercase prone and writes remaining list', ['prone'], []],
-        ['writes no activeConditions when no prone is present', ['Poisoned'], null],
-        ['writes no activeConditions when there are no conditions', [], null],
-    ])('clicking the row — %s, consumes the permission, confirms via popup', async (_label, conditions, expected) => {
+        ['removes Prone and preserves other conditions', ['Prone', 'Poisoned'],
+            [['TestFighter', 'activeConditions', ['Poisoned'], campaignName],
+             ['TestFighter', 'powerWordHealStandPermission', false, campaignName]]],
+        ['matches lowercase prone and writes remaining list', ['prone'],
+            [['TestFighter', 'activeConditions', [], campaignName],
+             ['TestFighter', 'powerWordHealStandPermission', false, campaignName]]],
+        ['writes no activeConditions when no prone is present', ['Poisoned'],
+            [['TestFighter', 'powerWordHealStandPermission', false, campaignName]]],
+        ['writes no activeConditions when there are no conditions', [],
+            [['TestFighter', 'powerWordHealStandPermission', false, campaignName]]],
+    ])('clicking the row — %s, consumes the permission, confirms via popup', (_label, conditions, expectedWrites) => {
         runtimeWith({ powerWordHealStandPermission: true });
         getRuntimeValue.mockImplementation((_charKey, key) =>
             key === 'activeConditions' ? conditions : null);
@@ -207,35 +231,37 @@ describe('CharReactions - Stand (Power Word Heal) click', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
 
-        const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
-        if (expected) {
-            expect(conditionWrites).toEqual([['TestFighter', 'activeConditions', expected, campaignName]]);
-            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
-        } else {
-            expect(conditionWrites).toHaveLength(0);
-            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-        }
-        // The stance permission is single-use — always consumed on click,
-        // even when no condition changed.
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'powerWordHealStandPermission',
-            false,
-            campaignName
-        );
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('stand up'));
+        // L5-002: standing consumes the reaction budget — charge first, with
+        // the exact dispatch args.
+        expect(chargeSlot).toHaveBeenCalledTimes(1);
+        expect(chargeSlot).toHaveBeenCalledWith({
+            creatureName: 'TestFighter',
+            bucket: 'reaction',
+            campaignName,
+        });
+        // Ordered exact-array census doubles as the double-fire detector:
+        // condition write (only when a prone row was stripped) lands BEFORE
+        // the single-use permission consumption, each written exactly once.
+        expect(setRuntimeValue.mock.calls).toEqual(expectedWrites);
+        // The stand lane logs nothing; confirmation is one popup, exact copy.
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(STAND_POPUP_HTML);
     });
 
-    it('blocks a cannotAct press with zero runtime writes but pops the shared reason (RB-1115)', () => {
+    it('blocks a cannotAct press with zero writes/charges/log rows but pops the shared reason (RB-1115)', () => {
         runtimeWith({ powerWordHealStandPermission: true });
-        getRuntimeValue.mockReturnValue(null);
 
         render(<CharReactions {...createProps({ cannotAct: true })} />);
         fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
 
+        expect(chargeSlot).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         // RB-1115: the silent gate now routes through the assertCanAct popup
-        // lane with the canTakeAction copy (UI-only).
+        // lane with the shared canTakeAction copy — enforcement-off denial is
+        // exactly ONE popup and ZERO campaign-log rows (UI-only).
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
         expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
     });
 });

@@ -1,16 +1,27 @@
-// @maintained-by-ai 2026-10-17
-// Cleanup applied (redundant test removal):
-//
-//   Removed 2 redundant tests:
-//     "renders ally badge when no stored allies (defaults to monster name)"
-//       → fully covered by "renders ally badge with monster name as default
-//         ally count of 1" (beforeEach already sets selectedAllies to null).
-//     "renders ally badge as a clickable element with icon and title"
-//       → asserts implementation details (CSS classes, icon element) already
-//         covered by "opens ally selection modal when ally badge is clicked"
-//         which asserts the same title attribute and clicks the same element.
+// @maintained-by-ai 2026-11-27
+// ── Scope (ally-modal lane, 2026-11-27 audit-trim) ──────────────────────────
+// The ally-facing surface of the GM monster card modal: the footer "Allies
+// (N)" badge (MonsterCardBody.jsx mc-footer) and the AllySelectionModal it
+// mounts (MonsterCardModal.jsx handleAllyModalOpen/Confirm/Cancel,
+// resolveCurrentAllies). Pins:
+//   - resolveCurrentAllies both arms: stored list vs default [monsterName]
+//   - badge click mounts the modal populated from getCombatSummary (rows
+//     rendered) with currentAllies pre-checked through the open handler
+//   - confirm writes setRuntimeValue('selectedAllies', …) AND logs the
+//     'Ally Selection' ability_use entry (repo rule: every automation logs),
+//     then closes; cancel is a zero-write close witness.
+// NOT this lane: AllySelectionModal internals — row/Player/NPC/HP% display,
+// bulk actions, confirm-gate, Escape/backdrop → AllySelectionModal.test.jsx
+// and .dismiss.test.jsx; stat-block render, dice chips, legendary
+// ally-prerequisite gate → the sibling MonsterCardModal.* lanes.
+// Trim 2026-11-27 (6 → 5): "passes combat summary creatures" (bare
+// getCombatSummary toHaveBeenCalled, never contradicted on output) folded
+// into the open test as rendered-row assertions; confirm/cancel upgraded to
+// accessible exact-name queries, full-shape log pin, and zero-write
+// witnesses; no-op waitFor on synchronous handler writes dropped; dead
+// __set* mock setters and the _setPopupHtml phantom export purged.
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
@@ -27,28 +38,22 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => String(html || '')),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    rollAbilityCheck: vi.fn(),
+    rollSavingThrow: vi.fn(),
+    rollSkillCheck: vi.fn(),
+    rollInitiative: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
+  })),
+}));
 
-  return {
-    default: vi.fn(() => ({
-      popupHtml: _popupHtml,
-      setPopupHtml: _setPopupHtml,
-      rollAttack: vi.fn(),
-      rollDamage: vi.fn(),
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-      rollInitiative: vi.fn(),
-      quickRollPlayerSave: vi.fn(),
-    })),
-    _setPopupHtml,
-  };
-});
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
-  const defaultEffects = {
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
+  computeConditionEffects: vi.fn(() => ({
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
     abilityCheckDisadvantage: false,
@@ -75,37 +80,19 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
     reliableTalent: false,
     tacticalMind: false,
     tacticalMindBonus: null,
-  };
+  })),
+  combineAttackModes: vi.fn(() => 'normal'),
+  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
+}));
 
-  let _computeReturn = null;
-  const computeConditionEffects = vi.fn((_conditions) => {
-    return _computeReturn ?? { ...defaultEffects };
-  });
-
-  return {
-    computeConditionEffects,
-    combineAttackModes: vi.fn(() => 'normal'),
-    CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-    __setComputeReturn(val) { _computeReturn = val; },
-  };
-});
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => {
-  const DEFAULT_CREATURE = { name: 'Goblin', conditions: [] };
-  let _findCreatureReturn = null;
-
-  return {
-    extractDamageTypes: vi.fn(() => []),
-    formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-    getTargetFromAttacker: vi.fn(() => null),
-    getResistanceNotice: vi.fn(() => null),
-    findCreatureByName: vi.fn((_ctx, _name) => {
-      return _findCreatureReturn ?? { ...DEFAULT_CREATURE };
-    }),
-    getCombatContext: vi.fn().mockResolvedValue(null),
-    __setFindCreatureReturn(val) { _findCreatureReturn = val; },
-  };
-});
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  extractDamageTypes: vi.fn(() => []),
+  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
+  getTargetFromAttacker: vi.fn(() => null),
+  getResistanceNotice: vi.fn(() => null),
+  findCreatureByName: vi.fn(() => ({ name: 'Goblin', conditions: [] })),
+  getCombatContext: vi.fn().mockResolvedValue(null),
+}));
 
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
@@ -128,26 +115,26 @@ vi.mock('../../services/shared/abilityLookup.js', () => ({
   getAbilitySaveModifier: vi.fn((_abilities, _abilityKey) => 0),
 }));
 
+// Producer-shaped: the open handler maps {name, type, currentHp, maxHp} off
+// combatSummary.creatures (MonsterCardModal.jsx handleAllyModalOpen).
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
-      { name: 'Goblin', type: 'humanoid', currentHp: 7, maxHp: 7 },
+      { name: 'Goblin', type: 'npc', currentHp: 7, maxHp: 7 },
       { name: 'Player A', type: 'player', currentHp: 10, maxHp: 10 },
       { name: 'Player B', type: 'player', currentHp: 8, maxHp: 8 },
     ],
   })),
 }));
 
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-  let _inspiringMoveNoOA = false;
-  let _remarkableNoOA = false;
-  let _targetEffects = [];
   let _selectedAllies = null;
 
   const mockUseRuntimeValue = vi.fn((_characterKey, propertyName, _campaignName) => {
-    if (propertyName === 'targetEffects') return _targetEffects;
-    if (propertyName === 'inspiringMovementNoOA') return _inspiringMoveNoOA;
-    if (propertyName === 'remarkableAthleteNoOA') return _remarkableNoOA;
     if (propertyName === 'selectedAllies') return _selectedAllies;
     return null;
   });
@@ -156,104 +143,101 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
     useRuntimeValue: mockUseRuntimeValue,
     setRuntimeValue: vi.fn(),
     getRuntimeValue: vi.fn(() => null),
-    __setInspiringMoveNoOA(val) { _inspiringMoveNoOA = val; },
-    __setRemarkableNoOA(val) { _remarkableNoOA = val; },
-    __setTargetEffects(val) { _targetEffects = val; },
     __setSelectedAllies(val) { _selectedAllies = val; },
   };
 });
 
-// ── Re-import mocked modules for test setup helpers ─────────────────────────
+// ── Re-import mocked modules for test assertions ───────────────────────────
 
-import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
-import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
-import * as combatData from '../../services/encounters/combatData.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('MonsterCardModal - ally modal interactions', () => {
+describe('MonsterCardModal - ally badge + AllySelectionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    conditionEffects.__setComputeReturn(null);
-    damageUtils.__setFindCreatureReturn(null);
     useRuntimeState.__setSelectedAllies(null);
   });
 
-  it('renders ally badge with monster name as default ally count of 1', () => {
+  const openAllyModal = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Allies (1)' }));
+  };
+
+  it('defaults the ally badge to the monster alone (count 1) when no allies are stored', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText(/Allies \(1\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Allies (1)' })).toBeInTheDocument();
   });
 
-  it('renders ally badge with stored allies count', () => {
+  it('ally badge count reflects the stored selectedAllies list', () => {
     useRuntimeState.__setSelectedAllies(['Goblin', 'Player A']);
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText(/Allies \(2\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Allies (2)' })).toBeInTheDocument();
   });
 
-  it('opens ally selection modal when ally badge is clicked', () => {
+  it('badge click mounts the ally modal populated from the combat summary, with current allies pre-checked', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
 
-    // CI 2026-11-03 a11y sibling parity: badge is a real named button now.
-    const allyBadge = screen.getByRole('button', { name: /Allies \(1\)/ });
-    expect(allyBadge).toHaveAttribute('title', 'Manage allies');
-    fireEvent.click(allyBadge);
+    const badge = screen.getByRole('button', { name: 'Allies (1)' });
+    expect(badge).toHaveAttribute('title', 'Manage allies');
+    fireEvent.click(badge);
 
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+    // Modal header (AllySelectionModal default title, exact copy).
+    expect(screen.getByText('Select Allies')).toBeInTheDocument();
+
+    // Rows rendered from the getCombatSummary-mapped creatures — the only
+    // way these names reach the modal is handleAllyModalOpen's mapping.
+    expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Player A' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Player B' })).toBeInTheDocument();
+    // currentHp/maxHp survive the mapping: Goblin is non-player → HP% shown
+    // (7/7 → 100%; players render no HP chip).
+    expect(within(screen.getByRole('checkbox', { name: 'Select Goblin' }).closest('label')).getByText('(100% HP)')).toBeInTheDocument();
+    expect(within(screen.getByRole('checkbox', { name: 'Select Player A' }).closest('label')).queryByText('(100% HP)')).not.toBeInTheDocument();
+
+    // resolveCurrentAllies default [monsterName] threads through the
+    // currentAllies prop: the Goblin row arrives pre-checked.
+    expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Player A' })).not.toBeChecked();
   });
 
-  it('passes combat summary creatures to the ally selection modal', () => {
+  it('confirm writes selectedAllies, logs the Ally Selection ability use, and closes the modal', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    openAllyModal();
 
-    const allyBadge = screen.getByTitle('Manage allies');
-    fireEvent.click(allyBadge);
+    // Goblin arrives pre-checked (default [monsterName]); add Player A.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Player A' }));
 
-    // The modal should have received creatures from getCombatSummary
-    expect(combatData.getCombatSummary).toHaveBeenCalled();
-  });
-
-  it('calls setRuntimeValue with selected allies on confirm', async () => {
-    const { container } = render(<MonsterCardModal {...makeProps(makeMonster())} />);
-
-    // Open the ally modal
-    const allyBadge = screen.getByTitle('Manage allies');
-    fireEvent.click(allyBadge);
-
-    // The modal pre-selects currentAllies (default = [monsterName], per
-    // resolveCurrentAllies), so the first row (Goblin) is already checked.
-    // Click an UNchecked row (Player A) to ADD an ally — clicking the
-    // pre-checked Goblin would deselect it and disable confirm with 0 left.
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes.length).toBeGreaterThan(0);
-    fireEvent.click(checkboxes[1]);
-
-    // Click the confirm button
-    const confirmBtn = screen.getByRole('button', { name: /confirm/i });
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm Allies (2)' });
     expect(confirmBtn).toBeEnabled();
     fireEvent.click(confirmBtn);
 
-    await waitFor(() => {
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'selectedAllies',
-        ['Goblin', 'Player A'],
-        'test-campaign'
-      );
+    // Handler body is synchronous through both writes — no waitFor needed.
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin',
+      'selectedAllies',
+      ['Goblin', 'Player A'],
+      'test-campaign'
+    );
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'Goblin',
+      abilityName: 'Ally Selection',
+      description: 'Goblin selected allies: Goblin, Player A',
+      timestamp: expect.any(Number),
     });
+    expect(screen.queryByText('Select Allies')).not.toBeInTheDocument();
   });
 
-  it('closes the ally modal on cancel', () => {
+  it('cancel closes the modal with zero writes', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    openAllyModal();
 
-    const allyBadge = screen.getByTitle('Manage allies');
-    fireEvent.click(allyBadge);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    const cancelBtn = screen.getByRole('button', { name: /cancel/i });
-    expect(cancelBtn).toBeInTheDocument();
-    fireEvent.click(cancelBtn);
-
-    // Modal should be removed from DOM
-    expect(document.querySelector('.sp-modal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select Allies')).not.toBeInTheDocument();
+    // Zero-action witness: dismissing the draft never persists or logs.
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
-
 });

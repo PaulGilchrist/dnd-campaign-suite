@@ -1,20 +1,24 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27
 /**
  * Contract tests for src/test/mockComponents.jsx.
  *
- * The App.*.test.jsx suites replace real components with these mocks via
+ * The 21 App.*.test.jsx suites replace real components with these mocks via
  * vi.mock(), then drive the app by clicking mock testids and reading
  * rendered text. These tests pin that contract at the mock level so a mock
  * edit fails HERE — locally and with a clear name — instead of surfacing as
- * a confusing navigation failure inside one of six app suites:
- *   - every root/element testid a consuming suite queries is rendered
- *   - every callback fires with the exact payload consumers depend on,
- *     and fires ONLY its own callback (wiring isolation)
- *   - mocks never crash when App omits optional props
+ * a confusing navigation failure inside an app suite:
+ *   - every root testid a consuming suite queries is rendered, even when
+ *     App omits every prop
+ *   - every element testid/label a consuming suite actually queries is
+ *     rendered with the right payload (echo testids no consumer reads are
+ *     NOT pinned — the consumers are the real tests of those)
+ *   - every callback fires with the exact payload consumers depend on, and
+ *     fires ONLY its own callback (wiring isolation), exactly once
  *
  * These tests describe the MOCKS, not production components — green here
- * makes no claim about real component behaviour.
+ * makes no claim about real component behaviour. Subscriber event feeders
+ * and SavePromptModal triggers are deliberately NOT hosted here: each lane
+ * mocks Subscriber inline.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -33,14 +37,16 @@ import {
   MockSettlements,
   MockLog,
   MockFactions,
+  MockMusicPlayer,
   MockCampaignAdmin,
+  musicPlayerLifecycle,
 } from './mockComponents';
 import { mockState } from './appTestState.js';
 
 // Root testids each App.* suite queries to prove which view is mounted.
-// Consuming suites: App.map-navigation, App.map-unavailable,
-// App.map-activate, App.state-transitions, App.runtime-events,
-// App.post-restore.
+// Also proves no mock crashes when App renders it with zero props. The
+// plain view outlets (Notes…Factions) render nothing else any consumer
+// queries, so this table is their entire contract.
 const ROOT_TESTIDS = [
   ['MockCharSheet', MockCharSheet, 'char-sheet'],
   ['MockInitiative', MockInitiative, 'initiative'],
@@ -56,6 +62,7 @@ const ROOT_TESTIDS = [
   ['MockSettlements', MockSettlements, 'settlements-view'],
   ['MockLog', MockLog, 'campaign-log-view'],
   ['MockFactions', MockFactions, 'factions-view'],
+  ['MockMusicPlayer', MockMusicPlayer, 'music-player'],
   ['MockCampaignAdmin', MockCampaignAdmin, 'campaign-admin'],
 ];
 
@@ -95,29 +102,24 @@ describe('MockCharSheet', () => {
     expect(() => fireEvent.click(screen.getByTitle('Delete Character'))).not.toThrow();
   });
 
-  // No testids on these — consuming suites locate them by label, so the
-  // visible label text is part of the contract.
-  it.each([
-    ['Upload', 'onUploadClick'],
-    ['Download', 'onSaveClick'],
-    ['Edit', 'onEditCharacter'],
-  ])('%s button fires %s exactly once', (label, propName) => {
+  // No testid — App.campaign-switch-wizards clicks it by visible label, so
+  // the label text is part of the contract.
+  it('Edit button fires onEditCharacter exactly once', () => {
     const cb = vi.fn();
-    render(<MockCharSheet {...{ [propName]: cb }} />);
-    fireEvent.click(screen.getByText(label));
+    render(<MockCharSheet onEditCharacter={cb} />);
+    fireEvent.click(screen.getByText('Edit'));
     expect(cb).toHaveBeenCalledTimes(1);
   });
 });
 
+// App.map-activate and App.map-deactivated-advisory read init-map-name to
+// prove the active map name reaches the Initiative view.
 describe('MockInitiative', () => {
-  it.each([
-    ['three characters', ['a', 'b', 'c'], '3'],
-    ['an empty list', [], '0'],
-    ['no characters prop', undefined, '0'],
-  ])('%s renders the count alongside the campaign name', (_label, characters, expectedCount) => {
-    render(<MockInitiative characters={characters} campaignName="my-campaign" />);
-    expect(screen.getByTestId('init-char-count')).toHaveTextContent(expectedCount);
-    expect(screen.getByTestId('init-campaign')).toHaveTextContent('my-campaign');
+  it('renders the mapName seam, empty when App omits it', () => {
+    const { rerender } = render(<MockInitiative campaignName="t" characters={[]} />);
+    expect(screen.getByTestId('init-map-name')).toBeEmptyDOMElement();
+    rerender(<MockInitiative campaignName="t" characters={[]} mapName="dungeon-1" />);
+    expect(screen.getByTestId('init-map-name')).toHaveTextContent('dungeon-1');
   });
 });
 
@@ -175,24 +177,29 @@ describe('MockWizard', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('editing-character shows the character name when characterData is provided', () => {
-    render(<MockWizard characterData={{ name: 'EditMe' }} />);
-    expect(screen.getByTestId('editing-character')).toHaveTextContent('EditMe');
-  });
-
-  it.each([null, undefined])('editing-character is absent when characterData is %s', (characterData) => {
-    render(<MockWizard characterData={characterData} />);
-    expect(screen.queryByTestId('editing-character')).toBeNull();
-  });
-
-  it.each([true, false])('editing-mode renders iff isEditing is %s', (isEditing) => {
-    render(<MockWizard isEditing={isEditing} />);
-    if (isEditing) {
-      expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
-    } else {
-      expect(screen.queryByTestId('editing-mode')).toBeNull();
-    }
-  });
+  // Mixed matrix pins that each seam reads its OWN prop (a swap of
+  // characterData/isEditing would otherwise pass single-prop tests).
+  it.each([
+    ['both set', { name: 'EditMe' }, true, 'EditMe', true],
+    ['neither set', undefined, undefined, null, false],
+    ['only characterData', { name: 'EditMe' }, false, 'EditMe', false],
+    ['only isEditing', null, true, null, true],
+  ])(
+    'editing-character and editing-mode render independently (%s)',
+    (_label, characterData, isEditing, expectedName, expectedMode) => {
+      render(<MockWizard characterData={characterData} isEditing={isEditing} />);
+      if (expectedName) {
+        expect(screen.getByTestId('editing-character')).toHaveTextContent(expectedName);
+      } else {
+        expect(screen.queryByTestId('editing-character')).toBeNull();
+      }
+      if (expectedMode) {
+        expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByTestId('editing-mode')).toBeNull();
+      }
+    },
+  );
 });
 
 // testid → the prop App.jsx wires to it. One shared callback would let a
@@ -209,6 +216,7 @@ const SIDEBAR_NAV_BUTTONS = [
   ['npcs-btn', 'onNPCsClick'],
   ['quests-btn', 'onQuestsClick'],
   ['settlements-btn', 'onSettlementsClick'],
+  ['log-btn', 'onLogClick'],
   ['music-btn', 'onMusicClick'],
 ];
 
@@ -221,45 +229,43 @@ function allSidebarHandlers() {
 }
 
 describe('MockSidebar', () => {
-  it('renders the campaign name and the localhost flag as a string', () => {
-    render(<MockSidebar campaignName="my-campaign" isLocalhost={true} />);
+  it('renders the campaign name App.state-transitions asserts', () => {
+    render(<MockSidebar campaignName="my-campaign" />);
     expect(screen.getByTestId('sidebar-campaign')).toHaveTextContent('my-campaign');
-    expect(screen.getByTestId('sidebar-localhost')).toHaveTextContent('true');
   });
 
   // Mirrors MOCK_VIEW_LABELS in mockComponents.jsx. App.state-transitions
-  // asserts these exact strings via sidebar-active-indicator.
-  const ACTIVE_VIEW_LABELS = [
-    ['encounter', 'Encounters'],
-    ['factions', 'Factions'],
-    ['initiative', 'Initiative'],
-    ['mapsManager', 'Maps'],
-    ['notes', 'Notes'],
-    ['quests', 'Quests'],
-    ['npcs', 'NPCs'],
-    ['settlements', 'Settlements'],
-    ['campaignLog', 'Log'],
-    ['music', 'Music'],
-    ['unknownView', ''], // unknown views get an empty label, not a crash
+  // and App.map-navigation assert these exact strings via
+  // sidebar-active-indicator. '' rows assert the indicator renders EMPTY
+  // (toHaveTextContent('') would pass trivially).
+  const ACTIVE_VIEW_CASES = [
+    ['encounter', 'Encounters', {}],
+    ['factions', 'Factions', {}],
+    ['initiative', 'Initiative', {}],
+    ['mapsManager', 'Maps', {}],
+    ['notes', 'Notes', {}],
+    ['quests', 'Quests', {}],
+    ['npcs', 'NPCs', {}],
+    ['settlements', 'Settlements', {}],
+    ['campaignLog', 'Log', {}],
+    ['music', 'Music', {}],
+    ['unknownView', '', {}], // unknown views get an empty label, not a crash
+    ['charSheet', 'Hero', { activeCharacter: { name: 'Hero' } }],
+    ['charSheet', 'Character', {}], // no active character → generic label
   ];
 
-  it.each(ACTIVE_VIEW_LABELS)(
+  it.each(ACTIVE_VIEW_CASES)(
     'active indicator for the %s view shows "%s"',
-    (activeView, expected) => {
-      render(<MockSidebar campaignName="test" activeView={activeView} />);
-      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent(expected);
+    (activeView, expected, extraProps) => {
+      render(<MockSidebar campaignName="test" activeView={activeView} {...extraProps} />);
+      const indicator = screen.getByTestId('sidebar-active-indicator');
+      if (expected === '') {
+        expect(indicator).toBeEmptyDOMElement();
+      } else {
+        expect(indicator).toHaveTextContent(expected);
+      }
     },
   );
-
-  it('charSheet view shows the active character name', () => {
-    render(<MockSidebar campaignName="test" activeView="charSheet" activeCharacter={{ name: 'Hero' }} />);
-    expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Hero');
-  });
-
-  it('charSheet view falls back to the generic label without an active character', () => {
-    render(<MockSidebar campaignName="test" activeView="charSheet" />);
-    expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Character');
-  });
 
   it('omits the active indicator when no activeView is provided', () => {
     render(<MockSidebar campaignName="test" />);
@@ -327,34 +333,74 @@ describe('MockSidebar', () => {
 });
 
 describe('MockMapsManager', () => {
-  it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id + row display name', () => {
+  it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id + row display name exactly once', () => {
     const onOpenMap = vi.fn();
     render(<MockMapsManager campaignName="my-campaign" onOpenMap={onOpenMap} />);
     expect(screen.getByTestId('mm-campaign')).toHaveTextContent('my-campaign');
     fireEvent.click(screen.getByTestId('open-map-btn'));
+    expect(onOpenMap).toHaveBeenCalledTimes(1);
     expect(onOpenMap).toHaveBeenCalledWith('dungeon-1', 'Dungeon 1');
   });
+
+  // App.map-activate and App.state-transitions click delete-map-btn; the
+  // handler is optional, so the button must never crash without it.
+  it.each([
+    ['provided', () => {
+      const onMapDeleted = vi.fn();
+      render(<MockMapsManager campaignName="t" onOpenMap={vi.fn()} onMapDeleted={onMapDeleted} />);
+      fireEvent.click(screen.getByTestId('delete-map-btn'));
+      expect(onMapDeleted).toHaveBeenCalledWith('dungeon-1');
+    }],
+    ['omitted', () => {
+      render(<MockMapsManager campaignName="t" onOpenMap={vi.fn()} />);
+      expect(() => fireEvent.click(screen.getByTestId('delete-map-btn'))).not.toThrow();
+    }],
+  ])('delete-map-btn is correct when onMapDeleted is %s', (_label, run) => run());
 });
 
 describe('MockMap', () => {
-  it('echoes map name, campaign, counts, and localhost flag', () => {
-    render(
-      <MockMap
-        mapName="dungeon-1"
-        mapDisplayName="Dungeon 1"
-        campaignName="my-campaign"
-        characters={['c1', 'c2']}
-        npcs={['n1']}
-        isLocalhost={true}
-        onBack={vi.fn()}
-      />,
-    );
+  it('echoes the map name and display name App.map-navigation asserts', () => {
+    render(<MockMap mapName="dungeon-1" mapDisplayName="Dungeon 1" campaignName="t" onBack={vi.fn()} />);
     expect(screen.getByTestId('map-name')).toHaveTextContent('dungeon-1');
     expect(screen.getByTestId('map-display-name')).toHaveTextContent('Dungeon 1');
-    expect(screen.getByTestId('map-campaign')).toHaveTextContent('my-campaign');
-    expect(screen.getByTestId('map-char-count')).toHaveTextContent('2');
-    expect(screen.getByTestId('map-npc-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('map-localhost')).toHaveTextContent('true');
+  });
+
+  // App.map-navigation drives the dynamic Back label through this seam:
+  // displayName preferred, then mapName, then empty with no target.
+  it('map-back-target prefers displayName, falls back to mapName, empty without a target', () => {
+    const { rerender } = render(
+      <MockMap mapName="m" campaignName="t" onBack={vi.fn()} />,
+    );
+    expect(screen.getByTestId('map-back-target')).toBeEmptyDOMElement();
+    rerender(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} backMapTarget={{ mapName: 'base' }} />);
+    expect(screen.getByTestId('map-back-target')).toHaveTextContent('base');
+    rerender(
+      <MockMap
+        mapName="m"
+        campaignName="t"
+        onBack={vi.fn()}
+        backMapTarget={{ mapName: 'base', mapDisplayName: 'Base Camp' }}
+      />,
+    );
+    expect(screen.getByTestId('map-back-target')).toHaveTextContent('Base Camp');
+  });
+
+  // App.map-deactivated-advisory branches on this echoed flag.
+  it('map-is-active echoes the prop, defaulting to "true"', () => {
+    const { rerender } = render(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} />);
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('true');
+    rerender(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} mapIsActive={false} />);
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('false');
+  });
+
+  // The advisory's jump button exists only while App passes the handler.
+  it('map-view-new-btn renders iff onViewNewMap is provided, firing it exactly once', () => {
+    const onViewNewMap = vi.fn();
+    const { rerender } = render(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} />);
+    expect(screen.queryByTestId('map-view-new-btn')).toBeNull();
+    rerender(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} onViewNewMap={onViewNewMap} />);
+    fireEvent.click(screen.getByTestId('map-view-new-btn'));
+    expect(onViewNewMap).toHaveBeenCalledTimes(1);
   });
 
   it('back button fires onBack exactly once', () => {
@@ -364,8 +410,8 @@ describe('MockMap', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  // App.map-navigation drives the POI stack through this fixed id:
-  // clicking must open "inner-cave" via onPoiEntered.
+  // App.map-navigation drives the POI stack through this fixed id; the
+  // handler is optional, so the button must never crash without it.
   it('POI button fires onPoiEntered with "inner-cave"', () => {
     const onPoiEntered = vi.fn();
     render(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} onPoiEntered={onPoiEntered} />);
@@ -379,58 +425,37 @@ describe('MockMap', () => {
   });
 });
 
-describe('MockEncounterBuilder', () => {
-  it.each([
-    ['0', []],
-    ['3', ['c1', 'c2', 'c3']],
-  ])('renders character count %s and the campaign name', (expectedCount, characters) => {
-    render(<MockEncounterBuilder characters={characters} campaignName="my-campaign" />);
-    expect(screen.getByTestId('eb-char-count')).toHaveTextContent(expectedCount);
-    expect(screen.getByTestId('eb-campaign')).toHaveTextContent('my-campaign');
+// App.state-transitions asserts the player stays mounted (mounts===1) while
+// visible flips across navigation. Counters are module state — assert
+// DELTAS so test order inside this file cannot matter.
+describe('MockMusicPlayer', () => {
+  it('echoes campaign and mirrors visible as a data attribute', () => {
+    render(<MockMusicPlayer campaignName="my-campaign" visible={false} />);
+    expect(screen.getByTestId('music-player')).toHaveAttribute('data-visible', 'false');
+    expect(screen.getByTestId('music-campaign')).toHaveTextContent('my-campaign');
   });
-});
 
-// Notes, Quests, and Factions share one mock shape; consuming suites query
-// them by their prefixed testids.
-describe.each([
-  ['MockNotes', MockNotes, 'notes'],
-  ['MockQuests', MockQuests, 'quests'],
-  ['MockFactions', MockFactions, 'factions'],
-])('%s', (_name, Component, prefix) => {
-  it('echoes campaign and localhost', () => {
-    render(<Component campaignName="my-campaign" isLocalhost={true} />);
-    expect(screen.getByTestId(`${prefix}-campaign`)).toHaveTextContent('my-campaign');
-    expect(screen.getByTestId(`${prefix}-localhost`)).toHaveTextContent('true');
+  it('mounts and unmounts exactly once per lifecycle', () => {
+    const before = { ...musicPlayerLifecycle };
+    const view = render(<MockMusicPlayer visible />);
+    expect(musicPlayerLifecycle.mounts - before.mounts).toBe(1);
+    expect(musicPlayerLifecycle.unmounts - before.unmounts).toBe(0);
+    view.unmount();
+    expect(musicPlayerLifecycle.unmounts - before.unmounts).toBe(1);
   });
-});
 
-describe('MockNPCs', () => {
-  it('echoes campaign and char count', () => {
-    render(<MockNPCs campaignName="my-campaign" characters={['c1', 'c2']} />);
-    expect(screen.getByTestId('npcs-campaign')).toHaveTextContent('my-campaign');
-    expect(screen.getByTestId('npcs-char-count')).toHaveTextContent('2');
-  });
-});
-
-describe('MockSettlements', () => {
-  it('echoes campaign', () => {
-    render(<MockSettlements campaignName="my-campaign" />);
-    expect(screen.getByTestId('settlements-campaign')).toHaveTextContent('my-campaign');
-  });
-});
-
-describe('MockLog', () => {
-  it.each([
-    ['0', []],
-    ['3', ['c1', 'c2', 'c3']],
-  ])('renders the campaign name and character count %s', (expectedCount, characters) => {
-    render(<MockLog campaignName="my-campaign" characters={characters} />);
-    expect(screen.getByTestId('log-campaign')).toHaveTextContent('my-campaign');
-    expect(screen.getByTestId('log-char-count')).toHaveTextContent(expectedCount);
+  it('does not remount when visible flips', () => {
+    const before = { ...musicPlayerLifecycle };
+    const { rerender } = render(<MockMusicPlayer visible={false} />);
+    rerender(<MockMusicPlayer visible />);
+    expect(musicPlayerLifecycle.mounts - before.mounts).toBe(1);
+    expect(musicPlayerLifecycle.unmounts - before.unmounts).toBe(0);
+    expect(screen.getByTestId('music-player')).toHaveAttribute('data-visible', 'true');
   });
 });
 
 describe('MockCampaignAdmin', () => {
+  // App.state-transitions asserts the theme cycle through admin-theme.
   it('echoes campaign name and theme', () => {
     render(<MockCampaignAdmin campaignName="my-campaign" theme="dark" />);
     expect(screen.getByTestId('admin-campaign')).toHaveTextContent('my-campaign');

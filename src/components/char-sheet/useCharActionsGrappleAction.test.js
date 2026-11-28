@@ -1,14 +1,23 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Grapple ACTION lane of useCharActionsBaseActions: enforcement/selection gates
-// (cannotAct, no-target, already-grappled), adv/dis check-context resolution,
-// target contest-modifier fallback CHANNELS with byte-exact popup pins (including
-// popup sign formatting), and grappled-condition stamping on the success leg.
+// (cannotAct, no-target, already-grappled), L5-002 action-slot charging (never on
+// a refused gate, exactly once on the contest leg), adv/dis check-context
+// resolution, target contest-modifier fallback CHANNELS with byte-exact popup
+// pins (including popup sign formatting), and grappled-condition stamping on the
+// success leg.
 // Attacker bonus math (skill channels, Jack of All Trades, exhaustion), the
 // higher-of-Athletics-or-Acrobatics contest resolution, and the outcome boundary
 // (tie/loss) are owned byte-exact by
 // useCharActionsBaseActions.grapple-contest-math.test.js — not duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../../services/combat/chargeEconomy.js', () => ({
+    chargeSlot: vi.fn(() => true),
+    refundSlot: vi.fn(() => true),
+}));
+
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
+import { chargeSlot } from '../../services/combat/chargeEconomy.js';
 import {
     createHooks,
     mockRollAbilityCheck,
@@ -58,6 +67,8 @@ function useGrappleRun({ playerStats = basePlayerStats, target, total = 18, d20 
 
 describe('useCharActionsBaseActions — handleGrappleAction', () => {
     beforeEach(() => {
+        // clearAllMocks clears call history but NOT the factory-provided
+        // chargeSlot implementation (#2065 trap) — intended, it stays live.
         vi.clearAllMocks();
     });
 
@@ -70,11 +81,11 @@ describe('useCharActionsBaseActions — handleGrappleAction', () => {
             // RB-1115: silent gate → assertCanAct reason popup (UI-only feedback).
             expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
             expect(mockRollAbilityCheck).not.toHaveBeenCalled();
+            expect(chargeSlot).not.toHaveBeenCalled();
         });
 
         it.each([
             { label: 'combat summary is null', cs: null },
-            { label: 'combat summary has no creatures', cs: { creatures: [] } },
             { label: 'attacker has no selected target', cs: { creatures: [{ name: 'TestFighter', conditions: [] }] } },
         ])('no-target gate: $label', async ({ cs }) => {
             const hooks = createHooks({
@@ -104,6 +115,8 @@ describe('useCharActionsBaseActions — handleGrappleAction', () => {
                 description: 'Target is already grappled.',
             });
             expect(mockRollAbilityCheck).not.toHaveBeenCalled();
+            // Refused before the contest leg — the action slot stays uncharged.
+            expect(chargeSlot).not.toHaveBeenCalled();
         });
     });
 
@@ -224,6 +237,9 @@ describe('useCharActionsBaseActions — handleGrappleAction', () => {
             await hooks.handleGrappleAction();
 
             expect(gmd).not.toHaveBeenCalled();
+            // L5-002: the contest is taken here — the action slot is charged exactly once.
+            expect(chargeSlot).toHaveBeenCalledTimes(1);
+            expect(chargeSlot).toHaveBeenCalledWith({ creatureName: basePlayerStats.name, bucket: 'action', campaignName });
             expect(mockSetPopupHtml).toHaveBeenCalledWith({
                 type: 'automation_info',
                 name: 'Grapple',

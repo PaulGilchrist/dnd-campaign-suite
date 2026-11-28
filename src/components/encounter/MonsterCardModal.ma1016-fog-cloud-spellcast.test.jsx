@@ -1,28 +1,30 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1016 modal seam: handleSpellCast forks the innate utility row
 // (Ice Mephit "Fog Cloud", real monsters.json bytes: spellcasting_ability
 // + numeric uses:1/maxUses:1 MA-0633 shape, usage "1/Day" on the FIELD —
-// so the modal's own description-parsing spellUsesGate (:1683/:2516) is a
-// deliberate passthrough) to resolveUtilitySpellCastRow BEFORE the
-// invisibility ender and BEFORE the block-save fork — routing the save seam
-// here would spend then resolve "DC Unknown" (§218/§860; spell_save_dc never
-// reaches the save DC). Fork/economy identity: press 1 spends the 1/Day via
-// spendMonsterAbilityUse (monsterSpellUses {'Fog Cloud':1}, no monsterRecharge
-// key — that economy is MA-1014 ice wall's) + advisory cast "(Charisma)" with
-// the BY-name fog §70 byte (#387 — service monsterUtilitySpellCast.ma1016
-// pins the same advisory at service level; this lane pins the chip→modal
-// wiring through the real row). Press 2 refuses via the SERVICE numeric gate
-// through the modal runtime store: mc-prerequisite-refusal popup +
-// fog_cloud_refused log, zero extra records (§57) — distinct emitter from
-// spellcasting.test.jsx:282's buildMonsterSpellRefusalEntry "already cast
-// today" lane. Restored-uses pins the MA-0020 uses-gate re-arm at the modal
-// seam (service fog test has no recovered-row test; §70 rest-rearm stays
-// GM-enforced). Generic advisory record: service owner
-// monsterUtilitySpellCast.js; usage parse: monsterAbilityUses.test.js;
-// chip spent state: MonsterAction.ma1016-fog-cloud-chip.test.jsx (mocked
+// so the modal's own description-parsing spellUsesGate is a deliberate
+// passthrough) to resolveUtilitySpellCastRow BEFORE the invisibility ender
+// and BEFORE the block-save fork — routing the save seam here would spend
+// then resolve "DC Unknown" (§218/§860; spell_save_dc never reaches the
+// save DC). Fork/economy identity: press 1 spends the 1/Day via
+// spendMonsterAbilityUse (monsterSpellUses {'Fog Cloud':1}, no
+// monsterRecharge key — that economy is MA-1014 ice wall's) + advisory cast
+// "(Charisma)" with the BY-name fog §70 byte (#387 — service
+// monsterUtilitySpellCast.ma1016 pins the same advisory at service level;
+// this lane pins the chip→modal wiring through the real row). Press 2
+// refuses via the SERVICE numeric gate through the modal runtime store:
+// mc-prerequisite-refusal popup + fog_cloud_refused log, zero extra records
+// (§57) — distinct emitter from spellcasting.test.jsx's buildMonsterSpell-
+// RefusalEntry "already cast today" lane. The press-2 + GM-cleared-uses
+// re-arm share one lifecycle test: service fog test has no recovered-row
+// test (§70 rest-rearm stays GM-enforced), and the re-armed press must NOT
+// emit a second refusal. Generic advisory record: service owner
+// monsterUtilitySpellCast.js; usage parse: monsterAbilityUses.test.js; chip
+// spent state: MonsterAction.ma1016-fog-cloud-chip.test.jsx (mocked
 // useRuntimeValue does not re-render, §179). Dead-mock purge per #677
 // utility-lane map — diceRoller/sanitize/mapsService/abilityLookup/
-// conditionEffects/damageUtils/rangeValidation empirically inert on this path.
+// conditionEffects/damageUtils/rangeValidation empirically inert on this
+// path.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,8 +34,8 @@ import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
 
-const ICE_MEPHIT = monsters.find(m => m.index === 'ice-mephit');
-const FOG_ROW = ICE_MEPHIT.actions[1];
+// Disk-faithful: the utility row is actions[1] on the real ice-mephit bytes.
+const FOG_ROW = monsters.find(m => m.index === 'ice-mephit').actions[1];
 const MONSTER_NAME = 'Ice Mephit 1';
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -94,6 +96,10 @@ function refusals() {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.automationType === 'fog_cloud_refused');
 }
 
+async function pressChip() {
+  await act(async () => { fireEvent.click(chip()); });
+}
+
 function renderMephit() {
   const m = makeMonster({ name: 'Ice Mephit', ability_score_modifiers: { ...makeMonster().ability_score_modifiers, cha: 1 }, actions: [FOG_ROW] });
   const creatures = [
@@ -112,7 +118,7 @@ describe('MA-1016 modal: Fog Cloud chip → 1/Day-gated advisory cast', () => {
   it('first press spends the 1/Day use + logs the RAW advisory cast, no save/attack/recharge route', async () => {
     renderMephit();
     await waitFor(() => expect(chip()).toBeTruthy());
-    await act(async () => { fireEvent.click(chip()); });
+    await pressChip();
     await waitFor(() => expect(abilityUses('Fog Cloud').length).toBe(2));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fog Cloud': 1 });
     expect(runtime.store[`${MONSTER_NAME}.monsterRecharge`] ?? null).toBeNull();
@@ -126,27 +132,25 @@ describe('MA-1016 modal: Fog Cloud chip → 1/Day-gated advisory cast', () => {
     expect(_rollAttack).not.toHaveBeenCalled();
   });
 
-  it('exhausted row: second press refuses (popup + fog_cloud_refused), zero extra records', async () => {
+  it('uses-gate lifecycle: exhausted press refuses (popup + fog_cloud_refused, zero extra records); GM-cleared uses re-arm a fresh spend with no second refusal', async () => {
     renderMephit();
     await waitFor(() => expect(chip()).toBeTruthy());
-    await act(async () => { fireEvent.click(chip()); });
+    await pressChip();
     await waitFor(() => expect(abilityUses('Fog Cloud').length).toBe(2));
-    await act(async () => { fireEvent.click(chip()); });
+
+    // Exhausted: the service numeric gate reads the modal runtime store.
+    await pressChip();
     await waitFor(() => expect(refusals().length).toBe(1));
     expect(abilityUses('Fog Cloud').length).toBe(2);
     expect(_setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('mc-prerequisite-refusal'));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fog Cloud': 1 });
-  });
 
-  it('restored uses (long rest, GM-cleared) cast again with a fresh spend', async () => {
-    renderMephit();
-    await waitFor(() => expect(chip()).toBeTruthy());
-    await act(async () => { fireEvent.click(chip()); });
-    await waitFor(() => expect(abilityUses('Fog Cloud').length).toBe(2));
+    // Restored uses (long rest, GM-cleared): the gate reads the store live
+    // per press, so the row casts again with a fresh spend.
     runtime.store[`${MONSTER_NAME}.monsterSpellUses`] = {};
-    await act(async () => { fireEvent.click(chip()); });
+    await pressChip();
     await waitFor(() => expect(abilityUses('Fog Cloud').length).toBe(4));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fog Cloud': 1 });
-    expect(refusals().length).toBe(0);
+    expect(refusals().length).toBe(1);
   });
 });

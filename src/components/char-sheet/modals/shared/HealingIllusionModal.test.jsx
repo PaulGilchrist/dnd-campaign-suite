@@ -1,6 +1,6 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HealingIllusionModal from './HealingIllusionModal.jsx';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -18,6 +18,7 @@ import * as healingRoll from '../../../../services/automation/common/healingRoll
 const mockPlayerStats = { name: 'Paladin1', level: 5, hitPoints: 40 };
 const campaignName = 'test-campaign';
 const mockOnClose = vi.fn();
+const onSummaryUpdated = vi.fn();
 
 function makeProps(overrides) {
   return {
@@ -37,18 +38,30 @@ function mockHp(getCurrent, getMax) {
   });
 }
 
+async function healCustomTarget(current, max) {
+  mockHp(() => current, () => max);
+  render(<HealingIllusionModal {...makeProps()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /Other/ }));
+  fireEvent.change(screen.getByPlaceholderText('creature name'), { target: { value: 'Orc Warrior' } });
+  fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+}
+
 describe('HealingIllusionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useRuntimeState.getRuntimeValue.mockReturnValue(null);
     useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
+    window.addEventListener('combat-summary-updated', onSummaryUpdated);
+  });
+
+  afterEach(() => {
+    window.removeEventListener('combat-summary-updated', onSummaryUpdated);
   });
 
   it.each([
-    { level: 5, hp: '5 HP' },
     { level: 10, hp: '10 HP' },
     { level: 0, hp: '1 HP' },
-  ])('offers $level HP of healing for cleric level $level', ({ level, hp }) => {
+  ])('offers $level HP of healing for cleric level $level, falling back to 1 at level 0', ({ level, hp }) => {
     render(<HealingIllusionModal {...makeProps({ playerStats: { ...mockPlayerStats, level } })} />);
     expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`Choose a target within 5 feet to regain ${hp}`))).toBeInTheDocument();
@@ -76,15 +89,25 @@ describe('HealingIllusionModal', () => {
     expect(customRadio).not.toBeChecked();
   });
 
-  it('calls onClose when the Skip button is clicked', () => {
+  it('does not heal or close when the custom target name is empty', async () => {
+    // HP resolves fully: only the empty-name guard can stop the heal.
+    mockHp(() => 10, () => 30);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     render(<HealingIllusionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('radio', { name: /Other/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(onSummaryUpdated).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Heal/ })).toBeInTheDocument();
+    expect(mockOnClose).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it('heals self, logs the result, broadcasts the update, and closes via Done', async () => {
-    const onSummaryUpdated = vi.fn();
-    window.addEventListener('combat-summary-updated', onSummaryUpdated);
     mockHp(() => 20);
 
     render(<HealingIllusionModal {...makeProps()} />);
@@ -104,12 +127,18 @@ describe('HealingIllusionModal', () => {
       maxHp: 40,
     });
     expect(onSummaryUpdated).toHaveBeenCalledTimes(1);
+    // Result view replaces the action buttons; Done closes.
     expect(screen.queryByRole('button', { name: /Heal/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(mockOnClose).toHaveBeenCalledTimes(1);
-    window.removeEventListener('combat-summary-updated', onSummaryUpdated);
+  });
+
+  it('calls onClose when the Skip button is clicked', () => {
+    render(<HealingIllusionModal {...makeProps()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -138,32 +167,38 @@ describe('HealingIllusionModal', () => {
     });
   });
 
-  it.each([
-    { currentHp: 10, newHp: 15, actualHeal: 5 },
-    { currentHp: 28, newHp: 30, actualHeal: 2 },
-  ])('heals a custom target and caps at its runtime max HP ($currentHp HP → $newHp HP)', async ({ currentHp, newHp, actualHeal }) => {
-    mockHp(() => currentHp, () => 30);
-
-    render(<HealingIllusionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('radio', { name: /Other/ }));
-    fireEvent.change(screen.getByPlaceholderText('creature name'), { target: { value: 'Orc Warrior' } });
-    fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+  it('heals a custom target using its runtime max HP and caps at it', async () => {
+    await healCustomTarget(28, 30);
 
     await waitFor(() => {
       expect(screen.getByText(
-        `Healing Illusion restored ${actualHeal} HP to Orc Warrior (Cleric level 5)`
+        'Healing Illusion restored 2 HP to Orc Warrior (Cleric level 5)'
       )).toBeInTheDocument();
     });
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Orc Warrior', 'currentHitPoints', newHp, campaignName
+      'Orc Warrior', 'currentHitPoints', 30, campaignName
     );
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
       targetName: 'Orc Warrior',
       sourceName: 'Healing Illusion',
-      actualHeal,
-      newHp,
+      actualHeal: 2,
+      newHp: 30,
       maxHp: 30,
     });
+    expect(onSummaryUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a stored 0 HP target as real damage state, not unset: heals to level amount exactly', async () => {
+    await healCustomTarget(0, 30);
+
+    await waitFor(() => {
+      expect(screen.getByText(
+        'Healing Illusion restored 5 HP to Orc Warrior (Cleric level 5)'
+      )).toBeInTheDocument();
+    });
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Orc Warrior', 'currentHitPoints', 5, campaignName
+    );
   });
 
   it('refuses to heal a custom target with unset runtime max HP: console.error, no write, no log, stays open', async () => {
@@ -177,8 +212,9 @@ describe('HealingIllusionModal', () => {
 
     await waitFor(() => {
       expect(errorSpy).toHaveBeenCalledWith(
-        '[HealingIllusionModal] Refusing heal for Orc Warrior: unresolved runtime HP values ' +
-        '(currentHitPoints=10, maxHp=null). No write performed.'
+        expect.stringMatching(
+          /\[HealingIllusionModal\] Refusing heal for Orc Warrior: unresolved runtime HP values \(currentHitPoints=10, maxHp=null\)\. No write performed\./
+        )
       );
     });
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
@@ -197,42 +233,14 @@ describe('HealingIllusionModal', () => {
 
     await waitFor(() => {
       expect(errorSpy).toHaveBeenCalledWith(
-        '[HealingIllusionModal] Refusing heal for Paladin1: unresolved runtime HP values ' +
-        '(currentHitPoints=null, maxHp=40). No write performed.'
+        expect.stringMatching(
+          /\[HealingIllusionModal\] Refusing heal for Paladin1: unresolved runtime HP values \(currentHitPoints=null, maxHp=40\)\. No write performed\./
+        )
       );
     });
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Heal/ })).toBeInTheDocument();
     errorSpy.mockRestore();
-  });
-
-  it('treats a stored 0 HP target as real damage state, not unset: heals to level amount exactly', async () => {
-    mockHp(() => 0, () => 30);
-
-    render(<HealingIllusionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('radio', { name: /Other/ }));
-    fireEvent.change(screen.getByPlaceholderText('creature name'), { target: { value: 'Orc Warrior' } });
-    fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText(
-        'Healing Illusion restored 5 HP to Orc Warrior (Cleric level 5)'
-      )).toBeInTheDocument();
-    });
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Orc Warrior', 'currentHitPoints', 5, campaignName
-    );
-  });
-
-  it('does not heal or close when the custom target name is empty', () => {
-    render(<HealingIllusionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('radio', { name: /Other/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /Heal/ })).toBeInTheDocument();
-    expect(mockOnClose).not.toHaveBeenCalled();
   });
 });

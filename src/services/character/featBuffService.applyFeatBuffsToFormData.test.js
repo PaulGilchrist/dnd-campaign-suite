@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // featBuffService.applyFeatBuffsToFormData.test.js — LANE #1/9 of the featBuffService
 // nine-lane cluster (queue #2016-2024). Subject: src/services/character/featBuffService.js (662 l).
 //
@@ -12,7 +12,8 @@
 //         every ability. The sole undo-seam for this lane's additive writes.
 //   #2018 computeAllFeatBuffs.2024                     — aggregate (pure), 2024 structured path
 //   #2019 computeAllFeatBuffs.5e                       — aggregate (pure), 5e text path
-//   #2020 computeAllFeatBuffs.edge-cases             — aggregate null/undefined tolerance
+//   #2020 computeAllFeatBuffs.edge-cases             — aggregate null/undefined tolerance +
+//         not-found skip (canonical home for throw-inheritance and findFeat-null legs)
 //   #2021 computeAllFeatBuffs.resilient              — aggregate saveType resolution via
 //         resolveFeatChosenAbility (NOTE: mutates SPA-cached feats.json rows in place,
 //         L626-627 — see test-setup-playbook.md §13 "Feats/ASI mechanics")
@@ -32,21 +33,45 @@
 //   - Merge-vs-replace: resistances APPEND-merge case-insensitively via the REAL
 //     buffApplier.mergeDeduplicated (unit-canonical-home: buffApplier.test.js; here we
 //     pin actual post-state through the apply wrapper, not delegation to a mock).
+//   - Application faces ONLY: named-increase targeting (case-insensitive), the 'or'-pair
+//     both-sides quirk (pushAbilityOrIncrease, L43-50 → apply filter excludes only name
+//     === 'any'), the 'any'-sentinel skip, merge-append, the missing-abilities guard,
+//     write-scope boundary and the returned-envelope identity. Parsing/derivation of the
+//     envelope is #2022/#2023; empty-envelope + findFeat-null tolerance is #2020 (its
+//     header explicitly owns "not-found skip"; the former duplicate here was REMOVED —
+//     this lane keeps only the application-side no-op witness for empty buffs).
 //   - feats are resolved through findFeat (mocked input seam) — no claims about disk
 //     public/data/feats.json rows here; disk-verbatim rows live in the compute lanes.
 //
-// LIVENESS FLAG (verified by repo-wide grep, 2026-10-16): applyFeatBuffsToFormData has
+// LIVENESS FLAG (re-verified by repo-wide grep, 2026-11-27): applyFeatBuffsToFormData has
 // ZERO production callers — live wizard lanes are computeAllFeatBuffs + useWizardFeatBuffs'
-// own clearBuffs/applyBuffs (useWizardFeatBuffs.js:83-87) and rules.js:255. Same for
+// own clearBuffs/applyBuffs (useWizardFeatBuffs.js:83-87) and rules.js:253 (applyFeatBuffs;
+// header previously cited :255 — drifted 2 lines). Same for
 // clearAppliedFeatBuffs (#2017). #1534 RESOLVED: the writer lane no longer carries an inline
 // twin of applyAbilityScoreIncreases — it calls the shared buffApplier export (single source).
-// This lane pins the
-// legacy writer contract for whatever caller revives it; flagged to parent for trim decision.
+// This lane pins the legacy writer contract for whatever caller revives it; flagged to parent
+// for trim decision.
+//
+// 2026-11-27 IMPROVE-AND-TRIM (10→8 tests):
+//   - multi-feat accumulation leg REMOVED: same additive line
+//     (buffApplier.js:12 `featIncrease = (featIncrease||0)+amount`) as the re-apply leg —
+//     same-branch collapse; the re-apply leg accumulates findFeat twice anyway.
+//   - findFeat-null leg REMOVED: #2020 edge-cases pins the not-found skip for the shared
+//     compute; kept here only as the application-side "empty buffs write nothing" leg.
+//   - case-insensitive-match leg FOLDED into the named-increase leg (mixed-case fixtures).
+//   - "writes only featIncrease/resistances" FOLDED into the return-structure leg; both now
+//     use full-shape toEqual of the returned envelope AND of post-state formData (#1947:
+//     extra/missing/renamed keys fail; every buff byte-distinct from the 0-defaults).
+//   - negative legs upgraded to full "unchanged input" deep-equal witnesses, and the
+//     missing-abilities leg now ALSO feeds a resistance to prove the guard does not
+//     short-circuit the second write.
+//   - *Once mock chain dropped (hygiene); mockReset re-baseline in beforeEach
+//     (clearAllMocks keeps mockReturnValue).
 //
 // Anti-pattern hygiene: exact assertions only (no toBeDefined), no timers, no vacuous
-// loops, no fabricated disk rows (findFeat fully mocked).
+// loops, no fabricated disk rows (findFeat fully mocked), no mock-call echoes.
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { findFeat } from '../shared/featFinder.js';
 import { applyFeatBuffsToFormData } from './featBuffService.js';
@@ -58,8 +83,8 @@ vi.mock('../shared/featFinder.js', () => ({
 // resistance semantics are actual post-states (merge-append + case-insensitive dedup),
 // not mock-call echoes. Its unit canon lives in shared/buffApplier.test.js.
 
-afterEach(() => {
-  vi.clearAllMocks();
+beforeEach(() => {
+  findFeat.mockReset();
 });
 
 describe('applyFeatBuffsToFormData', () => {
@@ -67,16 +92,19 @@ describe('applyFeatBuffsToFormData', () => {
     rules: '5e',
     feats: ['Tough'],
     abilities: [
-      { name: 'Strength', featIncrease: 0 },
+      { name: 'strength', featIncrease: 0 },
       { name: 'Dexterity', featIncrease: 0 },
-      { name: 'Constitution', featIncrease: 0 },
+      { name: 'CONSTITUTION', featIncrease: 0 },
     ],
     ...overrides,
   });
 
   describe('side effects on formData (mutated in place)', () => {
-    it('applies non-choice ability score increases to matching abilities in formData', () => {
-
+    it('adds a named increase to the exactly-matching ability only, case-insensitively, touching nothing else', () => {
+      // Parser derives name 'Strength' from benefit text; formData entries carry mixed
+      // casing — the apply lookup lowercases both sides (buffApplier.js:8-9). Full-shape
+      // post-state: amount 2 is byte-distinct from the 0 defaults, and no resistances
+      // key may materialize (empty parsed resistances → mergeDeduplicated early-return).
       const formData = makeFormData();
 
       findFeat.mockReturnValue({
@@ -86,53 +114,21 @@ describe('applyFeatBuffsToFormData', () => {
 
       applyFeatBuffsToFormData(formData, []);
 
-      expect(formData.abilities[0].featIncrease).toBe(2);
-      expect(formData.abilities[1].featIncrease).toBe(0);
-      expect(formData.abilities[2].featIncrease).toBe(0);
-    });
-
-    it('accumulates ability score increases when multiple feats affect the same ability', () => {
-
-      const formData = makeFormData({
-        feats: ['Feat A', 'Feat B'],
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [
+          { name: 'strength', featIncrease: 2 },
+          { name: 'Dexterity', featIncrease: 0 },
+          { name: 'CONSTITUTION', featIncrease: 0 },
+        ],
       });
-
-      findFeat
-        .mockReturnValueOnce({
-          name: 'Feat A',
-          benefits: ['Increase your Strength score by 2'],
-        })
-        .mockReturnValueOnce({
-          name: 'Feat B',
-          benefits: ['Increase your Strength score by 1'],
-        });
-
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(formData.abilities[0].featIncrease).toBe(3);
-    });
-
-    it('matches ability names case-insensitively', () => {
-
-      const formData = makeFormData({
-        abilities: [{ name: 'strength', featIncrease: 0 }],
-      });
-
-      findFeat.mockReturnValue({
-        name: 'Test feat',
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(formData.abilities[0].featIncrease).toBe(2);
     });
 
     it('applies BOTH sides of an "or" increase pair — apply filter excludes only name "any"', () => {
-
       // 'or'-text parses to TWO named increases (pushAbilityOrIncrease, featBuffService.js:43);
       // the apply filter excludes only name === 'any', so BOTH abilities receive the bump.
-      // Pinned as--is: if choice handling is added, this must change with it.
+      // Pinned as-is: if choice handling is added, this must change with it.
       const formData = makeFormData();
 
       findFeat.mockReturnValue({
@@ -142,13 +138,45 @@ describe('applyFeatBuffsToFormData', () => {
 
       applyFeatBuffsToFormData(formData, []);
 
-      expect(formData.abilities[0].featIncrease).toBe(1);
-      expect(formData.abilities[1].featIncrease).toBe(1);
-      expect(formData.abilities[2].featIncrease).toBe(0);
+      expect(formData.abilities.map(a => a.featIncrease)).toEqual([1, 1, 0]);
+      expect(formData).not.toHaveProperty('resistances');
+    });
+
+    it('skips choice/"any" increases on formData while still reporting them in the returned buffs', () => {
+      // The skip is an APPLY-side filter, not a parse loss: the envelope witness below
+      // proves the increase was derived (name 'any') and simply never written.
+      const formData = makeFormData();
+
+      findFeat.mockReturnValue({
+        name: 'Skill feat',
+        benefits: ['Choose one ability score. Increase the chosen ability score by 2'],
+      });
+
+      const buffs = applyFeatBuffsToFormData(formData, []);
+
+      expect(buffs.abilityScoreIncreases).toEqual([
+        {
+          name: 'any',
+          amount: 2,
+          isChoice: true,
+          description: 'Choose one ability score. Increase the chosen ability score by 2',
+          max_value: 20,
+          featName: 'Skill feat',
+          featDescription: undefined,
+        },
+      ]);
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [
+          { name: 'strength', featIncrease: 0 },
+          { name: 'Dexterity', featIncrease: 0 },
+          { name: 'CONSTITUTION', featIncrease: 0 },
+        ],
+      });
     });
 
     it('appends parsed resistances onto existing ones without replacing (real mergeDeduplicated)', () => {
-
       const formData = makeFormData({ resistances: ['cold', 'FIRE'] });
 
       findFeat.mockReturnValue({
@@ -167,62 +195,31 @@ describe('applyFeatBuffsToFormData', () => {
       expect(formData.resistances).toEqual(['cold', 'FIRE', 'poison']);
     });
 
-    it('does not crash when formData has no abilities array', () => {
-
-      const formData = {
-        rules: '5e',
-        feats: ['Tough'],
-      };
+    it('with no abilities array still writes resistances and never invents the abilities key', () => {
+      // The ability guard (buffApplier.js:5) must not short-circuit the resistance
+      // merge — the fixture pairs an unappliable increase with a resistance so a
+      // whole-apply early-return mutant fails here.
+      const formData = { rules: '5e', feats: ['Tough'] };
 
       findFeat.mockReturnValue({
         name: 'Test feat',
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      expect(() => applyFeatBuffsToFormData(formData, [])).not.toThrow();
-      expect(formData.abilities).toBeUndefined();
-    });
-
-    it('skips choice/any ability score increases when applying side effects to formData', () => {
-
-      const formData = makeFormData();
-
-      findFeat.mockReturnValue({
-        name: 'Skill feat',
-        benefits: ['Choose one ability score. Increase the chosen ability score by 2'],
-      });
-
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(formData.abilities.every(a => a.featIncrease === 0)).toBe(true);
-    });
-
-    it('writes only abilities[].featIncrease and resistances — never proficiencies/features keys', () => {
-
-      const formData = makeFormData();
-
-      findFeat.mockReturnValue({
-        name: 'Mixed feat',
         benefits: [
           'Increase your Strength score by 2',
-          'You gain proficiency with heavy armor',
           'You have resistance to fire',
-          'Your speed increases by 10 feet',
         ],
       });
 
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(formData.abilities[0].featIncrease).toBe(2);
-      expect(formData.resistances).toEqual(['fire']);
-      expect(formData).not.toHaveProperty('proficiencies');
-      expect(formData).not.toHaveProperty('features');
+      expect(() => applyFeatBuffsToFormData(formData, [])).not.toThrow();
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: ['Tough'],
+        resistances: ['fire'],
+      });
     });
   });
 
   describe('idempotency (as-is: NON-idempotent on featIncrease, stable on resistances)', () => {
     it('re-applying doubles featIncrease (additive) while resistances stay deduplicated', () => {
-
       const formData = makeFormData();
 
       findFeat.mockReturnValue({
@@ -234,15 +231,23 @@ describe('applyFeatBuffsToFormData', () => {
       applyFeatBuffsToFormData(formData, []);
 
       // Actual behavior pinned: no internal reset guard — the undo seam is
-      // clearAppliedFeatBuffs (lane #2017), which zeroes featIncrease.
-      expect(formData.abilities[0].featIncrease).toBe(4);
-      expect(formData.resistances).toEqual(['fire']);
+      // clearAppliedFeatBuffs (lane #2017), which zeroes featIncrease. This same
+      // additive line is what multi-feat accumulation walked (folded leg).
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [
+          { name: 'strength', featIncrease: 4 },
+          { name: 'Dexterity', featIncrease: 0 },
+          { name: 'CONSTITUTION', featIncrease: 0 },
+        ],
+        resistances: ['fire'],
+      });
     });
   });
 
-  describe('return value structure', () => {
-    it('returns the four-category buffs object itself, not the mutated formData', () => {
-
+  describe('return value and write-scope boundary', () => {
+    it('returns the full four-category buffs envelope (not formData) while writing ONLY featIncrease and resistances', () => {
       const formData = makeFormData();
 
       findFeat.mockReturnValue({
@@ -258,46 +263,66 @@ describe('applyFeatBuffsToFormData', () => {
       const result = applyFeatBuffsToFormData(formData, []);
 
       expect(result).not.toBe(formData);
-      expect(Object.keys(result).sort()).toEqual([
-        'abilityScoreIncreases',
-        'features',
-        'proficiencies',
-        'resistances',
-      ]);
-      expect(result.abilityScoreIncreases).toHaveLength(1);
-      expect(result.abilityScoreIncreases[0]).toMatchObject({ name: 'Strength', amount: 2 });
-      expect(result.proficiencies).toHaveLength(1);
-      expect(result.resistances).toEqual(['fire']);
-      expect(result.features).toHaveLength(1);
-      expect(result.features[0]).toMatchObject({ name: 'Speed Bonus', type: 'speed', value: 10 });
+      expect(result).toEqual({
+        abilityScoreIncreases: [
+          {
+            name: 'Strength',
+            amount: 2,
+            isChoice: false,
+            max_value: 20,
+            featName: 'Mixed feat',
+            featDescription: undefined,
+          },
+        ],
+        proficiencies: [{ name: 'Heavy Armor', type: 'proficiency' }],
+        resistances: ['fire'],
+        features: [
+          {
+            name: 'Speed Bonus',
+            description: 'Your speed increases by 10 feet',
+            type: 'speed',
+            value: 10,
+            featName: 'Mixed feat',
+          },
+        ],
+      });
+
+      // Write-scope boundary: proficiencies/features exist in the RETURNED envelope
+      // only — a full-shape formData toEqual fails on any extra written key.
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [
+          { name: 'strength', featIncrease: 2 },
+          { name: 'Dexterity', featIncrease: 0 },
+          { name: 'CONSTITUTION', featIncrease: 0 },
+        ],
+        resistances: ['fire'],
+      });
     });
 
-    it('returns empty arrays for all categories when no feats are selected', () => {
-
+    it('with no feats selected returns the empty four-category envelope and leaves formData byte-for-byte untouched', () => {
       const formData = makeFormData({ feats: [] });
 
       const result = applyFeatBuffsToFormData(formData, []);
 
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('skips feats that are not found (findFeat returns null) without touching formData', () => {
-
-      findFeat.mockReturnValue(null);
-
-      const formData = makeFormData({ feats: ['Nonexistent'], resistances: ['cold'] });
-
-      const result = applyFeatBuffsToFormData(formData, []);
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-      expect(formData.abilities.every(a => a.featIncrease === 0)).toBe(true);
-      expect(formData.resistances).toEqual(['cold']);
+      expect(result).toEqual({
+        abilityScoreIncreases: [],
+        proficiencies: [],
+        resistances: [],
+        features: [],
+      });
+      // Empty resistance list must NOT materialize the key (mergeDeduplicated
+      // early-return). findFeat-null skip is #2020 canon.
+      expect(formData).toEqual({
+        rules: '5e',
+        feats: [],
+        abilities: [
+          { name: 'strength', featIncrease: 0 },
+          { name: 'Dexterity', featIncrease: 0 },
+          { name: 'CONSTITUTION', featIncrease: 0 },
+        ],
+      });
     });
   });
 });

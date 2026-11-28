@@ -1,11 +1,11 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // # charmMonsterHandler — Charm Monster (WIS save-or-suck charm, concentration, freed-on-damage).
 // Production module is an 11-line DELEGATION shell: handle() → handleCharmSpell(action, playerStats,
 // campaignName, config) in charmSpellUtils.js. This lane pins DELEGATION only — the charmMonster
 // config table (strict, full-object: exact strings AND the absence of saveConditions), positional
 // passthrough by identity, and return/failure transparency.
 //
-// Pair + canonical-home split (recorded 2026-10-16, verified at source):
+// Pair + canonical-home split (recorded 2026-10-16, re-verified against source bytes 2026-11-27):
 // - charmPersonHandler (#1883, next in queue) routes through the SAME charmSpellUtils with its own
 //   config; the ONLY pair diffs are targetsKey/advantagesKey/rollType/refusal-text/logPrefix plus
 //   charmPerson's saveConditions:['charmed'] (Beguiling Twist) — charmMonster does NOT pass
@@ -22,8 +22,8 @@
 // - Freed-on-damage lives in applyDamage.js ('removed Charmed — took damage'), concentration latch
 //   rides addExpiration inside the utils. No clock in this handler — turn-based, per no-timers policy.
 //
-// Caller liveness (grep-verified 2026-10-16): sheet chooser useSimpleSpellHandlers.js:337 /
-// useComplexSpellHandlers.js:181 → charmMonsterService.triggerCharmMonster (rebuilds action with
+// Caller liveness (grep-verified 2026-11-27): sheet chooser useSimpleSpellHandlers.js:362 /
+// useComplexSpellHandlers.js:179 → charmMonsterService.triggerCharmMonster (rebuilds action with
 // automation.type 'charm_monster') → executeHandler (automation/index.js:702) → dynamic dispatch
 // index.js:547 charm_monster → this handle(). Registration is the live production lane; no
 // index-level routing test exists, so the config table here is the unique pin that the REAL
@@ -31,7 +31,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./charmSpellUtils.js', () => ({
-  handleCharmSpell: vi.fn(() => Promise.resolve({ type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: '1 creature(s) charmed: Goblin. 0 creature(s) saved: .' } })),
+  // Bare spy only: the base return value is re-baselined in beforeEach below (a factory-embedded
+  // resolve value would be dead bytes — no test ever observes it).
+  handleCharmSpell: vi.fn(),
 }));
 
 import { handle } from './charmMonsterHandler.js';
@@ -49,17 +51,19 @@ const CHARM_MONSTER_CONFIG = {
   logPrefix: '[charmMonster] Error:',
 };
 
+// The shell treats playerStats as an OPAQUE identity (it forwards the reference untouched and
+// reads nothing from it — DC building/ability reads live in charmSpellUtils lanes). Keep the
+// fixture minimal so it cannot imply the shell inspects rules fields.
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCaster',
-    level: 10,
-    proficiency: 4,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
     ...overrides,
   };
 }
 
 // Merges overrides (lane convention: makeAction-style helpers merge unless documented otherwise).
+// automation/metaCtx are likewise opaque to the shell; they document the real transport shape
+// (charmMonsterService rebuilds both) so the identity pins exercise realistic bytes.
 function makeAction(overrides = {}) {
   return {
     name: 'Charm Monster',

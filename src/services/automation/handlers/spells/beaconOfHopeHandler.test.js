@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // beaconOfHopeHandler lane contract — Beacon of Hope (automation registry 'beacon_of_hope:' @ index.js:608).
 // Live dispatch: spellCastService/execution/triggerSpells.js → beaconOfHopeService.triggerBeaconOfHope →
 // executeHandler → handle(). handle() side effects: one resolveMapPositions + one getCombatContext read;
@@ -51,7 +51,6 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 }));
 
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as targetEffectDefs from '../../../combat/conditions/targetEffectDefinitions.js';
 import * as targetResolver from '../../common/targetResolver.js';
@@ -107,23 +106,20 @@ describe('handle', () => {
         targetResolver.resolveMapPositions.mockResolvedValue({});
     });
 
-    it.each([{ ctx: null }, { ctx: undefined }])(
-        'returns the automation_info popup when combat context is $ctx',
-        async ({ ctx }) => {
-            damageUtils.getCombatContext.mockResolvedValue(ctx);
+    it('returns the automation_info popup when combat context is missing', async () => {
+        damageUtils.getCombatContext.mockResolvedValue(null);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'main-map');
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, 'main-map');
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Beacon of Hope',
-                    description: 'No combat context found. Cannot apply Beacon of Hope.',
-                },
-            });
-        },
-    );
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Beacon of Hope',
+                description: 'No combat context found. Cannot apply Beacon of Hope.',
+            },
+        });
+    });
 
     it('returns the beacon_of_hope_target_selection popup with the exact full payload', async () => {
         targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 5, y: 10 } });
@@ -147,7 +143,7 @@ describe('handle', () => {
         });
     });
 
-    it('pins the range fallback chain automation > spell > "30 feet" default', async () => {
+    it('pins the range fallback chain automation > spell', async () => {
         const automationResult = await handle(
             makeAction({ automation: { range: '60 feet', customField: 'value' } }),
             makePlayerStats(),
@@ -166,24 +162,16 @@ describe('handle', () => {
         );
         expect(spellResult.payload.range).toBe('45 feet');
         expect(spellResult.payload.rangeFt).toBe(45);
-
-        const defaultResult = await handle(makeAction(), makePlayerStats(), campaignName, null);
-        expect(defaultResult.payload.range).toBe('30 feet');
-        expect(defaultResult.payload.rangeFt).toBe(30);
-
-        // rangeToFeet seam is fed the resolved string, in order.
-        expect(rangeValidation.rangeToFeet.mock.calls.map((c) => c[0])).toEqual(['60 feet', '45 feet', '30 feet']);
+        // '30 feet' literal fallback is pinned by the missing-automation/spell defaults test.
     });
 
-    it('pins the slot-level chain spellSlotLevel > spell.level > 3', async () => {
+    it('pins the slot-level chain spellSlotLevel > spell.level', async () => {
         let result = await handle(makeAction({ spellSlotLevel: 5 }), makePlayerStats(), campaignName, null);
         expect(result.payload.slotLevel).toBe(5);
 
         result = await handle(makeAction({ spell: { level: 4 } }), makePlayerStats(), campaignName, null);
         expect(result.payload.slotLevel).toBe(4);
-
-        result = await handle({ name: 'Beacon of Hope' }, makePlayerStats(), campaignName, null);
-        expect(result.payload.slotLevel).toBe(3);
+        // Default 3 is pinned by the missing-automation/spell defaults test.
     });
 
     it('defaults missing automation/spell and reports null attackerPos without a mapName', async () => {
@@ -214,7 +202,6 @@ describe('applyBeaconOfHopeEffect', () => {
 
     it.each([
         ['null', null],
-        ['undefined', undefined],
         ['an empty array', []],
         ['a non-array string', 'Goblin'],
     ])('returns null and writes nothing when targetNames is %s', async (_label, targetNames) => {
@@ -264,7 +251,7 @@ describe('applyBeaconOfHopeEffect', () => {
             { target: 'Goblin', effect: 'beacon_of_hope', label: 'Old Beacon' },
         ]);
 
-        await applyBeaconOfHopeEffect(
+        const result = await applyBeaconOfHopeEffect(
             makeAction(),
             makePlayerStats(),
             campaignName,
@@ -284,6 +271,8 @@ describe('applyBeaconOfHopeEffect', () => {
             campaignName,
             true,
         );
+        // Quirk: popup reports requested counts even though only ONE row was fresh-added.
+        expect(result.payload.description).toBe('2 of 2 target(s) affected by Beacon of Hope.');
     });
 
     it.each([

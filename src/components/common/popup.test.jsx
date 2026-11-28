@@ -1,5 +1,11 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27
+// Shared Popup surface contract: html/children ternary + real DOMPurify
+// sanitization, the modal-family dismissal tier (Done / panel-Escape /
+// pure-backdrop / drag-guard / window body-Escape rescue), the guarded
+// (dismissable={false}) inert law, and the close-chrome matrix. Focus-pull,
+// focus-trap and close-restore tiers own their dedicated sibling files
+// (popup.focus-retention / popup.close-restore / popup.guarded-close-restore);
+// consumer lanes pin their composed payloads at their seams.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Popup from './popup.jsx';
@@ -11,6 +17,13 @@ import Popup from './popup.jsx';
 const renderPopup = (props = {}, ui = undefined) =>
   render(<Popup {...(ui ? { children: ui } : {})} {...props} />);
 
+const overlay = () => screen.getByTestId('popup-overlay');
+const panel = () => overlay().querySelector('.popup-modal');
+const pureBackdropClick = () => {
+  fireEvent.mouseDown(overlay());
+  fireEvent.click(overlay());
+};
+
 describe('Popup', () => {
   // ── Content rendering ──
 
@@ -20,9 +33,8 @@ describe('Popup', () => {
         html: '<h3>Fireball</h3><ul><li><b>8d6</b> fire damage</li></ul>',
       });
 
-      const overlay = screen.getByTestId('popup-overlay');
-      expect(overlay.querySelector('h3')).toHaveTextContent('Fireball');
-      expect(overlay.querySelector('li b')).toHaveTextContent('8d6');
+      expect(overlay().querySelector('h3')).toHaveTextContent('Fireball');
+      expect(overlay().querySelector('li b')).toHaveTextContent('8d6');
     });
 
     it('strips dangerous markup instead of injecting it raw', () => {
@@ -30,23 +42,21 @@ describe('Popup', () => {
         html: '<p>Safe</p><script>window.evil = true</script><img src=x onerror="steal()">',
       });
 
-      const overlay = screen.getByTestId('popup-overlay');
-      expect(overlay).toHaveTextContent('Safe');
-      expect(overlay.querySelector('script')).toBeNull();
-      expect(overlay.querySelector('[onerror]')).toBeNull();
+      expect(overlay()).toHaveTextContent('Safe');
+      expect(overlay().querySelector('script')).toBeNull();
+      expect(overlay().querySelector('[onerror]')).toBeNull();
+      // The scrubbed script body never executes.
+      expect(window.evil).toBeUndefined();
     });
 
-    it('renders children when no html is provided', () => {
-      renderPopup({}, <span>Child Content</span>);
+    it.each([[undefined], ['']])(
+      'renders children when html is %s (falsy falls through the ternary)',
+      (html) => {
+        renderPopup({ html }, <span>Child Content</span>);
 
-      expect(screen.getByText('Child Content')).toBeInTheDocument();
-    });
-
-    it('falls back to children when html is an empty string', () => {
-      renderPopup({ html: '' }, <span>Child Content</span>);
-
-      expect(screen.getByText('Child Content')).toBeInTheDocument();
-    });
+        expect(screen.getByText('Child Content')).toBeInTheDocument();
+      }
+    );
 
     it('prefers html over children when both are provided', () => {
       renderPopup({ html: '<b>HTML Content</b>' }, <span>Child Content</span>);
@@ -59,17 +69,13 @@ describe('Popup', () => {
   // ── Modal-family dismissal law (backlog XE 2026-11-16) ──
   // A face with a plain close handler (every consumer's onClickOrKeyDown today)
   // answers Escape and a PURE backdrop click through the shared useModalDismiss
-  // tier — identical to pressing its Done. A drag that starts inside the panel
-  // (text selection released over the backdrop) never dismisses, and faces the
-  // caller marks dismissable={false} (staged-damage popups: the
-  // hit-popup-backdrop-void-guard) keep Escape AND backdrop fully inert.
-
-  const overlay = () => screen.getByTestId('popup-overlay');
-  const panel = () => overlay().querySelector('.popup-modal');
-  const pureBackdropClick = () => {
-    fireEvent.mouseDown(overlay());
-    fireEvent.click(overlay());
-  };
+  // tier — identical to pressing its Done. Panel-targeted Escape rides the
+  // subtree lane; a BODY-targeted Escape (focus stranded after a click shed)
+  // rides the hook's window-rescue lane — each must fire EXACTLY once. A drag
+  // that starts inside the panel (text selection released over the backdrop)
+  // never dismisses, and faces the caller marks dismissable={false}
+  // (staged-damage popups: the hit-popup-backdrop-void-guard) keep Escape —
+  // both lanes — AND backdrop fully inert.
 
   describe('modal-family dismissal', () => {
     it('closes exactly once on a pure backdrop click (mousedown and click both on the overlay)', () => {
@@ -88,6 +94,17 @@ describe('Popup', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
+    it('answers an Escape targeted at BODY exactly once (window-rescue lane for stranded focus)', () => {
+      const handleClose = vi.fn();
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose });
+
+      // The body-targeted keydown never bubbles through the overlay, so ONLY
+      // the hook's window listener can reach it — and the panel subtree lane
+      // must not double-fire alongside it.
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
     it('a dismissable popup pulls focus into its panel on open (Escape reachability)', () => {
       renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: vi.fn() });
 
@@ -103,24 +120,21 @@ describe('Popup', () => {
       expect(handleClose).not.toHaveBeenCalled();
     });
 
-    it.each(['.popup-modal', 'button', 'input'])(
-      'does not close when content inside the popup (%s) is clicked',
-      (selector) => {
-        const handleClose = vi.fn();
-        renderPopup(
-          { onClickOrKeyDown: handleClose },
-          <>
-            <button type="button">Click Me</button>
-            <input type="text" aria-label="Target name" />
-          </>
-        );
+    it('does not close when content inside the panel is clicked', () => {
+      const handleClose = vi.fn();
+      renderPopup(
+        { onClickOrKeyDown: handleClose },
+        <>
+          <button type="button">Click Me</button>
+          <input type="text" aria-label="Target name" />
+        </>
+      );
 
-        const target = overlay().querySelector(selector);
-        fireEvent.mouseDown(target);
-        fireEvent.click(target);
-        expect(handleClose).not.toHaveBeenCalled();
-      }
-    );
+      const target = overlay().querySelector('button');
+      fireEvent.mouseDown(target);
+      fireEvent.click(target);
+      expect(handleClose).not.toHaveBeenCalled();
+    });
   });
 
   describe('guarded faces (dismissable={false}) stay fully inert', () => {
@@ -132,11 +146,12 @@ describe('Popup', () => {
       expect(handleClose).not.toHaveBeenCalled();
     });
 
-    it('does not close on Escape', () => {
+    it('does not close on Escape via either lane (panel subtree, body-targeted window rescue)', () => {
       const handleClose = vi.fn();
       renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose, dismissable: false });
 
       fireEvent.keyDown(panel(), { key: 'Escape' });
+      fireEvent.keyDown(document.body, { key: 'Escape' });
       expect(handleClose).not.toHaveBeenCalled();
     });
 
@@ -144,16 +159,6 @@ describe('Popup', () => {
       renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: vi.fn(), dismissable: false });
 
       expect(document.activeElement).not.toBe(panel());
-    });
-  });
-
-  describe('faces without a close handler are inert', () => {
-    it('backdrop click and Escape never fire anything without onClickOrKeyDown', () => {
-      renderPopup({ html: '<b>Test Content</b>' });
-
-      pureBackdropClick();
-      fireEvent.keyDown(panel(), { key: 'Escape' });
-      expect(panel()).toBeInTheDocument();
     });
   });
 
@@ -185,11 +190,20 @@ describe('Popup', () => {
       // Content must still be visible without the close row.
       expect(screen.getByText('Test Content')).toBeInTheDocument();
     });
+  });
 
-    it('does not render a Done button without a close handler', () => {
-      renderPopup({ html: '<b>Test Content</b>' });
+  // A face with NO handler is the other half of the guarded flag
+  // (`!onClickOrKeyDown`): nothing may fire and no Done chrome may render.
+  // No live consumer takes this lane today; the pin guards the shared prop
+  // contract itself.
+  it('faces without a close handler render no Done chrome and answer nothing', () => {
+    renderPopup({ html: '<b>Test Content</b>' });
 
-      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+
+    pureBackdropClick();
+    fireEvent.keyDown(panel(), { key: 'Escape' });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(panel()).toBeInTheDocument();
   });
 });

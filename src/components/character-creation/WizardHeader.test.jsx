@@ -1,29 +1,25 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardHeader from './WizardHeader.jsx';
 
-const createProps = (overrides = {}) => ({
-  title: 'Create New Character',
-  onClose: vi.fn(),
-  ...overrides,
-});
-
+// Component lane only: WizardHeader is a generic pass-through of `title`
+// and `onClose`. The wizard's title-building and close-wiring lanes live
+// in CharacterCreationWizard.header.test.jsx / .close-guard.test.jsx.
 describe('WizardHeader', () => {
   it('renders the title prop as the header heading', () => {
-    const props = createProps({ title: 'Edit Character' });
-    render(<WizardHeader {...props} />);
+    render(<WizardHeader title="Edit Character" onClose={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Edit Character' })).toBeInTheDocument();
   });
 
   it('routes the × close button click to onClose exactly once', () => {
-    const props = createProps();
-    render(<WizardHeader {...props} />);
+    const onClose = vi.fn();
+    render(<WizardHeader title="Create New Character" onClose={onClose} />);
     const close = screen.getByRole('button', { name: 'Close character wizard' });
     // Lock the accessible name — the × glyph alone is unreadable to AT.
     expect(close).toHaveAttribute('aria-label', 'Close character wizard');
-    expect(props.onClose).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(close);
-    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

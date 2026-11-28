@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // HypnoticPatternModal metamagic lane: Heightened Spell (note + radio wiring and
 // the disadvantage roll on the marked target) and Careful Spell (ally badges,
 // NPC auto-success resolution, player prompt skip). Overlay guard + teardown live
@@ -189,8 +189,8 @@ describe('HypnoticPatternModal - Metamagic', () => {
                 expect(saveEntriesFor('PlayerAlly').length).toBe(1);
             });
 
-            const playerEntries = saveEntriesFor('PlayerAlly');
-            expect(playerEntries[0]).toMatchObject({
+            const [playerEntry] = saveEntriesFor('PlayerAlly');
+            expect(playerEntry).toMatchObject({
                 type: 'save_result',
                 characterName: 'Wizard1',
                 targetName: 'PlayerAlly',
@@ -201,8 +201,7 @@ describe('HypnoticPatternModal - Metamagic', () => {
                 total: 0,
                 saveBonus: 0,
             });
-            expect(playerEntries[0].description).toBe('PlayerAlly succeeded on WIS save (DC 14, rolled 0 + 0 = 0) — Careful Spell protected');
-            expect(typeof playerEntries[0].timestamp).toBe('number');
+            expect(playerEntry.description).toBe('PlayerAlly succeeded on WIS save (DC 14, rolled 0 + 0 = 0) — Careful Spell protected');
 
             expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
                 targetName: 'PlayerAlly',

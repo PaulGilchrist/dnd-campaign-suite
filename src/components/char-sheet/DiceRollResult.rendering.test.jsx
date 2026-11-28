@@ -1,23 +1,54 @@
-// @maintained-by-ai 2026-10-17
-// Rendering lane of the DiceRollResult family. Ownership map (per
-// displayFeatures' ownership notes):
-//   THIS FILE owns the Starry Form (Dragon) floor seam — the floored total
-//   (10 + bonus + modifier via computeFloorTotals/computeBaseTotal) and the
-//   verbatim floor notice — plus crit / Natural 20 / crit-miss notice gating,
-//   the forced-mode badge, and baseline totals (d20 arithmetic, the damage
-//   `total` prop verbatim, and missing/empty rolls fallbacks).
+// @maintained-by-ai 2026-11-27
+// Rendering lane of the DiceRollResult family — CANONICAL OWNERSHIP MAP for
+// the family (verified against current sibling headers, 2026-11-27).
+// THIS FILE owns the top-level face gating: the authoritative .dice-roll-total
+// slot (d20 arithmetic, the damage `total` prop verbatim, null/undefined/empty
+// roll fallbacks), crit / Natural 20 / Critical Miss notice gating, the
+// forced-mode chip attribution matrix (buildForcedModeChips: which reason
+// prints under which prefix, how many chips), and the Starry Form (Dragon)
+// floor seam (floored total via computeFloorTotals/computeBaseTotal + verbatim
+// floor notice).
 // Deferred to sibling lanes (do not re-add here):
-//   hit/miss, auto-miss, save-result, damage-applied lines →
-//     DiceRollResult.combatDisplay.test.jsx
-//   breakdown line (formula, dice span, modifier text incl. comma-separated
-//     non-d20 rolls) → DiceRollResult.infoDisplay.test.jsx
-//   advantage/disadvantage toggles and their non-d20 suppression →
-//     DiceRollResult.toggles.test.jsx
-//   header icons, Reliable Talent, GWF, Elemental Adept, heal outcomes →
-//     DiceRollResult.displayFeatures.test.jsx
-//   Trance of Order floor → DiceRollResult.flooring.test.jsx
-//   crit-damage auto-damage notices → DiceRollResult.interactive.test.jsx
-// This seam is pure display: no interaction, no randomness, no spies needed.
+//   breakdown line CONTENT (formula, dice span, modifier text incl.
+//     bonusDetail, bonus+modifier summation, zero-modifier suppression), Save
+//     DC line + full visibility gate, resistance/hunter-lore/potent-cantrip
+//     notices, Indomitable Might str replace ladder, WIS check-replace totals
+//     → DiceRollResult.infoDisplay.test.jsx.
+//   hit/miss, auto-miss, waiting-for-player-save (+ Quick Roll), save-result
+//     and damage-applied lines → DiceRollResult.combatDisplay.test.jsx.
+//   adv/dis checkbox mount/click/mutual-exclusivity/total recompute,
+//     forcedMode initial marking with click-override, non-d20 toggle
+//     suppression, saveResult mode suffix, Psi-Bolstered Knack panel,
+//     console.error paths → DiceRollResult.toggles.test.jsx.
+//   header dice-type icons, Reliable Talent indicator, GWF/Elemental Adept
+//     notices, heal outcomes → DiceRollResult.displayFeatures.test.jsx.
+//   Trance of Order (d20Floor10) floor → DiceRollResult.flooring.test.jsx.
+//   total↔breakdown fusion detector (space text nodes, `→ total` equation-tail
+//     gating on floor/homing faces; defers breakdown byte CONTENT to
+//     infoDisplay) → DiceRollResult.roll-line-separation.test.jsx.
+//   interaction faces: click-dispatch (damage-type window CustomEvents, prop-
+//     callback dispatch, offer visibility, Done auto-damage incl.
+//     damageTypeChoices, post-click transitions; its isCrit/isAutoCrit notice
+//     leg is the click-face side of this lane's gating matrix) →
+//     DiceRollResult.interactive.test.jsx.
+//   createDiceRollHandlers payload contracts → DiceRollResult.handlers.test.js
+//     (savage reroll/keep payloads, group-aware scoping, inertness →
+//     zero-mock DiceRollResult.handlers.savageAttacker.test.js).
+//   post-trigger reroll result-row copy + declined guard → rerollResults;
+//     savage chooser UI → savageAttackerChoice; savage chip raw byte-exactness
+//     → savageChipByteExact; die-size selection + evaluate-throw →
+//     superiorityDie; onStrokeOfLuck identity + failure-only gate →
+//     stroke-of-luck; boon miss→hit flip sequence → boon-of-combat-prowess;
+//     fumble-banner suppression on converted faces → boon-nat1-fumble.
+//   monster GM-adjudication offers → charge-bonus / two-handed /
+//     ranged-variant / hit-choice; DamageTypeChoiceSection rendering →
+//     damageTypeChoice; Homing Strikes fold → homing; effective-AC recompute +
+//     boundary Done gate → shieldOfFaith; true-pre-hit HP transition →
+//     hpTransition; secondary-damage tree → secondaryDamage; awayNote →
+//     away-note; direct-roll disclosure → directDamageDisclosure; "Swing N of
+//     N" ordinal → extraAttackSwing.
+// This seam is pure display: no interaction, no randomness, no spies, no
+// vi.mock — real renders only.
 import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
@@ -47,109 +78,93 @@ describe('DiceRollResult rendering', () => {
         });
     });
 
-    describe('forced-mode badge', () => {
+    describe('forced-mode chip attribution (buildForcedModeChips)', () => {
+        // bug-adv-chip-borrows-range-reason: rangeReason is ALWAYS
+        // disadvantage-family prose, so it must never ride the Adv prefix.
+        // Aura reason strings (measured / lenient "GM-enforced" faces) are
+        // produced and pinned by the resolver lanes (contextBuilder-sync,
+        // lion/wolfAuraUtils); this lane pins only WHICH slot the threaded
+        // string interpolates into — measured and gridless-lenient copy both
+        // ride the same interpolation, so one representative string per slot
+        // suffices (the old per-aura verbatim cases were content duplicates).
+        // .forced-mode-badge class probe is load-bearing: only a count of the
+        // rendered chips proves "one chip per source / no phantom second
+        // chip", and the title attribute needs the element handle.
+        const chipCount = () => document.querySelectorAll('.forced-mode-badge');
+
         it.each([
             {
                 label: 'advantage with only a range reason present — range copy never rides the Adv prefix',
-                props: { name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage', rangeReason: 'Ranged disadvantage' },
-                badgeText: 'Adv (conditions)',
-                title: 'Automatically set by active conditions',
+                props: { forcedMode: 'advantage', rangeReason: 'Ranged disadvantage' },
+                chip: 'Adv (conditions)', title: 'Automatically set by active conditions',
             },
             {
-                label: 'disadvantage forced with no explicit reason',
-                props: { name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage', rangeReason: null },
-                badgeText: 'Disadv (conditions)',
-                title: 'Automatically set by active conditions',
+                // The threaded advantage reason wins over any co-occurring
+                // range reason; rangeReason stays on the Disadv side /
+                // AUTO-MISS banner only.
+                label: 'advantage prefers its own threaded reason over a co-occurring range reason',
+                props: { forcedMode: 'advantage', advantageReason: 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft', rangeReason: 'Target out of melee range (21 ft > 8 ft)' },
+                chip: 'Adv (Wolf rage aura — enemy of raging DraconicDragon within 5 ft)', title: 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft',
             },
-        ])('$label — badge "$badgeText" carries title "$title"', ({ props, badgeText, title }) => {
+            {
+                label: 'disadvantage with no explicit reason — generic conditions copy',
+                props: { forcedMode: 'disadvantage' },
+                chip: 'Disadv (conditions)', title: 'Automatically set by active conditions',
+            },
+            {
+                label: 'empty reason list falls back to the conditions copy',
+                props: { forcedMode: 'disadvantage', disadvantageReasons: [] },
+                chip: 'Disadv (conditions)', title: 'Automatically set by active conditions',
+            },
+            {
+                label: 'disadvantage borrows the range reason under its own prefix (byte-identical legacy face)',
+                props: { forcedMode: 'disadvantage', rangeReason: 'Beyond normal range (40 ft > 30 ft)' },
+                chip: 'Disadv (Beyond normal range (40 ft > 30 ft))', title: 'Beyond normal range (40 ft > 30 ft)',
+            },
+            {
+                // 2026-11-03 attribution parity: PC sync-lane aura resolvers
+                // thread their reason via the advantageReason channel; on a
+                // disadvantage press it must print under the DISADV prefix.
+                label: 'disadvantage prints a threaded aura reason under the Disadv prefix',
+                props: { forcedMode: 'disadvantage', advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft' },
+                chip: 'Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)', title: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
+            },
+            {
+                label: 'a threaded aura reason beats a co-occurring range reason',
+                props: { forcedMode: 'disadvantage', advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft', rangeReason: 'Beyond normal range (40 ft > 30 ft)' },
+                chip: 'Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)', title: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
+            },
+            {
+                // 2026-11-04 backlog parity: a ONE-reason aura list feeds the
+                // single-chip slot instead of falling through to the generic
+                // conditions copy; ≤1 reason keeps the legacy single chip.
+                label: 'single-source reason list prints on the chip (no generic copy, no second chip)',
+                props: { forcedMode: 'disadvantage', disadvantageReasons: ['Lion rage aura — within 5 ft of raging ElderPaladin'] },
+                chip: 'Disadv (Lion rage aura — within 5 ft of raging ElderPaladin)', title: 'Lion rage aura — within 5 ft of raging ElderPaladin',
+            },
+            {
+                label: 'a single-reason list beats a different co-occurring range reason',
+                props: { forcedMode: 'disadvantage', disadvantageReasons: ['Beyond normal range (15 ft > 8 ft)'], rangeReason: 'Target out of melee range (25 ft > 8 ft)' },
+                chip: 'Disadv (Beyond normal range (15 ft > 8 ft))', title: 'Beyond normal range (15 ft > 8 ft)',
+            },
+            {
+                label: 'lenient single-source aura reason carries its GM-enforced tail verbatim',
+                props: { forcedMode: 'disadvantage', disadvantageReasons: ['Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced'] },
+                chip: 'Disadv (Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced)', title: 'Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced',
+            },
+        ])('$label — one chip "$chip" titled "$title"', ({ props, chip, title }) => {
             renderRoll(props);
-            const badge = screen.getByText(badgeText);
-            expect(badge).toHaveAttribute('title', title);
+            expect(chipCount()).toHaveLength(1);
+            expect(document.querySelector('.forced-mode-badge')).toHaveTextContent(chip);
+            expect(document.querySelector('.forced-mode-badge')).toHaveAttribute('title', title);
         });
 
-        // bug-adv-chip-borrows-range-reason: an aura advantage without a threaded
-        // reason + a range miss/band reason on the same press used to print
-        // "Adv (Target out of melee range (…))" — a disadvantage-family range fact
-        // attributed as the advantage reason. The Adv chip now prints the
-        // advantage's OWN threaded reason when present, and rangeReason stays on
-        // the Disadv chip / AUTO-MISS banner only.
-        it('advantage prefers its own threaded reason over any range reason', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
-                advantageReason: 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft',
-                rangeReason: 'Target out of melee range (21 ft > 8 ft)',
-            });
-            const badges = document.querySelectorAll('.forced-mode-badge');
-            expect(badges).toHaveLength(1);
-            expect(badges[0]).toHaveTextContent('Adv (Wolf rage aura — enemy of raging DraconicDragon within 5 ft)');
-            expect(badges[0]).toHaveAttribute('title', 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
-        });
-
-        it('disadvantage still borrows the range reason under its own prefix (byte-identical legacy face)', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                rangeReason: 'Beyond normal range (40 ft > 30 ft)',
-            });
-            expect(screen.getByText('Disadv (Beyond normal range (40 ft > 30 ft))')).toHaveAttribute('title', 'Beyond normal range (40 ft > 30 ft)');
-        });
-
-        // 2026-11-03 QA backlog (attribution parity): the PC sync-lane lion and
-        // corona aura resolvers now thread their own reason (contextBuilder-sync
-        // resolveLionAura/resolveCoronaAura). It rides the advantageReason
-        // channel and must print under the DISADV prefix — measured face names
-        // proximity, lenient face admits GM-enforcement instead of claiming
-        // "within 5 ft" (3db9da635 honesty precedent).
-        it('disadvantage prints a threaded aura reason under the Disadv prefix', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
-            });
-            const badge = document.querySelector('.forced-mode-badge');
-            expect(badge).toHaveTextContent('Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)');
-            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
-        });
-
-        it('corona lenient reason prints its GM-enforced tail verbatim', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                advantageReason: 'Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced',
-            });
-            const badge = document.querySelector('.forced-mode-badge');
-            expect(badge).toHaveTextContent('Disadv (Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced)');
-            expect(badge).toHaveAttribute('title', 'Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced');
-        });
-
-        // bug-wolf-gridless-chip-claims-within-5ft-unmeasured: the gridless wolf
-        // lenient face (resolveWolfAura fork, lion twin 2cd75b9de) must print its
-        // honest GM-enforced tail under the Adv prefix — no "within 5 ft" claim.
-        it('wolf lenient reason prints its GM-enforced tail under the Adv prefix', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
-                advantageReason: 'Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced',
-            });
-            const badge = document.querySelector('.forced-mode-badge');
-            expect(badge).toHaveTextContent('Adv (Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced)');
-            expect(badge).toHaveAttribute('title', 'Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
-        });
-
-        it('disadvantage prefers a threaded aura reason over a co-occurring range reason', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
-                rangeReason: 'Beyond normal range (40 ft > 30 ft)',
-            });
-            const badges = document.querySelectorAll('.forced-mode-badge');
-            expect(badges).toHaveLength(1);
-            expect(badges[0]).toHaveTextContent('Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)');
-        });
-
-        // 2026-11-03 QA backlog (multi-source disadvantage attribution): when
-        // the roll seam carries 2+ reasons (range band + Lion rage aura), the
-        // popup stacks one chip per source; ≤1 reason keeps the legacy single
-        // chip copy byte-identical (no phantom second chip).
+        // 2026-11-03 QA backlog (multi-source disadvantage attribution): with
+        // 2+ threaded reasons (range band + aura), the popup stacks one chip
+        // per source so neither "why" is silently dropped.
         it('stacks one chip per reason when multiple disadvantage sources apply', () => {
             renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                forcedMode: 'disadvantage',
                 rangeReason: 'Target out of melee range (25 ft > 8 ft)',
                 disadvantageReasons: ['Target out of melee range (25 ft > 8 ft)', 'Lion rage aura — within 5 ft of raging ElderPaladin'],
             });
@@ -159,56 +174,11 @@ describe('DiceRollResult rendering', () => {
             expect(badges[0]).toHaveAttribute('title', 'Target out of melee range (25 ft > 8 ft)');
             expect(badges[1]).toHaveTextContent('Disadv (Lion rage aura — within 5 ft of raging ElderPaladin)');
             expect(badges[1]).toHaveAttribute('title', 'Lion rage aura — within 5 ft of raging ElderPaladin');
-            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
-        });
-
-        it('single-reason list keeps the legacy single chip (no second chip)', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                rangeReason: 'Beyond normal range (15 ft > 8 ft)',
-                disadvantageReasons: ['Beyond normal range (15 ft > 8 ft)'],
-            });
-            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
-            expect(screen.getByText('Disadv (Beyond normal range (15 ft > 8 ft))')).toBeInTheDocument();
-        });
-
-        // 2026-11-04 backlog parity (monster-lane single-source chip): a
-        // ONE-reason aura list feeds the single-chip slot instead of falling
-        // through to the generic conditions copy (PC-lane lion shape 2cd75b9de).
-        it('single-source aura reason prints on the chip (no generic conditions copy)', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                disadvantageReasons: ['Lion rage aura — within 5 ft of raging ElderPaladin'],
-            });
-            const badge = document.querySelector('.forced-mode-badge');
-            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
-            expect(badge).toHaveTextContent('Disadv (Lion rage aura — within 5 ft of raging ElderPaladin)');
-            expect(badge).toHaveAttribute('title', 'Lion rage aura — within 5 ft of raging ElderPaladin');
-            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
-        });
-
-        it('lenient single-source aura chip carries the honest GM-enforced tail', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                disadvantageReasons: ['Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced'],
-            });
-            const badge = document.querySelector('.forced-mode-badge');
-            expect(badge).toHaveTextContent('Disadv (Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced)');
-            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
-        });
-
-        it('empty/null reason list falls back to the conditions copy', () => {
-            renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
-                disadvantageReasons: [],
-            });
-            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
-            expect(screen.getByText('Disadv (conditions)')).toHaveAttribute('title', 'Automatically set by active conditions');
         });
 
         it('advantage mode never stacks the disadvantage reason list', () => {
             renderRoll({
-                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
+                forcedMode: 'advantage',
                 advantageReason: 'Precise Hunter (Hunter\'s Mark)',
                 disadvantageReasons: ['Target out of melee range (25 ft > 8 ft)', 'Lion rage aura — within 5 ft of raging ElderPaladin'],
             });
@@ -254,14 +224,13 @@ describe('DiceRollResult rendering', () => {
             label, total, notice, starryDragonFloor: true, ...props,
         }));
         it.each(floorRows)('$label — total $total', ({ rolls, bonus, rollType, starryDragonFloor, total, notice }) => {
-                const { container } = renderRoll({ rolls, bonus, rollType, starryDragonFloor });
-
-                expect(totalText(container)).toBe(total);
-                if (notice) {
-                    expect(screen.getByText(notice)).toBeInTheDocument();
-                } else {
-                    expect(screen.queryByText(/Starry Form \(Dragon\)/)).not.toBeInTheDocument();
-                }
-            });
+            const { container } = renderRoll({ rolls, bonus, rollType, starryDragonFloor });
+            expect(totalText(container)).toBe(total);
+            if (notice) {
+                expect(screen.getByText(notice)).toBeInTheDocument();
+            } else {
+                expect(screen.queryByText(/Starry Form \(Dragon\)/)).not.toBeInTheDocument();
+            }
+        });
     });
 });

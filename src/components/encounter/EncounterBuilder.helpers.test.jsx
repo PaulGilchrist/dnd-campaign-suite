@@ -1,18 +1,21 @@
-// @maintained-by-ai 2026-10-18
-// Helpers lane, salvaged: EncounterBuilder's calc/filter/persistence helpers are
-// module-private, so the previous inline copies tested here could never fail when the
-// REAL source broke — they were pure re-implementations. This file now drives the
-// REAL builder (real filter panel, summary panel, monster table) and owns only the
-// behaviors asserted nowhere else:
+// @maintained-by-ai 2026-11-28
+// Helpers lane: drives the REAL builder (filter panel, summary panel, monster table)
+// and owns only the behaviors asserted nowhere else:
 //   • localStorage filter persistence ('encounterFilter-2024'): restore on mount,
-//     corrupt/invalid fallback, and the full saveFilter payload written on change
-//   • filterMonsters narrowing via the UI: name/subtype search (case-insensitive),
-//     fractional CR parsing ('1/8'), 'None' CR exclusion, inclusive CR bounds
+//     rejected-save fallback (non-numeric difficulty hits the typeof guard;
+//     corrupt JSON hits the catch), and the full saveFilter payload on mount/change
+//   • builder-side WIRING of the Environment and CR Min/Max controls into
+//     filterMonsters (argument keys, bestiary-derived option lists, multi-environment
+//     matching). Pure filterMonsters semantics — name/type/subtype search, case
+//     folding, fractional-CR parsing, 'None' exclusion, inclusive bounds — are unit-
+//     pinned in src/services/encounters/monsterBestiarySearch.test.js; search-box
+//     wiring is pinned in bounded-render.test.jsx. Not restated here.
 //   • calculateDifficultyIndex band mapping shown as the summary Difficulty label
+//     (this UI lane is the ONLY coverage of the band ratios — no unit file).
 // Coverage kept elsewhere (not restated): toggleMonster/updateQty select/decrement and
-// XP/count math — gameplay-flows #400 + panel-interactions; save payload (stripMonsters),
-// sort, Join — additional-interactions #399; selected-monster preservation + Clear All —
-// remaining.test.jsx.
+// XP/count math — gameplay-flows + panel-interactions; party add/level/remove threshold
+// legs — additional-interactions; save payload (stripMonsters), sort, Join —
+// additional-interactions; selected-monster preservation + Clear All — remaining.test.jsx.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -55,7 +58,7 @@ const FILTER_KEY = 'encounterFilter-2024';
 
 const MONSTERS = [
   { index: 'cloud', name: 'Cloud', xp: 0, type: 'elemental', challenge_rating: 'None', environments: ['sky'] },
-  { index: 'goblin', name: 'Goblin', xp: 50, type: 'humanoid', subtype: 'tribe', challenge_rating: 0.25, environments: ['forest'] },
+  { index: 'goblin', name: 'Goblin', xp: 50, type: 'humanoid', subtype: 'tribe', challenge_rating: 0.25, environments: ['forest', 'underdark'] },
   { index: 'kobold', name: 'Kobold', xp: 250, type: 'humanoid', challenge_rating: 0.25, environments: ['underdark'] },
   { index: 'kobold-captain', name: 'Kobold Captain', xp: 250, type: 'humanoid', challenge_rating: 0.5, environments: ['underdark'] },
   { index: 'orc', name: 'Orc', xp: 100, type: 'humanoid', challenge_rating: 0.5, environments: ['hill'] },
@@ -146,7 +149,6 @@ describe('filter persistence (localStorage key encounterFilter-2024)', () => {
 
   describe.each([
     ['a saved filter without a numeric difficulty', JSON.stringify({ difficulty: 'hard', environment: 'forest' })],
-    ['saved data missing difficulty entirely', JSON.stringify({ environment: 'forest' })],
     ['corrupt JSON', '{not valid json'],
   ])('with %s', (_desc, raw) => {
     it('falls back to default Medium with no filters applied', () => {
@@ -177,9 +179,10 @@ describe('monster table filtering', () => {
     expect(env).toHaveValue('');
 
     fireEvent.change(env, { target: { value: 'underdark' } });
-    expect(rowNames(container)).toEqual(['Kobold', 'Kobold Captain', 'Shadow']);
+    // Goblin matches on its SECOND environment ('underdark').
+    expect(rowNames(container)).toEqual(['Goblin', 'Kobold', 'Kobold Captain', 'Shadow']);
 
-    // Multi-environment monsters match on any of their environments.
+    // And on its first environment when 'forest' is selected.
     fireEvent.change(env, { target: { value: 'forest' } });
     expect(rowNames(container)).toEqual(['Goblin', 'Rat']);
 
@@ -188,26 +191,6 @@ describe('monster table filtering', () => {
     expect(rowNames(container)).toEqual([
       'Cloud', 'Goblin', 'Kobold', 'Kobold Captain', 'Orc', 'Rat', 'Shadow', 'Young Dragon',
     ]);
-  });
-
-  it('narrows rows by search text on name, subtype, and type, case-insensitively', () => {
-    const { container } = mountBuilder({ monsters: MONSTERS, characters: thorinLv5 });
-    expect(rowNames(container)).toEqual([
-      'Cloud', 'Goblin', 'Kobold', 'Kobold Captain', 'Orc', 'Rat', 'Shadow', 'Young Dragon',
-    ]);
-
-    const search = screen.getByLabelText('Search monsters');
-
-    fireEvent.change(search, { target: { value: 'orc' } });
-    expect(rowNames(container)).toEqual(['Orc']);
-
-    // 'tribe' matches only Goblin's subtype, not any name.
-    fireEvent.change(search, { target: { value: 'tribe' } });
-    expect(rowNames(container)).toEqual(['Goblin']);
-
-    // Case-insensitive name match.
-    fireEvent.change(search, { target: { value: 'DRAGON' } });
-    expect(rowNames(container)).toEqual(['Young Dragon']);
   });
 
   it('applies CR bounds inclusively, parsing fractional CRs and excluding CR None', () => {

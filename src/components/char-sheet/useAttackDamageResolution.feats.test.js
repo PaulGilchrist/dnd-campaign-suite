@@ -1,16 +1,18 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * Feats lane (#298-#303 family): which FEAT passives actually DISPATCH at the
  * hook seam of resolveAttackDamage — real buildPipelineForAction() wiring, mocked
- * services. Step internals are owned by co-located step tests: shieldBash.test.js
- * covers every gate branch (attacker/weaponType/shield/oncePerTurn) and
- * tavernBrawlerPush.test.js the latch internals; GWM/Frenzy/monk exact formulas
- * live in the automationDamage lane (#299). Here, one seam test per feat family:
- * exact targetEffects payloads, latch round-trips, save-prompt consumer args
- * (DC branch: automation buildSaveDc vs STR+PB fallback), and damage committing
- * at Done while the shield-bash / charger choice modals hold only the rider
- * (FT-074 lane, post bug-sheet-attack-shield-bash-rider-drops-weapon-damage).
- * Every absence assertion is positive-leg-gated (damage still rolls / prompt fires).
+ * services. Step internals are owned by co-located step tests and this lane does
+ * NOT re-litigate them: shieldBash.test.js owns every gate branch
+ * (attacker/weaponType/shield/range/oncePerTurn), crusher.test.js owns the
+ * latch cycle and enhanced-critical non-crit silence, tavernBrawlerPush.test.js
+ * owns the unarmed condition and exact latch-then-te tuples. What stays here is
+ * the seam's unique value: positive dispatch per feat family, save-prompt
+ * consumer args (DC branch: automation buildSaveDc vs STR+PB fallback), the
+ * enhanced-critical crit gate for Slasher (slasher.js has no step test), the
+ * Piercer formula token (piercer.js has no step test), and damage committing at
+ * Done while rider modals hold only their rider (FT-074 lane, post
+ * bug-sheet-attack-shield-bash-rider-drops-weapon-damage).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
@@ -245,6 +247,8 @@ describe('useAttackDamageResolution - feats', () => {
     describe('Shield Master', () => {
         // Both authored feat shapes (5e trigger rider / 2024 push_or_prone rider)
         // must reach the STR save and surface the choice modal after a failed save.
+        // Gate refusals (attacker/shield/range/latch) are byte-owned by
+        // shieldBash.test.js — only the consumer args differ at this seam.
         it.each([
             {
                 branch: '5e trigger shape uses 8+STR+PB fallback DC',
@@ -297,49 +301,71 @@ describe('useAttackDamageResolution - feats', () => {
             // base damage (exactly one rollDamage, no parked backlog).
             expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
+    });
 
-        it('refuses the bash when the last hit was not the player\'s own — no save, no latch, damage flows', async () => {
-            getRuntimeValue.mockImplementation((_name, key) =>
-                key === 'lastAttack'
-                    ? { ...playerMeleeHit, attackerName: 'Goblin', targetName: attackerName }
-                    : null
-            );
+    describe('Enhanced critical (Crusher/Slasher)', () => {
+        // slasher.js has no step test, so the non-crit silence leg stays here;
+        // Crusher's non-crit/gate silences are owned by crusher.test.js.
+        it.each([
+            {
+                branch: 'bludgeoning crit rides advantage onto the target',
+                passiveName: 'Crusher Enhanced Critical',
+                trigger: 'critical_hit_bludgeoning',
+                attack: { name: 'Warhammer', damageType: 'Bludgeoning' },
+                isCrit: true,
+                expectedEffect: 'crusher_enhanced_critical',
+            },
+            {
+                branch: 'slashing crit rides disadvantage onto the target',
+                passiveName: 'Slasher Enhanced Critical',
+                trigger: 'critical_hit_slashing',
+                attack: {},
+                isCrit: true,
+                expectedEffect: 'slasher_enhanced_critical',
+            },
+            {
+                branch: 'no enhanced-critical effect without a crit (Slasher gate)',
+                passiveName: 'Slasher Enhanced Critical',
+                trigger: 'critical_hit_slashing',
+                attack: {},
+                isCrit: false,
+                expectedEffect: null,
+            },
+        ])('$branch', async ({ passiveName, trigger, attack, isCrit, expectedEffect }) => {
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 playerStats: makeStats([{
-                    type: 'attack_rider',
-                    trigger: 'melee_hit_with_shield_equipped',
-                    name: 'Shield Bash',
-                    options: [{ name: 'Push 5 ft', effect: 'push', value: 5 }],
+                    type: 'conditional_advantage',
+                    trigger,
+                    name: passiveName,
                 }]),
+                popupHtml: { isCrit },
             });
 
-            await resolveAttackDamage(makeAttack(), { hit: true });
+            await resolveAttackDamage(makeAttack(attack), { hit: true });
             await tick();
 
-            expect(createSaveListener).not.toHaveBeenCalled();
-            expect(modalState.shieldBashModal).toBeUndefined();
-            expect(callsForKey('_Shield_Bash_usedRound')).toHaveLength(0);
-            // Positive leg: refusal must not strand the weapon damage.
+            const effects = writtenEffects().filter((e) => e.source === passiveName);
+            if (expectedEffect) {
+                expect(effects).toEqual([{
+                    target: 'Goblin',
+                    source: passiveName,
+                    effect: expectedEffect,
+                    duration: 'until_start_of_next_turn',
+                }]);
+            } else {
+                expect(effects).toHaveLength(0);
+            }
+            // Positive leg: the feat gate never blocks the weapon damage itself.
             expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
     });
 
     describe('Crusher', () => {
-        it.each([
-            {
-                branch: 'fresh round pushes and stamps the latch',
-                latch: null,
-                expectPush: true,
-            },
-            {
-                branch: 'already stamped this round stays silent and skips re-stamp',
-                latch: 1,
-                expectPush: false,
-            },
-        ])('once-per-turn round-trip — $branch', async ({ latch, expectPush }) => {
-            useKeyValueStore(
-                latch === null ? {} : { [`${attackerName}:_Crusher_usedRound`]: latch }
-            );
+        // Seam round-trip: the push payload and the latch write both flow through
+        // the real runtime-store reads/writes. Same-round refusal is owned by
+        // crusher.test.js's mocked-round latch cycle.
+        it('bludgeoning hit lands the push once and stamps the round latch', async () => {
+            const store = useKeyValueStore();
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 playerStats: makeStats([{
                     type: 'attack_rider',
@@ -353,117 +379,23 @@ describe('useAttackDamageResolution - feats', () => {
             await resolveAttackDamage(makeAttack({ name: 'Warhammer', damageType: 'Bludgeoning' }), { hit: true });
             await tick();
 
-            const pushEffects = writtenEffects().filter((e) => e.source === 'Crusher');
-            if (expectPush) {
-                expect(pushEffects).toEqual([
-                    {
-                        target: 'Goblin',
-                        source: 'Crusher',
-                        option: 'Push 5 ft',
-                        effect: 'push',
-                        value: 5,
-                        sizeLimit: null,
-                        noOpportunityAttacks: false,
-                        duration: 'until_start_of_next_turn',
-                    },
-                ]);
-                expect(callsForKey('_Crusher_usedRound')).toEqual([
-                    [attackerName, '_Crusher_usedRound', 1, mockCampaignName],
-                ]);
-            } else {
-                expect(pushEffects).toHaveLength(0);
-                expect(callsForKey('_Crusher_usedRound')).toHaveLength(0);
-            }
-            // Positive leg: the feat gate never blocks the weapon damage itself.
-            expect(mockRollDamage).toHaveBeenCalledTimes(1);
-        });
-
-        it('grants enhanced-critical advantage on a bludgeoning crit', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: makeStats([{
-                    type: 'conditional_advantage',
-                    trigger: 'critical_hit_bludgeoning',
-                    name: 'Crusher Enhanced Critical',
-                }]),
-                popupHtml: { isCrit: true },
-            });
-
-            await resolveAttackDamage(makeAttack({ name: 'Warhammer', damageType: 'Bludgeoning' }));
-            await tick();
-
-            expect(writtenEffects()).toEqual(
-                expect.arrayContaining([
-                    {
-                        target: 'Goblin',
-                        source: 'Crusher Enhanced Critical',
-                        effect: 'crusher_enhanced_critical',
-                        duration: 'until_start_of_next_turn',
-                    },
-                ])
-            );
-        });
-
-        it('grants no enhanced-critical effect without a crit', async () => {
-            getRuntimeValue.mockImplementation((_name, key) =>
-                key === 'lastAttack' ? { ...playerMeleeHit } : null
-            );
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: makeStats([{
-                    type: 'conditional_advantage',
-                    trigger: 'critical_hit_bludgeoning',
-                    name: 'Crusher Enhanced Critical',
-                }]),
-                popupHtml: { isCrit: false },
-            });
-
-            await resolveAttackDamage(makeAttack({ name: 'Warhammer', damageType: 'Bludgeoning' }), { hit: true });
-            await tick();
-
-            expect(writtenEffects().filter((e) => e.effect === 'crusher_enhanced_critical')).toHaveLength(0);
-            expect(mockRollDamage).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('Slasher', () => {
-        it('applies enhanced-critical disadvantage on a slashing crit', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: makeStats([{
-                    type: 'conditional_advantage',
-                    trigger: 'critical_hit_slashing',
-                    name: 'Slasher Enhanced Critical',
-                }]),
-                popupHtml: { isCrit: true },
-            });
-
-            await resolveAttackDamage(makeAttack());
-            await tick();
-
-            expect(writtenEffects()).toEqual(
-                expect.arrayContaining([
-                    {
-                        target: 'Goblin',
-                        source: 'Slasher Enhanced Critical',
-                        effect: 'slasher_enhanced_critical',
-                        duration: 'until_start_of_next_turn',
-                    },
-                ])
-            );
-        });
-
-        it('applies no enhanced-critical effect without a crit', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: makeStats([{
-                    type: 'conditional_advantage',
-                    trigger: 'critical_hit_slashing',
-                    name: 'Slasher Enhanced Critical',
-                }]),
-                popupHtml: { isCrit: false },
-            });
-
-            await resolveAttackDamage(makeAttack(), { hit: true });
-            await tick();
-
-            expect(writtenEffects().filter((e) => e.effect === 'slasher_enhanced_critical')).toHaveLength(0);
+            expect(writtenEffects().filter((e) => e.source === 'Crusher')).toEqual([
+                {
+                    target: 'Goblin',
+                    source: 'Crusher',
+                    option: 'Push 5 ft',
+                    effect: 'push',
+                    value: 5,
+                    sizeLimit: null,
+                    noOpportunityAttacks: false,
+                    duration: 'until_start_of_next_turn',
+                },
+            ]);
+            expect(callsForKey('_Crusher_usedRound')).toEqual([
+                [attackerName, '_Crusher_usedRound', 1, mockCampaignName],
+            ]);
+            // Round-trip proof: the latch value is readable back from the store.
+            expect(store.get(`${attackerName}:_Crusher_usedRound`)).toBe(1);
             expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
     });
@@ -508,44 +440,28 @@ describe('useAttackDamageResolution - feats', () => {
     });
 
     describe('Tavern Brawler', () => {
-        it.each([
-            {
-                branch: 'unarmed strike lands the MA-0079 push marker and latches first',
-                attack: { name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning', weaponType: 'unarmed' },
-                expectPush: true,
-            },
-            {
-                branch: 'armed strike never writes the push marker',
-                attack: { name: 'Shortsword', damage: '1d8+5', damageType: 'Piercing', weaponType: 'melee' },
-                expectPush: false,
-            },
-        ])('$branch', async ({ attack, expectPush }) => {
+        // Unarmed/armed condition gate is owned by tavernBrawlerPush.test.js;
+        // here the seam proves the effect-keyed passive dispatches and the
+        // push marker survives real wiring.
+        it('unarmed strike lands the MA-0079 push marker through the seam', async () => {
             useKeyValueStore();
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 playerStats: makeStats([{ effect: 'tavern_brawler_push' }]),
             });
 
-            await resolveAttackDamage(makeAttack(attack), { hit: true });
+            await resolveAttackDamage(
+                makeAttack({ name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning', weaponType: 'unarmed' }),
+                { hit: true }
+            );
             await tick();
 
-            const pushes = writtenEffects().filter((e) => e.source === attackerName && e.effect === 'push');
-            if (expectPush) {
-                expect(pushes).toEqual([
-                    { target: 'Goblin', source: attackerName, effect: 'push', value: 5, duration: 'instant' },
-                ]);
-                // Playbook §39: latch awaited BEFORE the te write.
-                const latchIdx = setRuntimeValue.mock.calls.findIndex((c) => c[1] === '_Tavern_Brawler_Push_UsedRound');
-                const teIdx = setRuntimeValue.mock.calls.findIndex((c) => c[1] === 'targetEffects');
-                expect(latchIdx).toBeGreaterThanOrEqual(0);
-                expect(latchIdx).toBeLessThan(teIdx);
-                // #1062 fix#363: seam pins PRESENCE-once only — the exact latch-value
-                // tuple ([attacker, key, round, campaign]) is byte-owned at the push
-                // lane, tavernBrawlerPush.test.js :167-170 (pair-split table #1061).
-                expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toHaveLength(1);
-            } else {
-                expect(pushes).toHaveLength(0);
-                expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toHaveLength(0);
-            }
+            expect(writtenEffects().filter((e) => e.source === attackerName && e.effect === 'push')).toEqual([
+                { target: 'Goblin', source: attackerName, effect: 'push', value: 5, duration: 'instant' },
+            ]);
+            // #1062 fix#363: seam pins PRESENCE-once only — the exact latch-value
+            // tuple and the latch-then-te ordering are byte-owned at the push
+            // lane, tavernBrawlerPush.test.js (pair-split table #1061).
+            expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toHaveLength(1);
             expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
     });

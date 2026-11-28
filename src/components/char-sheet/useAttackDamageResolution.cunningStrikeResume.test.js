@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Cunning Strike (Rogue 2024) resume-after-choice seam — CLA-188: a hit with
 // sneak dice available pauses the REAL pipeline at _pausedStep:'cunningStrike'
 // (the modal is opened by the step via setAttackRiderModal; the hook must hold
@@ -214,5 +214,10 @@ describe('useAttackDamageResolution — Cunning Strike pipeline resume (CLA-188)
       expect(setRuntimeValue).not.toHaveBeenCalledWith(CHAR, '_cunningStrikeCostUsed', 0, 'test-campaign');
     }
     expect(resumeRef.current).toBeNull();
+
+    // Completeness: resume must not re-open the modal, and the sneak-used
+    // latch lands exactly once even though resume was fired twice.
+    expect(deps.setModalState).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue.mock.calls.filter(c => c[1] === '_SneakAttack_usedRound')).toHaveLength(1);
   });
 });

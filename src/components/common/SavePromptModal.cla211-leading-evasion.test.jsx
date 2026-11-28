@@ -1,19 +1,28 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
-// CLA-211 — Leading Evasion chooser, MODAL side of the contract:
-//   1. Confirming a chooser session stamps ONLY the ticked prompt/target
-//      pairs (queue-filtered) and logs the share.
-//   2. The stamp survives the local `save-result` dispatch (adjudication
+// @maintained-by-ai 2026-11-27 — CLA-211 Leading Evasion: trigger gate, stamp/skip/Apply flow, share survive-and-consume
+// CLA-211 — Leading Evasion chooser TRIGGER + MODAL side of the contract:
+//   1. Trigger gate (hasShareableEvasionFor): a chooser session opens only
+//      for a half-damage (dcSuccess 'half') save when a shareable holder
+//      OTHER than the target exists. Full-damage saves and mismatched-save-
+//      type prompts never ask; the holder's own save folds own Evasion with
+//      no chooser and no stamp.
+//   2. Confirming stamps ONLY the ticked prompt/target pairs (queue-filtered,
+//      once per event) and logs the share with the exact copy.
+//   3. The stamp survives the local `save-result` dispatch (adjudication
 //      lanes read it there) and is consumed immediately after.
-//   3. A ticked ally's save dispatches evasionActive:true; an unselected
+//   4. A ticked ally's save dispatches evasionActive:true; an unselected
 //      ally in the SAME chooser session dispatches evasionActive:false.
-//   4. Skip grants nobody: declined log, no stamp, evasionActive:false.
-//   5. The holder's own save folds its own Evasion with no chooser session.
+//   5. Skip grants nobody: exact declined log, no stamp, evasionActive:false.
 //
-// Not re-tested here (covered elsewhere): chooser presentation/Apply gating
-// (.actions), row select/deselect and overlay inertness (.coverage),
-// adjudication-lane folding via isLeadingEvasionSelected
-// (saveProcessing.cla211-leading-evasion.test.js, evasionUtils.test.js).
+// Not owned here — do not re-add:
+// - Apply(0) gating, Done payloads, hold-until-Done, rolled Next Save
+//   advancement ................................. .actions.test.jsx (#1935)
+// - chooser row tick/untick UX, Apply-count copy, overlay modal inertness,
+//   confirm-closes-chooser-leaves-save-PENDING, external-clear/dismiss
+//   advancement .................................. .coverage.test.jsx
+// - Evasion NOTE display branches (shared/own/incapacitated, cross-prompt
+//   stamp inertness) ............... .evasion-note-selection.test.jsx
+// - adjudication-lane folding via isLeadingEvasionSelected
+//   (saveProcessing.cla211-leading-evasion.test.js, evasionUtils.test.js)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
@@ -34,7 +43,10 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
+// sendSavePrompt is a real graph import (savePrompt.js → this module); it must
+// exist on the mock or its access throws, even though this lane never sends.
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
+  sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
   clearSavePrompt: vi.fn(),
 }));
@@ -47,13 +59,17 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }));
 
+// Keys mirror the graph's actual imports: getStore (applyDamage.js),
+// deleteRuntimeKey (savePrompt.js), setRuntimeObject + getAllStoreKeys
+// (applyDamage.js / expirationQueue.js / infernalWoundService.js).
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => null),
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
+  deleteRuntimeKey: vi.fn(),
+  setRuntimeObject: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -82,28 +98,36 @@ vi.mock('../../services/rules/combat/evasionUtils.js', async (importOriginal) =>
   };
 });
 
-// Test-event feeder: one button per creature, each delivering a DEX DC 16
-// half-damage save prompt (Lightning Breath) through the real handleEvent,
-// campaign-scoped as production SSE delivers them.
+// Test-event feeder: one button per scenario, each delivering a DEX DC 16
+// save prompt (Lightning Breath) through the real handleEvent, campaign-
+// scoped as production SSE delivers them. The first three are dcSuccess
+// 'half' (chooser-eligible); 'plain' omits dcSuccess (full damage) and
+// 'wis' is a mismatched-ability half save — both trigger-gate negatives.
 vi.mock('./Subscriber.jsx', () => {
   function MockSubscriber({ handleEvent, campaignName }) {
-    const trigger = (testId, targetName, promptId) => (
-      <button
-        data-testid={`trigger-${testId}`}
-        aria-label={`prompt ${targetName}`}
-        onClick={() => handleEvent({
-          key: `change-${campaignName}-savePrompt-${targetName}`,
-          data: { promptId, targetName, saveType: 'DEX', saveDc: 16, disadvantage: false, dcSuccess: 'half', sourceName: 'Lightning Breath' },
-        })}
-      >
-        {targetName}
-      </button>
-    );
+    const trigger = (testId, targetName, promptId, { saveType = 'DEX', dcSuccess } = {}) => {
+      const data = { promptId, targetName, saveType, saveDc: 16, disadvantage: false, sourceName: 'Lightning Breath' };
+      if (dcSuccess) data.dcSuccess = dcSuccess;
+      return (
+        <button
+          data-testid={`trigger-${testId}`}
+          aria-label={`prompt ${targetName}`}
+          onClick={() => handleEvent({
+            key: `change-${campaignName}-savePrompt-${targetName}`,
+            data,
+          })}
+        >
+          {targetName}
+        </button>
+      );
+    };
     return (
       <div data-testid="subscriber">
-        {trigger('hex', 'HexWarlock', 'p-hex')}
-        {trigger('pal', 'ElderPaladin', 'p-pal')}
-        {trigger('bard', 'Bard', 'p-bard')}
+        {trigger('hex', 'HexWarlock', 'p-hex', { dcSuccess: 'half' })}
+        {trigger('pal', 'ElderPaladin', 'p-pal', { dcSuccess: 'half' })}
+        {trigger('bard', 'Bard', 'p-bard', { dcSuccess: 'half' })}
+        {trigger('plain', 'ElderPaladin', 'p-plain')}
+        {trigger('wis', 'HexWarlock', 'p-wis', { saveType: 'WIS', dcSuccess: 'half' })}
       </div>
     );
   }
@@ -175,19 +199,21 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
     cleanupDefaults();
   });
 
-  it('confirming ticks stamps only the ticked prompt/target pair, logs the share, and the stamp survives the save-result dispatch', async () => {
+  it('confirming ticks stamps only the ticked prompt/target pair, logs the exact share copy, and the stamp survives the save-result dispatch', async () => {
     renderModal();
     await openChooser('hex');
 
     tickAlly('HexWarlock');
     fireEvent.click(screen.getByRole('button', { name: /Apply Evasion \(1\)/i }));
 
+    // Once per confirm event; queue-filtered to exactly the ticked pair.
+    expect(stampLeadingEvasionSelections).toHaveBeenCalledTimes(1);
     expect(stampLeadingEvasionSelections).toHaveBeenCalledWith('test-campaign', [['p-hex', ['HexWarlock']]]);
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'automation',
       automationType: 'leading_evasion_shared',
       characterName: 'HexWarlock',
-      description: expect.stringMatching(/shared with HexWarlock/i),
+      description: 'Leading Evasion shared with HexWarlock — DC 16 DEX save (Lightning Breath). Selected allies take half damage on a failed save and no damage on a successful save.',
     }));
     await waitFor(() => {
       expect(screen.queryByText(/Leading Evasion — Choose Allies/i)).not.toBeInTheDocument();
@@ -200,6 +226,7 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
     expect(dispatched[0]).toEqual(expect.objectContaining({
       promptId: 'p-hex',
       targetName: 'HexWarlock',
+      saveType: 'DEX',
       saveDc: 16,
       dcSuccess: 'half',
       success: false,
@@ -261,7 +288,7 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
     expect(clearLeadingEvasionSelection).toHaveBeenCalledWith('test-campaign', 'p-hex');
   });
 
-  it('Skip declines the share for everyone: no stamp, declined logged, the save pays full', async () => {
+  it('Skip declines the share for everyone: no stamp, exact declined log, the save pays full', async () => {
     renderModal();
     await openChooser('pal');
 
@@ -272,6 +299,7 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
       type: 'automation',
       automationType: 'leading_evasion_declined',
       characterName: 'ElderPaladin',
+      description: 'Leading Evasion share declined for DC 16 DEX save (Lightning Breath) — no allies selected; every unselected target pays normal save damage.',
     }));
     await waitFor(() => {
       expect(screen.queryByText(/Leading Evasion — Choose Allies/i)).not.toBeInTheDocument();
@@ -290,6 +318,8 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
 
   it('the holder itself folds own Evasion with no chooser session and no stamp', async () => {
     renderModal();
+    // Self-exclusion leg of the trigger: the only shareable holder IS the
+    // target, so the roster scan finds nobody else and never asks.
     fireEvent.click(screen.getByTestId('trigger-bard'));
     await waitFor(() => {
       expect(screen.getByText(/must make a/i)).toBeInTheDocument();
@@ -303,8 +333,54 @@ describe('SavePromptModal — CLA-211 Leading Evasion chooser', () => {
     expect(dispatched[0]).toEqual(expect.objectContaining({
       promptId: 'p-bard',
       targetName: 'Bard',
+      saveType: 'DEX',
+      dcSuccess: 'half',
+      success: false,
       evasionActive: true,
     }));
     expect(stampLeadingEvasionSelections).not.toHaveBeenCalled();
+  });
+
+  it('the trigger gate holds: a full-damage save and a mismatched-save-type save never open the chooser', async () => {
+    renderModal();
+
+    // Leg 1: dcSuccess !== 'half' short-circuits hasShareableEvasionFor even
+    // though Bard holds a shareable DEX evasion.
+    fireEvent.click(screen.getByTestId('trigger-plain'));
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Leading Evasion — Choose Allies/i)).not.toBeInTheDocument();
+
+    await rollAndWaitForFailure();
+    clickSubmit();
+
+    // Leg 2: a half save of the WRONG ability — the holder's DEX-only
+    // shareable evasion does not match a WIS prompt.
+    fireEvent.click(screen.getByTestId('trigger-wis'));
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Leading Evasion — Choose Allies/i)).not.toBeInTheDocument();
+
+    await rollAndWaitForFailure();
+    clickSubmit();
+
+    expect(stampLeadingEvasionSelections).not.toHaveBeenCalled();
+    expect(dispatched).toHaveLength(2);
+    expect(dispatched[0]).toEqual(expect.objectContaining({
+      promptId: 'p-plain',
+      targetName: 'ElderPaladin',
+      saveType: 'DEX',
+      dcSuccess: undefined,
+      evasionActive: false,
+    }));
+    expect(dispatched[1]).toEqual(expect.objectContaining({
+      promptId: 'p-wis',
+      targetName: 'HexWarlock',
+      saveType: 'WIS',
+      dcSuccess: 'half',
+      evasionActive: false,
+    }));
   });
 });

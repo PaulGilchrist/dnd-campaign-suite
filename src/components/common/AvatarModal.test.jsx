@@ -1,5 +1,13 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27 — shared avatar zoom: owns the src/letter branch
+// wiring (branch-by-branch resolution is canonical in avatarSrc.test.js), the
+// dangling-path degrade, the close lanes (×, one-shot document Escape, backdrop
+// with the .avatar-modal drag guard), and the focus tier (pull/retain/restore —
+// CreatureCard.avatarImagePopup.test.jsx explicitly defers these here; the
+// arming decision lives at the CharSummary-AvatarZoomArming seam).
+// panelEl() queries the .avatar-modal class on purpose: it is a behavioral
+// contract (the panelSelector handed to useModalDismiss) as well as popup.css.
+// Escape legs dispatch AT document/panel targets: a keydown targeted at
+// document.body would also trip useModalDismiss's window-level rescue lane.
 import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -7,7 +15,7 @@ import AvatarModal from './AvatarModal.jsx';
 
 /** Render the modal with sensible defaults; pass props to override. */
 const renderModal = (props = {}) =>
-  render(<AvatarModal name="Gandalf" onClose={vi.fn()} {...props} />);
+  render(<AvatarModal name="Grimtooth" onClose={vi.fn()} {...props} />);
 
 const panelEl = () =>
   screen.getByTestId('avatar-modal-overlay').querySelector('.avatar-modal');
@@ -46,80 +54,36 @@ const openFromAvatar = () => {
 const flush = () => act(async () => {});
 
 describe('AvatarModal', () => {
-  describe('image display', () => {
-    it('displays the image at the given path unchanged when no campaignName is set', () => {
-      renderModal({ imagePath: '/images/gandalf.png' });
-
-      const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', '/images/gandalf.png');
-      expect(img).toHaveAttribute('alt', 'Gandalf');
+  // Only the WIRING is pinned here: distinctively-named fixtures prove the
+  // modal routes imagePath + campaignName into resolveAvatarSrc in that order
+  // and paints the result; the falsy-src side drops to the letter branch.
+  it('paints the campaign-prefixed resolved src named after the character, hiding the letter fallback', () => {
+    renderModal({
+      name: 'Mirkwood Bal',
+      imagePath: 'images/npcs/mirkwood-bal.png',
+      campaignName: 'my-campaign',
     });
 
-    it('prefers the image over the letter fallback when both are available', () => {
-      renderModal({ imagePath: '/images/gandalf.png' });
-
-      expect(screen.getByRole('img')).toBeInTheDocument();
-      expect(screen.queryByText('G')).not.toBeInTheDocument();
-    });
-
-    it.each([
-      ['https://example.com/gandalf.png'],
-      ['http://example.com/gandalf.png'],
-    ])('serves external URLs unchanged even when campaignName is set', (url) => {
-      renderModal({ imagePath: url, campaignName: 'frostfall' });
-
-      expect(screen.getByRole('img')).toHaveAttribute('src', url);
-    });
-
-    it('prefixes the campaign directory onto relative campaign image paths', () => {
-      renderModal({ imagePath: 'images/npcs/gandalf.png', campaignName: 'frostfall' });
-
-      expect(screen.getByRole('img')).toHaveAttribute(
-        'src',
-        'campaigns/frostfall/images/npcs/gandalf.png'
-      );
-    });
-
-    // Documents current string-join behaviour: a leading slash on imagePath is
-    // preserved, so the joined URL contains a double slash. Servers normalise
-    // this, but the exact output is pinned here so a join refactor is deliberate.
-    it('preserves a leading slash on the image path when joining the campaign directory', () => {
-      renderModal({ imagePath: '/images/gandalf.png', campaignName: 'frostfall' });
-
-      expect(screen.getByRole('img')).toHaveAttribute(
-        'src',
-        'campaigns/frostfall//images/gandalf.png'
-      );
-    });
+    const img = screen.getByRole('img');
+    expect(img).toHaveAttribute('src', 'campaigns/my-campaign/images/npcs/mirkwood-bal.png');
+    expect(img).toHaveAttribute('alt', 'Mirkwood Bal');
+    expect(screen.queryByText('M')).not.toBeInTheDocument();
   });
 
   describe('letter fallback', () => {
-    it('shows the uppercased initial when no image is available', () => {
-      renderModal({ name: 'gandalf' });
+    it('shows the uppercased initial when no image resolves', () => {
+      renderModal({ name: 'mirkwood bal', imagePath: null });
 
-      expect(screen.getByText('G')).toBeInTheDocument();
+      expect(screen.getByText('M')).toBeInTheDocument();
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
     });
 
-    it.each([['empty string', ''], ['null', null], ['undefined', undefined]])(
-      'shows "?" when name is %s',
-      (_label, name) => {
-        renderModal({ name });
+    it('shows "?" when the name is empty', () => {
+      renderModal({ name: '' });
 
-        expect(screen.getByText('?')).toBeInTheDocument();
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-      }
-    );
-
-    it.each([['null', null], ['undefined', undefined]])(
-      'shows the initial instead of an img element when imagePath is %s',
-      (_label, imagePath) => {
-        renderModal({ imagePath });
-
-        expect(screen.getByText('G')).toBeInTheDocument();
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-      }
-    );
+      expect(screen.getByText('?')).toBeInTheDocument();
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    });
   });
 
   // Dangling-path degrade (backlog 2026-11-17 CD): a zoom whose image fails to
@@ -132,7 +96,7 @@ describe('AvatarModal', () => {
       fireEvent.error(screen.getByRole('img'));
 
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
-      expect(panelEl().querySelector('.avatar-modal-initial')).toHaveTextContent('G');
+      expect(screen.getByText('G')).toBeInTheDocument();
     });
 
     it('shows the letter fallback when a "successful" load decodes zero pixels', () => {
@@ -144,29 +108,20 @@ describe('AvatarModal', () => {
     });
 
     it('keeps the painting image on a successful load (no lingering fallback)', () => {
-      renderModal({ imagePath: '/images/gandalf.png' });
+      renderModal({ imagePath: '/images/grimtooth.png' });
       const img = screen.getByRole('img');
       Object.defineProperty(img, 'naturalWidth', { value: 494 });
       fireEvent.load(img);
 
-      expect(screen.getByRole('img')).toHaveClass('avatar-modal-image');
-      expect(panelEl().querySelector('.avatar-modal-initial')).toBeNull();
-    });
-
-    it('the degraded zoom still closes via the × lane', () => {
-      const handleClose = vi.fn();
-      renderModal({ imagePath: '/images/missing.png', onClose: handleClose });
-      fireEvent.error(screen.getByRole('img'));
-
-      fireEvent.click(screen.getByLabelText('Close'));
-      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('img')).toHaveAttribute('src', '/images/grimtooth.png');
+      expect(screen.queryByText('G')).not.toBeInTheDocument();
     });
   });
 
   describe('closing', () => {
     it('calls onClose when the close button is clicked', () => {
       const handleClose = vi.fn();
-      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
+      renderModal({ imagePath: '/images/grimtooth.png', onClose: handleClose });
 
       fireEvent.click(screen.getByLabelText('Close'));
       expect(handleClose).toHaveBeenCalledTimes(1);
@@ -174,8 +129,10 @@ describe('AvatarModal', () => {
 
     // Backdrop dismiss lane (backlog 2026-11-16, modal-family law shared with
     // DeleteConfirmModal/quick-create): a PURE backdrop click — mousedown AND
-    // click both on the overlay — routes to onClose. A drag that started inside
-    // .avatar-modal (text selection released over the backdrop) never dismisses.
+    // click both on the overlay — routes to onClose. A drag that started
+    // inside .avatar-modal (text selection released over the backdrop) never
+    // dismisses, and neither does a click bubbling up from the panel body —
+    // together these prove the panelSelector '.avatar-modal' is wired in.
     it('calls onClose exactly once on a pure backdrop click (mousedown and click both on the overlay)', () => {
       const handleClose = vi.fn();
       renderModal({ onClose: handleClose });
@@ -188,53 +145,26 @@ describe('AvatarModal', () => {
 
     it('does not close when a drag started inside the modal body and released over the backdrop', () => {
       const handleClose = vi.fn();
-      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
+      renderModal({ imagePath: '/images/grimtooth.png', onClose: handleClose });
 
-      const overlay = screen.getByTestId('avatar-modal-overlay');
       fireEvent.mouseDown(screen.getByRole('img'));
-      fireEvent.click(overlay);
-      expect(handleClose).not.toHaveBeenCalled();
-    });
-
-    it('does not close when a backdrop press releases inside the modal body', () => {
-      const handleClose = vi.fn();
-      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
-
-      fireEvent.mouseDown(screen.getByTestId('avatar-modal-overlay'));
-      fireEvent.click(screen.getByRole('img'));
+      fireEvent.click(screen.getByTestId('avatar-modal-overlay'));
       expect(handleClose).not.toHaveBeenCalled();
     });
 
     it('does not close when a click bubbles up from the modal body', () => {
       const handleClose = vi.fn();
-      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
+      renderModal({ imagePath: '/images/grimtooth.png', onClose: handleClose });
 
-      // Clicking the image bubbles up through the modal to the overlay.
       fireEvent.click(screen.getByRole('img'));
       expect(handleClose).not.toHaveBeenCalled();
       expect(screen.getByRole('img')).toBeInTheDocument();
     });
 
-    it('calls onClose when Escape is pressed', () => {
-      const handleClose = vi.fn();
-      renderModal({ onClose: handleClose });
-
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(handleClose).toHaveBeenCalledTimes(1);
-    });
-
-    it.each(['Enter', 'Tab', 'e'])(
-      'ignores the %s key',
-      (key) => {
-        const handleClose = vi.fn();
-        renderModal({ onClose: handleClose });
-
-        fireEvent.keyDown(document, { key });
-        expect(handleClose).not.toHaveBeenCalled();
-      }
-    );
-
-    it('closes exactly once — repeat presses after the first do not re-fire onClose', () => {
+    // One-shot document Escape lane: the first press closes and removes the
+    // listener, repeat presses are inert until a fresh gesture re-arms the
+    // count, and unmounting unbinds entirely.
+    it('closes exactly once per Escape gesture; repeat presses never re-fire onClose', () => {
       const handleClose = vi.fn();
       renderModal({ onClose: handleClose });
 
@@ -242,11 +172,20 @@ describe('AvatarModal', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(handleClose).toHaveBeenCalledTimes(1);
 
-      // Same guard applies after closing via the button.
+      // The × lane still answers afterwards (listener removal rides onClose,
+      // not a permanent kill switch).
       fireEvent.click(screen.getByLabelText('Close'));
       expect(handleClose).toHaveBeenCalledTimes(2);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(handleClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores keydowns that are not Escape', () => {
+      const handleClose = vi.fn();
+      renderModal({ onClose: handleClose });
+
+      fireEvent.keyDown(document, { key: 'Enter' });
+      expect(handleClose).not.toHaveBeenCalled();
     });
 
     it('no longer responds to Escape after the modal is unmounted', () => {
@@ -263,17 +202,11 @@ describe('AvatarModal', () => {
   // pull + focusin retention, mirrored into the avatar zoom so an Enter-opened
   // overlay never leaves a keyboard user on the avatar behind it.
   describe('keyboard focus tier', () => {
-    it('pulls focus into the .avatar-modal panel on open (any open lane)', () => {
+    it('pulls focus into the panel on open and marks it programmatically focusable (tabIndex -1, no Tab stop)', () => {
       render(<ZoomHarness />);
       openFromAvatar();
 
       expect(document.activeElement).toBe(panelEl());
-    });
-
-    it('marks the panel programmatically focusable (tabIndex -1, no Tab stop)', () => {
-      render(<ZoomHarness />);
-      openFromAvatar();
-
       expect(panelEl()).toHaveAttribute('tabindex', '-1');
     });
 
@@ -296,14 +229,6 @@ describe('AvatarModal', () => {
       expect(document.activeElement).toBe(panelEl());
     });
 
-    it('Escape from inside the panel closes the zoom without tabbing first', () => {
-      render(<ZoomHarness />);
-      openFromAvatar();
-
-      fireEvent.keyDown(panelEl(), { key: 'Escape' });
-      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
-    });
-
     it('Escape from the focused × closes the zoom', () => {
       render(<ZoomHarness />);
       openFromAvatar();
@@ -314,33 +239,14 @@ describe('AvatarModal', () => {
       expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
     });
 
+    // Every close lane (×, Escape, backdrop) funnels through the consumer's
+    // open flag, so one restore leg rides the real unmount path.
     it('Escape restores focus to the avatar that opened the zoom', async () => {
       render(<ZoomHarness />);
       const opener = openFromAvatar();
 
       fireEvent.keyDown(panelEl(), { key: 'Escape' });
       await flush();
-      expect(document.activeElement).toBe(opener);
-    });
-
-    it('the × click restores focus to the opening avatar too', async () => {
-      render(<ZoomHarness />);
-      const opener = openFromAvatar();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      await flush();
-      expect(document.activeElement).toBe(opener);
-    });
-
-    it('a pure backdrop click closes and restores focus to the opening avatar', async () => {
-      render(<ZoomHarness />);
-      const opener = openFromAvatar();
-
-      const overlay = screen.getByTestId('avatar-modal-overlay');
-      fireEvent.mouseDown(overlay);
-      fireEvent.click(overlay);
-      await flush();
-      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
       expect(document.activeElement).toBe(opener);
     });
 

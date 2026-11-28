@@ -1,7 +1,8 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // Save-flow lane for AOEConditionModal (NON-overlay path): cast logging +
-// storeSpellLastAttack, NPC auto-save resolution, player save prompts and
-// save-result handling, Careful Spell protection (NPC and player branches),
+// storeSpellLastAttack, NPC auto-save resolution, the player prompt round trip
+// (payload, pendingSaveListenerPrompts registration, minimal-detail ?? 0
+// zero-fill resolution), Careful Spell protection (NPC and player branches),
 // mixed targets in one cast.
 // Sibling lanes (do not duplicate here): test.jsx = render/selection UI;
 // results.test.jsx = activeConditions dedup + trap-blocking truth table;
@@ -166,10 +167,10 @@ describe('AOEConditionModal save flow', () => {
 
     it('selection wrapper flips to the dynamic display:none inline when the summary shows (dynamic-data exception)', async () => {
         // fix#313 recipe pin, positive half: the one lawful inline style on the
-        // non-overlay wrapper (AOEConditionModal.jsx :644-era) is visibility
-        // derived from showResults. Selection phase inline is display-free; after
-        // every NPC target resolves it must read exactly display:none and still
-        // carry no static decoration (those live in the CSS files).
+        // non-overlay wrapper is visibility derived from showResults (the
+        // selection-phase half is pinned by test.jsx). Selection phase inline is
+        // display-free; after every NPC target resolves it must read exactly
+        // display:none and still carry no static decoration (those live in CSS).
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC })} />);
         const wrapper = document.querySelector('.sp-overlay').parentElement;
         expect(wrapper.getAttribute('style') || '').not.toMatch(/margin|padding|background|color|cursor/i);
@@ -291,7 +292,7 @@ describe('AOEConditionModal save flow', () => {
         expect(summaryText()).toMatch(/2\s*targets saved,\s*0\s*targets failed/);
     });
 
-    it('sends a save prompt for an unprotected player and registers it in pendingSaveListenerPrompts', async () => {
+    it('prompts an unprotected player, registers the pending prompt, then resolves the arriving save-result with ?? 0 zero-fill', async () => {
         render(<AOEConditionModal {...makeProps()} />);
         selectTarget('PlayerAlly');
         await flush(clickApply);
@@ -316,17 +317,11 @@ describe('AOEConditionModal save flow', () => {
         expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
         expect(saveResultFor('PlayerAlly')).toBeUndefined();
         expect(addExpiration).not.toHaveBeenCalled();
-    });
 
-    it('applies blinded and zero-fills the log when a player save-result fails with minimal fields', async () => {
-        render(<AOEConditionModal {...makeProps()} />);
-        selectTarget('PlayerAlly');
-        await flush(clickApply);
-        const promptId = sendSavePrompt.mock.calls[0][1].promptId;
-
-        // Genuinely minimal detail: no roll/total/saveBonus — pins the ?? 0 fallback.
+        // Genuinely minimal detail: no roll/total/saveBonus — pins the ?? 0
+        // fallback on the logged save_result row (AOEConditionModal.jsx :86-88).
         await flush(() => fireEvent(window, new CustomEvent('save-result', {
-            detail: { promptId, success: false },
+            detail: { promptId: payload.promptId, success: false },
         })));
 
         const writes = conditionWritesFor('PlayerAlly');

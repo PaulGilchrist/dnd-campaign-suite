@@ -1,10 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardStepRules from './WizardStepRules.jsx';
+import { RULESET_REQUIRED_ERROR } from '../../config/utils.js';
 
 // Disk-faithful option content copied verbatim from WizardStepRules.jsx (#387).
 const OPTION_5E = {
+  value: '5e',
   testId: 'rules-option-5e',
   label: '5th Edition (5e)',
   blurb: 'The classic D&D ruleset from 2014. Features traditional spell slots, class features, and ability scores.',
@@ -16,6 +18,7 @@ const OPTION_5E = {
   ],
 };
 const OPTION_2024 = {
+  value: '2024',
   testId: 'rules-option-2024',
   label: '2024 Rules (Essentials)',
   blurb: 'The updated D&D ruleset with streamlined mechanics and modernized features.',
@@ -26,6 +29,8 @@ const OPTION_2024 = {
     'Modern subclass system',
   ],
 };
+const RULESET_OPTIONS = [OPTION_5E, OPTION_2024];
+const otherOption = (option) => RULESET_OPTIONS.find(o => o !== option);
 
 function renderStep(props = {}) {
   // Fresh props per render (#362); stepNumber is not a prop of this component.
@@ -46,7 +51,7 @@ describe('WizardStepRules', () => {
     expect(screen.getByText(OPTION_5E.blurb)).toBeInTheDocument();
     expect(screen.getByText(OPTION_2024.blurb)).toBeInTheDocument();
 
-    for (const option of [OPTION_5E, OPTION_2024]) {
+    for (const option of RULESET_OPTIONS) {
       expect(
         within(screen.getByTestId(option.testId)).getAllByRole('listitem').map(li => li.textContent)
       ).toEqual(option.features);
@@ -55,126 +60,79 @@ describe('WizardStepRules', () => {
 
   // 'selected' is CSS-load-bearing: it renders the chosen-option highlight
   // (.character-creation-wizard .rules-option.selected, CharacterCreationWizard.css:339).
-  it.each([OPTION_5E, OPTION_2024])(
-    'marks only $testId as selected when ruleset is its value', ({ testId }) => {
-      const ruleset = testId === OPTION_5E.testId ? '5e' : '2024';
-      renderStep({ ruleset });
+  it.each(RULESET_OPTIONS)(
+    'marks only $testId as selected when ruleset is $value', (option) => {
+      renderStep({ ruleset: option.value });
 
-      expect(screen.getByTestId(testId)).toHaveClass('selected');
-      const other = testId === OPTION_5E.testId ? OPTION_2024 : OPTION_5E;
-      expect(screen.getByTestId(other.testId)).not.toHaveClass('selected');
+      expect(screen.getByTestId(option.testId)).toHaveClass('selected');
+      expect(screen.getByTestId(otherOption(option).testId)).not.toHaveClass('selected');
     }
   );
 
-  it.each([OPTION_5E, OPTION_2024])(
-    'clicking $testId calls onRulesetChange once with the exact ruleset value', ({ testId }) => {
+  it.each(RULESET_OPTIONS)(
+    'clicking $testId calls onRulesetChange once with the exact ruleset value', ({ testId, value }) => {
       const onRulesetChange = vi.fn();
       renderStep({ onRulesetChange });
 
       fireEvent.click(screen.getByTestId(testId));
 
-      const ruleset = testId === OPTION_5E.testId ? '5e' : '2024';
       expect(onRulesetChange).toHaveBeenCalledTimes(1);
-      expect(onRulesetChange).toHaveBeenCalledWith(ruleset);
+      expect(onRulesetChange).toHaveBeenCalledWith(value);
     }
   );
 
+  // One error line derived from errors.ruleset and the ruleset prop: an explicit
+  // validator message wins (even over a selection); otherwise the step-1 blocker
+  // hint (parity with the step-2 name gate) shows until a pick clears it on the
+  // very same re-render. The whole matrix asserts exactly ONE .error-message.
+  const VALIDATOR_MSG = 'Please select a ruleset';
   it.each([
-    [{ ruleset: 'Please select a ruleset' }, 'Please select a ruleset'],
-    [{}, null],
-    [undefined, null],
-  ])('with errors %j renders error text %s', (errors, expected) => {
-    renderStep({ errors });
+    // [ruleset, errors, sole .error-message text (null = none)]
+    ['5e', { ruleset: VALIDATOR_MSG }, VALIDATOR_MSG],
+    [null, { ruleset: VALIDATOR_MSG }, VALIDATOR_MSG],
+    [null, {}, RULESET_REQUIRED_ERROR],
+    ['5e', undefined, null],
+  ])(
+    'ruleset=%s with errors %j renders only %s as the error line',
+    (ruleset, errors, expected) => {
+      renderStep({ ruleset, errors });
 
-    if (expected) {
-      const errorEl = screen.getByText(expected);
-      expect(errorEl).toBeInTheDocument();
-      expect(errorEl).toHaveClass('error-message');
-    } else {
-      expect(screen.queryByText('Please select a ruleset')).not.toBeInTheDocument();
-      expect(document.querySelector('.error-message')).not.toBeInTheDocument();
-    }
-  });
-
-  // Step-1 blocker hint (parity with the step-2 name gate): derived straight
-  // from the ruleset prop, so a pick clears it on the very same re-render.
-  it('shows the inline blocker hint while no ruleset is selected', () => {
-    renderStep({ ruleset: null });
-
-    const hint = screen.getByText('Select a ruleset to continue');
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveClass('error-message');
-  });
-
-  it.each(['5e', '2024'])(
-    'shows no hint once ruleset %s is selected', (ruleset) => {
-      renderStep({ ruleset });
-
-      expect(screen.queryByText('Select a ruleset to continue')).not.toBeInTheDocument();
-      expect(document.querySelector('.error-message')).not.toBeInTheDocument();
+      expect(
+        [...document.querySelectorAll('.error-message')].map(el => el.textContent)
+      ).toEqual(expected === null ? [] : [expected]);
     }
   );
-
-  it('prefers an explicit errors.ruleset message over the default hint', () => {
-    renderStep({ ruleset: null, errors: { ruleset: 'Please select a ruleset' } });
-
-    expect(screen.getByText('Please select a ruleset')).toBeInTheDocument();
-    expect(screen.queryByText('Select a ruleset to continue')).not.toBeInTheDocument();
-  });
 
   // ——— Quick build / Custom build entry affordance (Item 1, foundation plan) ———
-  it('renders both build-mode cards with custom selected by default', () => {
-    renderStep();
+  it.each([
+    // buildMode prop defaults to 'custom'
+    [undefined, 'custom', 'quick'],
+    ['quick', 'quick', 'custom'],
+  ])(
+    'buildMode %s marks only build-mode-%s selected', (buildMode, selected, unselected) => {
+      renderStep({ buildMode });
 
-    expect(screen.getByTestId('build-mode-custom')).toBeInTheDocument();
-    expect(screen.getByTestId('build-mode-quick')).toBeInTheDocument();
-    expect(screen.getByTestId('build-mode-custom')).toHaveClass('selected');
-    expect(screen.getByTestId('build-mode-quick')).not.toHaveClass('selected');
-  });
+      expect(screen.getByTestId(`build-mode-${selected}`)).toHaveClass('selected');
+      expect(screen.getByTestId(`build-mode-${unselected}`)).not.toHaveClass('selected');
+    }
+  );
 
-  it('marks only the selected build-mode card when buildMode=quick', () => {
-    renderStep({ buildMode: 'quick' });
+  it.each(['quick', 'custom'])(
+    'clicking build-mode-%s calls onBuildModeChange once with that mode and leaves the ruleset untouched',
+    (mode) => {
+      const onBuildModeChange = vi.fn();
+      const onRulesetChange = vi.fn();
+      renderStep({ buildMode: mode === 'quick' ? 'custom' : 'quick', onBuildModeChange, onRulesetChange });
 
-    expect(screen.getByTestId('build-mode-quick')).toHaveClass('selected');
-    expect(screen.getByTestId('build-mode-custom')).not.toHaveClass('selected');
-  });
+      fireEvent.click(screen.getByTestId(`build-mode-${mode}`));
 
-  it('clicking build-mode-quick calls onBuildModeChange with quick and leaves the ruleset untouched', () => {
-    const onBuildModeChange = vi.fn();
-    const onRulesetChange = vi.fn();
-    renderStep({ onBuildModeChange, onRulesetChange });
+      expect(onBuildModeChange).toHaveBeenCalledTimes(1);
+      expect(onBuildModeChange).toHaveBeenCalledWith(mode);
+      expect(onRulesetChange).not.toHaveBeenCalled();
+    }
+  );
 
-    fireEvent.click(screen.getByTestId('build-mode-quick'));
-
-    expect(onBuildModeChange).toHaveBeenCalledTimes(1);
-    expect(onBuildModeChange).toHaveBeenCalledWith('quick');
-    expect(onRulesetChange).not.toHaveBeenCalled();
-  });
-
-  it('clicking build-mode-custom calls onBuildModeChange with custom', () => {
-    const onBuildModeChange = vi.fn();
-    renderStep({ buildMode: 'quick', onBuildModeChange });
-
-    fireEvent.click(screen.getByTestId('build-mode-custom'));
-
-    expect(onBuildModeChange).toHaveBeenCalledWith('custom');
-  });
-
-  it('tolerates a missing onBuildModeChange prop (no throw on click)', () => {
-    renderStep();
-    expect(() => fireEvent.click(screen.getByTestId('build-mode-quick'))).not.toThrow();
-  });
-
-  // Edit lane: a saved character is already built and the quick-build prefill
-  // is inert while editing, so the cards stay hidden — the ruleset cards and
-  // the ledger-guarded switch lane are the whole step.
-  it('edit mode hides the build-mode cards but keeps the ruleset cards', () => {
-    renderStep({ isEditing: true, ruleset: '2024' });
-
-    expect(screen.queryByTestId('build-mode-custom')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('build-mode-quick')).not.toBeInTheDocument();
-    expect(screen.queryByText('Choose how to build your character:')).not.toBeInTheDocument();
-    expect(screen.getByTestId('rules-option-5e')).toBeInTheDocument();
-    expect(screen.getByTestId('rules-option-2024')).toHaveClass('selected');
-  });
+  // Edit-mode card hiding (the {!isEditing && ...} branch) is covered at the
+  // integration level by CharacterCreationWizard.edit-ruleset-switch.test.jsx
+  // ('create-only build-mode cards hidden') — not re-asserted here.
 });

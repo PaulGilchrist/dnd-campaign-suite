@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /* Lane: loading a SAVED encounter into the builder — server GET boundary
  * (loadEncounterData) → state hydration: title/description/selected monsters
  * restored, bestiary-first ref resolution, effective-XP reconcile write-back,
@@ -250,6 +250,8 @@ describe('EncounterBuilder - handleLoadEncounter', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selected-xp-unknown-monster')).toHaveTextContent('500 XP');
     });
+    expect(screen.getByTestId('selected-name-unknown-monster')).toHaveTextContent('Unknown Monster');
+    expect(screen.getByTestId('monster-count')).toHaveTextContent('1');
     expect(screen.getByTestId('total-xp')).toHaveTextContent('500');
     expect(screen.getByTestId('effective-xp')).toHaveTextContent('500');
   });
@@ -284,14 +286,15 @@ describe('EncounterBuilder - handleLoadEncounter', () => {
     }
   });
 
-  it('clears stale description and keeps no selection when the stored roster is empty', async () => {
+  it('replaces the current selection with nothing and skips write-back when the stored roster is empty', async () => {
+    const updateEncounter = vi.fn();
     const loadEncounterData = vi.fn().mockResolvedValue({
       selectedMonsters: [],
       description: 'No monsters',
-      effectiveXP: 0,
+      effectiveXP: 999, // stale, but the empty-roster guard must skip reconcile
     });
 
-    await renderWithLoadEncounter(loadEncounterData);
+    await renderWithLoadEncounter(loadEncounterData, { updateEncounter });
     await setupLoadFlow();
 
     await waitFor(() => {
@@ -299,8 +302,10 @@ describe('EncounterBuilder - handleLoadEncounter', () => {
     });
 
     expect(screen.getByText('Encounter: test-encounter')).toBeInTheDocument();
+    // Pre-load goblin selection is wiped by the empty saved roster.
     expect(screen.queryByTestId('selected-item-goblin')).not.toBeInTheDocument();
     expect(screen.getByTestId('total-xp')).toHaveTextContent('0');
+    expect(updateEncounter).not.toHaveBeenCalled();
   });
 
   it.each([

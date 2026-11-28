@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 bloodied-gate lane: exact-threshold badge/gate/inertness pins
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HealingPoolModal from './HealingPoolModal.jsx';
@@ -6,30 +6,42 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 // ── Ownership ──
 // This file owns BLOODIED-state behavior only: the "(Bloodied only)" badge in
 // the heal heading, the bloodied threshold gate (currentHp > 0 &&
-// currentHp <= floor(maxHp / 2)) across both HP-resolution lanes (combat
-// player-creature runtime reads and the no-combat playerStats fallback),
-// the restriction-note visibility, exact heal payloads that pass the gate,
-// and heal/overlay inertness while the gate blocks.
+// currentHp <= floor(maxHp / 2)) pinned at EXACT boundary values across both
+// HP-resolution lanes (combat player-creature runtime reads and the no-combat
+// playerStats.hitPoints fallback incl. odd max floor), the restriction-note
+// visibility, the open-gate commit for a selected bloodied NPC, and full
+// zero-silence inertness while the gate blocks.
 // Deferred to owners:
 // - HealingPoolModal.test.jsx — loading state, pool/target display strings,
 //   heal-input capping, default feature name, target-selection rendering,
 //   Done/Escape/overlay close plumbing (generic, non-bloodied).
 // - HealingPoolModal.healing.test.jsx — general applyHeal plumbing:
 //   applyHealingToTarget args, pool-zero disable, successive-heal pool
-//   deduction, self-heal max-HP cap. (Subsumes the former "disables apply
-//   heal when bloodiedOnly is true and pool is zero" case — pool-zero
-//   disable is pool behavior, not bloodied behavior.)
+//   deduction, self-heal max-HP cap, no-combat self-heal exact write/payload,
+//   and inertness of overlay/Escape/Done closes when no heal was taken
+//   (close inertness is not bloodied-specific, so the former "closing a
+//   blocked modal via Done/Escape/overlay" case lives there).
+//   (Also subsumes the former "disables apply heal when bloodiedOnly is true
+//   and pool is zero" case — pool-zero disable is pool behavior.)
 // - HealingPoolModal.curing.test.jsx — condition-cure lane.
 // - HealingPoolModal.dice.test.jsx — dice-pool lane (Roll a dX, accumulation).
 // - HealingPoolModal.channel-divinity.test.jsx — Channel Divinity charge
 //   consumption and ability_use logging.
 
 // ── Mocked modules ──
+// Keys mirror ONLY what the loaded render graph imports:
+// HealingPoolModal.jsx itself, SecondaryTargetModal.jsx (real component, its
+// own deps load for real), combatData.js and healingPoolHandler.js
+// (getCombatContext), rangeCheck/spellOverlayService/healingPoolHandler
+// (getRuntimeValue). Former phantom keys getTargetFromAttacker,
+// addStorageChangeListener and the unused services/ui/storage.js mock were
+// purged (nothing in the graph imports them). conditionUtils is a pure data
+// module — the mirror-fixture mock (4 of 15 CONDITIONS) is retired in favor
+// of the real catalog.
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
-  addStorageChangeListener: vi.fn(() => () => {}),
   useRuntimeValue: vi.fn(() => null), // display-echo subscription seam (return value unused by the heal modals)
 }));
 
@@ -37,16 +49,11 @@ vi.mock('../../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../../../services/ui/storage.js', () => ({
-  default: { set: vi.fn() },
-}));
-
 vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
-  getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
@@ -56,15 +63,6 @@ vi.mock('../../../../services/rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../../../services/ui/utils.js', () => ({
   default: { getName: vi.fn((n) => n?.toLowerCase().trim()) },
-}));
-
-vi.mock('../../../../services/combat/conditions/conditionUtils.js', () => ({
-  CONDITIONS: [
-    { key: 'blinded', label: 'Blinded' },
-    { key: 'charmed', label: 'Charmed' },
-    { key: 'poisoned', label: 'Poisoned' },
-    { key: 'frightened', label: 'Frightened' },
-  ],
 }));
 
 // ── Re-import mocked modules ──
@@ -138,6 +136,15 @@ async function selectTarget(name) {
   await screen.findByRole('button', { name: 'Apply Heal' });
 }
 
+// Zero-silence contract: a blocked gate must move nothing anywhere.
+function expectTotalInertness(poolUntouched) {
+  expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+  expect(applyHealingService.applyHealingToTarget).not.toHaveBeenCalled();
+  expect(poolUpdate).not.toHaveBeenCalled();
+  expect(poolStore.current).toBe(poolUntouched);
+  expect(logService.addEntry).not.toHaveBeenCalled();
+}
+
 // NOTE — flagged component defects (not fixed here): HealingApplySection's
 // amount input and HealingDiceSection's roll-details block use inline
 // styles, and the target-selection overlay renders a second modal layer with
@@ -148,14 +155,20 @@ async function selectTarget(name) {
 describe('HealingPoolModal - Bloodied', () => {
   beforeEach(() => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
+    // Re-baseline every overridable stub (clearAllMocks alone would keep
+    // mockReturnValue chains across tests).
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      const entry = hpStore?.[name];
+      return entry && key in entry ? entry[key] : null;
+    });
+    useRuntimeState.setRuntimeValue.mockImplementation(() => {});
+    damageUtils.getCombatContext.mockResolvedValue(null);
+    applyHealingService.applyHealingToTarget.mockReturnValue(undefined);
+    logService.addEntry.mockReturnValue(Promise.resolve());
     poolUpdate = vi.fn((v) => { poolStore.current = v; });
     hpStore = {
       Paladin1: { currentHitPoints: 20, hitPoints: 40, activeConditions: [] },
     };
-    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      const entry = hpStore[name];
-      return entry && key in entry ? entry[key] : null;
-    });
   });
 
   afterEach(() => {
@@ -163,7 +176,6 @@ describe('HealingPoolModal - Bloodied', () => {
     useRuntimeState.setRuntimeValue.mockReset();
     useTrackedResource.mockReset();
     damageUtils.getCombatContext.mockReset();
-    damageUtils.getTargetFromAttacker.mockReset();
     applyHealingService.applyHealingToTarget.mockReset();
     logService.addEntry.mockReset();
   });
@@ -183,7 +195,8 @@ describe('HealingPoolModal - Bloodied', () => {
     }
   });
 
-  // ── Threshold gate via combat player-creature (runtime HP reads) ──
+  // ── Threshold gate via combat player-creature (runtime HP reads):
+  //    exact boundary values of currentHp > 0 && currentHp <= floor(40 / 2) ──
 
   it.each([
     { currentHp: 20, isBloodied: true, label: 'exactly half max HP' },
@@ -211,7 +224,8 @@ describe('HealingPoolModal - Bloodied', () => {
     }
   });
 
-  // ── Threshold gate via no-combat fallback (playerStats.hitPoints, odd max) ──
+  // ── Threshold gate via no-combat fallback (playerStats.hitPoints,
+  //    odd max pins floor(25 / 2) = 12) ──
 
   it.each([
     { currentHp: 12, isBloodied: true, label: 'floor(25 / 2) — bloodied' },
@@ -229,41 +243,16 @@ describe('HealingPoolModal - Bloodied', () => {
     expect(screen.getByRole('heading', { level: 4, name: `Heal — Paladin1 (${currentHp} / 25 HP)(Bloodied only)` })).toBeInTheDocument();
     if (isBloodied) {
       expect(healBtn()).toBeEnabled();
+      expect(screen.queryByText(RESTRICTION_NOTE)).not.toBeInTheDocument();
     } else {
       expect(healBtn()).toBeDisabled();
+      expect(screen.getByText(RESTRICTION_NOTE)).toBeInTheDocument();
     }
   });
 
-  // ── Exact heal payloads while the gate is open ──
+  // ── Gate follows the SELECTED target: bloodied NPC opens it ──
 
-  it('applies an exact self-heal payload to a bloodied target with no combat context', async () => {
-    hpStore.Paladin1.currentHitPoints = 20;
-    hpStore.Paladin1.hitPoints = null;
-
-    await renderModal({ current: 15, max: 20 });
-    setHealAmount(8);
-    fireEvent.click(healBtn());
-
-    expect(applyHealingService.applyHealingToTarget).not.toHaveBeenCalled();
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Paladin1', 'currentHitPoints', 28, CAMPAIGN);
-    expect(poolUpdate).toHaveBeenCalledTimes(1);
-    expect(poolUpdate).toHaveBeenCalledWith(7);
-    expect(poolStore.current).toBe(7);
-    expect(logService.addEntry).toHaveBeenCalledTimes(1);
-    expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, {
-      type: 'healing_pool',
-      sourceName: 'Paladin1',
-      featureName: 'Lay On Hands',
-      targetName: 'Paladin1',
-      amount: 8,
-      poolAfter: 7,
-    });
-  });
-
-  // ── Gate re-evaluates per selected target ──
-
-  it('opens the gate for a bloodied NPC and blocks a non-bloodied NPC chosen in target selection', async () => {
+  it('opens the gate for a bloodied NPC chosen in target selection and commits the exact heal', async () => {
     const summary = {
       creatures: [
         { name: 'Paladin1', type: 'player' },
@@ -272,26 +261,29 @@ describe('HealingPoolModal - Bloodied', () => {
       ],
     };
     damageUtils.getCombatContext.mockResolvedValue(summary);
-    applyHealingService.applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 12, newHp: 17 });
+    // Real applyHealingToTarget return shape (applyHealing.js:78).
+    applyHealingService.applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 12, newHp: 17, maxHp: 30 });
 
-    const creatureTargets = [
-      { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 12 },
-      { name: 'Goblin', type: 'npc', maxHp: 7, currentHp: 6 },
-    ];
+    await renderModal({ current: 15, max: 20 }, {
+      creatureTargets: [
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 12 },
+        { name: 'Goblin', type: 'npc', maxHp: 7, currentHp: 6 },
+      ],
+    });
 
-    const first = await renderModal({ current: 15, max: 20 }, { creatureTargets });
-
-    // Bloodied NPC (12 <= floor(30/2)) — gate opens, exact payload flows.
-    await selectTarget('Orc Warrior');
+    await selectTarget('Orc Warrior'); // 12 <= floor(30/2) — bloodied
     expect(screen.getByRole('heading', { level: 4, name: 'Heal — Orc Warrior (12 / 30 HP)(Bloodied only)' })).toBeInTheDocument();
     setHealAmount(5);
     expect(healBtn()).toBeEnabled();
+    expect(screen.queryByText(RESTRICTION_NOTE)).not.toBeInTheDocument();
     fireEvent.click(healBtn());
 
     expect(applyHealingService.applyHealingToTarget).toHaveBeenCalledTimes(1);
     expect(applyHealingService.applyHealingToTarget).toHaveBeenCalledWith(summary, 'Orc Warrior', 5, CAMPAIGN);
+    expect(poolUpdate).toHaveBeenCalledTimes(1);
     expect(poolUpdate).toHaveBeenCalledWith(10);
     expect(poolStore.current).toBe(10);
+    expect(logService.addEntry).toHaveBeenCalledTimes(1);
     expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'healing_pool',
       sourceName: 'Paladin1',
@@ -300,19 +292,37 @@ describe('HealingPoolModal - Bloodied', () => {
       amount: 5,
       poolAfter: 10,
     });
+  });
 
-    // Non-bloodied NPC (6 > floor(7/2)) — fresh session, gate blocks.
-    first.unmount();
-    await renderModal({ current: poolStore.current, max: 20 }, { creatureTargets });
-    await selectTarget('Goblin');
+  // ── Gate follows the SELECTED target: non-bloodied NPC blocks it ──
+
+  it('blocks the gate for a non-bloodied NPC chosen in target selection with total inertness', async () => {
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Paladin1', type: 'player' },
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 12 },
+        { name: 'Goblin', type: 'npc', maxHp: 7, currentHp: 6 },
+      ],
+    });
+
+    await renderModal({ current: 15, max: 20 }, {
+      creatureTargets: [
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 12 },
+        { name: 'Goblin', type: 'npc', maxHp: 7, currentHp: 6 },
+      ],
+    });
+
+    await selectTarget('Goblin'); // 6 > floor(7/2) — not bloodied
     expect(screen.getByRole('heading', { level: 4, name: 'Heal — Goblin (6 / 7 HP)(Bloodied only)' })).toBeInTheDocument();
     setHealAmount(2);
     expect(healBtn()).toBeDisabled();
     expect(screen.getByText(RESTRICTION_NOTE)).toBeInTheDocument();
-    expect(poolStore.current).toBe(10);
+
+    fireEvent.click(healBtn()); // disabled — click must be inert
+    expectTotalInertness(15);
   });
 
-  // ── Inertness while the gate blocks ──
+  // ── Inertness while the gate blocks (no-combat lane) ──
 
   it('forced click on blocked Apply Heal changes no HP, pool, or log', async () => {
     hpStore.Paladin1.currentHitPoints = 30;
@@ -321,31 +331,7 @@ describe('HealingPoolModal - Bloodied', () => {
     setHealAmount(5);
     fireEvent.click(healBtn()); // disabled — click must be inert
 
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    expect(poolUpdate).not.toHaveBeenCalled();
-    expect(poolStore.current).toBe(15);
-    expect(logService.addEntry).not.toHaveBeenCalled();
+    expectTotalInertness(15);
     expect(screen.getByText(RESTRICTION_NOTE)).toBeInTheDocument();
-  });
-
-  it('closing a blocked modal via Done, Escape, or overlay neither heals nor spends pool', async () => {
-    const onClose = vi.fn();
-    hpStore.Paladin1.currentHitPoints = 30;
-
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    setHealAmount(5);
-
-    fireEvent.click(document.querySelector('.short-rest-overlay'));
-    expect(onClose).not.toHaveBeenCalled();
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(onClose).toHaveBeenCalledTimes(2);
-
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    expect(poolUpdate).not.toHaveBeenCalled();
-    expect(poolStore.current).toBe(15);
   });
 });

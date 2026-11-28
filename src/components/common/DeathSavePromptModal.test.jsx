@@ -1,5 +1,21 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27 (improved-and-trimmed)
+// DeathSavePromptModal — SSE queue management, roll dispatch payloads, and
+// outcome display. Mock boundaries: the network send/clear (savePromptService),
+// the rules roll (determinism), the log lane, the runtime-store reads/writes,
+// and the SSE Subscriber (captured to inject events directly).
+//
+// Covered elsewhere in this file family, NOT repeated here:
+// - cross-tab null echoes, result-echo re-roll refusal, acting-tab panel
+//   survival: DeathSavePromptModal.cross-tab.test.jsx
+// - merged single-batch wire shape (isDead / HP restore / one POST per roll)
+//   on the REAL store + service: DeathSavePromptModal.roll-single-write.test.jsx
+// - stable/dead finality-row shapes: DeathSavePromptModal.finality-rows.test.jsx
+// - GM-only Cancel render + zero-write lane: DeathSavePromptModal.gm-cancel.test.jsx
+// - mount-side stale re-verdict (player-roster auto-evict):
+//   DeathSavePromptModal.stale-mount-recheck.test.jsx
+// The #1400 void-guard's positive leg (HP<=0 rolls normally) is exercised by
+// every roll in this file — the default getRuntimeValue mock leaves the target
+// at 0 HP — so it has no dedicated case.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
@@ -24,6 +40,9 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
+
+// Cancel render-gating (isGmHost) is owned by the gm-cancel lane — not mocked
+// or asserted here.
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -110,6 +129,7 @@ beforeEach(() => {
 
 afterEach(() => {
   window.removeEventListener('death-save-result', collectResults);
+  delete globalThis.EventSource;
 });
 
 // ── Tests ──
@@ -130,12 +150,12 @@ describe('DeathSavePromptModal', () => {
   });
 
   it('ignores SSE events that are not this campaign\'s death-save prompts', async () => {
+    // other-campaign and other-key share the one prefix guard; null data is
+    // the legitimate clear-echo branch, pinned in the cross-tab lane.
     render(<DeathSavePromptModal campaignName={CAMPAIGN} />);
     const invalidEvents = [
       { key: undefined, data: { promptId: 'p' } },
-      { key: `change-${CAMPAIGN}-deathSavePrompt-target1`, data: null },
       { key: `change-${CAMPAIGN}-someOtherKey-target1`, data: { promptId: 'p' } },
-      { key: 'change-other-campaign-deathSavePrompt-target1', data: { promptId: 'p' } },
       { key: `change-${CAMPAIGN}-deathSavePrompt-`, data: { promptId: 'p' } },
     ];
     for (const event of invalidEvents) {
@@ -147,7 +167,7 @@ describe('DeathSavePromptModal', () => {
     expect(await screen.findByText(/must make a/i)).toBeInTheDocument();
   });
 
-  // ── Queue display ──
+  // ── Queue display (pins promptQueueCounterText's two faces via mount) ──
 
   it('shows a queue counter only when a second prompt is waiting', async () => {
     await renderWithPrompt('target1');
@@ -165,7 +185,7 @@ describe('DeathSavePromptModal', () => {
 
     await rollAndWaitForResult();
 
-    expect(document.querySelector('.dsp-header').textContent.trim()).toBe('Death Saving Throw (1 remaining)');
+    expect(screen.getByText('(1 remaining)')).toBeInTheDocument();
     expect(screen.queryByText(/\(\d+ of \d+\)/)).not.toBeInTheDocument();
   });
 
@@ -212,6 +232,7 @@ describe('DeathSavePromptModal', () => {
     expect(screen.getByText('target1')).toBeInTheDocument();
     expect(screen.getByText('(1 of 2)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Roll Death Save' })).toBeInTheDocument();
+    expect(clearDeathSavePrompt).not.toHaveBeenCalled();
   });
 
   // ── Rolling and committing the result ──
@@ -226,7 +247,12 @@ describe('DeathSavePromptModal', () => {
 
   it('broadcasts a death-save-result event and posts the same payload to the server', async () => {
     await renderWithPrompt('target1');
-    await rollAndWaitForResult();
+    const resultLine = await rollAndWaitForResult();
+
+    // plain "success" face: label, roll value, and NO HP-restore line
+    expect(screen.getByText('DEATH SAVE SUCCESS')).toBeInTheDocument();
+    expect(resultLine).toHaveTextContent('15');
+    expect(screen.queryByText(/Restored to .* HP/)).not.toBeInTheDocument();
 
     const expectedPayload = {
       promptId: 'prompt-target1',
@@ -241,25 +267,9 @@ describe('DeathSavePromptModal', () => {
     };
     expect(dispatchedResults).toHaveLength(1);
     expect(dispatchedResults[0]).toEqual({ ...expectedPayload, targetName: 'target1' });
+    expect(sendDeathSaveResult).toHaveBeenCalledTimes(1);
     expect(sendDeathSaveResult).toHaveBeenCalledWith(CAMPAIGN, 'target1', expectedPayload);
-  });
-
-  it('writes new saves and failures to the runtime store and clears the prompt', async () => {
-    await renderWithPrompt('target1');
-    await rollAndWaitForResult();
-
-    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
-    expect(setRuntimeBatch).toHaveBeenCalledWith('target1', {
-      deathSaves: [true, false, false],
-      deathFailures: [false, false, false],
-    }, CAMPAIGN);
     expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
-    // a plain success must not kill or heal the target
-    const [, writes] = setRuntimeBatch.mock.calls[0];
-    expect(writes.deathSaves).toEqual([true, false, false]);
-    expect(writes.deathFailures).toEqual([false, false, false]);
-    expect(writes).not.toHaveProperty('isDead');
-    expect(writes).not.toHaveProperty('currentHitPoints');
   });
 
   it('reads saved death saves from the runtime store before rolling', async () => {
@@ -278,53 +288,11 @@ describe('DeathSavePromptModal', () => {
     expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith([false, false, false], [false, false, false]);
   });
 
-  it('marks the target dead when the roll results in death', async () => {
-    deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
-      roll: 3,
-      result: 'dead',
-      newSaves: [false, false, false],
-      newFailures: [true, true, true],
-    }));
-    await renderWithPrompt('target1');
-    await rollAndWaitForResult();
-    // One merged batch — isDead rides the SAME body as the fatal tracks
-    // (no intermediate 'dead beside stale track' snapshot).
-    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
-    expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
-      deathSaves: [false, false, false],
-      deathFailures: [true, true, true],
-      isDead: 1,
-    });
-  });
-
-  it('restores current hit points when the roll restores HP', async () => {
-    deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
-      roll: 20, isNat20: true, result: 'nat20', restoredToHp: 1,
-    }));
-    await renderWithPrompt('target1');
-    await rollAndWaitForResult();
-    // HP restore merged into the single batch, and the window event declares
-    // hpWritten so the CharHitPoints/Initiative listeners skip their own
-    // duplicate whole-bucket currentHitPoints POST (single-writer law).
-    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
-    expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
-      deathSaves: [true, false, false],
-      deathFailures: [false, false, false],
-      currentHitPoints: 1,
-    });
-    expect(dispatchedResults[0]).toMatchObject({ restoredToHp: 1, hpWritten: true });
-  });
-
-  // ── Roll outcome display (label, roll value, HP line, broadcast flag) ──
+  // ── Roll outcome display (merged isDead/HP batch shapes are pinned on the
+  // real wire by roll-single-write.test.jsx — not repeated here) ──
 
   describe('roll outcomes', () => {
     const outcomes = [
-      {
-        name: 'success',
-        roll: { roll: 15, result: 'success' },
-        label: 'DEATH SAVE SUCCESS',
-        success: true,
-      },
       {
         name: 'natural 20',
         roll: { roll: 20, isNat20: true, result: 'nat20', restoredToHp: 1 },
@@ -384,70 +352,37 @@ describe('DeathSavePromptModal', () => {
   // ── #1400 voided-prompt guard (single-producer law, 2026-10-22) ──
   // relentlessRageService (and heals) may lift a target off 0 HP while a
   // death-save prompt sits queued HERE. The service commits HP >= 1 BEFORE
-  // clearing deathSaves/deathFailures (fix#105 order, pinned by the
-  // saveResults lane's writes[0] census). A roll clicked after that point
-  // is VOID: this modal must not resurrect counters (or POST the outcome)
-  // onto a standing creature. Key ownership: modal = sole producer of
-  // counter ACCUMULATION on live dying targets; service = one-shot reset.
+  // clearing deathSaves/deathFailures (fix#105 order), so a roll clicked
+  // after that point is VOID: this modal must not resurrect counters (or
+  // POST the outcome) onto a standing creature. The positive leg (still at
+  // 0 HP → roll proceeds) is the default face of every other test here —
+  // this is the negative leg only.
 
-  describe('#1400 voided-prompt guard', () => {
-    it('rolls normally while the target is at 0 HP — counters written exactly once each', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentHitPoints') return 0; // still dying: valid prompt
-        return null;
-      });
-      await renderWithPrompt('target1');
-      await rollAndWaitForResult();
-
-      // One merged batch carrying both tracks at the roll's commit (#1348
-      // full-state write shape, single-POST per the sequential-bucket fix):
-      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
-      expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
-        deathSaves: [true, false, false],
-        deathFailures: [false, false, false],
-      });
-      expect(sendDeathSaveResult).toHaveBeenCalledTimes(1);
+  it('#1400 voids the roll when rage/heal already lifted HP above 0 — ZERO counter writes, no POST, prompt cleared', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 1; // relentless rage landed
+      return null;
     });
+    const opens = [];
+    const collectOpen = (e) => opens.push(e.detail);
+    window.addEventListener('open-death-saving-throw', collectOpen);
 
-    it('voids the roll when rage/heal already lifted HP above 0 — ZERO counter writes, no POST, prompt cleared', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentHitPoints') return 1; // relentless rage landed
-        return null;
-      });
-      const opens = [];
-      const collectOpen = (e) => opens.push(e.detail);
-      window.addEventListener('open-death-saving-throw', collectOpen);
+    await renderWithPrompt('target1');
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
 
-      await renderWithPrompt('target1');
-      fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
+    // No roll is consumed and NOTHING is written to foreign-state keys:
+    expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
+    expect(sendDeathSaveResult).not.toHaveBeenCalled();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    // The stale prompt is cleared and the queue advances with no result view.
+    expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
+    // Queue advanced: the modal is gone and NO result view was rendered —
+    // including no DEAD stamp from a would-be-fatal queued outcome.
+    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Roll:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('DEAD')).not.toBeInTheDocument();
+    expect(opens.length).toBeGreaterThan(0);
 
-      // No roll is consumed and NOTHING is written to foreign-state keys:
-      expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
-      expect(sendDeathSaveResult).not.toHaveBeenCalled();
-      expect(setRuntimeBatch).not.toHaveBeenCalled();
-      // The stale prompt is cleared and the queue advances with no result view.
-      expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
-      // Queue advanced: the modal is gone and NO result view was rendered.
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/^Roll:/i)).not.toBeInTheDocument();
-      expect(opens.length).toBeGreaterThan(0);
-
-      window.removeEventListener('open-death-saving-throw', collectOpen);
-    });
-
-    it('does not stamp isDead from a voided prompt even when the queued roll outcome would be dead', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentHitPoints') return 5; // healed past dying
-        return null;
-      });
-      deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
-        result: 'dead', newFailures: [true, true, true],
-      }));
-      await renderWithPrompt('target1');
-      fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-
-      expect(setRuntimeBatch).not.toHaveBeenCalled();
-      expect(screen.queryByText('DEAD')).not.toBeInTheDocument();
-    });
+    window.removeEventListener('open-death-saving-throw', collectOpen);
   });
 });

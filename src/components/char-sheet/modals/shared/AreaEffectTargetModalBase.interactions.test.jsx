@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
@@ -61,25 +61,28 @@ function renderWithButtons(buttons, props = {}) {
 }
 
 describe('AreaEffectTargetModalBase - Interactions', () => {
-  it('Apply click marks the modal busy and delegates to handleApplyOverride with live context', () => {
+  it('Apply click re-arms the busy flag and delegates to handleApplyOverride with live context', () => {
     isApplyBusy.mockReturnValue(false);
     const handleApplyOverride = vi.fn();
-    const getCtx = renderWithButtons([{ label: 'Apply', onClick: (c) => c.handleApply() }], { handleApplyOverride });
+    renderWithButtons([
+      { label: 'Select Orc', onClick: (c) => c.toggleTarget('Orc') },
+      { label: 'Apply', onClick: (c) => c.handleApply() },
+    ], { handleApplyOverride });
 
+    // Select after mount so the applied context must be the live one.
+    fireEvent.click(screen.getByRole('button', { name: 'Select Orc' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(handleApplyOverride).toHaveBeenCalledTimes(1);
-    expect(getCtx()).toEqual(expect.objectContaining({
+    // Full context shape is pinned in .rendering.test.jsx; here only prove
+    // props travel and the freshest state is handed to the consumer.
+    expect(handleApplyOverride).toHaveBeenCalledWith(expect.objectContaining({
       saveType: 'CHA',
       saveDc: 14,
-      rangeFeet: 30,
       featureName: 'Test Effect',
-      attackerName: 'Wizard1',
-      campaignName,
-      selected: expect.any(Set),
-      handleSaveResult: expect.any(Function),
-      setProcessing: expect.any(Function),
-      setResults: expect.any(Function),
+      selected: new Set(['Orc']),
+      results: [],
+      processing: false,
     }));
     // Mount released the busy flag; the click must re-arm it (last call is true).
     expect(setApplyBusyInstance).toHaveBeenLastCalledWith(true);
@@ -96,8 +99,8 @@ describe('AreaEffectTargetModalBase - Interactions', () => {
     // Once free, applying with no override must complete without throwing.
     isApplyBusy.mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(setApplyBusyInstance).toHaveBeenCalledTimes(2); // mount release + re-arm
     expect(setApplyBusyInstance).toHaveBeenLastCalledWith(true);
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
   });
 
   it('routes save-result window events to handleSaveResultOverride only while processing, releasing apply-busy when done', () => {
@@ -156,7 +159,7 @@ describe('AreaEffectTargetModalBase - Interactions', () => {
     expect(getCtx().selected).toEqual(new Set());
   });
 
-  it('notifies onAllResolved once every selected target has a result', () => {
+  it('onAllResolved fires only while processing, with no pending prompts, and once results cover every selection', () => {
     const onAllResolved = vi.fn();
     let ctx;
     const renderActions = (c) => {
@@ -171,10 +174,16 @@ describe('AreaEffectTargetModalBase - Interactions', () => {
     act(() => { ctx.setProcessing(true); });
     expect(onAllResolved).not.toHaveBeenCalled(); // 0 results < 1 selected
 
+    act(() => { ctx.setPendingPrompts([{ promptId: 'p1', targetName: 'Goblin' }]); });
     act(() => { ctx.setResults([{ targetName: 'Goblin', success: true }]); });
+    // Results fully cover the selection, but an open prompt must hold resolution.
+    expect(onAllResolved).not.toHaveBeenCalled();
+
+    act(() => { ctx.setPendingPrompts([]); });
     expect(onAllResolved).toHaveBeenCalledTimes(1);
     expect(onAllResolved).toHaveBeenCalledWith(expect.objectContaining({
       results: [{ targetName: 'Goblin', success: true }],
+      selected: new Set(['Goblin']),
       pendingPrompts: [],
     }));
   });

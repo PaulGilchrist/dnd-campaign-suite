@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * settlementGenerator lane — pure procedural settlement CREATION (the
  * settlementsService lane owns CRUD persistence).
@@ -11,14 +11,19 @@
  * through the Human fallback branch.
  *
  * Dice discipline: all randomness is pick/pickN/randomInt over Math.random
- * (seeded-vs-live: none — the module is fully live-random). Every test rigs
- * a constant with a vi spy (exact capture; vi.restoreAllMocks in afterEach
+ * (seeded-vs-live: none — the module is fully live-random). Tests rig
+ * constants with a vi spy (exact capture; vi.restoreAllMocks in afterEach
  * is the restore — avoids the historical raw-assignment restore poison) and
- * pins exact table-first (rig 0) / table-last (rig ~1) outputs plus exact
+ * pin exact table-first (rig 0) / table-last (rig ~1) outputs plus exact
  * roll economies:
  *   village 21 = culture+name+flavor(3)+pop+featCount+feat(2)+threat
  *                +svcCount+types(1) | 1 service x 7 | rumorCount+rumors(1)
  *   city    83   metropolis 115 (+2 guild-resolve)   no-size path +1
+ * Constant rigs are draw-order-blind (every draw same value), so one census
+ * test swaps in an ALTERNATING keyed rig (odd draw 0 → table-first, even
+ * draw ~1 → table-last, 23 draws) with every field's first/last assignment
+ * pinned from disk: any adjacent draw swap flips two fields' parity and the
+ * full-shape toEqual fails.
  *
  * Cache honesty: the module caches each fetch at module scope, so the suite
  * re-imports a FRESH instance per test (the previous file reset modules in
@@ -57,6 +62,18 @@ let fetchSpy;
 // (arrays here are all < 1e6 long).
 function riggedRandom(value) {
   return vi.spyOn(Math, 'random').mockReturnValue(value);
+}
+
+// Per-slot census rig (#1926): draw 1,3,5… land table-first, draw 2,4,6…
+// table-last. A constant rig is draw-order-blind (every draw same value);
+// this one pins WHICH draw feeds WHICH field by slot parity, so an
+// off-by-one draw swap misassigns first/last on at least one field and the
+// full-shape toEqual fails. ONE spy.
+function alternatingRig() {
+  let draw = 0;
+  return vi.spyOn(Math, 'random').mockImplementation(() =>
+    (++draw % 2 === 1 ? 0 : 0.999999)
+  );
 }
 
 // Serve verbatim disk content; unknown URLs fail loudly (no unmocked holes).
@@ -196,26 +213,23 @@ describe('settlementGenerator', () => {
       expect(randomSpy).toHaveBeenCalledTimes(21);
     });
 
-    it('builds description from base description plus exactly 2 rolled features', async () => {
-      riggedRandom(0);
-
-      const result = await generateSettlement([], { size: 'village' });
-      const villageDescs = disk['/data/settlement-descriptions.json'].village;
-
-      expect(result.description).toBe(
-        `${villageDescs.descriptions[0]} ${villageDescs.features[0]} ${villageDescs.features[1]}`
-      );
-    });
-
-    it('production path (no options) burns one extra roll on the size pick, then matches the village pin', async () => {
-      // Settlements.jsx:445 calls generateSettlement(settlements) — no size.
+    it('production path (no options) rolls size as draw 1: village/22 at rig 0, metropolis/116 at rig ~1', async () => {
+      // Settlements.jsx:601 calls generateSettlement(settlements) — no size.
       const randomSpy = riggedRandom(0);
 
-      const result = await generateSettlement();
-
-      expect(result.size).toBe('village'); // SIZE_LABELS[0]
-      expect(result).toEqual(VILLAGE_FIRST);
+      const first = await generateSettlement();
+      expect(first.size).toBe('village'); // SIZE_LABELS[0]
+      expect(first).toEqual(VILLAGE_FIRST);
       expect(randomSpy).toHaveBeenCalledTimes(22); // 21 + size pick
+
+      // Same spy re-baselined (ONE spy per stub); mockClear resets the count
+      // so the 116 pin is this generation's economy, not cumulative.
+      randomSpy.mockReturnValue(0.999999);
+      randomSpy.mockClear();
+      const last = await generateSettlement();
+      expect(last.size).toBe('metropolis'); // SIZE_LABELS[3]
+      expect(last).toEqual(METRO_LAST);
+      expect(randomSpy).toHaveBeenCalledTimes(116); // 115 + size pick
     });
 
     it('appends incrementing numbers to resolve settlement-name conflicts (no extra rolls)', async () => {
@@ -251,37 +265,78 @@ describe('settlementGenerator', () => {
         'Zurgash', 'Zurgash 2', 'Zurgash 3', 'Zurgash 4', 'Zurgash 5', 'Zurgash 6',
         'Zurgash 7', 'Zurgash 8', 'Zurgash 9', 'Zurgash 10', 'Zurgash 11', 'Zurgash 12',
       ]);
-    });
-
-    it('production path (no options) at rig ~1 rolls metropolis with one extra size roll', async () => {
-      const randomSpy = riggedRandom(0.999999);
-
-      const result = await generateSettlement();
-
-      expect(result.size).toBe('metropolis'); // SIZE_LABELS[3]
-      expect(result).toEqual(METRO_LAST);
-      expect(randomSpy).toHaveBeenCalledTimes(116); // 115 + size pick
-    });
-
-    it('draws guild-type names from guild-names.json, NPCs keep the pre-resolve shop name', async () => {
-      riggedRandom(0.999999);
-
-      const result = await generateSettlement([], { size: 'metropolis' });
-
+      // Guild quirk cross-check (already toEqual'd byte-exact above): the
+      // service name IS guild-names.json smugglers-last while the NPC keeps
+      // the pre-resolve shop-names.json guild last.
       expect(result.services[6].name).toBe(disk['/data/guild-names.json'].smugglers.at(-1));
       expect(result.notableNPCs[6].description).toContain(disk['/data/shop-names.json'].guild.at(-1));
     });
   });
 
+  describe('per-slot draw census (alternating keyed rig)', () => {
+    it('assigns every field to its parity slot: first/last mix across all 23 village draws', async () => {
+      // Village, 1 service, 3 rumors = 23 draws. Odd draw → table-first,
+      // even draw → table-last, so EVERY slot's fate is pinned: culture(1)
+      // first, name(2) last, description(3) first, atmosphere(4) last,
+      // government(5) first, population(6) last, featCount(7)=2,
+      // featureA(8) last, featureB(9) first (of the spliced list — pins
+      // splice order vs raw index), threat(10) last, svcCount(11)=1,
+      // type(12) last='temple', shopName(13) first, svcDesc(14) last,
+      // role(15) first, race(16) last='Half-Orc', gender(17→0)='female',
+      // npcName(18) last, descriptor(19) first, rumorCount(20)=3,
+      // rumors(21 first, 22 last, 23 next-first after two splices).
+      // Swap ANY adjacent pair and at least one first/last flips → fail.
+      const randomSpy = alternatingRig();
+      const village = disk['/data/settlement-descriptions.json'].village;
+
+      const result = await generateSettlement([], { size: 'village' });
+
+      expect(result).toEqual({
+        name: disk['/data/settlement-names.json'].Human.village.at(-1), // 'Chestwick'
+        size: 'village',
+        description:
+          `${village.descriptions[0]} ${village.features.at(-1)} ${village.features[0]}`,
+        atmosphere: village.atmospheres.at(-1),
+        government: village.governments[0],
+        population: '400-800 souls', // module POPULATION_RANGES.village last
+        services: [
+          {
+            type: 'temple',
+            name: disk['/data/shop-names.json'].temple[0], // 'Mercy & Throne'
+            // module SERVICE_DESCRIPTIONS.temple last
+            description: 'A controversial temple whose teachings draw both followers and critics.',
+          },
+        ],
+        notableNPCs: [
+          {
+            name: disk['/data/npc-names.json']['Half-Orc'].female.at(-1), // 'Zagra'
+            role: 'Priest', // module SERVICE_NPC_TYPES.temple first
+            // module SERVICE_NPC_DESCRIPTORS first
+            description: 'The Priest of Mercy & Throne. Known for fair dealing and a dry sense of humor.',
+          },
+        ],
+        rumors: [
+          disk['/data/settlement-rumors.json'].general[0],
+          disk['/data/settlement-rumors.json'].trade_economy.at(-1), // merged-pool last
+          disk['/data/settlement-rumors.json'].general[1], // merged-pool head after splice
+        ],
+        tags: 'village, human-culture, temple',
+        notes: '',
+        threat: village.threats.at(-1),
+      });
+      expect(randomSpy).toHaveBeenCalledTimes(23);
+    });
+  });
+
   describe('population table (module constants)', () => {
     it('maps each size to its exact population band (rig 0 = first, rig ~1 = last)', async () => {
-      riggedRandom(0);
+      const randomSpy = riggedRandom(0);
       expect((await generateSettlement([], { size: 'village' })).population).toBe('50-100 souls');
       expect((await generateSettlement([], { size: 'town' })).population).toBe('800-1,500 souls');
       expect((await generateSettlement([], { size: 'city' })).population).toBe('5,000-12,000 souls');
       expect((await generateSettlement([], { size: 'metropolis' })).population).toBe('50,000-100,000 souls');
 
-      riggedRandom(0.999999);
+      randomSpy.mockReturnValue(0.999999); // same spy re-baselined
       expect((await generateSettlement([], { size: 'village' })).population).toBe('400-800 souls');
       expect((await generateSettlement([], { size: 'town' })).population).toBe('3,000-5,000 souls');
       expect((await generateSettlement([], { size: 'city' })).population).toBe('25,000-50,000 souls');
@@ -314,17 +369,10 @@ describe('settlementGenerator', () => {
       expect(nameLegCalls[0][0]).toContain("culture 'Elven' has no 'city' name pool");
     });
 
-    it('applies the conflict suffix to fallback names too (still loud, still returning)', async () => {
-      serveDisk({ '/data/settlement-names.json': LADDER_NAMES });
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      riggedRandom(0.999999);
-
-      const result = await generateSettlement([{ name: 'Fallbackton' }], { size: 'city' });
-
-      expect(result.name).toBe('Fallbackton 2');
-      expect(errorSpy.mock.calls.filter(c => String(c[0]).includes('walking Human fallback')).length).toBe(1);
-    });
-
+    // (deleted: suffix-on-fallback-name test — the dedupe suffix loop lives
+    // AFTER the culture/fallback branch merge in pickSettlementName; the
+    // conflict-suffix pin on the primary path covers that shared code, and
+    // the walk test above pins the fallback return value.)
     it('fix#357 loud-terminal: Human[size] present-but-empty [] routes through length-checked town arm and still returns (never pick([])===undefined)', async () => {
       // old `fallback[size] || fallback['town']` shape rode a present-empty []
       // terminal into an undefined name; new arms are length-checked, same walk.
@@ -349,17 +397,11 @@ describe('settlementGenerator', () => {
       expect(errorSpy.mock.calls.map(c => String(c[0])).some(m => m.includes('no non-empty settlement-name pool'))).toBe(true);
     });
 
-    it('fix#357 loud-terminal: no Human bank at all — announced exhaustion TypeError, never raw undefined[size]', async () => {
-      // the old chain TypeErrored raw on undefined[size]; same TypeError terminal,
-      // now named as data exhaustion (fresh module in beforeEach = fresh cache).
-      serveDisk({ '/data/settlement-names.json': { Elven: { city: [] } } });
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      riggedRandom(0.999999);
-
-      await expect(generateSettlement([], { size: 'city' })).rejects.toThrow(TypeError);
-      expect(errorSpy.mock.calls.map(c => String(c[0])).some(m => m.includes('walking Human fallback'))).toBe(true);
-    });
-
+    // (deleted: no-Human-bank-at-all leg — same !fallbackPool throw branch as
+    // the absent-or-empty test above, which ALSO fires both announcements
+    // (empty Elven.city triggers the 'walking Human fallback' line), and the
+    // all-empty-arrays shape is the one that kills the old truthy-[] ||-chain
+    // mutant; an absent Human bank survives that mutant unchanged.)
     it('rejects loudly (TypeError) on an unknown size instead of inventing data', async () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       riggedRandom(0);
@@ -378,10 +420,9 @@ describe('settlementGenerator', () => {
       // so neither the settlement-name fallback nor the pickNpcName gender/race leg
       // fires. Authored-intent defaults stay silent (fix#357 preservation arm).
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      riggedRandom(0);
+      const randomSpy = riggedRandom(0);
       await generateSettlement([], { size: 'village' });
-      riggedRandom(0.999999);
+      randomSpy.mockReturnValue(0.999999); // same spy re-baselined
       await generateSettlement([], { size: 'metropolis' });
 
       expect(errorSpy).not.toHaveBeenCalled();

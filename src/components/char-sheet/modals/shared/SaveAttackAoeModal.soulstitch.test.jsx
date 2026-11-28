@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // CLA-321: SaveAttackAoeModal must enforce the Soulstitch Spells stamp on the live sheet AoE path.
 // Three lanes: (1) NPC auto-resolve at confirm (protected zeroed, unprotected normal, stamp consumed
 // once, popup row); (2) PC auto-resolve at confirm (no prompt); (3) stamp applied mid-prompt is
@@ -178,7 +178,9 @@ describe('SaveAttackAoeModal — CLA-321 Soulstitch enforcement', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Soulstitch — automatically succeeds, takes no damage/)).toHaveLength(1);
     });
-    expect(screen.getByText(/Failed — takes 20 Fire damage \(rolled 1 \+ -1 = 0 vs DC 17\)/)).toBeInTheDocument();
+    // (the full "rolled R + B = T vs DC D" copy law is pinned by results-face-equation;
+    // the rolled-save mechanics are pinned by the saveRoll/saveBonus log asserts above)
+    expect(screen.getByText(/Failed — takes 20 Fire damage/)).toBeInTheDocument();
   });
 
   it('PC lane: chosen player auto-resolves at confirm — no save prompt, auto-success log, zero damage written', async () => {

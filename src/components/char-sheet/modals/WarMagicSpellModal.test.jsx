@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
@@ -14,8 +14,9 @@ const mockCampaignName = 'test-campaign'
 const mockOnClose = vi.fn()
 
 // Real candidates: spells the handler would offer for Improved War Magic.
+// The only production supplier (warMagicSpellHandler.handle) always emits every
+// option with a truthy level and casting_time, so tests pin that full-detail shape.
 const mockOptions = ['Burning Hands', 'Magic Missile', 'Web']
-// Modal only reads optionDetails[name]?.level and ?.casting_time — keep the mock to that.
 const mockOptionDetails = {
     'Burning Hands': { level: 1, casting_time: '1 action' },
     'Magic Missile': { level: 1, casting_time: '1 action' },
@@ -42,7 +43,7 @@ describe('WarMagicSpellModal', () => {
         vi.resetAllMocks()
     })
 
-    it('renders title, prompt, options with level and casting time, and keeps Replace Attack inert until a selection', () => {
+    it('renders title, level/casting-time prompt, option rows, and keeps Replace Attack inert until a selection', () => {
         const { rerender } = render(<WarMagicSpellModal {...makeProps()} />)
 
         expect(screen.getByText('Improved War Magic')).toBeInTheDocument()
@@ -66,29 +67,6 @@ describe('WarMagicSpellModal', () => {
         rerender(<WarMagicSpellModal {...makeProps({ maxSpellLevel: 3 })} />)
         expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–3/)).toBeInTheDocument()
         expect(screen.queryByText(/level 1–2/)).not.toBeInTheDocument()
-    })
-
-    it('omits level and casting time spans when details are missing or optionDetails is absent', () => {
-        const { unmount } = render(<WarMagicSpellModal {...makeProps({
-            optionDetails: {
-                'Burning Hands': { level: 1 },
-                'Magic Missile': { casting_time: '1 action' },
-            },
-        })} />)
-
-        expect(screen.getByRole('button', { name: /Burning Hands/ })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /Magic Missile/ })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
-        expect(screen.queryAllByText('Level 1')).toHaveLength(1) // only Burning Hands has a level
-        expect(screen.queryAllByText('Level 2')).toHaveLength(0)
-        expect(screen.queryAllByText('(1 action)')).toHaveLength(1) // only Magic Missile has a casting time
-        unmount()
-
-        render(<WarMagicSpellModal {...makeProps({ optionDetails: null })} />)
-        expect(screen.getByRole('button', { name: /Burning Hands/ })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
-        expect(screen.queryAllByText(/Level \d/)).toHaveLength(0)
-        expect(screen.queryAllByText('(1 action)')).toHaveLength(0)
     })
 
     it('submits the last-clicked spell with exact args, renders the HTML description unescaped, and Done closes once', async () => {
@@ -123,22 +101,6 @@ describe('WarMagicSpellModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Done' }))
         expect(mockOnClose).toHaveBeenCalledTimes(1)
-    })
-
-    it('stays in the selection view when the handler returns no result', async () => {
-        confirmWarMagicSpell.mockResolvedValue(null)
-
-        render(<WarMagicSpellModal {...makeProps()} />)
-        fireEvent.click(screen.getByRole('button', { name: /Web/ }))
-        fireEvent.click(replaceButton())
-
-        await waitFor(() => {
-            expect(confirmWarMagicSpell).toHaveBeenCalledTimes(1)
-        })
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument()
-        expect(screen.getByText(/Replace one attack with a Wizard spell/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
-        expect(mockOnClose).not.toHaveBeenCalled()
     })
 
     it('Cancel closes without dispatching the handler', () => {

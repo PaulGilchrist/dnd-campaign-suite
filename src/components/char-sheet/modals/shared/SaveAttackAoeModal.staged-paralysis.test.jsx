@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0248: Ancient Silver Dragon Paralyzing Breath picker lane — stagedParalysis
 // arms the multi-stage ladder seam: picker copy states the two-stage ladder
 // (never half-damage / null-damage / flat "Incapacitated, Paralyzed" grant
@@ -99,8 +99,9 @@ beforeEach(() => {
   seenPicker.current = null;
   // Flat spyRandom stream (order-independent): every d20 is nat 2, so
   // Thug 1 (constitution +2 → 4) fails any DC this lane throws at it.
-  // saveBonuses uses the full-lowercase key the modal reads
-  // (saveType.toLowerCase() — SaveAttackAoeModal.jsx:47).
+  // saveBonuses uses the lowercased normalized-save-type key the modal reads
+  // (normalizeSaveType(saveType).toLowerCase() in the save-bonus lookup of
+  // SaveAttackAoeModal.jsx — branch reference per #2056).
   randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.05);
 });
 afterEach(() => randomSpy.mockRestore());
@@ -138,10 +139,10 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
     expect(seenPicker.current.note).toContain('Incapacitated until the end of its next turn');
     expect(seenPicker.current.note).toContain('Second failure: Paralyzed');
     expect(seenPicker.current.note).toContain('automatically succeeds after 1 minute');
-    // Damageless ladder copy: never half-damage, never "null", never the
-    // flat both-conditions grant, never the sleep ladder's Unconscious.
-    expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
-    expect(seenPicker.current.note).not.toContain('null');
+    // Paralysis-vs-sleep and staged-vs-flat discriminators (the shared
+    // never-half-damage copy discipline is pinned by the staged-sleep and
+    // staged-petrify siblings): never the flat both-conditions grant text,
+    // never the sleep ladder's Unconscious.
     expect(seenPicker.current.note).not.toContain('target is Incapacitated, Paralyzed');
     expect(seenPicker.current.note).not.toContain('Unconscious');
     // Pre-confirm inertness: nothing staged, no rolls, no logs, no damage.
@@ -179,8 +180,10 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
     expect(conds[0].description).toContain('second failure Paralyzes');
     expect(conds[0].description).toContain('auto-succeeds after 1 minute');
 
-    // Results row shows the staged copy — no null-damage cosmetics.
-    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save (rolled 2 + 2 = 4 vs DC 24)'));
+    // Results row shows the staged fail copy (the branch is shared with
+    // staged-sleep — prefix pinned there; the equation suffix belongs to
+    // results-face-equation, not re-pinned here) — no null-damage cosmetics.
+    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save'));
     expect(container.textContent).not.toContain('null null');
   });
 
@@ -202,6 +205,10 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
     expect(stageSleepTargets).not.toHaveBeenCalled();
     expect(conditionLogs()).toHaveLength(0);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20 + 2 = 22 vs DC 13)'));
+    // The Saved row must not leak the staged-fail copy (the "Saved — takes
+    // no damage" row + equation faces are pinned by staged-petrify,
+    // staged-sleep, damage-edge-cases and results-face-equation).
+    await waitFor(() => expect(container.textContent).toContain('Saved'));
+    expect(container.textContent).not.toContain('Incapacitated until the end of its next turn');
   });
 });

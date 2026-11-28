@@ -1,5 +1,5 @@
-// @maintained-by-ai 2026-10-18
-// Natural Recovery lane: Druid/Ranger 2024 hit-dice-per-short-rest slot recovery UI
+// @maintained-by-ai 2026-11-28
+// Natural Recovery lane: Druid 2024 slot recovery UI
 // wiring — gating flags, budget/disable states, CLA-232 merged-batch apply, once-per-
 // long-rest consumption, stale-apply refusal, and consumed/re-armed display.
 // Rest math itself lives in restRules-* services and is asserted there, not re-derived.
@@ -134,14 +134,20 @@ describe('ShortRestModal - Natural Recovery', () => {
     getRuntimeValueMock.mockImplementation(() => null);
   });
 
-  it('gates on Druid + natural_recovery passive: renders section with level/2 budget, hidden without the passive', () => {
+  it('gates on Druid class + natural_recovery passive: renders section with level/2 budget; hidden without the passive or without the Druid class', () => {
     const { unmount } = renderModal({ ...druid(), level: 5 });
     expect(screen.getByRole('heading', { name: 'Natural Recovery' })).toBeInTheDocument();
     // Level 5 druid budget is computed by the modal itself: floor(5/2) = 2.
     expect(screen.getByText(/Budget: 2 of 2 levels remaining/)).toBeInTheDocument();
     unmount();
 
-    renderModal({ ...druid({ automation: { passives: [] } }), level: 5 });
+    const { unmount: unmountNoPassive } = renderModal({ ...druid({ automation: { passives: [] } }), level: 5 });
+    expect(screen.queryByRole('heading', { name: 'Natural Recovery' })).not.toBeInTheDocument();
+    unmountNoPassive();
+
+    // Class gate is required too (ShortRestModal.jsx:259 isDruid term): a Cleric
+    // carrying the passive must NOT get the section (Ranger Tireless is a separate lane).
+    renderModal({ level: 5, automation: { passives: [{ type: 'natural_recovery' }], actions: [] } });
     expect(screen.queryByRole('heading', { name: 'Natural Recovery' })).not.toBeInTheDocument();
   });
 
@@ -151,10 +157,9 @@ describe('ShortRestModal - Natural Recovery', () => {
       spellAbilities: { spell_slots_level_1: 4, spell_slots_level_2: 0, spell_slots_level_3: 3, spells: [] },
     }));
     const rows = within(screen.getByRole('table')).getAllByRole('row');
-    expect(rows).toHaveLength(3); // header + level 1 + level 3
+    expect(rows).toHaveLength(3); // header + level 1 + level 3 (the max-0 level-2 row is filtered out)
     expect(within(rows[1]).getByText('1')).toBeInTheDocument();
     expect(within(rows[2]).getByText('3')).toBeInTheDocument();
-    expect(screen.queryByText('2')).not.toBeInTheDocument();
   });
 
   it('tracks budget with + and minus: level-weighted cost, refund, and budget-driven disables', () => {

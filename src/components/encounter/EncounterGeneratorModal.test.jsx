@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
@@ -160,19 +160,9 @@ describe('EncounterGeneratorModal', () => {
     expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
   });
 
-  it('replaces previous suggestions when Generate is clicked again', () => {
-    generateMock.mockReturnValue(defaultSuggestions);
-    renderModal();
-    clickGenerate();
-    expect(screen.getByText('Medium')).toBeInTheDocument();
-
-    generateMock.mockReturnValue(secondSuggestions);
-    clickGenerate();
-    expect(screen.getByText('Hard')).toBeInTheDocument();
-    expect(screen.queryByText('Medium')).not.toBeInTheDocument();
-    expect(generateMock).toHaveBeenCalledTimes(2);
-  });
-
+  // Re-generate replacement + last-roll persistence is owned by the sibling
+  // EncounterGeneratorModal.budget-history.test.jsx ("last-roll persistence"
+  // suite) — stronger version lives there; not duplicated here.
   it('falls back to the deadly modifier class for an unknown difficulty label', () => {
     generateMock.mockReturnValue([suggestion('Mystery', 100, 1, [goblin])]);
     renderModal();

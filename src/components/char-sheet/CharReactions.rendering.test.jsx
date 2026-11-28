@@ -1,74 +1,40 @@
-// @maintained-by-ai 2026-10-17
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @maintained-by-ai 2026-11-27 CharReactions REACTION-ROW VISIBILITY lane: which rows appear under which
+// states — reaction-spell section gate (length-guard legs vs filter leg) and
+// the PWH stance-row negative. Pre-refresh harness purged (slow #1970 idiom):
+// 7 modal mocks + MetamagicPopup + popup/SpellDetailPopup (no click lane here —
+// modalState/selectedSpell/pendingMetamagic can never populate, none can mount),
+// baseCombatActions + formatUtils + spellSectionUtils + spellDamageUtils mirror
+// mocks (rows ride the REAL constants/eligibility/damage math — eligibility is
+// props-driven now: '1 reaction' + prepared), useSpellCastExecutor mock, and the
+// phantom hasTacticalShift key (CharReactions.jsx:23 imports exactly
+// hasAutomation + hasSpeedyOpportunityDisadvantage). Row assembly/dedup →
+// edgeCases (23 observed); click dispatch → handlers (5) / slow (5) / OA (14);
+// spell-row cells + castable testids → spells (10).
+import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
 
-vi.mock('../common/popup.jsx', () => ({
-    default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
-}));
-vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-    default: () => React.createElement('div', { 'data-testid': 'spell-detail-popup' }, null),
-}));
-vi.mock('./popups/MetamagicPopup.jsx', () => ({
-    default: () => React.createElement('div', { 'data-testid': 'metamagic-popup' }, null),
-}));
-vi.mock('./modals/arcane/ArcaneWardRestoreModal.jsx', () => ({
-    default: () => React.createElement('div', { 'data-testid': 'arcane-ward-restore' }, null),
-}));
-vi.mock('./modals/divine/BastionOfLawSpendModal.jsx', () => ({
-    default: () => React.createElement('div', { 'data-testid': 'bastion-of-law-spend' }, null),
-}));
-vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
-    default: ({ title, onTargetSelected, onSkip }) =>
-        React.createElement('div', { 'data-testid': 'secondary-target-modal' },
-            React.createElement('span', { 'data-testid': 'modal-title' }, title),
-            React.createElement('button', { 'data-testid': 'confirm-btn', onClick: () => onTargetSelected('Target1') }, 'Confirm'),
-            React.createElement('button', { 'data-testid': 'skip-btn', onClick: () => onSkip() }, 'Skip'),
-        ),
-}));
-vi.mock('./modals/BendFateModal.jsx', () => ({
-    default: ({ onClose }) =>
-        React.createElement('div', { 'data-testid': 'bend-fate-modal', onClick: onClose }, null),
-}));
-vi.mock('./modals/BoonFateModal.jsx', () => ({
-    default: ({ onClose }) =>
-        React.createElement('div', { 'data-testid': 'boon-fate-modal', onClick: onClose }, null),
-}));
-vi.mock('./modals/StepsOfTheFeyTauntModal.jsx', () => ({
-    default: ({ onClose }) =>
-        React.createElement('div', { 'data-testid': 'steps-of-fey-modal', onClick: onClose }, null),
-}));
-vi.mock('./modals/SearingVengeanceModal.jsx', () => ({
-    default: ({ onConfirm, onSkip }) =>
-        React.createElement('div', { 'data-testid': 'searing-vengeance-modal' },
-            React.createElement('button', { 'data-testid': 'sv-confirm', onClick: () => onConfirm([{ name: 'Enemy1' }]) }, 'Confirm'),
-            React.createElement('button', { 'data-testid': 'sv-skip', onClick: onSkip }, 'Skip'),
-        ),
-}));
-vi.mock('../../services/ui/spellSectionUtils.js', () => ({
-    getReactionSpellNames: vi.fn(() => new Set(['Shield', 'Hellish Rebuke'])),
-}));
+// Only surfaces this lane can reach/mount are mocked; the rest are import-graph
+// containment for modules the component statically imports but this lane never
+// dispatches into (click/handler territory lives in the sibling lanes).
 vi.mock('../../services/character/featureCategories.js', () => ({
     getCategories: vi.fn(() => ({ featuresToIgnore: [] })),
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: (html) => html }));
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
-    buildFeatureDetailHtml: vi.fn((reaction) => `<div>${reaction.name}</div>`),
+    buildFeatureDetailHtml: vi.fn(),
 }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-    default: vi.fn(),
+    default: vi.fn(() => ({ rollAttack: vi.fn(), rollDamage: vi.fn() })),
 }));
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
     useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
 }));
-vi.mock('../../services/combat/baseCombatActions.js', () => ({
-    OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
-    MELEE_REACH_FEET: 5,
-}));
 vi.mock('../../services/combat/automation/automationService.js', () => ({
+    // CharReactions.jsx:23 imports exactly these two; hasTacticalShift was a
+    // phantom exported-but-never-imported key (#1910/#1964).
     hasAutomation: vi.fn(() => false),
-    hasTacticalShift: vi.fn(() => false),
     hasSpeedyOpportunityDisadvantage: vi.fn(() => false),
 }));
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -76,8 +42,13 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
 }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    useRuntimeValue: vi.fn(),
-    getRuntimeValue: vi.fn(),
+    // No per-test overrides in this visibility lane, so the keyed baseline
+    // lives in the factory (mockClear/reset never run here).
+    useRuntimeValue: vi.fn((_charKey, key) => {
+        if (key === 'powerWordHealStandPermission') return false;
+        return [];
+    }),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
 }));
 vi.mock('../../services/automation/index.js', () => ({
@@ -86,7 +57,7 @@ vi.mock('../../services/automation/index.js', () => ({
     skipSearingVengeance: vi.fn(),
 }));
 vi.mock('../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id' })),
+    createSaveListener: vi.fn(),
 }));
 vi.mock('../../services/ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
@@ -105,44 +76,35 @@ vi.mock('./useAttackDamageResolution.js', () => ({
     resolveAttackDamageStandalone: vi.fn(),
 }));
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-    useSpellMetamagicFlow: vi.fn(() => ({
-        pendingMetamagic: null,
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-    })),
+    useSpellMetamagicFlow: vi.fn(() => ({ pendingMetamagic: null })),
 }));
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
-    useSpellUpcastFlow: vi.fn(() => ({ buildUpcastLevels: vi.fn(() => []) })),
+    useSpellUpcastFlow: vi.fn(() => ({ buildUpcastLevels: () => [] })),
 }));
 vi.mock('../../hooks/combat/useSpellPositionResolver.js', () => ({
     useSpellPositionResolver: vi.fn(() => ({
-        resolvePositions: vi.fn(),
+        resolvePositions: () => {},
         cachedPosRef: { current: null },
     })),
 }));
-vi.mock('../../hooks/combat/useSpellCastExecutor.js', () => ({
-    useSpellCastExecutor: vi.fn(() => ({ castAction: vi.fn() })),
-}));
-vi.mock('../../services/rules/core/spellDamageUtils.js', () => ({
-    resolveSpellDamageAtLevel: vi.fn(),
-    isAutoHitSpell: vi.fn(() => false),
-    resolveHealExpression: vi.fn(),
-}));
-vi.mock('../../services/ui/formatUtils.js', () => ({
-    signFormatter: { format: (val) => (val >= 0 ? '+' : '') + val },
-}));
-
-import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
-import { getCategories } from '../../services/character/featureCategories.js';
-import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
-import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from '../../services/rules/core/spellDamageUtils.js';
 
 const campaignName = 'test-campaign';
+
+const baseSpell = (name, castingTime, extra = {}) => ({
+    name,
+    casting_time: castingTime,
+    level: 1,
+    range: 'Self',
+    prepared: 'Always',
+    damage: null,
+    heal_at_slot_level: false,
+    ...extra,
+});
+
+const reactionSpells = [
+    baseSpell('Shield', '1 reaction'),
+    baseSpell('Hellish Rebuke', '1 reaction', { range: '60 ft.', damage: { expression: '1d10', damage_type: 'fire' } }),
+];
 
 const basePlayerStats = {
     name: 'TestFighter',
@@ -158,10 +120,7 @@ const basePlayerStats = {
         modifier: 3,
         toHit: 6,
         saveDc: 13,
-        spells: [
-            { name: 'Shield', casting_time: '1 reaction', level: 1, range: 'Self', prepared: 'Always', damage: null, heal_at_slot_level: false },
-            { name: 'Hellish Rebuke', casting_time: '1 reaction', level: 1, range: '60 ft.', prepared: 'Always', damage: { expression: '1d10', damage_type: 'fire' }, heal_at_slot_level: false },
-        ],
+        spells: reactionSpells,
     },
     abilities: [
         { name: 'Strength', bonus: 3 },
@@ -182,122 +141,97 @@ function createProps(overrides = {}) {
     };
 }
 
-describe('CharReactions - Basic Rendering', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'powerWordHealStandPermission') return false;
-            if (key === 'bastionOfLawActive') return false;
-            if (key === 'bastionOfLawWardDice') return [];
-            return [];
+describe('CharReactions - reaction-row visibility', () => {
+    // Section-absence guard legs. fix#148: the `?.spells?.length` guard covers
+    // the inner array, not just the container — pre-fix, slot-only containers
+    // (disk census: test-campaign HeroesFeastBard.json carries
+    // spell_slots_level_1..9 with no spells key) and store round-trips carrying
+    // { spells: null } crashed on `.spells.length`. All absent-ish shapes hit
+    // the SAME falsy leg of the one guard (a falsy-variant family per
+    // #1897/#1920), so they are pinned as ONE identical-output case: each shape
+    // renders (a null-deref would throw), all DOMs are byte-equal to each
+    // other (#1348 same-empty-state), and the shared DOM is the section-
+    // omitted face with the reactions list intact. Falsifiability: reverting
+    // the optional-chain throws on the null/absent arms; widening the guard to
+    // always-render would leak the 'Range' header into every arm.
+    it('renders identical section-omitted DOM for null container, null/absent/empty spells (#1348/#148)', () => {
+        const slotOnlyContainer = Object.fromEntries(
+            Object.entries(basePlayerStats.spellAbilities).filter(([key]) => key !== 'spells'),
+        );
+        const shapes = [
+            null,
+            { ...basePlayerStats.spellAbilities, spells: null },
+            slotOnlyContainer,
+            { ...basePlayerStats.spellAbilities, spells: [] },
+        ];
+        const texts = shapes.map((spellAbilities) => {
+            const { container } = render(
+                <CharReactions {...createProps({ playerStats: { ...basePlayerStats, spellAbilities } })} />,
+            );
+            return container.textContent;
         });
-        getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
-        hasAutomation.mockReturnValue(false);
-        hasTacticalShift.mockReturnValue(false);
-        hasSpeedyOpportunityDisadvantage.mockReturnValue(false);
-        getCombatContext.mockResolvedValue(null);
-        getTargetFromAttacker.mockReturnValue(null);
-        buildFeatureDetailHtml.mockImplementation((r) => `<div>${r.name}</div>`);
-        getCategories.mockReturnValue({ featuresToIgnore: [] });
-        getReactionSpellNames.mockReturnValue(new Set(['Shield', 'Hellish Rebuke']));
-        resolveSpellDamageAtLevel.mockReturnValue('1d10');
-        resolveHealExpression.mockReturnValue('2d8+3');
-        isAutoHitSpell.mockReturnValue(false);
-        useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
+        const [nullContainer, nullSpells, absentSpells, emptySpells] = texts;
+        expect(nullSpells).toBe(absentSpells);
+        expect(absentSpells).toBe(emptySpells);
+        expect(nullContainer).toBe(emptySpells);
+        for (const text of texts) {
+            expect(text).not.toContain('Range');
+            expect(text).not.toContain('Shield');
+            // Reactions list still renders — the guard hides only the spell table.
+            expect(text).toContain('Opportunity Attack:');
+        }
     });
 
-    afterEach(cleanup);
-
-    // Section-absence guard (reactionSpells.length > 0). spells.test.jsx owns the
-    // positive spell-row rendering; this file owns the negative for both branches
-    // of buildReactions: empty eligible-name set (filter leg) and null
-    // spellAbilities (guard leg).
-    // fix#148 arms: the guard leg only guarded the container — the inner spells
-    // array was dereferenced unguarded (CharReactions.jsx:144 `.spells.length`).
-    // Persisted disk census shows slot-only containers (test-campaign
-    // HeroesFeastBard.json carries spell_slots_level_1..9 with no spells key), and
-    // the store round-trip can carry { spells: null }. absent/null/[] all reach the
-    // same UI outcome (section omitted, reactions list intact) — silent guard per
-    // fix#40 precedent and the house `?.spells` treatment (spellSectionUtils.js:53,
-    // formatUtils.js:19). The populated arm proves the optional-chain is not
-    // vacuous: real rows still list through the same guard.
-    it.each([
-        ['no reaction spells are configured', () => {
-            getReactionSpellNames.mockReturnValue(new Set());
-            return createProps();
-        }],
-        ['spellAbilities is null', () => {
-            return createProps({
-                playerStats: { ...basePlayerStats, spellAbilities: null },
-            });
-        }],
-        ['spellAbilities.spells is null', () => {
-            return createProps({
-                playerStats: { ...basePlayerStats, spellAbilities: { ...basePlayerStats.spellAbilities, spells: null } },
-            });
-        }],
-        ['spellAbilities has no spells key (disk shape)', () => {
-            const slotOnlyContainer = Object.fromEntries(
-                Object.entries(basePlayerStats.spellAbilities).filter(([key]) => key !== 'spells'),
-            );
-            return createProps({
-                playerStats: { ...basePlayerStats, spellAbilities: slotOnlyContainer },
-            });
-        }],
-        ['spellAbilities.spells is empty', () => {
-            return createProps({
-                playerStats: { ...basePlayerStats, spellAbilities: { ...basePlayerStats.spellAbilities, spells: [] } },
-            });
-        }],
-    ])('does not render the reaction spells section when %s', (_label, buildProps) => {
-        render(<CharReactions {...buildProps()} />);
+    // The OTHER guard leg: spells array populated but the filter yields nothing
+    // eligible (real getReactionSpellNames: reaction casting time AND prepared
+    // are both required — two falsy filter legs collapse into one empty-set
+    // case, #1897). Distinct from the length-guard arms above: here
+    // spellAbilities.spells.length > 0 passes and only the filter empties it.
+    it('omits the reaction-spells section when no listed spell is an eligible reaction spell', () => {
+        render(<CharReactions {...createProps({
+            playerStats: {
+                ...basePlayerStats,
+                spellAbilities: {
+                    ...basePlayerStats.spellAbilities,
+                    spells: [
+                        baseSpell('Fireball', '1 action', { level: 3, range: '150 ft.' }),
+                        baseSpell('Counterspell', '1 reaction', { prepared: 'Not' }),
+                    ],
+                },
+            },
+        })} />);
         expect(screen.queryByText('Range')).not.toBeInTheDocument();
-        expect(screen.queryByText('Shield')).not.toBeInTheDocument();
-        expect(screen.queryByText('Hellish Rebuke')).not.toBeInTheDocument();
-        // Reactions list still renders — the guard hides only the spell table.
+        expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
+        expect(screen.queryByText('Counterspell')).not.toBeInTheDocument();
         expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
     });
 
-    it('still lists reaction spells when the spells array is populated (non-vacuous guard)', () => {
-        // Same section-absence assertions inverted: the exact spell row that the
-        // null/absent/[] arms above omit must appear byte-identical in label when
-        // a legal spells array is present, proving fix#148's ?. chain passes
-        // populated paths through unchanged.
-        render(<CharReactions {...createProps()} />);
+    // Populated arm — proves neither the length guard nor the filter is
+    // vacuous: exactly the eligible rows list, each getByText query pins
+    // uniqueness (duplicates would throw), and the ineligible spell is absent.
+    it('lists exactly the eligible reaction spells, once each, when the section renders', () => {
+        render(<CharReactions {...createProps({
+            playerStats: {
+                ...basePlayerStats,
+                spellAbilities: {
+                    ...basePlayerStats.spellAbilities,
+                    spells: [...reactionSpells, baseSpell('Fireball', '1 action', { level: 3, range: '150 ft.' })],
+                },
+            },
+        })} />);
         expect(screen.getByText('Range')).toBeInTheDocument();
         expect(screen.getByText('Shield')).toBeInTheDocument();
         expect(screen.getByText('Hellish Rebuke')).toBeInTheDocument();
+        expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
         expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
     });
 
-    it('renders the reactions list identically for null, absent, and empty spells arrays (#1348 same-empty-state)', () => {
-        // Identical-input, differing-output discrimination: all three absent-ish
-        // shapes must produce the SAME DOM as each other (section omitted), not
-        // just "not the populated DOM".
-        const shapes = [
-            { ...basePlayerStats.spellAbilities, spells: null },
-            (() => Object.fromEntries(Object.entries(basePlayerStats.spellAbilities).filter(([key]) => key !== 'spells')))(),
-            { ...basePlayerStats.spellAbilities, spells: [] },
-        ];
-        const containers = shapes.map((spellAbilities, i) => {
-            const { container } = render(<CharReactions {...createProps({ playerStats: { ...basePlayerStats, spellAbilities } })} key={i} />);
-            return container;
-        });
-        expect(containers[0].textContent).toBe(containers[1].textContent);
-        expect(containers[1].textContent).toBe(containers[2].textContent);
-        // And that shared DOM is the section-omitted state.
-        expect(containers[0].textContent).not.toContain('Range');
-        expect(containers[0].textContent).toContain('Opportunity Attack:');
-    });
-
-    // Dynamic-grant negative (appendDynamicReactions, CharReactions.jsx:82):
+    // Dynamic-grant negative (appendDynamicReactions, CharReactions.jsx:84):
     // without the PWH stance the Stand row must never appear. Positive grant
     // is pinned by the click lane in handlers.test.jsx and the dedupe pin in
     // edgeCases.test.jsx — this is the app-wide-gap counterpart.
     it('does not render the Stand (Power Word Heal) row when the PWH stance is not granted', () => {
-        // beforeEach pins powerWordHealStandPermission=false.
+        // Runtime baseline pins powerWordHealStandPermission=false.
         render(<CharReactions {...createProps()} />);
         expect(screen.queryByText('Stand (Power Word Heal):')).not.toBeInTheDocument();
         // Sanity: rows do render in this config, so the absence above is meaningful.

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsAutomation from './useCharActionsAutomation.js';
 
@@ -15,6 +15,12 @@ import useCharActionsAutomation from './useCharActionsAutomation.js';
 //   modal routing → .test.resource-modals.js / .test.condition-modals.js / .test.class-feature-modals.js
 //   telepathicSpeech producer → .test.telepathic-speech.js (CLA-053)
 //   handleDivineInterventionCast flows → .test.divine-intervention.js
+//   falsy executeHandler guard → .test.result-types.js (its reached-guard
+//   superset; the duplicate robustness arm here was cut 2026-11-28)
+//   non-array activeBuffs arm cut 2026-11-28: the `|| []` fallback is
+//   behaviorally indistinguishable (activeBuffs feeds ONLY the cloakActive
+//   check, which is itself Array.isArray-guarded, and executeHandler's 5th
+//   arg is deps.characters, not buffs) — no test can fail if it is removed.
 //   guard passthroughs (non-monk MONK_KI-membership negative, empty-options damage_bonus,
 //   omitted onBuffsChange dep) → .test.early-returns.js. (#330 whole-file-delete flag
 //   CLOSED 2026-10-23: its FP-lane dups were deleted in the 2026-10-18 trim and are
@@ -222,6 +228,8 @@ describe('useCharActionsAutomation', () => {
 
             await handleAutomationAction(action);
 
+            // exactly-once: a double-write (double-charge) fails the count pin.
+            expect(deps.setRuntimeValue).toHaveBeenCalledTimes(1);
             expect(deps.setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter', 'focusPoints', 1, campaignName
             );
@@ -254,12 +262,13 @@ describe('useCharActionsAutomation', () => {
         });
 
         // CLA-159 skip list: flurry rows only, via either exemption source, at FP=0
-        // (a skip must dispatch, not refuse).
+        // (a skip must dispatch, not refuse). Both names × both sources is a cross
+        // product over one boolean expression — the 4th arm (Heightened × cloak)
+        // added no branch and was cut 2026-11-28.
         it.each([
             { name: 'Flurry of Blows', source: 'fhh' },
             { name: 'Heightened Flurry of Blows', source: 'fhh' },
             { name: 'Flurry of Blows', source: 'cloak' },
-            { name: 'Heightened Flurry of Blows', source: 'cloak' },
         ])('skips FP cost for $name at FP=0 when $source exemption applies', async ({ name, source }) => {
             const playerStats = source === 'fhh'
                 ? { ...basePlayerStats, specialActions: [{ name: 'Flurry of Healing and Harm' }] }
@@ -293,19 +302,20 @@ describe('useCharActionsAutomation', () => {
 
         // CLA-247 / CLA-333: patientDefenseHandler and stepOfTheWindHandler are the
         // sole FP writers — the row lane never pre-spends and never blocks the
-        // plain-Disengage fallback, even at FP=0. Heightened names share the type
-        // guard (identical path), so one row per automation type suffices.
+        // plain-Disengage fallback, even at FP=0. One arm per automation type at
+        // FP=0 (the strongest value: removing the type guard would refuse AND
+        // popup here, so a positive-FP arm would pin strictly less); the surviving
+        // arms mix a base and a Heightened name to pin that the exclusion keys on
+        // automation.type, not on the row name.
         it.each([
-            { name: 'Patient Defense', type: 'patient_defense', focusPoints: 17 },
-            { name: 'Heightened Patient Defense', type: 'patient_defense', focusPoints: 0 },
-            { name: 'Step of the Wind', type: 'step_of_the_wind', focusPoints: 17 },
-            { name: 'Heightened Step of the Wind', type: 'step_of_the_wind', focusPoints: 0 },
-        ])('never pre-spends or blocks for $name ($type) at FP=$focusPoints', async ({ name, type, focusPoints }) => {
+            { name: 'Patient Defense', type: 'patient_defense' },
+            { name: 'Heightened Step of the Wind', type: 'step_of_the_wind' },
+        ])('never pre-spends or blocks for $name ($type) at FP=0', async ({ name, type }) => {
             const action = {
                 name,
                 automation: { type, cost: { resource: 'focus_points', amount: 1 } },
             };
-            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], focusPoints) });
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], 0) });
             const { handleAutomationAction } = getHandlers(deps);
 
             await handleAutomationAction(action);
@@ -336,10 +346,12 @@ describe('useCharActionsAutomation', () => {
 
             await handleAutomationAction(action);
 
-            expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                'TestFighter', 'focusPoints', expect.any(Number), campaignName
+            // No row-lane write AT ALL at FP=2 (a regression to pre-spend would
+            // write 1 here) and dispatch always proceeds.
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                action, playerStats, campaignName, 'test-map', []
             );
-            expect(deps.executeHandler).toHaveBeenCalled();
         });
 
         it('refuses Hand of Healing at 0 FP with refusal log and zero spend (CLA-159)', async () => {
@@ -497,19 +509,8 @@ describe('useCharActionsAutomation', () => {
             expect(addEntry).toHaveBeenCalled();
         });
 
-        it.each([null, undefined])('dispatches nothing when executeHandler returns %s', async (falsyResult) => {
-            const executeHandler = vi.fn().mockResolvedValue(falsyResult);
-            const deps = createDeps({ executeHandler });
-            const { handleAutomationAction } = getHandlers(deps);
-
-            await handleAutomationAction({ name: 'Test Feature', automation: {} });
-
-            expect(deps.setPopupHtml).not.toHaveBeenCalled();
-            expect(deps.setModalState).not.toHaveBeenCalled();
-            expect(deps.rollDamage).not.toHaveBeenCalled();
-            expect(deps.rollAttack).not.toHaveBeenCalled();
-            expect(deps.addEntry).not.toHaveBeenCalled();
-        });
+        // falsy executeHandler guard cut 2026-11-28 — owned by the
+        // reached-guard superset in .test.result-types.js.
 
         it('threads campaignName as third argument when reading activeBuffs', async () => {
             const grv = vi.fn((charKey, key, cn) => {
@@ -525,17 +526,6 @@ describe('useCharActionsAutomation', () => {
 
             expect(grv).toHaveBeenCalledWith('TestFighter', 'activeBuffs', 'test-campaign');
             expect(deps.executeHandler).toHaveBeenCalled();
-        });
-
-        it('treats a non-array activeBuffs as empty and still dispatches', async () => {
-            const deps = createDeps({ getRuntimeValue: makeBaseGRV(null, 3) });
-            const { handleAutomationAction } = getHandlers(deps);
-
-            await handleAutomationAction({ name: 'Test Feature', automation: {} });
-
-            expect(deps.executeHandler).toHaveBeenCalledWith(
-                { name: 'Test Feature', automation: {} }, basePlayerStats, campaignName, 'test-map', []
-            );
         });
     });
 
@@ -584,6 +574,10 @@ describe('useCharActionsAutomation', () => {
         it('falls back to modalState.divineInterventionAction when runtime returns null', async () => {
             const action = { name: 'Divine Intervention' };
             const grv = vi.fn((charKey, key, _cn) => (key === 'divineInterventionAction' ? null : undefined));
+            // force an abort after the fallback resolves: a falsy handler result
+            // must stop the chain before executeSpellCast. (clearAllMocks does not
+            // reset implementations, so the sibling test's resolved value is neutralized.)
+            mockOnDivineInterventionSpellSelected.mockReturnValueOnce(null);
 
             const deps = createDeps({
                 getRuntimeValue: grv,
@@ -596,6 +590,8 @@ describe('useCharActionsAutomation', () => {
             expect(mockOnDivineInterventionSpellSelected).toHaveBeenCalledWith(
                 action, basePlayerStats, campaignName, { name: 'Fireball' }
             );
+            // the resolved action's result is falsy (cleared mock) → chain stops there
+            expect(executeSpellCast).not.toHaveBeenCalled();
         });
     });
 });

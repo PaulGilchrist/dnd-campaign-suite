@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0399 Black Pudding Split + MA-1249 Ochre Jelly arming/species prose.
 // Row carries automation {type:'reaction', trigger:'bloodied_or_lightning_slashing',
 // effect:'split'}; the gate reads live combatSummary HP (bloodied: ≤ floor(maxHp/2)
@@ -20,7 +20,6 @@ import {
   oneSizeSmaller,
   splitTriggerEvidence,
   splitGate,
-  monsterReactionUsesRemaining,
   MONSTER_REACTION_USES_KEY,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
@@ -82,9 +81,10 @@ describe('MA-0399/MA-1249 split registry + disk fingerprints (BY-name #387)', ()
     for (const row of [pudding, ochre]) {
       expect(row.name).toBe('Split');
       expect(row.usage).toBe('At Will');
+      // 999 sentinel pinned ONCE here; sentinel→null counter behavior owned by
+      // services/encounters/monsterAbilityUses.at-will-sentinel.test.js — not re-pinned.
       expect(row.uses).toBe(999);
       expect(row.maxUses).toBe(999);
-      expect(monsterReactionUsesRemaining(row, {})).toBeNull(); // At Will sentinel → no counter
     }
     expect(pudding.description).toMatch(/^Trigger: While the pudding is Large or Medium/);
     expect(ochre.description).toMatch(/^The jelly splits into two new <strong>Ochre Jellies<\/strong>/);
@@ -106,6 +106,7 @@ describe('MA-0399 splitTriggerEvidence once-per-branch truth table', () => {
   it('bloodied + damage_type satisfy; size/combatant/trigger refuse', () => {
     // bloodied path (≤ floor(maxHp/2), ≥ minHp 10)
     expect(ev(null, combatant({ currentHp: 30 }))).toMatchObject({ satisfied: true, via: 'bloodied', hp: 30, maxHp: 68 });
+    expect(ev(null, combatant({ size: 'Medium', maxHp: 32, currentHp: 16 })).satisfied).toBe(true); // Medium qualifies too (RAW 'Large or Medium')
     expect(ev(null, combatant({ currentHp: 34 })).satisfied).toBe(true); // boundary floor(68/2)
     expect(ev(null, combatant({ currentHp: 35 })).satisfied).toBe(false); // one above the boundary
     expect(ev(null, combatant({ maxHp: 16, currentHp: 8 }))).toMatchObject({ satisfied: false, reason: 'trigger' }); // below 10+ HP floor (RAW)
@@ -206,12 +207,19 @@ describe('MA-1249 species-threaded Split prose (MA-0869 lineage)', () => {
   });
 
   it('EB-suffixed species "Black Pudding 1" strips the suffix to BYTE-IDENTICAL default pudding prose', async () => {
-    const { logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
-    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, species: 'Black Pudding 1', deps });
-    expect(result.ok).toBe(true);
-    const spend = logs.find(l => l.type === 'ability_use');
-    expect(spend.description).toBe(`${MONSTER} uses Split (Bloodied at 30/68 HP) — GM duplication instruction: replace ${MONSTER} with two Medium Black Puddings at 15/15 HP each (floor(30/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`);
-    expect(result.popupHtml).toContain('two Medium Black Puddings');
-    expect(result.popupHtml).toContain('add the two puddings via the Encounter Builder');
+    // two independent presses: default (no species) vs EB-suffixed species
+    const def = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
+    const defaultResult = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps: def.deps });
+    const suffixed = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
+    const suffixedResult = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, species: 'Black Pudding 1', deps: suffixed.deps });
+    expect(defaultResult.ok).toBe(true);
+    expect(suffixedResult.ok).toBe(true);
+    // default (species-less) prose correctness is pinned in the bloodied-accept test;
+    // here we pin ONLY the strip equivalence: suffixed press === default press, no '1' leak.
+    expect(suffixed.logs.find(l => l.type === 'ability_use').description)
+      .toBe(def.logs.find(l => l.type === 'ability_use').description);
+    expect(suffixedResult.popupHtml).toBe(defaultResult.popupHtml);
+    expect(suffixedResult.popupHtml).toContain('two Medium Black Puddings');
+    expect(suffixedResult.popupHtml).toContain('add the two puddings via the Encounter Builder');
   });
 });

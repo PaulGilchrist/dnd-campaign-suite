@@ -1,6 +1,6 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
- * ElementalAttunementModal — SUMMARY SECTION lane (jsx:661-695 rendering + the Close commit
+ * ElementalAttunementModal — SUMMARY SECTION lane (jsx:681-719 rendering + the Close commit
  * DESCRIPTION variants). This lane owns what only the summary view can show: the per-element
  * summary VARIANT lines (Fire-saved and Cold-failed exact lines are npc-save's; the Cold-saved,
  * Lightning-failed, Thunder-saved and Fire-failed lines — plus the CON DC banner variant — are
@@ -10,41 +10,71 @@
  * and onClose invocation on Close + the expiration log DESCRIPTION VARIANTS (custom action names /
  * non-Fire elements; the default Fire expiration payload is deactivation's).
  *
+ * HARNESS (stated per .player-save run2#1977 handoff): every element arm here reaches the summary
+ * through the NPC branch — creatures are type:'npc', resolved in-flight during processing
+ * (d20 draw at jsx:395), never via a dispatched 'save-result' event. So the Fire-failed line
+ * pinned below ('Goblin1: Failed (d20 2+-1 = 1). … 5 fire damage') does NOT collide with
+ * .player-save's PLAYER Fire-failed line (rendered off an event echo for type:'player'):
+ * same template, different branch and different exact bytes. This lane consumes player-save
+ * resolution MECHANISM only (one awaited prompt in the aggregation pin).
+ *
  * Ownership map (siblings, do not duplicate here):
  * - .elemental-data.test.jsx  — ELEMENT_DATA/ELEMENT_DESCRIPTIONS as rendered, non-mutation.
  * - .test.jsx (main)          — element-phase header/instruction text, Cancel button, skip/cancel.
  * - .phase-flow.test.jsx      — master chain transitions with previous-control-gone checks, DC
- *                               MATH (DC 12 consumed as given), processing-phase exact line, Fire
- *                               'Save DC 12 DEX' banner in transition, pending→summary gate,
+ *                               MATH (DC 12 consumed as given here), processing-phase exact line,
+ *                               Fire 'Save DC 12 DEX' banner in transition, pending→summary gate,
  *                               surviving-summary commit seam, zero-target stranding.
  * - .aoe-results exact lines  — pinned in .npc-save/.player-save lanes (single-target exact
  *                               result lines); this lane reuses their numbers ONLY where the pin is
  *                               aggregate ORDER, never to re-pin a lone line.
  * - .npc-save.test.jsx        — NPC save math, live store writes, exact log rows, persistAndNotify
  *                               order, exact single-target 'Saved (d20 19+2 = 21). 1d10 fire…' and
- *                               'Failed (d20 11+-10 = 1) — speed reduced by 15 ft.' summary lines.
+ *                               'Failed (d20 11+-10 = 1) — speed reduced by 15 ft.' summary lines
+ *                               (verified at npc-save :435-436).
  * - .player-save.test.jsx     — prompt payloads, save-result event handling, listener lifecycle,
- *                               double-roll divergence, player rejection lanes (consumed as mechanism).
+ *                               double-roll divergence. Its player addEntry rejection lanes now
+ *                               sit at ITS file bottom (~:758); the stale ':290-340' cite for them
+ *                               lives in .error-handling's header (report-only, not this file).
  * - .deactivation.test.jsx    — handleResultsClose commit payloads, §39 single-clock order,
- *                               duplicate expiration default-Fire log (exact payload at :249-274),
+ *                               duplicate expiration default-Fire log (exact payload at :267-277),
  *                               double-commit defect pin, inertness.
  * - .error-handling.test.jsx  — addEntry/loadMapData/addExpiration rejection survival.
  *
- * FLAG (product note, owned here as the aggregation lane):
- * - ElementalAttunementModal.jsx:672 — summary rows render in results-array order, which is
+ * TRIMMED (2026-11-27 audit; no test lost coverage, mock surface shrunk):
+ * - CreatureSelectionModal mock — PURGED (#1911/#1974/#1977 unreachable-modal method): every
+ *   render passes activeOverlay, so the targets effect auto-selects (jsx:416-447) and the
+ *   creatureSelection mount (jsx:470) is structurally unreachable. Its real import chain
+ *   (spellOverlayService → already-mocked paths) is inert — .player-save proved the same purge.
+ * - combatData mock key `setCombatSummaryCache` — PURGED phantom (#1910): the component imports
+ *   getCombatSummary ONLY; nothing here touches the cache setter.
+ * - applyDamage mirror overrides `computeDamageAfterSave` / `computeDamageAfterResistancesWithDetails`
+ *   — PURGED (#1977 mirror-mock canon, real builders). The stubs re-implemented the real rules;
+ *   the REAL functions are byte-identical on every fixture here (all damage elements use
+ *   dcSuccess:'half'; every creature has empty resistances/immunities, so the details fn passes
+ *   rawDamage through). The live-HP-mutating `applyDamageToTarget` stub STAYS — it is a harness
+ *   engine (by-fixture movement proving aggregate damage), not a rules mirror; the real fn carries
+ *   5-arg store/log behavior this lane deliberately keeps out.
+ *
+ * FLAG (product note, owned here as the aggregation lane; line refs re-verified against current
+ * component bytes 2026-11-27):
+ * - ElementalAttunementModal.jsx:692 — summary rows render in results-array order, which is
  *   RESOLUTION order: NPCs (resolved during processing) always appear ABOVE players (appended
  *   when their save-result event lands), regardless of selection order. A player selected first
  *   is listed last. Pinned below; product fix: order rows by selection order if that matters.
- * - ElementalAttunementModal.jsx:563 — expiration description hardcodes 'Elemental Attunement'
- *   even when the action has a custom name; abilityName and description can silently drift.
- *   The renamed-action arm below pins the actual behavior.
+ * - ElementalAttunementModal.jsx:578 — expiration description hardcodes 'Elemental Attunement'
+ *   even when the action has a custom name (abilityName carries action.name); the pair can
+ *   silently drift. The renamed-action arm below pins the actual behavior.
  *
- * Anti-vacuity: live runtime store (cells inspected); live applyDamage mutates the ONE by-identity
- * combat fixture so aggregate HP movement is proven on the summary itself; Math.random pinned
- * (d20 = floor(r*20)+1) so every roll total in every exact line is deterministic; Date.now frozen;
- * exact full-line text; exact row className mapping; role-scoped queries; fresh vi.fn onClose per
- * render; mockReset + re-arm per test; findBy idiom; captured promptId dispatched directly; no
- * bare setTimeout, no wall-clock waits.
+ * Anti-vacuity: live runtime store (cells inspected); live applyDamageToTarget stub mutates the
+ * ONE by-identity combat fixture so aggregate HP movement is proven on the summary itself;
+ * REAL computeDamageAfterSave/Resistances run (rule math is not restated here); Math.random
+ * pinned (d20 = floor(r*20)+1 at jsx:395; promptId draw at jsx:225 consumes the earlier value —
+ * sequential Once pins account for it) so every roll total in every exact line is deterministic;
+ * Date.now frozen; exact full-line text; exact row className mapping; role-scoped queries; fresh
+ * vi.fn onClose per render; mockReset + re-arm per test; findBy only for genuine async seams
+ * (overlay→processing .then, pending→summary passive gate) — all SYNC-settled state asserted
+ * directly; captured promptId dispatched directly; no bare setTimeout, no wall-clock waits.
  */
 import { render, screen, fireEvent, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -77,15 +107,11 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(() => ({ total: 5, rolls: [5], modifier: 0 })),
 }));
 
-// LIVE applyDamage: mutates the fixture's currentHp so aggregate damage landing on MULTIPLE
-// creatures is proven on the summary object itself, not on a call-args echo.
+// LIVE save/resistance math runs from the REAL module (no mirror stubs — see TRIMMED header);
+// only applyDamageToTarget is stubbed, as a live HP-mutator so aggregate damage landing on
+// MULTIPLE creatures is proven on the summary fixture itself, not on a call-args echo.
 vi.mock('../../../services/rules/combat/applyDamage.js', async (importOriginal) => ({
     ...await importOriginal(),
-    computeDamageAfterSave: vi.fn((damage, success, dcSuccess) => {
-        if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
-        return damage;
-    }),
-    computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
     applyDamageToTarget: vi.fn((summary, targetName, damage) => {
         const creature = summary?.creatures?.find(c => c.name === targetName);
         if (creature) creature.currentHp = Math.max(0, creature.currentHp - damage);
@@ -102,7 +128,6 @@ vi.mock('../../../services/rules/combat/aoeService.js', () => ({
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => null),
-    setCombatSummaryCache: vi.fn(),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -121,17 +146,6 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
-    default: vi.fn(({ targets, onConfirm, onSkip }) => (
-        <div className="sp-overlay">
-            <div className="sp-modal">
-                <button onClick={() => onConfirm(targets.map(t => t.name))} disabled={targets.length === 0}>Activate</button>
-                <button onClick={onSkip}>Skip</button>
-            </div>
-        </div>
-    )),
-}));
-
 // ── Re-import mocked modules ──
 
 import * as runtime from '../../../hooks/runtime/useRuntimeState.js';
@@ -147,7 +161,7 @@ const { cells } = runtime;
 const { applyDamageToTarget } = applyDamage;
 
 // ── Fixtures (frozen where the component must not mutate; creature HP stays mutable —
-//    the live applyDamage mock moves it) ──
+//    the live applyDamageToTarget stub moves it) ──
 
 const PLAYER = 'Monk1';
 const CAMPAIGN = 'test-campaign';
@@ -249,6 +263,8 @@ describe('ElementalAttunementModal summary section', () => {
     describe('per-element summary variant lines (the ones npc-save does NOT pin)', () => {
         // Fire-SAVED and Cold-FAILED exact lines are .npc-save's; every arm below is a variant
         // nothing else pins: Cold-saved, Lightning-failed, Thunder-saved (+CON banner), Fire-failed.
+        // All arms render through the NPC branch (see HARNESS header) — type:'npc', resolved
+        // during processing, no save-result event.
         it.each([
             {
                 element: 'Cold', saveBonuses: { dex: 2 }, random: 0.9, cls: 'abjure-result-success',
@@ -293,7 +309,8 @@ describe('ElementalAttunementModal summary section', () => {
         it('renders one row per resolved NPC in SELECTION order, mixed pass/fail unsorted, with exact per-row text and class', async () => {
             // Overlay auto-selects [Goblin1, Goblin2]; the d20 queue consumes Math.random in that
             // same iteration order: Goblin1 0.9 → 19 (19+2 = 21 ≥ 12 SAVED, half = 2),
-            // Goblin2 0.05 → 2 (2+-1 = 1 < 12 FAILED, full 5).
+            // Goblin2 0.05 → 2 (2+-1 = 1 < 12 FAILED, full 5). Halving is REAL
+            // computeDamageAfterSave('half'), not a stubbed echo.
             vi.spyOn(Math, 'random').mockReturnValueOnce(0.9).mockReturnValueOnce(0.05);
             const summary = seedCreatures([
                 npc('Goblin1', { dex: 2 }),
@@ -321,6 +338,7 @@ describe('ElementalAttunementModal summary section', () => {
             // Selection order is [Player1, Goblin1] (overlay list order, preserved by the Set),
             // but the NPC resolves during processing and the player only lands when its
             // save-result event arrives — so the summary lists Goblin1 FIRST.
+            // Sequential draws: promptId (jsx:225) consumes 0.5, the NPC d20 (jsx:395) draws 0.9.
             vi.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.9);
             const player = { name: 'Player1', type: 'player', currentHp: 20, maxHp: 20, saveBonuses: {}, resistances: [], immunities: [] };
             const summary = seedCreatures([player, npc('Goblin1', { dex: 5 })]);
@@ -329,11 +347,11 @@ describe('ElementalAttunementModal summary section', () => {
             clickElement('Fire');
 
             // Behind the pending gate (mechanism owned by .phase-flow/.player-save): consume it.
+            // ONE prompt is the fixture anchor; the promptId is captured ONLY to address the
+            // event — payload SHAPE is .player-save's, not re-pinned here.
             expect(await screen.findByText('Waiting for save roll...', { selector: 'em' })).toBeInTheDocument();
             expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(1);
-            const [promptCampaign, prompt] = savePromptService.sendSavePrompt.mock.calls[0];
-            expect(promptCampaign).toBe(CAMPAIGN);
-            expect(prompt.targetName).toBe('Player1');
+            const [, prompt] = savePromptService.sendSavePrompt.mock.calls[0];
 
             // Player FAILS with the event's rawDamage echo (8): full damage, no halving.
             fireEvent(window, new CustomEvent('save-result', {
@@ -343,6 +361,10 @@ describe('ElementalAttunementModal summary section', () => {
             await screen.findByRole('button', { name: /Close/ });
 
             const rows = summaryRows();
+            // DEFECT FACE (filed, jsx:256-vs-:266/:285 double-roll divergence): the '[5] = 8'
+            // bytes on the Player1 row are the summary RE-DISPLAYING the contradiction — rolls
+            // re-rolled from the mocked die, total taken from the event echo. Pinned as rendered;
+            // not laundered into self-consistent '[8] = 8'.
             expect(rows.map(r => r.textContent)).toEqual([
                 'Goblin1: Saved (d20 19+5 = 24). 1d10 fire: 1d10 [5] = 5 → 2 fire damage',
                 'Player1: Failed (d20 3+2 = 5). 1d10 fire: 1d10 [5] = 8 → 8 fire damage',
@@ -359,13 +381,13 @@ describe('ElementalAttunementModal summary section', () => {
     });
 
     describe('close from summary — onClose invocation + expiration log DESCRIPTION variants', () => {
-        // The DEFAULT Fire expiration payload is .deactivation's (:249-274); these arms own the
+        // The DEFAULT Fire expiration payload is .deactivation's (:267-277); these arms own the
         // VARIANTS: non-Fire elements and a custom (renamed) action. Description is BYTE-exact.
         it.each([
             { element: 'Cold', actionName: 'Elemental Attunement' },
             { element: 'Thunder', actionName: 'Elemental Attunement' },
             {
-                // FLAG (jsx:563): description hardcodes 'Elemental Attunement' even though
+                // FLAG (jsx:578): description hardcodes 'Elemental Attunement' even though
                 // abilityName carries the custom action name — the pair can silently drift.
                 element: 'Lightning', actionName: 'Storm Soul Manifestation',
             },

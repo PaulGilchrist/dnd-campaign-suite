@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * Unit lane for WizardStepBasic (name / level / alignment / portrait).
  *
@@ -148,8 +148,10 @@ describe('WizardStepBasic', () => {
   it('changing alignment sends ("alignment", value)', async () => {
     const { onInputChange } = renderBasic();
 
-    const alignmentSelect = await screen.findByRole('combobox');
-    fireEvent.change(alignmentSelect, { target: { value: 'Chaotic Neutral' } });
+    // Wait until the option actually exists before selecting it: a change to
+    // a value with no matching <option> cannot set a controlled select.
+    await screen.findByText('Chaotic Neutral');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Chaotic Neutral' } });
 
     expect(onInputChange).toHaveBeenCalledWith('alignment', 'Chaotic Neutral');
   });
@@ -164,8 +166,9 @@ describe('WizardStepBasic', () => {
       const message = `${field} failed validation`;
       renderBasic({ errors: { [field]: message } });
 
-      // Flush the alignment fetch so no act noise leaks after assertions.
-      await screen.findByRole('combobox');
+      // Flush the alignment fetch (last option rendered) so no act noise
+      // leaks after assertions.
+      await screen.findByText('Chaotic Evil');
 
       expect(screen.getByText(message)).toBeInTheDocument();
       expect(screen.getByRole(role)).toHaveClass('error');

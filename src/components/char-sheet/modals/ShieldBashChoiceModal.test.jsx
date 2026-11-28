@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ShieldBashChoiceModal from './ShieldBashChoiceModal.jsx';
@@ -40,18 +40,24 @@ beforeEach(() => {
 });
 
 describe('ShieldBashChoiceModal', () => {
-  it('renders the choice UI with both options, target/DC context, and an inert Apply until selected', () => {
-    render(<ShieldBashChoiceModal {...makeProps()} />);
+  it('renders both options with target/DC context, "<Option> <target>" radio names (multi-word target), and an inert Apply', () => {
+    // Rendered with a multi-word target so the accessible names prove the
+    // aria-label interpolation ("Push Goblin 2"): without it the computed
+    // name would be the mashed label text ("Push — Push target 5 feet...")
+    // and these role queries would fail. Also pins the fix#313 no-inline-style
+    // recipe at rest (RAW 5-foot fallback copy lives here too).
+    render(<ShieldBashChoiceModal {...makeProps({ targetName: 'Goblin 2' })} />);
 
     expect(screen.getByText('Shield Bash')).toBeInTheDocument();
     expect(screen.getByText(/Choose an effect for/)).toBeInTheDocument();
-    expect(screen.getByText('Orc')).toBeInTheDocument();
+    expect(screen.getByText('Goblin 2')).toBeInTheDocument();
     expect(screen.getByText(/DC 13/)).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getByRole('radio', { name: 'Push Orc' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Prone Orc' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Push Goblin 2' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Prone Goblin 2' })).not.toBeChecked();
     expect(screen.getByText(/Push target 5 feet away from you/)).toBeInTheDocument();
     expect(screen.getByText(/Target gains Prone condition/)).toBeInTheDocument();
+    expect(document.querySelector('[style]')).toBeNull();
 
     const apply = screen.getByRole('button', { name: /Apply Effect/ });
     expect(apply).toBeDisabled();
@@ -60,24 +66,8 @@ describe('ShieldBashChoiceModal', () => {
     expect(baseProps.onClose).not.toHaveBeenCalled();
   });
 
-  it('gives every radio an explicit "<Option> <target>" accessible name (a11y parity with the DS/heal choosers)', () => {
-    // Backlog KA 2026-11-18: the rows used to be label-wrapped UNLABELLED
-    // radios — role-keyed automation could not reach them. The aria-label now
-    // mirrors the SecondaryTargetModal `Select <Name>` idiom: option + target.
-    render(<ShieldBashChoiceModal {...makeProps({ targetName: 'Goblin 2' })} />);
-
-    expect(screen.getByRole('radio', { name: 'Push Goblin 2' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Prone Goblin 2' })).toBeInTheDocument();
-    // Same names resolvable via raw attribute selectors (automation parity).
-    expect(document.querySelector('input[aria-label="Push Goblin 2"]')).toBeTruthy();
-    expect(document.querySelector('input[aria-label="Prone Goblin 2"]')).toBeTruthy();
-    // The aria-label overrides the mashed label text: no effect copy bleed.
-    expect(screen.getByRole('radio', { name: 'Push Goblin 2' }).getAttribute('aria-label'))
-      .toBe('Push Goblin 2');
-  });
-
-  it('selects an option on click and enforces single-choice until Apply', () => {
-    render(<ShieldBashChoiceModal {...makeProps()} />);
+  it('selects an option on click, enforces single-choice until Apply, and keeps zero inline styles when the highlight moves', () => {
+    const { container } = render(<ShieldBashChoiceModal {...makeProps()} />);
 
     fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
     expect(screen.getByRole('radio', { name: 'Push Orc' })).toBeChecked();
@@ -87,6 +77,8 @@ describe('ShieldBashChoiceModal', () => {
     expect(screen.getByRole('radio', { name: 'Prone Orc' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Push Orc' })).not.toBeChecked();
     expect(shieldBash.applyShieldBashEffect).not.toHaveBeenCalled();
+    // Selection highlight is class-driven even in its dynamic state (fix#313).
+    expect(container.querySelector('[style]')).toBeNull();
   });
 
   it.each(['Push', 'Prone'])(
@@ -158,40 +150,17 @@ describe('ShieldBashChoiceModal', () => {
     consoleError.mockRestore();
   });
 
-  it('is not dismissed by clicking the overlay or the modal body', () => {
+  it('is not dismissed by clicking the overlay backdrop or the modal body', () => {
     const onClose = vi.fn();
     const { container } = render(<ShieldBashChoiceModal {...makeProps({ onClose })} />);
 
-    fireEvent.click(container.querySelector('.sp-overlay'));
-    fireEvent.click(container.querySelector('.sp-modal'));
+    // Class-independent: root element is the backdrop, its child the modal.
+    const backdrop = container.firstElementChild;
+    fireEvent.click(backdrop);
+    fireEvent.click(backdrop.firstElementChild);
 
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).toBeInTheDocument();
-  });
-
-  it('styles the choice list via scoped classes with zero inline styles (no-inline-styles convention)', () => {
-    // fix#313 recipe pin: the former inline styles on the options container,
-    // option labels, radio inputs, and effect spans (:50/:57/:63/:66-era) now
-    // live in ShieldBashChoiceModal.css (exact-value migration). Selection
-    // highlight rides the .selected modifier class (WarBondChooserModal
-    // precedent), so even the dynamic selection state needs no inline style.
-    render(<ShieldBashChoiceModal {...makeProps()} />);
-
-    const list = document.querySelector('.shield-bash-options');
-    expect(list).toBeTruthy();
-    expect(list.getAttribute('style')).toBeNull();
-
-    const rows = list.querySelectorAll('.shield-bash-option');
-    expect(rows).toHaveLength(2);
-    expect(list.querySelectorAll('.shield-bash-option-input')).toHaveLength(2);
-    expect(list.querySelectorAll('.shield-bash-option-effect')).toHaveLength(2);
-
-    // Choice view at rest AND after selecting Push: zero inline style attrs in the body.
-    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
-    expect(rows[0].className).toContain('selected');
-    expect(rows[1].className).not.toContain('selected');
-    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
   });
 
   it('derives Push copy from caller action.options value, falling back to the RAW 5 feet', () => {
@@ -215,6 +184,5 @@ describe('ShieldBashChoiceModal', () => {
     expect(screen.getByText(/Push target 10 feet away from you/)).toBeInTheDocument();
     expect(screen.queryByText(/Push target 5 feet away from you/)).not.toBeInTheDocument();
     expect(screen.getByText(/Target gains Prone condition/)).toBeInTheDocument();
-    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
   });
 });

@@ -1,4 +1,12 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
+// LANE: initiative.overlays — Initiative's spell-overlay SURFACE composition:
+// mount fetch (Initiative.jsx:573-585) → overlay state → exact `overlays` prop
+// handed to every CreatureCard (Initiative.jsx:1203), including the merge that
+// dedupes ids already added via SSE before the mount fetch resolves.
+// Owned elsewhere: createOverlayHandler add/update/remove/clear semantics
+// (sseHandlers-overlay.test.jsx); per-card overlay filtering/badge rendering
+// (CreatureCard.overlay-options.test.jsx); fetch transport + overlayTargetId
+// (services/maps/spellOverlayService.test.js).
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -12,25 +20,17 @@ vi.mock('../../services/maps/spellOverlayService.js', () => ({
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
 
-const syncStateStore = new Map();
+// Captured so the race test can drive the real createSseEventHandler exactly
+// the way the shared sseClient subscription would.
+const sseHarness = { handleEvent: null };
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     deleteRuntimeKey: vi.fn(),
-    getStore: vi.fn(() => syncStateStore),
+    getStore: vi.fn(() => new Map()),
     // L5-001: TurnEconomyStrip subscribes via useRuntimeValue; null ⇒ enforcement off.
     useRuntimeValue: vi.fn(() => null),
     // useLootHandlers subscribes to cross-tab loot-draft echoes via addStorageChangeListener.
     addStorageChangeListener: vi.fn(() => () => {}),
-    useSyncedState: vi.fn((key, prop, defaultValue) => {
-        const storeKey = `${key}-${prop}`;
-        if (!syncStateStore.has(storeKey)) {
-            syncStateStore.set(storeKey, { value: defaultValue, setter: null });
-        }
-        const entry = syncStateStore.get(storeKey);
-        if (!entry.setter) {
-            entry.setter = vi.fn((newValue) => { entry.value = newValue; });
-        }
-        return [entry.value, entry.setter];
-    }),
     listeners: new Map(),
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
@@ -89,13 +89,20 @@ vi.mock('../../services/encounters/combatLoggingService.js', () => ({
     logConditionSave: vi.fn(), logHpChange: vi.fn(), logNpcThreshold: vi.fn(),
 }));
 vi.mock('../encounter/MonsterCardModal.jsx', () => ({ default: () => <div data-testid="monster-card-modal" /> }));
-vi.mock('../common/Subscriber.jsx', () => ({ default: () => <div data-testid="subscriber" /> }));
+vi.mock('../common/Subscriber.jsx', () => ({
+    default: ({ handleEvent }) => {
+        sseHarness.handleEvent = handleEvent;
+        return <div data-testid="subscriber" />;
+    },
+}));
 vi.mock('../common/Popup.jsx', () => ({ default: ({ children }) => <div data-testid="popup-overlay">{children}</div> }));
 vi.mock('../char-sheet/DiceRollResult.jsx', () => ({ default: ({ name }) => <div data-testid="dice-roll-result">{name}</div> }));
 vi.mock('./CreatureCard.jsx', () => ({
+    // Serializes the WHOLE overlays prop (null distinguishes a missing prop
+    // from an empty list) so assertions pin the exact rows Initiative hands down.
     default: ({ creature, overlays }) => (
         <div data-testid={`creature-card-${creature.name}`}>
-            <span data-testid={`overlay-count-${creature.name}`}>{(overlays || []).length}</span>
+            <span data-testid={`overlays-${creature.name}`}>{JSON.stringify(overlays ?? null)}</span>
         </div>
     ),
 }));
@@ -103,12 +110,14 @@ vi.mock('./EffectAdder.jsx', () => ({ default: ({ targetName }) => <div data-tes
 
 import Initiative from './Initiative.jsx';
 
+const overlaysFor = (creatureName) => JSON.parse(screen.getByTestId(`overlays-${creatureName}`).textContent);
+
 describe('Initiative overlay loading', () => {
     let props;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        syncStateStore.clear();
+        sseHarness.handleEvent = null;
         Element.prototype.scrollIntoView = vi.fn();
         mockFetchSpellOverlays.mockResolvedValue([]);
         props = {
@@ -120,8 +129,12 @@ describe('Initiative overlay loading', () => {
         };
     });
 
-    it('fetches spell overlays from the server on mount', async () => {
-        mockFetchSpellOverlays.mockResolvedValue([{ id: 'o1', shape: 'sphere', radiusFt: 20 }]);
+    it('fetches spell overlays once on mount and hands every card the exact server rows', async () => {
+        const serverRows = [
+            { id: 'o1', shape: 'sphere', radiusFt: 20 },
+            { id: 'o2', shape: 'cylinder', radiusFt: 10 },
+        ];
+        mockFetchSpellOverlays.mockResolvedValue(serverRows);
 
         render(<Initiative {...props} />);
 
@@ -133,20 +146,50 @@ describe('Initiative overlay loading', () => {
         // window under full-suite parallel load (batch-run flake, 2026-10).
         await act(async () => {});
 
+        expect(mockFetchSpellOverlays).toHaveBeenCalledTimes(1);
         expect(mockFetchSpellOverlays).toHaveBeenCalledWith('test-campaign');
-        expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('1');
+        // Full-shape: order, ids, and geometry propagate untouched (the card
+        // itself decides targeting — Initiative only threads the raw rows).
+        expect(overlaysFor('Alice')).toEqual(serverRows);
     });
 
-    it('shows no overlay options when the server has none', async () => {
+    it('keeps every card on an empty overlay list when the server has none', async () => {
         render(<Initiative {...props} />);
 
         // See note above — fetch fires synchronously in the mount effect and
         // the beforeEach fake (mockResolvedValue([])) resolves in microtasks.
-        // Flushing deterministically still fails loudly if any option leaks
-        // into state (count ≠ 0) or the card never renders (getBy throws).
+        // Flushing deterministically still fails loudly if any row leaks into
+        // the prop (parse ≠ []) or the card never renders (getBy throws).
         await act(async () => {});
 
         expect(mockFetchSpellOverlays).toHaveBeenCalledWith('test-campaign');
-        expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('0');
+        expect(overlaysFor('Alice')).toEqual([]);
+    });
+
+    it('merges the mount fetch with SSE-added overlays without duplicating ids', async () => {
+        // Real-world race: another tab casts while this board mounts, so the
+        // SSE add lands before the mount fetch resolves. The mount merge must
+        // dedupe by id (Initiative.jsx:579-581) and append only new rows.
+        let resolveFetch;
+        mockFetchSpellOverlays.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+        render(<Initiative {...props} />);
+
+        const sseRow = { id: 'o1', shape: 'cube', radiusFt: 5 };
+        await act(async () => {
+            sseHarness.handleEvent({
+                key: 'spell-overlay-test-campaign',
+                data: { action: 'add', overlays: [sseRow] },
+            });
+        });
+        expect(overlaysFor('Alice')).toEqual([sseRow]);
+
+        // Late fetch echoes the same row back plus one genuinely new row.
+        await act(async () => {
+            resolveFetch([sseRow, { id: 'o2', shape: 'sphere', radiusFt: 20 }]);
+        });
+
+        expect(overlaysFor('Alice')).toEqual([sseRow, { id: 'o2', shape: 'sphere', radiusFt: 20 }]);
+        expect(mockFetchSpellOverlays).toHaveBeenCalledTimes(1);
     });
 });

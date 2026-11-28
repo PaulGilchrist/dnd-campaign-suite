@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // CLA-237 regression: Nature's Ward (2024 Druid, Circle of the Land lv10)
 // resistance ignored on the PC save-damage prompt lane. Persisted combatSummary
 // player entries are minimal stubs (CLA-119 family — no automation/computedStats),
@@ -9,8 +9,9 @@
 // useLoggedDiceRollSaves.js:367) to applyDamageToTarget instead.
 //
 // Scope: this file pins the MODAL forwarding contract only (primary leg,
-// secondary leg, missing-prop guard). The actual resistance halving lives at
-// the real applyDamage choke point — covered in applyDamage.natures-ward.test.js.
+// secondary leg, and the missing-prop loud guard on BOTH legs). The actual
+// resistance halving lives at the real applyDamage choke point — covered in
+// applyDamage.natures-ward.test.js.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -39,18 +40,14 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
 }));
 
+// Mock surface = exactly the modal's named imports. Bodies stay minimal: only
+// the failed-save branch is exercised here (all prompts fail); evasion/resist
+// arithmetic is owned by applyDamage.helpers.test.js and evasionUtils.test.js.
 vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn((cs, name, dmg) => ({ finalDamage: dmg, newHp: 143 - dmg })),
-  computeDamageAfterSave: vi.fn((raw, success, dcSuccess) => {
+  computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess) => {
     if (!success) return raw;
-    if (dcSuccess === 'half') return Math.floor(raw / 2);
-    return 0;
-  }),
-  computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess, evasionActive) => {
-    if (evasionActive && dcSuccess === 'half') return success ? 0 : Math.floor(raw / 2);
-    if (!success) return raw;
-    if (dcSuccess === 'half') return Math.floor(raw / 2);
-    return 0;
+    return dcSuccess === 'half' ? Math.floor(raw / 2) : 0;
   }),
   computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage, typeDetails: [] })),
   hasEvasionForSave: vi.fn(() => false),
@@ -221,19 +218,26 @@ describe('SaveAttackAoeModal — CLA-237 Nature\'s Ward save-damage lane', () =>
     expect(secondary?.[2]).toBe(7);
     expect(carriesLandResistance(primary?.[4].characters)).toBe(true);
     expect(carriesLandResistance(secondary?.[4].characters)).toBe(true);
+    // PC prompt secondary lane resolves defenses (ignoreResistance false) —
+    // distinguishes it from the NPC secondary apply which force-ignores them.
+    expect(secondary?.[4].ignoreResistance).toBe(false);
   });
 
-  it('missing full-stat characters prop is loud (console.error), never silently falls back to cs stubs', async () => {
+  it('missing full-stat characters prop is loud on BOTH prompt legs, never silently forwards cs stubs', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await castFailOnSelf({ characters: undefined });
+    await castFailOnSelf({ characters: undefined, secondaryDamage: '2d6', secondaryDamageType: 'Necrotic' });
 
     const applied = selfApplies();
-    expect(applied).toHaveLength(1);
-    expect(applied[0][4].characters).toEqual([]);
-    expect(errSpy.mock.calls.some(c => {
-      const msg = String(c[0]);
-      return msg.includes('CLA-237') && msg.includes('save-damage lane');
-    })).toBe(true);
+    expect(applied).toHaveLength(2);
+    // Both legs degrade to an EMPTY defense set (never the automation-less stubs).
+    for (const call of applied) {
+      expect(call[4].characters).toEqual([]);
+    }
+    const messages = errSpy.mock.calls.map(c => String(c[0]));
+    // Primary guard fires with its own message (no "secondary" qualifier)...
+    expect(messages.some(m => m.includes('CLA-237') && m.includes('save-damage lane') && !m.includes('secondary'))).toBe(true);
+    // ...and the secondary-leg twin guard fires too.
+    expect(messages.some(m => m.includes('CLA-237') && m.includes('secondary save-damage lane'))).toBe(true);
     errSpy.mockRestore();
   });
 });

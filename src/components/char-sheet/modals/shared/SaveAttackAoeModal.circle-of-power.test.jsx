@@ -1,8 +1,10 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // SP-023: Circle of Power must zero half-damage save damage on a successful
 // save at the SaveAttackAoeModal chooser adjudication seam, and the prompt
 // logs must carry advantage fidelity (distinct rawRolls + mode) instead of
-// the old [detailRoll, detailRoll] duplication.
+// the old [detailRoll, detailRoll] duplication (which stays as the single-
+// die normal-mode fallback). The gate is success-only, per-target, and is
+// never consulted on the NPC auto-roll lane.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -114,18 +116,28 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-function selectAndConfirm(name) {
-  const input = screen.getByText(name).closest('label').querySelector('input[type="checkbox"]');
-  fireEvent.click(input);
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(`Cold Breath \\(1\\)`) }));
+async function renderAndSelect(...names) {
+  await act(async () => {
+    render(<SaveAttackAoeModal {...baseProps} />);
+  });
+  await act(async () => {
+    for (const name of names) {
+      fireEvent.click(screen.getByText(name).closest('label').querySelector('input[type="checkbox"]'));
+    }
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Cold Breath \\(${names.length}\\)`) }));
+  });
 }
 
-function dispatchSaveResult(detail) {
-  const promptId = sendSavePrompt.mock.calls[0][1].promptId;
-  window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId, ...detail } }));
+function dispatchSaveResult(targetName, detail) {
+  const call = sendSavePrompt.mock.calls.find(c => c[1].targetName === targetName);
+  window.dispatchEvent(new CustomEvent('save-result', {
+    detail: { promptId: call[1].promptId, targetName, ...detail },
+  }));
 }
 
 const logs = (filterFn) => addEntry.mock.calls.map(c => c[1]).filter(e => e && filterFn(e));
+const damageLog = (targetName) => logs(e => e.rollType === 'save-damage' && e.targetName === targetName).find(e => e.formula === '5d8');
+const appliedDamage = (targetName) => applyDamageToTarget.mock.calls.filter(c => c[1] === targetName).map(c => c[2]);
 
 describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
   beforeEach(() => {
@@ -136,17 +148,11 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
   it('CoP-affected PC succeeds on a half-damage save: ZERO damage applied + CoP-named evasion log + distinct advantage raw rolls', async () => {
     isCircleOfPowerActive.mockImplementation((targetName) => targetName === 'ElderPaladin');
 
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm('ElderPaladin');
-    });
+    await renderAndSelect('ElderPaladin');
     expect(sendSavePrompt).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      dispatchSaveResult({
-        targetName: 'ElderPaladin',
+      dispatchSaveResult('ElderPaladin', {
         success: true,
         roll: 17,
         rawRolls: [9, 17],
@@ -159,47 +165,51 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
         total: 27,
       });
     });
-
     await waitFor(() => {
-      expect(addEntry.mock.calls.length).toBeGreaterThan(0);
+      expect(logs(e => e.rollType === 'save-damage' && e.targetName === 'ElderPaladin').length).toBeGreaterThan(0);
     });
 
     // Zero damage: no damage applied to the PC.
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'ElderPaladin');
-    expect(applied).toHaveLength(0);
+    expect(appliedDamage('ElderPaladin')).toHaveLength(0);
 
     // CoP-named evasion entry (logQuickRollEvasion mirror).
     const copLogs = logs(e => e.rollType === 'evasion' && e.targetName === 'ElderPaladin');
     expect(copLogs).toHaveLength(1);
-    expect(copLogs[0].name).toBe('Circle of Power');
-    expect(copLogs[0].saveResult).toBe('success');
-    expect(copLogs[0].finalDamage).toBe(0);
+    expect(copLogs[0]).toMatchObject({
+      name: 'Circle of Power',
+      saveResult: 'success',
+      finalDamage: 0,
+    });
 
     // Save-damage entry: finalDamage 0, distinct raw rolls, advantage mode.
-    const sdLogs = logs(e => e.rollType === 'save-damage' && e.targetName === 'ElderPaladin');
-    const damageLog = sdLogs.find(e => e.formula === '5d8');
-    expect(damageLog).toBeTruthy();
-    expect(damageLog.finalDamage).toBe(0);
-    expect(damageLog.saveRawRolls).toEqual([9, 17]);
-    expect(damageLog.mode).toBe('advantage');
-    expect(damageLog.note).toBe('Circle of Power');
+    const entry = damageLog('ElderPaladin');
+    expect(entry).toBeTruthy();
+    expect(entry).toMatchObject({
+      finalDamage: 0,
+      saveResult: 'success',
+      saveRawRolls: [9, 17],
+      mode: 'advantage',
+      note: 'Circle of Power',
+    });
 
     // The gate was consulted for the prompt's target (aura stamp lives on the PC).
     expect(isCircleOfPowerActive.mock.calls.map(c => c[0])).toContain('ElderPaladin');
   });
 
-  it('CoP-affected PC FAILS the save: full damage stands (success-only zero, byte-consistent control)', async () => {
+  it('one AoE, two PCs: CoP-affected FAIL pays full, unaffected SUCCESS pays half with single-die [roll, roll] normal-mode fallback', async () => {
+    // Negative controls through the SAME adjudication pass: the aura covers
+    // only ElderPaladin, whose failed save must still pay full (success-only
+    // zero), while out-of-aura HexWarlock's successful save pays the normal
+    // half rule and its one-dice prompt log duplicates [roll, roll] under
+    // mode 'normal' (fidelity fallback; distinct two-dice rawRolls pass
+    // through in the test above).
     isCircleOfPowerActive.mockImplementation((targetName) => targetName === 'ElderPaladin');
 
+    await renderAndSelect('ElderPaladin', 'HexWarlock');
+    expect(sendSavePrompt).toHaveBeenCalledTimes(2);
+
     await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm('ElderPaladin');
-    });
-    await act(async () => {
-      dispatchSaveResult({
-        targetName: 'ElderPaladin',
+      dispatchSaveResult('ElderPaladin', {
         success: false,
         roll: 3,
         rawRolls: [3, 11],
@@ -212,31 +222,8 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
         total: 13,
       });
     });
-
-    await waitFor(() => {
-      expect(applyDamageToTarget.mock.calls.some(c => c[1] === 'ElderPaladin')).toBe(true);
-    });
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'ElderPaladin');
-    expect(applied[0][2]).toBe(20);
-    expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
-    const damageLog = logs(e => e.rollType === 'save-damage' && e.targetName === 'ElderPaladin').find(e => e.formula === '5d8');
-    expect(damageLog.finalDamage).toBe(20);
-    expect(damageLog.saveRawRolls).toEqual([3, 11]);
-    expect(damageLog.mode).toBe('advantage');
-  });
-
-  it('control: non-affected PC succeeds: HALF damage stands, normal-mode log carries the [roll, roll] single-dice fallback', async () => {
-    isCircleOfPowerActive.mockReturnValue(false);
-
     await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm('HexWarlock');
-    });
-    await act(async () => {
-      dispatchSaveResult({
-        targetName: 'HexWarlock',
+      dispatchSaveResult('HexWarlock', {
         success: true,
         roll: 15,
         rawRolls: [15],
@@ -249,17 +236,18 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
         total: 20,
       });
     });
-
     await waitFor(() => {
-      expect(applyDamageToTarget.mock.calls.some(c => c[1] === 'HexWarlock')).toBe(true);
+      expect(logs(e => e.rollType === 'save-damage' && e.targetName === 'HexWarlock').length).toBeGreaterThan(0);
     });
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'HexWarlock');
-    expect(applied[0][2]).toBe(10);
+
+    expect(appliedDamage('ElderPaladin')).toEqual([20]);
+    expect(appliedDamage('HexWarlock')).toEqual([10]);
     expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
-    const damageLog = logs(e => e.rollType === 'save-damage' && e.targetName === 'HexWarlock').find(e => e.formula === '5d8');
-    expect(damageLog.finalDamage).toBe(10);
-    expect(damageLog.saveRawRolls).toEqual([15, 15]);
-    expect(damageLog.mode).toBe('normal');
+
+    const failedLog = damageLog('ElderPaladin');
+    expect(failedLog).toMatchObject({ finalDamage: 20, saveRawRolls: [3, 11], mode: 'advantage' });
+    const halfLog = damageLog('HexWarlock');
+    expect(halfLog).toMatchObject({ finalDamage: 10, saveRawRolls: [15, 15], mode: 'normal' });
   });
 
   it('NPC lane never folds Circle of Power: aura TRUE everywhere, auto-roll success still pays HALF and the gate is never consulted there', async () => {
@@ -268,28 +256,17 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
     // save success pays the normal half-rule byte-unchanged (SP-023).
     isCircleOfPowerActive.mockReturnValue(true);
 
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
     // Force an NPC save success: raw 20 + con 1 >= DC 12 (Math.min of two
     // disadvantage dice never applies — no disadvantage authored here).
     const randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.999);
-
-    await act(async () => {
-      const input = screen.getByText('Bandit 1').closest('label').querySelector('input[type="checkbox"]');
-      fireEvent.click(input);
-      fireEvent.click(screen.getByRole('button', { name: /Cold Breath \(1\)/ }));
-    });
+    await renderAndSelect('Bandit 1');
     randSpy.mockRestore();
 
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Bandit 1');
-    expect(applied).toHaveLength(1);
-    expect(applied[0][2]).toBe(10);
+    expect(appliedDamage('Bandit 1')).toEqual([10]);
     expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
     // The aura gate must NEVER be consulted on the NPC auto-roll lane.
     expect(isCircleOfPowerActive.mock.calls.map(c => c[0])).not.toContain('Bandit 1');
-    const damageLog = logs(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1')[0];
-    expect(damageLog.finalDamage).toBe(10);
-    expect(damageLog.saveResult).toBe('success');
+    const entry = logs(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1')[0];
+    expect(entry).toMatchObject({ finalDamage: 10, saveResult: 'success' });
   });
 });

@@ -1,19 +1,27 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28 — trimmed 4→2 (ma0543 twin pattern): one
+// consolidated disk-row data lock (typo grep-zero + BY-name extraction +
+// exact-match spell-DB resolution + 1/Day gate map folded into one
+// pure-function test) + one merged advisory-cast e2e (single render, PWT +
+// Greater Restoration, zero console errors — the pre-fix phantom-spell
+// symptom). Vacuous drops: none — the three prior data-lock legs share zero
+// execution paths with siblings (ma1202 locks the mummy-lord row, not this
+// one). Cite-skipped owners: extraction/counter/refusal/spend template
+// spellcasting.test.jsx:185/:276/:282/:318/:508, usage text #571
+// usage.test.js:16-38, ability-save-uses :127, advisory class + dual-tier
+// render ma0524-couatl:222 / ma0543:146, attack-seam negatives
+// spell-attack.test.jsx. Empyrean legendary lane (Bolster/Shockwave/Smite)
+// owned by legendary-uses-empyrean.test.jsx (#630) — zero legs here.
+// Save-shell is dead on this advisory lane (#659): no rollSavingThrow/
+// rollAttack legs; dataLoader stays LIVE (findMonsterSpell loads it, full
+// disk tables so it resolves 5e-first). Dead mocks purged by empirical
+// bisect (five twins agree): damageUtils, rangeValidation — the advisory
+// cast rolls no dice.
 // MA-0693 data lock: Empyrean Spellcasting authored the phantom spell name
 // "Pass with Trace" — findMonsterSpell exact-match missed both spell DBs
 // (canonical "Pass Without Trace"), so the chip cast logged a junk zero-
 // adjudication ability_use and console.error'd "Spell not found".
 // DATA fix (one string): <strong>Pass with Trace</strong> →
 // <strong>Pass Without Trace</strong> in empyrean actions[3].description.
-// Lanes here (distinct bytes only): typo-gone data lock, Empyrean BY-name
-// extraction + exact 1/Day gate map, and one merged advisory-cast e2e
-// (single render, PWT + Greater Restoration). Cite-skipped owners: extraction/
-// counter/refusal/spend template spellcasting.test.jsx:185/:276/:282/:318/:508,
-// usage text #571 usage.test.js:16-38, ability-save-uses :127, advisory class
-// ma0524-couatl:222. Empyrean legendary lane (Bolster/Shockwave/Smite) owned
-// by legendary-uses-empyrean.test.jsx (#630) — zero legs here. Save-shell is
-// dead on this advisory lane (#659): no rollSavingThrow/rollAttack legs;
-// dataLoader stays LIVE (findMonsterSpell loads it).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -39,6 +47,7 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// dataLoader LIVE: full disk tables so findMonsterSpell resolves 5e-first as in prod.
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? spells2024 : spells5e)),
 }));
@@ -62,22 +71,6 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
   combineAttackModes: vi.fn(() => 'normal'),
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -115,25 +108,18 @@ function renderEmpyrean() {
 // ── Data lock: Empyrean Spellcasting row ────────────────────────────────────
 
 describe('MA-0693 monsters.json data lock: Empyrean Spellcasting row', () => {
-  it('row authors the canonical "Pass Without Trace" and the phantom typo is grep-zero across ALL of monsters.json', () => {
+  it('canonical "Pass Without Trace" authored (phantom typo grep-zero across monsters.json), all seven spells extract BY-name and resolve exact-match against the spell DBs, and uses bind only to the 1/Day trio', () => {
     expect(row.description).toContain('<strong>Pass Without Trace</strong>');
     expect(rawMonsters).not.toContain('Pass with Trace');
-  });
 
-  it('extracts all seven spell names BY-name and every one resolves via exact-match against the spell DBs (5e-first) — no phantom names', () => {
     const names = extractSpellNamesFromSpellcasting(row.description);
     expect(names).toEqual(['Calm Emotions', 'Greater Restoration', SPELL, 'Water Breathing', 'Commune', 'Dispel Evil and Good', 'Plane Shift']);
     const findMonsterSpell = (name) => spells5e.find(s => s.name === name) || spells2024.find(s => s.name === name) || null;
     for (const name of names) {
       expect(findMonsterSpell(name), `spell "${name}" must resolve`).toBeTruthy();
     }
-  });
 
-  it('At Will tier: uses bound only to the 1/Day trio — Pass Without Trace ungated', () => {
-    const uses = extractSpellcastingSpellUses(row.description);
-    expect(uses[SPELL]).toBeUndefined();
-    expect(uses[OTHER_AT_WILL]).toBeUndefined();
-    expect(uses).toEqual({ 'Commune': 1, 'Dispel Evil and Good': 1, 'Plane Shift': 1 });
+    expect(extractSpellcastingSpellUses(row.description)).toEqual({ 'Commune': 1, 'Dispel Evil and Good': 1, 'Plane Shift': 1 });
   });
 });
 

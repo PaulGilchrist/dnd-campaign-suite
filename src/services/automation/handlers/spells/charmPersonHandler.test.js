@@ -1,44 +1,55 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // # charmPersonHandler — Charm Person (WIS save-or-suck charm, concentration). #1883
 // Production module is a 12-line DELEGATION shell: handle() → handleCharmSpell(action, playerStats,
 // campaignName, config) in charmSpellUtils.js. This lane pins DELEGATION only — the charmPerson
 // config table (strict, full-object: exact strings AND the PRESENCE of saveConditions:['charmed']),
 // positional passthrough by identity, and return/failure transparency.
 //
-// Pair + canonical-home split (recorded 2026-10-16, verified at source):
-// - charmMonsterHandler (#1883 closed 21→3) routes through the SAME charmSpellUtils with its own
-//   config; the ONLY pair diffs are targetsKey/advantagesKey/rollType/refusal-text/logPrefix plus
-//   charmPerson's saveConditions:['charmed'] (Beguiling Twist) — the mirror of charmMonster's
-//   strict pin of that key's ABSENCE. Both tables are strict full-object: any key drift in either
-//   direction fails, which is the point of the pair.
-// - Humanoid-target gate: verified at source — NONE exists (no config key, no check in utils).
-//   Pinning one would be invented spec; if a humanoid gate is ever added to the shell it is a
-//   source-change decision that lands in this config table first.
+// Pair + canonical-home split (recorded 2026-10-16, re-verified against source bytes 2026-11-27):
+// - charmMonsterHandler (#1883 pair, swept immediately prior) routes through the SAME
+//   charmSpellUtils with its own config; the ONLY pair diffs are
+//   targetsKey/advantagesKey/rollType/refusal-text/logPrefix plus charmPerson's
+//   saveConditions:['charmed'] (Beguiling Twist, charmPersonHandler.js:9) — charmMonster does NOT
+//   pass it. This strict table pins that PRESENCE byte-exact; charmMonster's table pins the
+//   ABSENCE. Both tables are strict full-object: any key drift in either direction fails, which
+//   is the point of the pair.
+// - Humanoid-target gate: re-verified — NONE in the shell or charmSpellUtils (no config key, zero
+//   'humanoid'/'level' bytes in utils). The gate lives UPSTREAM in charmPersonService.js
+//   (isTargetHumanoid :11, logNonHumanoidRejection :56, applied :77-83) on the sheet-chooser lane.
+//   Pinning one here would be invented spec; if a gate ever moves into the shell it lands in this
+//   config table first.
 // - charmSpellUtils internals belong to their own lanes: aura-immunity suppression leg +
 //   legacy-charmed-write control → charmSpellUtils.aura-immunity.test.js (#1884, drives THIS shell
-//   live via handle()); CLA-219 rollNpcSave 2d20 keep-low + Magical Ambush fold →
-//   charmSpellUtils.metamagic-disadvantage.test.js (#1885, hand-writes a charmMonster-shaped
-//   config and calls handleCharmSpell directly — it bypasses both shells and never carries
-//   saveConditions, so the strict table here is the ONLY pin of charmPerson's config keys).
-//   Pipeline outputs (activeConditions/meta writes, addExpiration latch, ability_use/save_result/
-//   condition logs, popup summaries) are NOT re-pinned here — the old 21-test suite re-ran those
-//   utils internals and has been shed.
+//   live via handle() with real utils — its :10 "only pair file that does" claim re-verified: the
+//   #1883 pair files mock handleCharmSpell, #1885 calls handleCharmSpell directly); CLA-219
+//   rollNpcSave 2d20 keep-low + Magical Ambush fold → charmSpellUtils.metamagic-disadvantage.test.js
+//   (#1885, hand-writes a charmMonster-shaped config and calls handleCharmSpell directly — it
+//   bypasses both shells and never carries saveConditions, so the strict table here is the ONLY
+//   pin of charmPerson's config keys). Pipeline outputs (activeConditions/meta writes,
+//   addExpiration latch, ability_use/save_result/condition logs, popup summaries) are NOT
+//   re-pinned here — the old 21-test suite re-ran those utils internals and has been shed.
 // - Charm-immunity seams live downstream, untouched by this shell: Aura of Devotion suppression in
 //   charmSpellUtils (#1884); PFEG ward block in saveProcessing.js
 //   (saveProcessing.pfeg-charm-immunity.test.js — green per-condition ward-filter lane, do not touch).
 // - Freed-on-damage lives in applyDamage.js ('removed Charmed — took damage'), concentration latch
 //   rides addExpiration inside the utils. No clock in this handler — turn-based, per no-timers policy.
 //
-// Caller liveness (grep-verified 2026-10-16): automationInfoBuilder/save.js:129 builds
-// automation.type 'charm_person' → automationRouter.js:188 pass-through list → dynamic dispatch
-// index.js:546 charm_person → handleCharmPerson (imported index.js:217) — this handle().
-// charmPersonService.js:104/:134 rebuilds the charm_person action on the sheet chooser lane.
+// Caller liveness (grep-verified 2026-11-27): sheet chooser useSimpleSpellHandlers.js:361 /
+// useComplexSpellHandlers.js:176 → charmPersonService.triggerCharmPerson
+// (src/services/rules/features/charmPersonService.js:166, rebuilds action with automation.type
+// 'charm_person') → executeHandler (automation/index.js:702) → dynamic dispatch index.js:546
+// charm_person → handleCharmPerson (imported index.js:217) — this handle(). Feature-builder lane:
+// combat/automation/automationInfoBuilder/save.js:129 builds the charm_person action;
+// combat/automation/automationRouter.js:188 lists charm_person in the save-style pass-through.
 // Registration is the live production lane; no index-level routing test exists, so the config
 // table here is the unique pin that the REAL handler hands the utils the charmPerson keys.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./charmSpellUtils.js', () => ({
-  handleCharmSpell: vi.fn(() => Promise.resolve({ type: 'popup', payload: { type: 'automation_info', name: 'Charm Person', description: '1 creature(s) charmed: Goblin. 0 creature(s) saved: .' } })),
+  // Bare spy only: the base return value is re-baselined in beforeEach below (a factory-embedded
+  // resolve value would be dead bytes — no test ever observes it). handleCharmSpell is the shell's
+  // sole import from this module (charmPersonHandler.js:1), so the factory carries no orphans.
+  handleCharmSpell: vi.fn(),
 }));
 
 import { handle } from './charmPersonHandler.js';
@@ -58,17 +69,19 @@ const CHARM_PERSON_CONFIG = {
   logPrefix: '[charmPerson] Error:',
 };
 
+// The shell treats playerStats as an OPAQUE identity (it forwards the reference untouched and
+// reads nothing from it — DC building/ability reads live in charmSpellUtils lanes). Keep the
+// fixture minimal so it cannot imply the shell inspects rules fields.
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCaster',
-    level: 10,
-    proficiency: 4,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
     ...overrides,
   };
 }
 
 // Merges overrides (lane convention: makeAction-style helpers merge unless documented otherwise).
+// automation/metaCtx are likewise opaque to the shell; they document the real transport shape
+// (charmPersonService rebuilds both) so the identity pins exercise realistic bytes.
 function makeAction(overrides = {}) {
   return {
     name: 'Charm Person',

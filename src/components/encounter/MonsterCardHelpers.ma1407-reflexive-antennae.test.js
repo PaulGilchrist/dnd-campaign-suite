@@ -1,23 +1,24 @@
-// @maintained-by-ai 2026-10-18 — MA-1407 reflexive antennae owner: trimmed 16→7 tests
-// (disk+registry+spec lock once, gate truth-table once, refusals collapsed,
-// resolve-e2e once per save outcome, honest latch chain incl. round-wrap).
+// @maintained-by-ai 2026-11-28 — MA-1407 reflexive antennae owner: trimmed 7→6 tests
+// (disk+registry+spec lock once, gate decision table incl. accept leg once,
+// resolve refusals collapsed, resolve-e2e once per save outcome, honest latch
+// chain incl. round-wrap). Cross-file ownership cites (#2078 honesty check):
+// getGatedMonsterReaction(plainRow)→null is owned by gated-reaction.test.js;
+// monsterReactionUsesRemaining At-Will sentinel→null (fresh AND after spends)
+// is owned by services/encounters/monsterAbilityUses.at-will-sentinel.test.js —
+// both legs removed here. This file keeps only what THAT generic coverage never
+// exercises: the rust-monster disk row by name, the reflexiveAntennaeGate own
+// branches (its own identity probe, 999-sentinel limit via reactionMaxUses,
+// round-before-uses precedence) and the reflexive_antennae resolver legs
+// (attacker-active check, corrosion advisory with NO damage, stamp/latch chain).
 // MA-1407 regression: Rust Monster Reflexive Antennae (At Will) gated reaction —
 // distinct effect/economy owner (not a byte-twin of #508/#532/#540/#512/#513;
 // those files never mention reflexive_antennae). Disk row locked BY NAME once:
 // reactions[0] automation DEX DC 11 dcSuccess:'none', NO damage dice (object
 // corrosion −1 AC/attack is GM-enforced advisory, CLA-325 — never fabricate HP
 // damage); spec read mirrors the Antennae action row (MA-0329/MA-1354 lineage).
-// Gate truth-table collapsed to ONE refusal-table test (MA-0341 hit lineage:
-// committed attack rolls stamp top-level hit:true; round latch
-// _reflexive_antennae_usedRound; MONSTER_REACTION_USES At Will sentinel 999;
-// round latch refuses BEFORE uses). Resolve refusals collapsed to one zero-spend
-// test (no trigger / miss / attacker down); resolve-e2e runs ONCE per save
-// outcome; honest latch chain: spend → same-hit refire refused → round-wrap
-// spends again.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
-  monsterReactionUsesRemaining,
   reflexiveAntennaeGate,
   reflexiveAntennaeSpec,
   resolveMonsterGatedReaction,
@@ -73,8 +74,8 @@ function makeDeps({ lastAttack = attackHit(), round = 1, store = {}, saveSuccess
   };
 }
 
-describe('MA-1407 Reflexive Antennae disk lock + registry (by name, once)', () => {
-  it('rust-monster reactions[0] + Antennae row locked: DC 11 DEX, NO damage dice, At Will sentinel, registry + economy', () => {
+describe('MA-1407 Reflexive Antennae disk lock + spec read (by name, once)', () => {
+  it('rust-monster reactions[0] + Antennae row locked: DC 11 DEX, NO damage dice, At Will, registry + honest dc refusal', () => {
     expect(RA_ACTION.name).toBe('Reflexive Antennae');
     expect(RA_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'attacked_by_hit', effect: 'reflexive_antennae', saveType: 'DEX', saveDc: 11, dcSuccess: 'none' });
     expect(RA_ACTION.trigger).toMatch(/attack roll hits the rust monster/);
@@ -94,21 +95,18 @@ describe('MA-1407 Reflexive Antennae disk lock + registry (by name, once)', () =
     // row without authored DC refuses honestly (no baked default)
     expect(reflexiveAntennaeSpec({ name: 'Reflexive Antennae' }).reason).toBe('dc');
 
+    // this row registers as its own gated effect (null/non-registration legs are
+    // owned by gated-reaction.test.js + the at-will-sentinel services lane)
     expect(getGatedMonsterReaction(RA_ACTION)?.effect).toBe('reflexive_antennae');
-    expect(getGatedMonsterReaction({ name: 'Bite', description: 'Melee Attack Roll: +3.' })).toBeNull();
-    expect(monsterReactionUsesRemaining(RA_ACTION, {})).toBeNull(); // At Will sentinel → no counter
-    expect(monsterReactionUsesRemaining(RA_ACTION, { reflexive_antennae: 1 })).toBeNull();
   });
 });
 
-describe('MA-1407 reflexiveAntennaeGate', () => {
+describe('MA-1407 reflexiveAntennaeGate — decision table (once)', () => {
   const g = (lastAttack, overrides = {}) => reflexiveAntennaeGate({ lastAttack, monsterName: MONSTER, currentRound: overrides.round ?? 1, storedUses: overrides.storedUses ?? {}, usedRound: overrides.usedRound ?? 0, action: RA_ACTION });
 
-  it('accepts monster-as-target hit:true (the MA-1407 live byte-shape)', () => {
+  it('accepts monster-as-target hit:true and refuses every gate leg incl. 999-sentinel uses + round-before-uses precedence', () => {
+    // the MA-1407 live byte-shape accepts with the 999 At-Will limit
     expect(g(attackHit())).toMatchObject({ ok: true, used: 0, limit: 999, attackerName: PC });
-  });
-
-  it('refusal truth-table (one test): trigger/miss/reacted/attacker/round/uses + round-before-uses precedence', () => {
     expect(g(null).reason).toBe('trigger');
     expect(g(attackHit({ targetName: 'Thug 1' })).reason).toBe('trigger');
     expect(g(attackHit({ hit: false })).reason).toBe('miss');
@@ -124,28 +122,23 @@ describe('MA-1407 reflexiveAntennaeGate', () => {
 });
 
 describe('MA-1407 resolveMonsterGatedReaction — Reflexive Antennae', () => {
-  it('refusal legs (no trigger / miss / attacker down): reflexive_antennae_refused logged, zero spend, no save', async () => {
+  it('resolve refusals (gate refusal + attacker-down branch): refused log with reason token, zero spend, no save', async () => {
     const noTrigger = makeDeps({ lastAttack: null });
     const r1 = await resolveMonsterGatedReaction({ action: RA_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps: noTrigger.deps });
     expect(r1.ok).toBe(false);
     expect(noTrigger.logs[0].automationType).toBe('reflexive_antennae_refused');
+    // reason token woven into the log prose (gate reasons reach the log)
+    expect(noTrigger.logs[0].description).toMatch(/refused \(trigger\)/);
     expect(noTrigger.deps.setRuntimeValue).not.toHaveBeenCalled();
     expect(noTrigger.saveCalls).toHaveLength(0);
-    expect(noTrigger.state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
 
-    const miss = makeDeps({ lastAttack: attackHit({ hit: false }) });
-    const r2 = await resolveMonsterGatedReaction({ action: RA_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps: miss.deps });
-    expect(r2.ok).toBe(false);
-    expect(miss.logs[0].automationType).toBe('reflexive_antennae_refused');
-    expect(miss.logs[0].description).toMatch(/miss/i);
-    expect(miss.saveCalls).toHaveLength(0);
-    expect(miss.deps.setRuntimeValue).not.toHaveBeenCalled();
-
+    // resolve-own branch: gate passes, but the attacker is down — still zero-spend
     const down = makeDeps({});
     down.deps.getCombatContext = vi.fn(async () => csWithPC(1, 0));
-    const r3 = await resolveMonsterGatedReaction({ action: RA_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps: down.deps });
-    expect(r3.ok).toBe(false);
+    const r2 = await resolveMonsterGatedReaction({ action: RA_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps: down.deps });
+    expect(r2.ok).toBe(false);
     expect(down.logs[0].automationType).toBe('reflexive_antennae_refused');
+    expect(down.logs[0].description).toMatch(/refused \(attacker\)/);
     expect(down.logs[0].description).toMatch(/not an active combatant/);
     expect(down.saveCalls).toHaveLength(0);
     expect(down.deps.setRuntimeValue).not.toHaveBeenCalled();
@@ -170,7 +163,7 @@ describe('MA-1407 resolveMonsterGatedReaction — Reflexive Antennae', () => {
     expect(spend.description).toMatch(/At Will/);
   });
 
-  it('save SUCCESS: no corrosion, still spends, stamp records success', async () => {
+  it('save SUCCESS: corrosion advisory records no object corroded, still spends, stamp records success', async () => {
     const { state, logs, campaignWrites, deps } = makeDeps({ saveSuccess: true });
     const result = await resolveMonsterGatedReaction({ action: RA_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);

@@ -1,20 +1,24 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0329 regression: Azer Pyromancer Hellish Rebuke (2/Day) gated reaction —
 // HELLISH_REBUKE LANE ONLY. Gate identity (damaged-target + damage-dealt probe
-// incl. spell-leg primary+secondary fallback, reacted stamp, attacker identity);
-// hellishRebukeSpec authored-row guards (DC/formula — nothing rolled, nothing
-// spent); lane-only live-state legs (dead attacker, 60 ft isWithinRange);
-// damage-redirect arithmetic (rebuke is its OWN 2d10 roll vs the attacker's DEX
-// save DC 15, half floored — NOT the trigger's damage); reaction spend incl.
-// storedUses merge. Round latch, uses-refusal, plain-row null-negative and
-// fresh/spend uses arithmetic are #508 reaction-family template legs owned ONCE
-// at MonsterCardHelpers.gated-reaction.test.js:89-90/:107-108/:66-68 — not
-// re-pinned here. Registry arm for azer also consumed at monsterJinx.test.js:141
-// (cite-skip). Fixtures by name per #387.
+// incl. spell-leg primary+secondary fallback, reacted stamp, attacker identity)
+// AND hellishRebukeGate's own round-latch/2-per-Day-uses legs — those branch in
+// hellishRebukeGate.js source, NOT the generic monsterReactionGate whose
+// feather_fall truth table gated-reaction.test.js owns (#508 template cite was
+// wrong: distinct function, was uncovered). hellishRebukeSpec authored-row
+// guards (DC/formula — nothing rolled, nothing spent) incl. the resolve-level
+// spec-refusal branch; lane-only live-state legs (dead attacker, 60 ft
+// isWithinRange); damage-redirect arithmetic (rebuke is its OWN 2d10 roll vs
+// the attacker's DEX save DC 15, half floored — NOT the trigger's damage);
+// reaction spend incl. storedUses merge. Plain-row null-negative + fresh/spend
+// uses arithmetic owned at gated-reaction.test.js (#508); At Will → null
+// sentinel mechanism owned at services/encounters/
+// monsterAbilityUses.at-will-sentinel.test.js; azer registry arm equality-pinned
+// at monsterJinx.test.js getGatedMonsterReaction census — cite-skip here.
+// Fixtures by name per #387.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
-  monsterReactionUsesRemaining,
   hellishRebukeGate,
   hellishRebukeSpec,
   resolveMonsterGatedReaction,
@@ -80,24 +84,26 @@ function makeDeps({ lastAttack = damageAgainstMonster(), round = 1, store = {}, 
 }
 
 describe('MA-0329 Hellish Rebuke authored data + spec', () => {
-  it('monsters.json azer-pyromancer reactions[0] locks the RAW byte-shape, 2/Day, and arms the gate', () => {
+  it('monsters.json azer-pyromancer reactions[0] locks the RAW byte-shape and 2/Day fields', () => {
     expect(HR_ACTION.name).toBe('Hellish Rebuke (2/Day)');
     expect(HR_ACTION.automation).toEqual(HR_AUTOMATION);
     expect(HR_ACTION.uses).toBe(2);
     expect(HR_ACTION.maxUses).toBe(2);
     expect(HR_ACTION.usage).toBe('2/Day');
     expect(HR_ACTION.range).toBe('60 ft.');
-    expect(getGatedMonsterReaction(HR_ACTION)?.effect).toBe('hellish_rebuke');
-    // Plain-row null-negative is owned ONCE at gated-reaction.test.js:66 (#508) — not re-pinned.
+    // This row's getGatedMonsterReaction→hellish_rebuke arm is equality-pinned in
+    // monsterJinx.test.js's gated-arm census; plain-row null-negative is owned
+    // ONCE at gated-reaction.test.js (#508) — neither re-pinned here.
   });
 
-  it('MA-0725 data-lock: fiend-cultist reactions[0] authors the identical automation with At Will sentinel, arms gate, never exhausts', () => {
+  it('MA-0725 data-lock: fiend-cultist reactions[0] authors the identical automation with the At Will sentinel and arms the gate', () => {
     expect(CULTIST_ACTION.name).toBe('Hellish Rebuke');
     expect(CULTIST_ACTION.automation).toEqual(HR_AUTOMATION);
     expect(CULTIST_ACTION).toMatchObject({ range: '60 ft.', usage: 'At Will', uses: 999, maxUses: 999 });
     expect(getGatedMonsterReaction(CULTIST_ACTION)?.effect).toBe('hellish_rebuke');
-    expect(monsterReactionUsesRemaining(CULTIST_ACTION, {})).toBeNull(); // At Will sentinel → no counter
-    // fresh/spent uses arithmetic owned at gated-reaction.test.js:67-68 (#508).
+    // 999/At Will → no counter (never exhausts) is the sentinel mechanism,
+    // owned at services/encounters/monsterAbilityUses.at-will-sentinel.test.js —
+    // the honest 999 fields on THIS row are pinned by the toMatchObject above.
   });
 
   it('hellishRebukeSpec: reads authored DC/formula/range from the row; missing DC or formula refuses with nothing rolled, nothing spent', () => {
@@ -107,37 +113,45 @@ describe('MA-0329 Hellish Rebuke authored data + spec', () => {
   });
 });
 
-describe('MA-0329 hellishRebukeGate — identity legs (round latch + uses owned by #508 template)', () => {
-  it('refuses wrong-target / zero-damage (weapon AND spell fallback) / reacted / self-or-missing attacker; accepts a fresh spell-leg hit', () => {
+describe('MA-0329 hellishRebukeGate — full truth table (its own round/uses branches, not the generic monsterReactionGate)', () => {
+  it('refuses wrong-target / zero-damage (weapon AND spell fallback) / reacted / self-or-missing attacker / same-round latch / 2-per-Day exhaustion; accepts a fresh spell-leg hit', () => {
+    const gate = (lastAttack, { currentRound = 2, storedUses = {}, usedRound = 1 } = {}) =>
+      hellishRebukeGate({ lastAttack, monsterName: MONSTER, currentRound, storedUses, usedRound, action: HR_ACTION });
     const rows = [
-      ['trigger: another creature was the damaged target', damageAgainstMonster({ targetName: 'Other 1' }), 'trigger'],
-      ['damage: weapon hit dealt 0', damageAgainstMonster({ actualDamage: 0 }), 'damage'],
-      ['damage: spell-leg fallback primary+secondary both 0', damageAgainstMonster({ actualDamage: undefined, primaryDamage: 0, secondaryDamage: 0 }), 'damage'],
-      ['reacted: same hit already stamped hellishRebukeResolved', damageAgainstMonster({ hellishRebukeResolved: true }), 'reacted'],
-      ['attacker: self-inflicted', damageAgainstMonster({ attackerName: MONSTER }), 'attacker'],
-      ['attacker: no attacker name', damageAgainstMonster({ attackerName: null }), 'attacker'],
+      ['trigger: another creature was the damaged target', damageAgainstMonster({ targetName: 'Other 1' }), {}],
+      ['damage: weapon hit dealt 0', damageAgainstMonster({ actualDamage: 0 }), {}],
+      ['damage: spell-leg fallback primary+secondary both 0', damageAgainstMonster({ actualDamage: undefined, primaryDamage: 0, secondaryDamage: 0 }), {}],
+      ['reacted: same hit already stamped hellishRebukeResolved', damageAgainstMonster({ hellishRebukeResolved: true }), {}],
+      ['attacker: self-inflicted', damageAgainstMonster({ attackerName: MONSTER }), {}],
+      ['attacker: no attacker name', damageAgainstMonster({ attackerName: null }), {}],
+      // These two legs branch inside hellishRebukeGate itself — the #508
+      // feather_fall truth table exercises the DISTINCT monsterReactionGate.
+      ['round: fresh hit but latch already armed this round', damageAgainstMonster(), { currentRound: 2, usedRound: 2 }],
+      ['uses: fresh round but 2/Day both spent', damageAgainstMonster(), { currentRound: 5, storedUses: { hellish_rebuke: 2 }, usedRound: 1 }],
     ];
-    for (const [label, lastAttack, reason] of rows) {
-      const g = hellishRebukeGate({ lastAttack, monsterName: MONSTER, currentRound: 2, storedUses: {}, usedRound: 1, action: HR_ACTION });
+    const reasons = ['trigger', 'damage', 'damage', 'reacted', 'attacker', 'attacker', 'round', 'uses'];
+    rows.forEach(([label, lastAttack, opts], i) => {
+      const g = gate(lastAttack, opts);
       expect(g.ok, label).toBe(false);
-      expect(g.reason, label).toBe(reason);
-    }
-    const accept = hellishRebukeGate({ lastAttack: damageAgainstMonster({ actualDamage: undefined, primaryDamage: 8, secondaryDamage: 6 }), monsterName: MONSTER, currentRound: 2, storedUses: {}, usedRound: 1, action: HR_ACTION });
+      expect(g.reason, label).toBe(reasons[i]);
+    });
+    const accept = gate(damageAgainstMonster({ actualDamage: undefined, primaryDamage: 8, secondaryDamage: 6 }));
     expect(accept).toMatchObject({ ok: true, used: 0, limit: 2, attackerName: PC });
-    // round-latch + uses legs are the #508 template, owned at gated-reaction.test.js:89-90.
   });
 });
 
 describe('MA-0329 resolveMonsterGatedReaction — Hellish Rebuke', () => {
-  it('refusals log hellish_rebuke_refused zero-spend (no event / dead attacker / out of 60 ft range)', async () => {
+  it('refusals log hellish_rebuke_refused zero-spend (no event / broken-row spec / dead attacker / out of 60 ft range)', async () => {
     const scenarios = [
       ['no damage event (gate trigger)', { lastAttack: null }, /trigger/],
+      ['row with no authored saveDc (spec branch, after the gate accepts)', { action: { ...HR_ACTION, automation: { ...HR_ACTION.automation, saveDc: undefined } } }, /\(dc\)/],
       ['attacker at 0 HP is not an active combatant', { attackerHp: 0 }, /attacker/],
       ['attacker beyond the authored 60 ft range', { inRange: false }, /range/],
     ];
     for (const [label, opts, descRe] of scenarios) {
-      const { state, logs, deps } = makeDeps(opts);
-      const result = await resolveMonsterGatedReaction({ action: HR_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
+      const { action = HR_ACTION, ...depOpts } = opts;
+      const { state, logs, deps } = makeDeps(depOpts);
+      const result = await resolveMonsterGatedReaction({ action, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
       expect(result.ok, label).toBe(false);
       expect(logs, label).toHaveLength(1);
       expect(logs[0].automationType, label).toBe('hellish_rebuke_refused');
@@ -193,6 +207,8 @@ describe('MA-0329 resolveMonsterGatedReaction — Hellish Rebuke', () => {
     expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ hellish_rebuke: 2, other_effect: 1 });
     expect(state[`${MONSTER}._hellish_rebuke_usedRound`]).toBe(2);
     expect(campaignWrites[0].hellishRebukeResolved).toBe(true);
-    // Third-click uses exhaustion zero-spend is the #508 template refusal, owned at gated-reaction.test.js:107-108.
+    // Third-click uses exhaustion zero-spend is the gate 'uses' leg, pinned in
+    // the hellishRebukeGate truth table above (its own branch, not #508's
+    // distinct monsterReactionGate).
   });
 });

@@ -1,18 +1,20 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * SilenceModal — execution owner for the Silence spell popup.
- * Lane map (verified 2026-10-17):
+ * Lane map (verified 2026-11-28):
  *   - Routing into this modal: silenceHandler.test.js (opens silence_target_selection).
  *   - Shared picker UI (rows, toggle, count label, confirm-disabled-at-0,
- *     empty state, Skip, string targets, pre-confirm inertness):
+ *     empty state incl. absent targets, Skip, string targets, pre-confirm inertness):
  *     shared/CreatureSelectionModal.test.jsx — not re-tested here.
  *   - Zone consumption after the cast: silenceService.test.js,
  *     clearExpirationEffects_additional_types.test.js (clear_silence_zone).
  * This file owns the modal's confirm dispatch: the Silence config forwarded to
- * the REAL picker, the zone triple (silenceCaster/silenceCenter/silenceRadius),
- * point-model center precedence, outside-radius refusal (real getDistanceFeet),
- * Deafened normalization, Silence buff grant/dedup, exact addExpiration
- * payloads, log discipline, combat-summary-updated + close, and cancel inertness.
+ * the REAL picker (title, icon, description, confirmLabel, target rows), the
+ * zone triple (silenceCaster/silenceCenter/silenceRadius), point-model center
+ * precedence, outside-radius refusal (real getDistanceFeet) with refusal copy
+ * naming the actual radius, Deafened normalization, Silence buff
+ * grant/dedup, exact addExpiration payloads, log discipline,
+ * combat-summary-updated + close, and cancel (Skip) inertness.
  * RAW: Silence has no saving throw — nothing here rolls, no RNG seam needed.
  */
 import { render, screen, fireEvent, act } from '@testing-library/react';
@@ -92,30 +94,29 @@ beforeEach(() => {
 });
 
 describe('SilenceModal', () => {
-    it('renders the Silence spell config on the picker with nothing castable until a target is picked', () => {
+    it('forwards the Silence config to the picker: title, icon, RAW description, target rows, and a confirm gated at zero', () => {
         const { container } = renderModal();
         expect(screen.getByText('Silence')).toBeInTheDocument();
         expect(container.querySelector('.sp-header .fa-volume-xmark')).toBeInTheDocument();
-        expect(screen.getByText(/no sound can be created/).textContent).toContain('20-foot-radius sphere');
+        expect(screen.getByText(/no sound can be created/)).toBeInTheDocument();
         expect(screen.getAllByRole('checkbox')).toHaveLength(3);
         expect(confirmButton(0)).toBeDisabled();
-        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
 
     // fix#155 truth-law: the picker description must show the SAME radius the
     // write side uses (silenceRadius zone write, refusal check, ability_use log)
     // — never a hardcoded 20 while the flow casts a wider or narrower sphere.
+    // Only non-default radii are swept here: a 20 case would pass even with the
+    // copy hardcoded to 20; the default-20 lane is pinned separately below.
     describe('description radius is coupled to the write-side aoeRadius', () => {
         const descriptionText = () => screen.getByText(/no sound can be created/).textContent;
         const shownRadius = () => Number(descriptionText().match(/(\d+)-foot-radius/)[1]);
 
-        for (const radius of [5, 20, 30]) {
+        for (const radius of [5, 30]) {
             it(`displays the ${radius}-foot radius it will write, never a stale 20`, async () => {
                 const view = renderModal({ aoeRadius: radius });
                 expect(descriptionText()).toContain(`${radius}-foot-radius sphere`);
-                if (radius !== 20) {
-                    expect(descriptionText()).not.toContain('20-foot-radius');
-                }
+                expect(descriptionText()).not.toContain('20-foot-radius');
                 selectTarget('Goblin1');
                 await confirm(1);
 
@@ -138,28 +139,6 @@ describe('SilenceModal', () => {
             expect(logsOfType('ability_use')[0][1].description).toContain('20-foot-radius sphere');
             view.unmount();
         });
-
-        it('refusal copy names the actual radius too (30-ft sphere, 42-ft outsider)', async () => {
-            // Center = Goblin1 @(2,2). Orc Warrior @(8,8): sqrt(72)*5 ≈ 42.4 ft > 30.
-            getCombatContext.mockResolvedValue({
-                players: [{ name: 'Wizard1', gridX: 1, gridY: 1 }],
-                creatures: [
-                    { name: 'Goblin1', gridX: 2, gridY: 2 },
-                    { name: 'Orc Warrior', gridX: 8, gridY: 8 },
-                ],
-            });
-            const view = renderModal({ aoeRadius: 30 });
-            selectTarget('Goblin1');
-            selectTarget('Orc Warrior');
-            await confirm(2);
-
-            const refusal = logsOfType('automation')[0][1];
-            expect(refusal.description).toContain('outside the 30-foot-radius sphere');
-            expect(refusal.description).not.toContain('20-foot-radius');
-            // 42.4 ft is inside 30? no — 42.4 > 30 so refusal stands.
-            expect(refusal.creatureName).toBe('Orc Warrior');
-            view.unmount();
-        });
     });
 
     it('closes via Skip without touching any runtime state', () => {
@@ -168,12 +147,6 @@ describe('SilenceModal', () => {
         expect(baseProps.onClose).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addSilencedTarget).not.toHaveBeenCalled();
-    });
-
-    it('forwards undefined creatureTargets as the picker empty state', () => {
-        renderModal({ creatureTargets: undefined });
-        expect(screen.getByText('No targets available.')).toBeInTheDocument();
-        expect(confirmButton(0)).toBeDisabled();
     });
 
     // Point-model ("point you choose"): first placed picked token wins, then
@@ -238,8 +211,10 @@ describe('SilenceModal', () => {
         }
     });
 
-    it('refuses a picked creature provably outside the sphere without granting anything to it', async () => {
-        // Center = Goblin1 @(2,2). Orc Warrior @(8,8): sqrt(72)*5 ≈ 42.4 ft > 20.
+    // Merged the radius-coupling refusal-copy case into the core refusal test:
+    // one home, cast at 30 ft so a hardcoded 20 in the refusal sentence fails.
+    it('refuses a picked creature provably outside the sphere without granting anything to it, naming the real radius', async () => {
+        // Center = Goblin1 @(2,2). Orc Warrior @(8,8): sqrt(72)*5 ≈ 42.4 ft > 30.
         getCombatContext.mockResolvedValue({
             players: [{ name: 'Wizard1', gridX: 1, gridY: 1 }],
             creatures: [
@@ -247,7 +222,7 @@ describe('SilenceModal', () => {
                 { name: 'Orc Warrior', gridX: 8, gridY: 8 },
             ],
         });
-        renderModal();
+        const view = renderModal({ aoeRadius: 30 });
         selectTarget('Goblin1');
         selectTarget('Orc Warrior');
         await confirm(2);
@@ -263,12 +238,14 @@ describe('SilenceModal', () => {
         expect(refusals).toHaveLength(1);
         expect(refusals[0][1].creatureName).toBe('Orc Warrior');
         expect(refusals[0][1].description).toContain('Orc Warrior is 42 ft from the Silence center');
-        expect(refusals[0][1].description).toContain('outside the 20-foot-radius sphere');
+        expect(refusals[0][1].description).toContain('outside the 30-foot-radius sphere');
+        expect(refusals[0][1].description).not.toContain('20-foot-radius');
 
         const ability = logsOfType('ability_use');
         expect(ability).toHaveLength(1);
         expect(ability[0][1].description).toContain('Goblin1 is Deafened.');
         expect(ability[0][1].description).not.toContain('Orc Warrior');
+        view.unmount();
     });
 
     it('writes Deafened to each accepted target, re-normalizing an existing deafened condition', async () => {

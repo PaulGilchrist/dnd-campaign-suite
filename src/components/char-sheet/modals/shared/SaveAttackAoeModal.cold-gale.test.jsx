@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // MA-0138: Adult Silver Dragon Cold Gale legendary line picker — DEX DC 19,
 // 4d6 Cold half-on-success, push-only fail clause ("pushed up to 30 feet
 // straight away"). saveConditions is EMPTY (push is not a canonical
@@ -14,7 +14,11 @@
 // prop saveType="Dexterity" (and this lane's identity-normalizeSaveType mock)
 // the canonical key is 'dexterity'; abbreviated { dex: N } mocks silently fold
 // to 0 via ?? 0 (fix#228/#233/#235/#237 family). numeric/uses data locks live
-// in MonsterCardModal.legendary-uses.test.jsx.
+// in MonsterCardModal.legendary-uses.test.jsx (adult row: DC/type/dc_success/
+// dice) and MonsterCardModal.legendary-uses-ancient-silver.test.jsx (adult
+// save_effect push-fingerprint + condition-free parse); the parsePushFeetClause
+// arms themselves live in MonsterCardHelpers.push-clause.test.js. This lane is
+// ONLY the picker te grant + logs (NPC seam + PC listener seam).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -81,7 +85,6 @@ vi.mock('./CreatureSelectionModal.jsx', async () => {
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
-import { extractConditionsFromSaveEffect, parsePushFeetClause } from '../../../encounter/MonsterCardHelpers.js';
 
 const COLD_GALE = monstersData.find(m => m.index === 'adult-silver-dragon').legendary_actions.find(a => a.name === 'Cold Gale');
 
@@ -127,15 +130,7 @@ beforeEach(() => {
   promptsSent.current = [];
 });
 
-describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
-  it('data lock: save_effect carries NO canonical conditions but parses a 30-ft push clause', () => {
-    expect(COLD_GALE.save_dc).toBe(19);
-    expect(COLD_GALE.save_type).toBe('Dexterity');
-    expect(COLD_GALE.dc_success).toBeUndefined(); // default half matches "Half damage only" prose
-    expect(extractConditionsFromSaveEffect(COLD_GALE.save_effect)).toEqual([]);
-    expect(parsePushFeetClause(COLD_GALE.save_effect)).toEqual({ feet: 30 });
-  });
-
+describe('MA-0138 Cold Gale — push-only fail clause producer (picker grants + logs)', () => {
   it('one confirm: NPC failed save takes FULL damage + instant push te (30) + push log; NPC successful save takes HALF, zero push, zero condition log', async () => {
     // Draws: Thug raw1/2 low → roll 2 + dexterity −1 = 1 (<DC 19, fail);
     // Guard raw1 high → roll 20 + dexterity 7 = 27 (success). Prompt id for

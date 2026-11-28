@@ -1,6 +1,6 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // AOEConditionModal — non-overlay selection lane only (render + selection + skip).
-// Coverage split across the family (verified 2026-10):
+// Coverage split across the family (re-verified 2026-11-27):
 //   save/apply flow & Careful Spell ......... AOEConditionModal.save-flow.test.jsx
 //   Heightened Spell metamagic .............. AOEConditionModal.integration.test.jsx
 //   results & condition dedupe .............. AOEConditionModal.results.test.jsx
@@ -50,6 +50,8 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
 // Re-import mocked modules
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 // ── Test fixtures ──
 
@@ -109,10 +111,11 @@ describe('AOEConditionModal', () => {
         getAllyList.mockReturnValue(null);
     });
 
-    it('renders the selection UI from combat summary creatures, save data, and condition label', () => {
+    it('composes title, save text, and condition note from props and offers every combat-summary creature as a row', () => {
         render(<AOEConditionModal {...makeProps()} />);
 
         // Title and spell-specific instructions composed from props
+        // (generic row/checkbox rendering is CreatureSelectionModal's own tests)
         expect(screen.getByText('Blinding Darkness')).toBeInTheDocument();
         expect(screen.getByText(/Select creatures in the area of effect/)).toBeInTheDocument();
         expect(screen.getByText('CON')).toBeInTheDocument();
@@ -127,10 +130,10 @@ describe('AOEConditionModal', () => {
         expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
         expect(screen.getAllByRole('checkbox')).toHaveLength(3);
 
-        // Nothing selected yet: apply gated off, skip offered
+        // Baseline before any selection (the select→enable→deselect→re-disable
+        // cycle is the next test; zero-state asserted there)
         expect(getApplyButton()).toBeDisabled();
         expect(getApplyButton()).toHaveTextContent('Blinding Darkness (0)');
-        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
 
     it('enables apply with a live target count as rows are selected and deselected', async () => {
@@ -181,6 +184,9 @@ describe('AOEConditionModal', () => {
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); });
 
         expect(props.onClose).toHaveBeenCalledTimes(1);
+        // "without resolving anything": no save prompts sent, no log rows written
+        expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
     // no-inline-styles convention pin (fix#313 recipe): statics live in

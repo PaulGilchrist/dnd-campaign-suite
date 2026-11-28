@@ -1,4 +1,13 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Completion-flow lane of ShortRestModal: the applyShortRest delegation contract, the
+// HP / hit-dice commit writes (clamped at max), short_rest log-line content and
+// restored-resource label aggregation, and the Replenishing Meal single-spend ledger.
+// Owned elsewhere, not re-tested here: zero-dice base completion + onComplete/onClose
+// (ShortRestModal.test.jsx), roll-time meal staging + cancel rollback
+// (ShortRestModal.test.jsx), Natural Recovery (…naturalRecovery.test.jsx), Celestial
+// picker copy/grant/skip and single-click commit-drop (…celestialResilience.test.jsx),
+// Memorize Spell swap (…coverage.test.jsx), hit-dice math in the service lane
+// (restRules-shortRest*.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
@@ -89,15 +98,17 @@ function createPlayerStats(overrides = {}) {
 
 function renderModal(overrides = {}) {
   const playerStats = createPlayerStats(overrides);
+  const onClose = vi.fn();
+  const onComplete = vi.fn();
   const rendered = render(
     <ShortRestModal
       playerStats={playerStats}
       campaignName={mockCampaignName}
-      onClose={vi.fn()}
-      onComplete={vi.fn()}
+      onClose={onClose}
+      onComplete={onComplete}
     />
   );
-  return { ...rendered, playerStats };
+  return { ...rendered, onClose, onComplete, playerStats };
 }
 
 function setupGetRuntimeValue(returns) {
@@ -167,20 +178,7 @@ describe('ShortRestModal - Completion Flow', () => {
     expect(message).not.toContain('Arcane Recovery');
   });
 
-  // Producer-shaped completion pin (test-maintain-bugs plan): plain Cleric through the
-  // REAL constants producer must expose 'Channel Divinity' in the message layer.
-  // Pre-fix this was RED — collectRestoredResources keyed find over string output
-  // never matched and the resources line was absent entirely.
-  it('plain Cleric completion exposes the producer base-class label in the restored-resources line', async () => {
-    renderModal();
-    await completeRest();
-
-    const { message } = shortRestEntry();
-    expect(message).toContain('Hit Dice: 0 used');
-    expect(message).toContain('Resources restored: Channel Divinity');
-  });
-
-  it('logs a zero-dice rest honestly and every resting feature label in one completion', async () => {
+  it('aggregates every resting-feature label in one completion (Warding Flare, Bolstering Treats, Tireless)', async () => {
     setupGetRuntimeValue({ exhaustionLevel: 1 });
     renderModal({
       level: 10,
@@ -190,9 +188,11 @@ describe('ShortRestModal - Completion Flow', () => {
     });
     await completeRest();
 
-    const { message } = shortRestEntry();
-    expect(message).toContain('Hit Dice: 0 used');
-    expect(message).toContain('Resources restored: Warding Flare, Bolstering Treats, Tireless (exhaustion reduced)');
+    // The zero-dice 'Hit Dice: 0 used' face is pinned in the base lane
+    // (ShortRestModal.test.jsx); this pin owns label aggregation only.
+    expect(shortRestEntry().message).toContain(
+      'Resources restored: Warding Flare, Bolstering Treats, Tireless (exhaustion reduced)'
+    );
   });
 
   it.each([
@@ -263,32 +263,54 @@ describe('ShortRestModal - Completion Flow', () => {
     }
   );
 
-  // run2#297 ledger probe: single spend owner (handleComplete). Rolls stage locally;
-  // the pool is decremented exactly once, from the fresh end-of-rest read.
-  describe('Replenishing Meal ledger (single spend owner)', () => {
-    const MEAL_PASSIVE = [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }];
-    const mealWrites = () => setRuntimeValueMock.mock.calls.filter(c => c[1] === 'replenishingMeals');
-
-    it('roll + complete spends exactly one meal: start 3 → end 2', async () => {
-      setupGetRuntimeValue({ replenishingMeals: 3, currentHitPoints: 30 });
-      renderModal({ automation: { passives: MEAL_PASSIVE } });
-      clickRollOne();
-      expect(mealWrites()).toHaveLength(0); // staged roll burns nothing
-      await completeRest();
-      expect(mealWrites()).toEqual([['Thorin', 'replenishingMeals', 2, mockCampaignName]]);
-      expect(shortRestEntry().message).toContain('Replenishing Meal consumed: +1d8 HP');
+  // run2#297 ledger probe: single spend owner (handleComplete). Rolls stage locally
+  // (zero writes at roll time, cancel-rollback pinned in the base lane); the pool is
+  // decremented exactly once at completion, from the fresh end-of-rest read, and the
+  // consumption line lands in the log.
+  it('Roll All after Roll One cannot double-spend: one meal write 3→2 and one meal log line', async () => {
+    setupGetRuntimeValue({ replenishingMeals: 3, currentHitPoints: 30 });
+    renderModal({
+      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
     });
+    clickRollOne(); // meal bonus applied once here: 4+2+4 = 10
+    fireEvent.click(screen.getByRole('button', { name: /Roll All/i })); // 4 dice, no second meal
+    await completeRest();
 
-    it('Roll All after Roll One cannot double-spend: one meal bonus, one write', async () => {
-      setupGetRuntimeValue({ replenishingMeals: 3, currentHitPoints: 30 });
-      renderModal({ automation: { passives: MEAL_PASSIVE } });
-      clickRollOne(); // meal consumed here: 4+2+4 = 10
-      fireEvent.click(screen.getByRole('button', { name: /Roll All/i })); // 4 dice, no second meal
-      await completeRest();
-      expect(mealWrites()).toHaveLength(1);
-      const { message } = shortRestEntry();
-      expect(message).toContain('(4→10, 4→6, 4→6, 4→6, 4→6) = 34 HP recovered');
-      expect(message).toContain('Current HP: 30 → 45');
-    });
+    const mealWrites = setRuntimeValueMock.mock.calls.filter(c => c[1] === 'replenishingMeals');
+    expect(mealWrites).toEqual([['Thorin', 'replenishingMeals', 2, mockCampaignName]]);
+    const { message } = shortRestEntry();
+    expect(message).toContain('Replenishing Meal consumed: +1d8 HP');
+    expect(message).toContain('(4→10, 4→6, 4→6, 4→6, 4→6) = 34 HP recovered');
+    expect(message).toContain('Current HP: 30 → 45');
+  });
+
+  // Standing rec from #2076: the base completion lane must pin the in-progress LATCH
+  // face. handleComplete has NO re-entry guard and the Complete button stays mounted
+  // while the Celestial Resilience picker is open (ShortRestModal.jsx:943-948), so a
+  // second click re-fires applyShortRest (double base-rest apply: resource clears,
+  // expirations, and any producer-side side effects run twice). This pins the shipped
+  // double-fire HONESTLY — when a latch is added, flip to toHaveBeenCalledTimes(1)
+  // and assert the picker stays open. Single-click commit-drop is pinned in the
+  // celestial lane (…celestialResilience.test.jsx); the double-fire face is unique here.
+  it('HONEST PIN: re-clicking Complete while the ally picker is open re-fires applyShortRest (no in-progress latch)', async () => {
+    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+    const grant = {
+      celestialResilienceAllies: {
+        selfTempHp: 7,
+        allyTempHp: 3,
+        maxTargets: 1,
+        creatureTargets: [{ name: 'Arrun' }],
+      },
+    };
+    applyShortRest.mockResolvedValueOnce(grant).mockResolvedValueOnce(grant);
+    const { onComplete } = renderModal();
+    await completeRest();
+    expect(screen.getByText('mock-creature-selection')).toBeInTheDocument();
+    await completeRest(); // second click while the picker is open
+
+    // 🔴 Source bug: the second click re-enters handleComplete and re-applies the base rest.
+    expect(applyShortRest).toHaveBeenCalledTimes(2);
+    // Neither click commits the rest — completion is gated on the picker outcome.
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });

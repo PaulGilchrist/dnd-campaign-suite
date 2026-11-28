@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Base-render lane for StepsOfTheFeyTauntModal: chooser header title/featureName
 // fallback, prompt copy, four step-card labels/descriptions, and mode-driven skip
 // button labels — all rendered with uses available. Zero-uses gating is owned by
@@ -21,18 +21,18 @@ const promptState = vi.hoisted(() => ({ n: 0 }));
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
   // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
   logSaveDismissed: vi.fn(() => Promise.resolve()),
-    createSaveListener: vi.fn((_campaignName, _config) => {
-        const promptId = `save-guid-${++promptState.n}`;
-        const promise = new Promise((resolve) => {
-            const handleSaveResult = (event) => {
-                if (event.detail.promptId !== promptId) return;
-                window.removeEventListener('save-result', handleSaveResult);
-                resolve(event.detail);
-            };
-            window.addEventListener('save-result', handleSaveResult);
-        });
-        return { promptId, promise };
-    }),
+  createSaveListener: vi.fn((_campaignName, _config) => {
+    const promptId = `save-guid-${++promptState.n}`;
+    const promise = new Promise((resolve) => {
+      const handleSaveResult = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-result', handleSaveResult);
+        resolve(event.detail);
+      };
+      window.addEventListener('save-result', handleSaveResult);
+    });
+    return { promptId, promise };
+  }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -125,47 +125,34 @@ describe('StepsOfTheFeyTauntModal - base chooser render', () => {
         expect(screen.queryByRole('button', { name: other })).toBeNull();
     });
 
-    it('styles the choice step via scoped classes with zero inline styles (no-inline-styles convention)', () => {
-        // fix#313 recipe pin (pass #254-era census): the former inline styles
-        // in renderChoiceStep — options container (:403-era), step cards
-        // (:410-417-era), card header (:419-era), icon (:420-era), description
-        // (:423-era), and no-uses note (:427-era) — now live in
-        // StepsOfTheFeyTauntModal.css (exact-value migration). The hasUses
-        // dimming state rides the .disabled modifier class. fix#254's
-        // vacuous-choice rec (bewitching lane) is untouched.
+    it('marks cards clickable with uses available and disabled at zero uses, with zero inline styles in the chooser', () => {
+        // fix#313 recipe pin: renderChoiceStep styles via scoped classes only
+        // (the old inline styles migrated to StepsOfTheFeyTauntModal.css); the
+        // hasUses dimming state rides the .disabled modifier class, never a
+        // style attribute. Scoped to the chooser body on purpose — the
+        // disappearing/refreshing confirm views (:538/:558) still carry inline
+        // styles and belong to their own step lanes.
         const { rerender } = render(<StepsOfTheFeyTauntModal {...makeProps()} />);
 
-        const body = document.querySelector('.sp-body');
-        expect(body.querySelectorAll('[style]')).toHaveLength(0);
-
-        const list = document.querySelector('.fey-taunt-options');
-        expect(list).toBeTruthy();
-        expect(list.getAttribute('style')).toBeNull();
-
-        const cards = list.querySelectorAll('.fey-taunt-option');
+        let cards = screen.getAllByTestId(/step-option-/);
         expect(cards).toHaveLength(4);
         for (const card of cards) {
-            expect(card.getAttribute('style')).toBeNull();
-            expect(card.className).toContain('clickable');
-            expect(card.className).not.toContain('disabled');
-            expect(card.querySelector('.fey-taunt-option-icon')).toBeTruthy();
-            expect(card.querySelector('.fey-taunt-option-desc')).toBeTruthy();
+            expect(card).toHaveClass('clickable');
+            expect(card).not.toHaveClass('disabled');
         }
-        // Uses available: no-uses note absent.
-        expect(list.querySelector('.fey-taunt-no-uses')).toBeNull();
+        // Uses available: no-uses note absent; zero inline styles in the body.
+        expect(document.querySelector('.fey-taunt-no-uses')).toBeNull();
+        expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
 
-        // Zero-uses state: cards gain .disabled, lose .clickable — still zero inline.
+        // Zero-uses state: cards gain .disabled, lose .clickable, note appears
+        // — still zero inline styles.
         rerender(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 0 })} />);
-        const dimmed = document.querySelectorAll('.fey-taunt-option');
-        expect(dimmed).toHaveLength(4);
-        for (const card of dimmed) {
-            expect(card.getAttribute('style')).toBeNull();
-            expect(card.className).toContain('disabled');
-            expect(card.className).not.toContain('clickable');
+        cards = screen.getAllByTestId(/step-option-/);
+        for (const card of cards) {
+            expect(card).toHaveClass('disabled');
+            expect(card).not.toHaveClass('clickable');
         }
-        const note = document.querySelector('.fey-taunt-no-uses');
-        expect(note).toBeTruthy();
-        expect(note.getAttribute('style')).toBeNull();
+        expect(document.querySelector('.fey-taunt-no-uses')).toBeTruthy();
         expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
     });
 });

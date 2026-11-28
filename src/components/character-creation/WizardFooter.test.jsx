@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardFooter from './WizardFooter.jsx';
@@ -75,57 +75,38 @@ describe('WizardFooter', () => {
     }
   });
 
-  describe('edit-mode Save Changes gate (sidebar ✓ Save parity)', () => {
-    const lastStepEdit = { isFirstStep: false, isLastStep: true, isEditing: true };
-    const saveChanges = () => screen.getByRole('button', { name: 'Save Changes' });
+  // Edit-mode Save Changes gate (sidebar ✓ Save parity). Gating idiom: the
+  // disabled STATE is the pin (repo law — assert the disabled attribute,
+  // never click a disabled control). Cause-naming idiom the sidebar Save
+  // ships (e8643bce3): a gated button names its cause — the combined
+  // saveCauseTitle wins, else it falls back to the ladder step for the
+  // CURRENT ruleset; an open lane is never titled even with a ladder gap.
+  const SAVE_TITLE_CASES = [
+    { name: 'ladder fallback cause when no saveCauseTitle is supplied',
+      props: { isSaveEnabled: false, ruleset: '5e', firstInvalidStep: 4 },
+      enabled: false, title: 'Complete "Subrace" first' },
+    { name: 'combined saveCauseTitle beats the ladder fallback (caps-only break)',
+      props: { isSaveEnabled: false, firstInvalidStep: null,
+        saveCauseTitle: 'Feats/skills exceed the rules limit — fix highlighted steps' },
+      enabled: false, title: 'Feats/skills exceed the rules limit — fix highlighted steps' },
+    { name: 'stays silent when no cause is supplied at all (bare gated face)',
+      props: { isSaveEnabled: false, firstInvalidStep: null },
+      enabled: false, title: null },
+    { name: 'no gate and no title when the Save lane is open despite a ladder gap',
+      props: { ruleset: '2024', firstInvalidStep: 5 },
+      enabled: true, title: null },
+  ];
 
-    // Gating idiom: the disabled STATE is the pin (repo law — assert the
-    // disabled attribute, never click a disabled control). The truth-table
-    // case 'last step (edit), Save lane gated' owns the disabled assertion;
-    // here we own the cause-title faces the sidebar Save already ships.
-
-    // Same cause-naming idiom the sidebar Save ships (e8643bce3): the
-    // disabled button names the step the ladder waits on.
-    it('names the ladder cause on a gated button, per the CURRENT ruleset flow', () => {
-      render(
-        <WizardFooter
-          {...createProps()}
-          {...lastStepEdit}
-          isSaveEnabled={false}
-          ruleset="5e"
-          firstInvalidStep={4}
-        />
-      );
-      expect(saveChanges()).toHaveAttribute('title', 'Complete "Subrace" first');
-    });
-
-    it('names the caps cause from saveCauseTitle on a non-ladder (caps-only) disablement', () => {
-      render(
-        <WizardFooter
-          {...createProps()}
-          {...lastStepEdit}
-          isSaveEnabled={false}
-          firstInvalidStep={null}
-          saveCauseTitle="Feats/skills exceed the rules limit — fix highlighted steps"
-        />
-      );
-      expect(saveChanges()).toBeDisabled();
-      expect(saveChanges()).toHaveAttribute(
-        'title',
-        'Feats/skills exceed the rules limit — fix highlighted steps'
-      );
-    });
-
-    it('stays silent only when no cause is supplied at all (bare component face)', () => {
-      render(<WizardFooter {...createProps()} {...lastStepEdit} isSaveEnabled={false} firstInvalidStep={null} />);
-      expect(saveChanges()).toBeDisabled();
-      expect(saveChanges()).not.toHaveAttribute('title');
-    });
-
-    it('shows no cause title and no gate when the Save lane is open', () => {
-      render(<WizardFooter {...createProps()} {...lastStepEdit} ruleset="2024" firstInvalidStep={5} />);
-      expect(saveChanges()).toBeEnabled();
-      expect(saveChanges()).not.toHaveAttribute('title');
-    });
+  it.each(SAVE_TITLE_CASES)('Save Changes gate: $name', ({ props, enabled, title }) => {
+    render(
+      <WizardFooter {...createProps()} isFirstStep={false} isLastStep isEditing {...props} />
+    );
+    const saveChanges = screen.getByRole('button', { name: 'Save Changes' });
+    expect(saveChanges)[enabled ? 'toBeEnabled' : 'toBeDisabled']();
+    if (title === null) {
+      expect(saveChanges).not.toHaveAttribute('title');
+    } else {
+      expect(saveChanges).toHaveAttribute('title', title);
+    }
   });
 });

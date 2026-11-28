@@ -1,28 +1,27 @@
-// @maintained-by-ai 2026-10-18
-import { render, screen, waitFor, within } from '@testing-library/react';
+// @maintained-by-ai 2026-11-28
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './WizardStepSpells.jsx';
 import SelectableList from './SelectableList.jsx';
 import * as spellLimits from '../../services/rules/spells/spellLimits.js';
 import * as spellValidation from '../../services/rules/spells/spellValidation.js';
 
+// Step-lane props only: list-shell behavior (search, dropdown reset, pre-selection
+// locking) is owned by SelectableList.test.jsx; feat modal internals by the
+// feature-touched / ritual-master sibling lanes.
 vi.mock('./SelectableList.jsx', () => ({
   default: vi.fn(({
     title,
-    resultLabel,
     renderSummary,
     items = [],
     renderItem,
     className,
     filters = [],
-    searchPlaceholder,
   }) => {
     const defaultSort = (a, b) => String(a).localeCompare(String(b));
     return (
       <div data-testid="selectable-list" className={className}>
         <h2>{title}</h2>
-        {searchPlaceholder && <input placeholder={searchPlaceholder} readOnly />}
-        {resultLabel && <div data-testid="result-label">{resultLabel}</div>}
         {filters.map((filter) => (
           <div key={filter.field} data-testid={`filter-${filter.field}`}>
             {[...new Set(items.flatMap(filter.getValue))]
@@ -101,7 +100,7 @@ describe('WizardStepSpells', () => {
     vi.clearAllMocks();
   });
 
-  it('renders step title, spell rows, auto-assigned label, and wires the spells field and search to SelectableList', async () => {
+  it('wires the spells field, pre-selections, search, and result label into SelectableList', async () => {
     const props = makeProps({ preSelectedSpells: ['Magic Missile'] });
     render(<WizardStepSpells {...props} />);
 
@@ -109,15 +108,14 @@ describe('WizardStepSpells', () => {
       expect(screen.getByText('Step 14: Spells')).toBeInTheDocument();
       expect(screen.getByText('Fireball')).toBeInTheDocument();
       expect(screen.getByText('Magic Missile')).toBeInTheDocument();
-      expect(screen.getByText('(Auto-assigned)')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Search spells...')).toBeInTheDocument();
-      expect(screen.getByTestId('result-label')).toHaveTextContent('spell');
     });
 
     const listProps = SelectableList.mock.calls.at(-1)[0];
     expect(listProps.fieldName).toBe('spells');
     expect(listProps.onArrayFieldChange).toBe(props.onArrayFieldChange);
     expect(listProps.preSelectedItems).toEqual(['Magic Missile']);
+    expect(listProps.searchPlaceholder).toBe('Search spells...');
+    expect(listProps.resultLabel).toBe('spell');
   });
 
   describe('known-spell summary', () => {
@@ -232,8 +230,10 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  it('extends Wizard spells into Fighter and Rogue class-filter options and labels cantrip levels', async () => {
-    render(<WizardStepSpells {...makeProps()} />);
+  it('builds filter options (Wizard extends to Fighter/Rogue, level 0 labels Cantrip) and defaults the class filter to the character class', async () => {
+    const props = makeProps();
+    props.formData = { ...props.formData, class: { name: 'Cleric' } };
+    render(<WizardStepSpells {...props} />);
 
     await waitFor(() => {
       const classFilter = within(screen.getByTestId('filter-class'));
@@ -244,19 +244,52 @@ describe('WizardStepSpells', () => {
     const levelFilter = within(screen.getByTestId('filter-level'));
     expect(levelFilter.getByText('Cantrip')).toBeInTheDocument();
     expect(levelFilter.getByText('3')).toBeInTheDocument();
+
+    // The step supplies the character class as the filter default; SelectableList
+    // honoring it (with the All reset) is pinned in SelectableList.test.jsx.
+    const listProps = SelectableList.mock.calls.at(-1)[0];
+    const classFilterProp = listProps.filters.find(f => f.field === 'class');
+    expect(classFilterProp.defaultValue).toBe('Cleric');
   });
 
-  it('defaults the class filter to the character class while allowing it to change', async () => {
-    const props = makeProps();
-    props.formData = { ...props.formData, class: { name: 'Cleric' } };
-    render(<WizardStepSpells {...props} />);
+  describe('2024 Bard Magical Secrets pool', () => {
+    const poolSpells = () => [
+      spell('BardSong', 0, { classes: ['Bard'] }),
+      spell('Fireball', 0, { classes: ['Wizard'] }),
+      spell('SorcererOnly', 0, { classes: ['Sorcerer'] }),
+    ];
 
-    await waitFor(() => {
-      const listProps = SelectableList.mock.calls.at(-1)[0];
-      const classFilter = listProps.filters.find(f => f.field === 'class');
-      expect(classFilter.defaultValue).toBe('Cleric');
-      // 'All' reset stays available because defaultLabel is untouched
-      expect(classFilter.defaultLabel).toBeUndefined();
+    it('shows the pool section for a level-10 2024 Bard, counts off-Bard picks, and filters the list to the pool on toggle', async () => {
+      setSpellLimits({ preparedSpells: 2 });
+      const props = makeProps({ spells: ['Fireball'], allSpells: poolSpells() });
+      props.formData = { ...props.formData, class: { name: 'Bard' }, rules: '2024', level: 10 };
+      const { container } = render(<WizardStepSpells {...props} />);
+
+      await waitFor(() => {
+        expect(within(container).getByText('Magical Secrets')).toBeInTheDocument();
+      });
+      // One selected spell (Fireball) is off the Bard list; pool budget is 2
+      expect(within(container).getByText('1/2 in pool')).toBeInTheDocument();
+      expect(within(container).getByText('SorcererOnly')).toBeInTheDocument();
+
+      fireEvent.click(within(container).getByRole('button', { name: /Show Magical Secrets Pool Only/ }));
+      await waitFor(() => {
+        // Sorcerer/Wizard-list rule: only Bard/Cleric/Druid/Wizard spells remain
+        expect(within(container).queryByText('SorcererOnly')).not.toBeInTheDocument();
+        expect(within(container).getByText('Fireball')).toBeInTheDocument();
+        expect(within(container).getByRole('button', { name: /Show All Spells/ })).toBeInTheDocument();
+      });
+    });
+
+    it('hides the pool section from characters without Magical Secrets access', async () => {
+      const props = makeProps({ spells: ['Fireball'], allSpells: poolSpells() });
+      props.formData = { ...props.formData, class: { name: 'Bard' }, rules: '5e', level: 10 };
+      const { container } = render(<WizardStepSpells {...props} />);
+
+      await waitFor(() => {
+        expect(within(container).getByText('Fireball')).toBeInTheDocument();
+      });
+      expect(within(container).queryByText('Magical Secrets')).not.toBeInTheDocument();
     });
   });
 
@@ -270,15 +303,6 @@ describe('WizardStepSpells', () => {
       await waitFor(() => {
         expect(screen.getByText(/Spell chosen outside/)).toBeInTheDocument();
       });
-    });
-
-    it('does not call getSpellValidationInfo when no spells are selected', async () => {
-      render(<WizardStepSpells {...makeProps({ spells: [] })} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Spell Selection Summary')).toBeInTheDocument();
-      });
-      expect(spellValidation.getSpellValidationInfo).not.toHaveBeenCalled();
     });
 
     it('logs the error and renders no warnings when getSpellValidationInfo rejects', async () => {

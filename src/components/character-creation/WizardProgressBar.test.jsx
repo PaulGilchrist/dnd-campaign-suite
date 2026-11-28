@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import WizardProgressBar from './WizardProgressBar.jsx';
@@ -15,6 +15,9 @@ describe('WizardProgressBar', () => {
     [3, 5, '50%'],
     [4, 5, '75%'],
     [5, 5, '100%'],
+    // Different denominator proves the ratio divides by totalSteps rather
+    // than a hardcoded 25%-per-step step.
+    [2, 3, '50%'],
   ])('step %i of %i fills the bar to %s', (
     currentStep, totalSteps, expected,
   ) => {

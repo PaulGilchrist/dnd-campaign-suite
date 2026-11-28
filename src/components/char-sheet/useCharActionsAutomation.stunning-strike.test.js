@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // CLA-342 Stunning Strike row-gate lane (gateStunningStrike / markStunningStrikeUsed):
 // a save_only 'Stunning Strike' row (trigger monk_weapon_or_unarmed_hit) arms ONLY on your
 // own melee HIT (not auto-miss), once per turn, with a legal OTHER-creature target CURRENTLY
@@ -33,9 +33,9 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
 }));
 // The gate's target-validity leg resolves the armed target with the SAME helper
-// saveOnlyHandler's resolveTarget wraps — configured per-test (mockReturnValue is
-// an implementation; vi.clearAllMocks keeps it, so every test that reaches the
-// target leg stamps its own value).
+// saveOnlyHandler's resolveTarget wraps — configured per-test. vi.clearAllMocks
+// preserves mockReturnValue implementations, so beforeEach mockReset()s it back
+// to a no-op; every test that reaches the target leg stamps its own value.
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 
 const SS_ACTION = {
@@ -79,6 +79,7 @@ function makeHarness({ rules = '2024', lastAttack, used, focusPoints = 4 } = {})
 describe('CLA-342 Stunning Strike row gate (own melee hit, once per turn)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getTargetFromAttacker.mockReset();
         combatRound.current = 4;
     });
 
@@ -148,35 +149,24 @@ describe('CLA-342 Stunning Strike row gate (own melee hit, once per turn)', () =
     // gate, BEFORE spendMonkFocusPoint: no focusPoints write, no latch stamp, no
     // spend log, no dispatch — popup + ONE <feature>_refused automation row with the
     // reason token, wording byte-identical to saveOnlyHandler's own refusal.
+    // Ruleset-agnostic by construction (refuseStaleStunningStrikeTarget never reads
+    // playerStats.rules), so one row per token; the 5e spend-through of this leg is
+    // already pinned by the 5e positive arm test above.
     describe('target-validity leg (stale/self-armed target after the hit): zero-spend refusal', () => {
         it.each([
             {
-                rules: '2024',
                 token: 'no_target',
                 armed: null,
                 message: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
             },
             {
-                rules: '5e',
-                token: 'no_target',
-                armed: null,
-                message: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
-            },
-            {
-                rules: '2024',
                 token: 'cannot_target_self',
                 armed: { name: 'TestFighter' },
                 message: "You can't target yourself with Stunning Strike — it requires another creature.",
             },
-            {
-                rules: '5e',
-                token: 'cannot_target_self',
-                armed: { name: 'TestFighter' },
-                message: "You can't target yourself with Stunning Strike — it requires another creature.",
-            },
-        ])('refuses $token ($rules): popup + exactly one stunning_strike_refused row, focusPoints UNCHANGED, latch NOT stamped, no dispatch', async ({ rules, token, armed, message }) => {
+        ])('refuses $token: popup + exactly one stunning_strike_refused row, focusPoints UNCHANGED, latch NOT stamped, no dispatch', async ({ token, armed, message }) => {
             getTargetFromAttacker.mockReturnValue(armed);
-            const { hooks, setRuntimeValue } = makeHarness({ rules, lastAttack: HIT, focusPoints: 4 });
+            const { hooks, setRuntimeValue } = makeHarness({ lastAttack: HIT, focusPoints: 4 });
 
             await useCharActionsAutomation(hooks).handleAutomationAction(SS_ACTION);
 

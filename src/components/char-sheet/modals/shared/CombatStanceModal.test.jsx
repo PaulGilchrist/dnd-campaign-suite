@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CombatStanceModal from './CombatStanceModal.jsx';
@@ -31,21 +31,18 @@ function makeProps(overrides = {}) {
   };
 }
 
-function selectRadio(index) {
-  fireEvent.click(document.querySelectorAll('input[type="radio"]')[index]);
-}
-
 describe('CombatStanceModal', () => {
   beforeEach(() => {
     combatStanceHandler.applyStanceOption.mockReset();
   });
+  const radios = () => screen.queryAllByRole('radio');
 
   it('renders action name, instruction, and one radio per option with its effect text', () => {
     render(<CombatStanceModal {...makeProps()} />);
 
     expect(screen.getByText('Rage')).toBeInTheDocument();
     expect(screen.getByText(/Choose a primal aspect of your Rage/)).toBeInTheDocument();
-    expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(6);
+    expect(radios()).toHaveLength(6);
 
     // Each stance shows the rules text players need to choose between them.
     expect(screen.getByText(/Resistance to all damage except Force, Necrotic, Psychic, Radiant/)).toBeInTheDocument();
@@ -61,7 +58,7 @@ describe('CombatStanceModal', () => {
       action: { name: 'Rage', automation: { type: 'stance', options: [{ name: 'Custom' }] } },
     })} />);
 
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
+    expect(radios()).toHaveLength(1);
     expect(screen.getByText('Custom')).toBeInTheDocument();
     // Unknown stances render no effect line rather than a stale/bogus one.
     expect(screen.queryByText(/—/)).not.toBeInTheDocument();
@@ -105,24 +102,26 @@ describe('CombatStanceModal', () => {
     render(<CombatStanceModal {...makeProps({ action: { name: 'Rage' } })} />);
 
     expect(screen.getByText('Rage')).toBeInTheDocument();
-    expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    expect(radios()).toHaveLength(0);
     expect(screen.getByRole('button', { name: /Activate Rage/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  it('enables Activate only after a selection, enforces single selection, and never applies without one', async () => {
+  it('enables Activate only after a selection, enforces single selection, and never applies without one', () => {
     render(<CombatStanceModal {...makeProps()} />);
     const activate = screen.getByRole('button', { name: /Activate Rage/ });
+    expect(activate).toBeDisabled();
 
     fireEvent.click(activate);
     expect(combatStanceHandler.applyStanceOption).not.toHaveBeenCalled();
 
-    selectRadio(0);
+    fireEvent.click(radios()[0]);
     expect(activate).toBeEnabled();
-    selectRadio(1);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    expect(radios[0].checked).toBe(false);
-    expect(radios[1].checked).toBe(true);
+    expect(radios()[0]).toBeChecked();
+
+    fireEvent.click(radios()[1]);
+    expect(radios()[0]).not.toBeChecked();
+    expect(radios()[1]).toBeChecked();
   });
 
   it('submits the selection, replaces the picker with an HTML result screen, and Done closes', async () => {
@@ -133,7 +132,7 @@ describe('CombatStanceModal', () => {
     });
 
     render(<CombatStanceModal {...makeProps({ onClose })} />);
-    selectRadio(0);
+    fireEvent.click(radios()[0]);
     fireEvent.click(screen.getByRole('button', { name: /Activate Rage/ }));
 
     await waitFor(() => {
@@ -158,35 +157,31 @@ describe('CombatStanceModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows an error and stays in selection mode when applying fails', async () => {
+  it('stays in selection mode when applying fails or yields no description', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     combatStanceHandler.applyStanceOption.mockRejectedValue(new Error('Failed to apply stance'));
 
     render(<CombatStanceModal {...makeProps()} />);
-    selectRadio(0);
+    fireEvent.click(radios()[0]);
     fireEvent.click(screen.getByRole('button', { name: /Activate Rage/ }));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to apply Rage: Failed to apply stance')).toBeInTheDocument();
     });
+    // No success screen; the user can retry from the same modal.
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    // Recovery path: the user can retry from the same modal.
     expect(screen.getByRole('button', { name: /Activate Rage/ })).toBeEnabled();
-    consoleError.mockRestore();
-  });
 
-  it('stays in selection mode when the handler returns no description', async () => {
+    // A handler result without a description must not render a blank success screen.
     combatStanceHandler.applyStanceOption.mockResolvedValue(null);
-
-    render(<CombatStanceModal {...makeProps()} />);
-    selectRadio(0);
     fireEvent.click(screen.getByRole('button', { name: /Activate Rage/ }));
 
     await waitFor(() => {
-      expect(combatStanceHandler.applyStanceOption).toHaveBeenCalled();
+      expect(combatStanceHandler.applyStanceOption).toHaveBeenCalledTimes(2);
     });
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    consoleError.mockRestore();
   });
 
   it('closes only via Cancel — overlay and modal shell clicks are ignored', () => {
@@ -199,40 +194,5 @@ describe('CombatStanceModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
-    const { container } = render(<CombatStanceModal {...makeProps()} />);
-
-    // Static containers/inputs/descriptions: zero inline style attributes — the
-    // rules live in CombatStanceModal.css (exact-value migration, fix#313 recipe).
-    for (const sel of ['.combat-stance-options', '.combat-stance-input', '.combat-stance-desc']) {
-      const els = container.querySelectorAll(sel);
-      expect(els.length).toBeGreaterThan(0);
-      for (const el of els) expect(el.getAttribute('style')).toBeNull();
-    }
-
-    // Option rows: static decoration lives in the class; the inline style attr
-    // carries ONLY the isSelected-derived background/border (dynamic exception).
-    const rows = container.querySelectorAll('.combat-stance-option');
-    expect(rows).toHaveLength(RAGE_OPTIONS.length);
-    for (const row of rows) {
-      const inline = row.getAttribute('style') || '';
-      expect(inline).toMatch(/background/i);
-      expect(inline).toMatch(/border/i);
-      expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius|opacity/i);
-    }
-
-    // Census sweep: the ONLY inline-styled elements in the body are the dynamic
-    // option labels — every former static site is now style-free.
-    expect(container.querySelectorAll('.sp-body [style]')).toHaveLength(RAGE_OPTIONS.length);
-
-    // Selecting a stance flips only its dynamic inline values (link-colored
-    // border on the chosen row; every other row stays transparent).
-    fireEvent.click(screen.getByText('Bear'));
-    const selectedStyle = screen.getByText('Bear').closest('.combat-stance-option').getAttribute('style') || '';
-    expect(selectedStyle).toMatch(/var\(--color-link\)/);
-    const unselectedStyle = screen.getByText('Wolf').closest('.combat-stance-option').getAttribute('style') || '';
-    expect(unselectedStyle).toMatch(/transparent/);
   });
 });

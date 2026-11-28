@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18: 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1000: Homunculus Bite — the save leg gates a CONDITION rider only
 // ("Failure: Poisoned … Failure by 5 or more: Poisoned … While Poisoned, …
 // Unconscious, which ends early if the target takes any damage"), but the
@@ -18,17 +18,17 @@
 // false-side damage pools (Salamander prose / Dao secondary inside
 // save_effect) + saveLegCarriesSecondaryDamage + Death Dog dice-NO-damage-
 // word byte-inert twin: MonsterCardModal.secondary-save-transport.test.js
-// :118-128/:186-201; full Salamander row: ma1427; margin-band adjudication
+// ("MA-0427 save transport" + "composite-fork predicate truth tables"
+// describes); full Salamander row: ma1427; margin-band adjudication
 // through the REAL save seam (shallow Poisoned-only, deep Poisoned+
 // Unconscious, zero save-leg damage): saveProcessing.ma1000-homunculus-
 // margin-band.test.js; parseSaveMarginClause unit contract + Drow twin:
-// MonsterCardHelpers.save-margin.test.js / ma1584:171-175. Sleep Gaze
+// MonsterCardHelpers.save-margin.test.js / ma1584. Sleep Gaze
 // "until it takes damage" is the same termination-clause equivalence class
 // as the fingerprint below — one instance is enough.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { saveLegIsConditionRider, saveChipPlan, buildSaveOptions, isCompositeAttackSaveRow } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 
 const homunculusBite = () => JSON.parse(readFileSync('public/data/monsters.json', 'utf8'))
   .find((m) => m.name === 'Homunculus').actions.find((a) => a.name === 'Bite');
@@ -46,10 +46,8 @@ describe('MA-1000 guard: termination-clause prose arms the rider, damage pools n
     };
     expect(isCompositeAttackSaveRow(row)).toBe(true);
     expect(saveLegIsConditionRider(row)).toBe(true);
-    const plan = saveChipPlan(row, false);
-    expect(plan.riderOnly).toBe(true);
-    expect(plan.formula).toBeNull(); // zero save-leg damage (attack chip pays flat 1 Piercing)
-    expect(plan.clickable).toBe(true);
+    // zero save-leg damage (attack chip pays flat 1 Piercing): full chip-plan face
+    expect(saveChipPlan(row, false)).toEqual({ riderOnly: true, formula: null, rollable: false, clickable: true });
   });
 });
 
@@ -64,7 +62,9 @@ describe('MA-1000 disk lock + rider forward through the modal seams', () => {
     expect(row.damage_type_primary).toBe('Piercing');
     expect(row.damage_dice_secondary).toBeUndefined();
     expect(row.save_effect).toBe('Failure: The target has the Poisoned condition until the end of the homunculus\'s next turn.');
-    expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['poisoned']); // §214: Unconscious lives ONLY in description (§70 advisory)
+    // §214 no-over-grant is pinned by the transport face below (opts.saveConditions
+    // === ['poisoned'] runs extractConditionsFromSaveEffect on this exact byte) and
+    // end-to-end by saveProcessing.ma1000-homunculus-margin-band.test.js.
     expect(row.save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
     const keys = Object.keys(row);
     expect(keys[keys.length - 1]).toBe('save_margin');

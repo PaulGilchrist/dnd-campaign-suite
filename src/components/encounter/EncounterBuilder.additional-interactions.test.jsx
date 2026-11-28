@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // EncounterBuilder lane: interactions NOT owned by sibling files.
 // Owned elsewhere (do NOT duplicate here):
 //   - panel-interactions.test.jsx  — checkbox toggle, qty +/-, remove, clear all,
@@ -20,10 +20,14 @@
 //     header onSort calls and panel player-callback calls (no builder state wiring)
 // This file uniquely covers:
 //   1. Table sort state machine (handleSort) with observable row order in the REAL table
-//   2. Join Encounter dispatch (log payload + addMonstersToInitiative + cleanup)
+//   2. Join Encounter dispatch (log payload + addMonstersToInitiative + join-then-log
+//      ordering + selection cleanup) — join-failure.test.jsx defers full ordering here
 //   3. Save → modal commit → saveEncounter payload, then edit-in-place → updateEncounter
+//      payload (strip refs + effectiveXP); the update confirm's copy/placement is owned
+//      by update-save-confirm.test.jsx
 //   4. Party add / level change / remove → target threshold recomputation end-to-end
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+//      (helpers.test.jsx owns only difficulty-toggle recomputation)
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import EncounterBuilder from './EncounterBuilder.jsx';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
@@ -127,6 +131,11 @@ beforeEach(() => {
   localStorage.removeItem('encounterFilter-2024');
 });
 
+afterEach(() => {
+  // Release the window.confirm spy from the update leg (no global restoreMocks).
+  vi.restoreAllMocks();
+});
+
 describe('EncounterBuilder - additional interactions', () => {
   it('reorders monster rows when sortable headers are clicked (field switch and direction toggle)', () => {
     const { container } = mountBuilder({ monsters: sortMonsters });
@@ -154,8 +163,7 @@ describe('EncounterBuilder - additional interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Goblin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Join Encounter' }));
 
-    // Exact campaign log payload (qty propagated). The joined row is written
-    // only AFTER the board accepts the creatures (join success first).
+    // Exact campaign log payload (qty propagated).
     await waitFor(() => {
       expect(addEntry).toHaveBeenCalledWith('test-campaign', {
         type: 'encounter',
@@ -172,6 +180,12 @@ describe('EncounterBuilder - additional interactions', () => {
       [{ name: 'Thorin', level: 5 }, { name: 'Elara', level: 3 }],
       'test-campaign'
     );
+
+    // Join-order contract (owned here; join-failure.test.jsx defers the full
+    // ordering to this lane): the durable `joined` row is written only AFTER
+    // the board accepts the creatures, never pre-emptively.
+    expect(addMonstersToInitiative.mock.invocationCallOrder[0])
+      .toBeLessThan(addEntry.mock.invocationCallOrder[0]);
 
     // Selection cleared and app notified.
     await waitFor(() => {
@@ -214,12 +228,13 @@ describe('EncounterBuilder - additional interactions', () => {
     expect(screen.getByRole('button', { name: 'Update' })).toHaveTextContent('Update');
 
     // Edit-in-place: second save updates directly — no modal, no new saveEncounter —
-    // but the update lane gates the PUT behind a named native overwrite confirm.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // the update lane gates the PUT behind a native overwrite confirm (its
+    // placement and NAMED copy are owned by update-save-confirm.test.jsx;
+    // here the spy is just the mechanism to pass the gate).
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Ambush at dawn (revised)' } });
     fireEvent.click(screen.getByRole('button', { name: 'Update' }));
 
-    expect(confirmSpy).toHaveBeenCalledWith('Overwrite encounter "Crag Mole Lair"? This replaces the saved encounter.');
     await waitFor(() => {
       expect(manageSpies.updateEncounter).toHaveBeenCalledTimes(1);
     });

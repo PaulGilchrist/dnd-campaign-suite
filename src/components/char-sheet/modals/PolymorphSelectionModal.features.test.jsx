@@ -1,5 +1,5 @@
-// @maintained-by-ai 2026-10-17
-import { render, screen, waitFor } from '@testing-library/react';
+// @maintained-by-ai 2026-11-27
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import PolymorphSelectionModal from './PolymorphSelectionModal.jsx';
@@ -11,10 +11,16 @@ import {
 } from './PolymorphSelectionModal.test-utils.js';
 
 // Features lane: customization props (title/actionLabel), allowAnyCreature /
-// object_into_creature modes, excludeTypes, CR display, class-feature fallbacks,
+// object_into_creature modes (label, placeholder and no-results copy for each
+// branch of computeListCopy), excludeTypes, CR display, class-feature fallbacks,
 // and the non-default limitation strings rendered in beast rows. Core flows
-// (loading, search, selection, close, CLA-391 dep stability) and the
+// (loading, search, selection, confirm/cancel, CLA-391 dep stability) and the
 // filterBeastSpeeds unit contract live in PolymorphSelectionModal.test.jsx.
+// The focus-entrance/arrow-rove tier is owned by
+// PolymorphSelectionModal.focus.test.jsx and hooks/ui/useOverlayEntranceFocus
+// (cite-don't-restate). This modal uses its OWN sp-actions footer (Cancel +
+// actionLabel), not the shared ChooserModalFooter — no CHOOSER_FOOTER_LABELS
+// bytes are owed here.
 //
 // Fixture note (ledger pass #150): the old mockMonsters here was a hand-copied,
 // drifted twin of the core lane fixture (numeric speeds instead of the disk's
@@ -60,6 +66,9 @@ const CLASS_FEATURES_DEFAULT = {
     maxWildShapeChallengeRating: 1,
 };
 
+// `??` (NOT `||`): tests that override with {} (feature values ABSENT, to
+// exercise the component's own fallback branches) must not silently fall back
+// to this default instead.
 vi.mock('../../../services/character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(() => getClassFeaturesOverride ?? CLASS_FEATURES_DEFAULT),
 }));
@@ -76,7 +85,11 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-// findBeastItem/speedTextOf come from test-utils (shared with core lane).
+// The <strong> carries the exact label text; the panel div's full textContent
+// is "Label: value" — exact byte pin of the whole info line.
+function infoPanelText(label) {
+    return screen.getByText(label).closest('.wild-shape-info').textContent;
+}
 
 describe('PolymorphSelectionModal - Features', () => {
     beforeEach(() => {
@@ -84,12 +97,14 @@ describe('PolymorphSelectionModal - Features', () => {
         getClassFeaturesOverride = undefined;
     });
 
-    it('renders custom title in the header and custom action label on the confirm button', async () => {
+    it('renders custom title in the header and dialog name, custom action label on the confirm button', async () => {
         render(<PolymorphSelectionModal {...makeProps({ title: 'Polymorph Selection', actionLabel: 'Transform' })} />);
-        await waitFor(() => {
-            expect(screen.getByText('Polymorph Selection')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /Transform/ })).toBeInTheDocument();
-        });
+        // The button is the genuine load seam: LoadingView ALSO renders the
+        // title in its header/dialog, so only the footer proves load finished.
+        await screen.findByRole('button', { name: 'Transform' });
+        // Exact accessible name (icon adds no text) — regex would bless drift.
+        expect(screen.getByRole('dialog', { name: 'Polymorph Selection' })).toBeInTheDocument();
+        expect(screen.getByText('Polymorph Selection')).toBeInTheDocument();
         // Default title/actionLabel ("Wild Shape") are exercised by every test
         // in the core lane (PolymorphSelectionModal.test.jsx).
     });
@@ -103,8 +118,14 @@ describe('PolymorphSelectionModal - Features', () => {
             expect(screen.getByText('Choose a creature form (CR 3 or lower)')).toBeInTheDocument();
             expect(screen.getByPlaceholderText('Search creatures...')).toBeInTheDocument();
         });
-        expect(screen.queryByText(/Movement:/)).not.toBeInTheDocument();
-        expect(screen.queryByText(/Excluded Types:/)).not.toBeInTheDocument();
+        expect(screen.queryByText('Movement:')).not.toBeInTheDocument();
+        expect(screen.queryByText('Excluded Types:')).not.toBeInTheDocument();
+
+        // allowAnyCreature no-results branch of computeListCopy (the beast-mode
+        // no-results copy is owned by the core lane).
+        fireEvent.change(screen.getByPlaceholderText('Search creatures...'), { target: { value: 'zzz' } });
+        expect(await screen.findByText("No creatures match the target's CR requirement.")).toBeInTheDocument();
+        expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
     });
 
     it('object_into_creature mode caps the list at CR 9 regardless of maxCR', async () => {
@@ -119,6 +140,10 @@ describe('PolymorphSelectionModal - Features', () => {
             expect(screen.getByText('Ghast')).toBeInTheDocument();
             expect(screen.queryByText('Adult Black Dragon')).not.toBeInTheDocument();
         });
+
+        // object_into_creature no-results branch — its own exact string.
+        fireEvent.change(screen.getByPlaceholderText('Search creatures...'), { target: { value: 'zzz' } });
+        expect(await screen.findByText('No creatures match the CR 9 requirement.')).toBeInTheDocument();
     });
 
     it('excludeTypes hides those creature types and lists them in an info panel', async () => {
@@ -128,11 +153,10 @@ describe('PolymorphSelectionModal - Features', () => {
             excludeTypes: ['Undead'],
         })} />);
         await waitFor(() => {
-            expect(screen.getByText('Excluded Types:')).toBeInTheDocument();
-            expect(screen.getByText('Excluded Types:').parentElement).toHaveTextContent('Undead');
-            expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
             expect(screen.getByText('Wolf')).toBeInTheDocument();
         });
+        expect(infoPanelText('Excluded Types:')).toBe('Excluded Types: Undead');
+        expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
     });
 
     it('formats fractional challenge ratings as decimals in beast rows', async () => {
@@ -145,43 +169,45 @@ describe('PolymorphSelectionModal - Features', () => {
         });
     });
 
-    it('falls back to class-feature max CR when maxCR prop is not a number', async () => {
-        getClassFeaturesOverride = {
-            wildShapeLimitations: WALK_ONLY,
-            maxWildShapeChallengeRating: 0,
-        };
+    it('honors class-feature max CR when the maxCR prop is not a number, defaulting missing limitation prose to walk-only', async () => {
+        // Feature maxCR 2 (not the prop's 1, not the `|| 0` branch) must drive
+        // the label; with wildShapeLimitations ABSENT the component's own
+        // fallback literal must equal the shared disk-vocabulary WALK_ONLY.
+        getClassFeaturesOverride = { maxWildShapeChallengeRating: 2 };
         render(<PolymorphSelectionModal {...makeProps({ maxCR: null })} />);
         await waitFor(() => {
-            expect(screen.getByText('Choose a beast form (CR 0 or lower)')).toBeInTheDocument();
-            expect(screen.getByText('Rat')).toBeInTheDocument();
-            expect(screen.queryByText('Wolf')).not.toBeInTheDocument();
+            expect(screen.getByText('Choose a beast form (CR 2 or lower)')).toBeInTheDocument();
         });
+        expect(infoPanelText('Movement:')).toBe(`Movement: ${WALK_ONLY}`);
+        // CR 2 feature value admits Wolf (0.25); the beast-only filter still
+        // excludes the CR 2 Undead Ghast.
+        expect(screen.getByText('Wolf')).toBeInTheDocument();
+        expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
     });
 
-    it('renders allowed speeds per limitation string (walk-or-swim hides fly/climb)', async () => {
+    it('renders the Movement panel and row speeds from the class-feature limitation prose, re-filtering rows when it changes', async () => {
         getClassFeaturesOverride = {
             wildShapeLimitations: WALK_OR_SWIM,
             maxWildShapeChallengeRating: 1,
         };
-        render(<PolymorphSelectionModal {...makeProps({ maxCR: 1 })} />);
-        await waitFor(() => expect(screen.getByText('Wolf')).toBeInTheDocument());
+        const { rerender } = render(<PolymorphSelectionModal {...makeProps({ maxCR: 1 })} />);
+        // The panel renders only in the loaded view — genuine load seam.
+        await waitFor(() => expect(infoPanelText('Movement:')).toBe(`Movement: ${WALK_OR_SWIM}`));
 
         // swim allowed on its own keyword; fly forbidden by the no-clause;
         // climb/burrow must not ride hasSwim (old defect, pass #150).
         expect(speedTextOf('Crocodile')).toBe('Walk 20 ft., Swim 30 ft.');
         expect(speedTextOf('Giant Spider')).toBe('Walk 30 ft.');
         expect(speedTextOf('Eagle')).toBe('Walk 10 ft.');
-    });
 
-    it('renders fly speeds when limitations allow it (walk, swim, or fly)', async () => {
+        // A live limitation change (2024 Fly-talent prose, no only/no clause)
+        // re-runs the load effect and re-filters the rows through the same path.
         getClassFeaturesOverride = {
             wildShapeLimitations: WALK_SWIM_FLY,
             maxWildShapeChallengeRating: 1,
         };
-        render(<PolymorphSelectionModal {...makeProps({ maxCR: 1 })} />);
-        await waitFor(() => expect(screen.getByText('Eagle')).toBeInTheDocument());
-
-        expect(speedTextOf('Eagle')).toBe('Walk 10 ft., Fly 60 ft.');
+        rerender(<PolymorphSelectionModal {...makeProps({ maxCR: 1 })} />);
+        await waitFor(() => expect(speedTextOf('Eagle')).toBe('Walk 10 ft., Fly 60 ft.'));
         expect(speedTextOf('Crocodile')).toBe('Walk 20 ft., Swim 30 ft.');
     });
 });

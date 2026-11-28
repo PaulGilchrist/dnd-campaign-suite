@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -10,7 +10,7 @@ import * as automation from '../../../services/automation/index.js';
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
 import { resetWeaponsCache } from './weapon-kind-mastery-cache.js';
 
-// XSS posture of the sp-body sink (WeaponKindMasteryModal.jsx:61):
+// XSS posture of the sp-body sink (WeaponKindMasteryModal.jsx:65):
 // payload.description is built by weaponKindMasteryHandler.applySelections (:46)
 // from a hard-coded template interpolating checkbox-picked weapon names sourced
 // from /data/equipment.json (trusted authored catalog). This is sanctioned
@@ -83,32 +83,34 @@ describe('WeaponKindMasteryModal — result state', () => {
     });
   });
 
-  it('replaces the selection UI with the applied result copy and a Done button', async () => {
-    renderWithWeapons();
+  it('applies the selection, shows the exact result copy in place of the selection UI, and Done closes', async () => {
+    const onClose = vi.fn();
+    renderWithWeapons({ onClose });
     await waitForWeapons();
 
     await selectAndApply();
 
     // The result copy is injected into the modal body via dangerouslySetInnerHTML
-    // (WeaponKindMasteryModal.jsx:61) — pin the raw innerHTML of that exact
+    // (WeaponKindMasteryModal.jsx:65) — pin the raw innerHTML of that exact
     // container, not just that the words appear somewhere in the document.
     const body = document.querySelector('.sp-modal .sp-body');
     expect(body).not.toBeNull();
     expect(body.innerHTML).toBe(RESULT_DESCRIPTION);
-    expect(body.textContent).toBe(RESULT_DESCRIPTION);
     // selection UI is gone, replaced by Done
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('renders markup in the result description as live HTML (sanctioned sp-body sink)', async () => {
-    // Markup-bearing shape matching sibling automation_info handlers
-    // (e.g. damageReductionHandler.js:272 wraps values in <b>/<strong>).
-    // A plain-text mock cannot discriminate this sink; this payload can:
-    // if the component ever swapped to a children render, the <b> would show
-    // as escaped literal text and both structural assertions below go red.
+    // Discriminates the set-HTML sink from a children render: with plain text
+    // both render identically, so only a markup-bearing description can prove
+    // the tag structure survives verbatim (see the fix#17 posture note above;
+    // cf. markup-bearing siblings like damageReductionHandler.js:272).
     automation.applyWeaponKindMastery.mockResolvedValue({
       type: 'popup',
       payload: {
@@ -123,26 +125,10 @@ describe('WeaponKindMasteryModal — result state', () => {
     await selectAndApply();
 
     const body = document.querySelector('.sp-modal .sp-body');
-    // innerHTML keeps the tag structure verbatim (set, not escaped)
+    // set, not escaped: a children render would escape to &lt;b&gt; here
     expect(body.innerHTML).toMatch(/^Weapon kinds set to: <b>Battleaxe, Club<\/b>\. Mastery properties will be available when attacking with these weapons\.$/);
-    // markup is interpreted: a real <b> element exists with the picked names
-    const bold = body.querySelector('b');
-    expect(bold).not.toBeNull();
-    expect(bold.textContent).toBe('Battleaxe, Club');
-    // text axis: no escaped tag noise leaks into the visible text
-    expect(body.textContent).toBe('Weapon kinds set to: Battleaxe, Club. Mastery properties will be available when attacking with these weapons.');
-    expect(body.textContent).not.toContain('<b>');
-  });
-
-  it('calls onClose when Done is clicked in the result state', async () => {
-    const onClose = vi.fn();
-    renderWithWeapons({ onClose });
-    await waitForWeapons();
-
-    await selectAndApply();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // interpreted, not literal: a children render would leak the tag text here
+    expect(body.textContent).toBe(RESULT_DESCRIPTION);
   });
 
   it('closes without applying when Skip is clicked, even with a selection made', async () => {

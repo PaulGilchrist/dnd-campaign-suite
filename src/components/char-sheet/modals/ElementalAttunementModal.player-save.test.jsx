@@ -1,7 +1,7 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ElementalAttunementModal — PLAYER SAVE RESOLUTION lane (queuePlayerSavePrompt dispatch +
- * the 'save-result' window listener contract: captured listener dispatched directly, unique
+ * the 'save-result' window listener contract: live bus anchor + direct event dispatch, unique
  * promptIds, exact damage/effect commits through LIVE stores).
  *
  * Ownership map (siblings, do not duplicate here):
@@ -18,62 +18,97 @@
  * - .error-handling.test.jsx  — NPC addEntry/loadMapData/addExpiration REJECTION lanes and the
  *                                unguarded .then pins. PER ITS HEADER: the player addEntry rejection
  *                                lanes ('Error logging player save:' / 'Error logging player effect:')
- *                                stay OWNED HERE, pinned below with commit-survival through live cells.
+ *                                stay OWNED HERE, pinned below with commit-survival through live
+ *                                cells. (Their header cites this file's ':290-340' — stale; the
+ *                                rejection lane now sits at the file bottom.)
+ * - .save-dismissed.test.jsx  — the 'save-dismissed' drain lane. This lane NEVER dispatches it.
  * This lane owns: the exact prompt payloads per element branch (damage / speed_reduction), unique
  * promptIds, save-result resolution — exact 'roll' and 'ability_use' log rows, exact HP writes
  * THROUGH the live summary fixture (half on save / full on fail), speed_reduction written through
  * the live store on the TARGET's key, the pending-gate per promptId (out-of-order dispatch),
- * junk/unknown-promptId drops, and the player addEntry rejection lanes.
+ * junk/unknown-promptId drops, listener teardown on unmount, and the player addEntry rejection
+ * lanes.
  *
- * FLAG (defects, pinned not fixed — found live, owned here as the player resolution lane):
- * - ElementalAttunementModal.jsx:224-247,:521-525 — Thunder push is DEAD CODE for PLAYERS too
+ * TRIMMED (2026-11-27 audit, same-branch deletions with rationale):
+ * - 'two player targets get unique pinned promptIds' test — FOLDED INTO the out-of-order gate
+ *   test below (identical 2-target fixture + identical sequential Math.random pins): the gate
+ *   test's exact 2-call sendSavePrompt toEqual is a strictly STRONGER byte-pin of the same
+ *   payloads and promptId uniqueness than the deleted waitFor-count-then-inspect.
+ * - Lightning arm of the damage-resolution it.each — '1d8' element→dice bytes are already
+ *   pinned by the Lightning DISPATCH arm (rollExpression('1d8') + exact prompt payload); the
+ *   resolution SHAPE is pinned by the Fire fail/save arms. Nothing weaker, one fewer render.
+ * - CreatureSelectionModal mock — PURGED (#1911/#1974 unreachable-modal method): this lane
+ *   always passes activeOverlay, so phase goes targets→processing and the creatureSelection
+ *   mount is structurally unreachable. Its import chain (spellOverlayService → mapsService /
+ *   combatData / useRuntimeState) resolves entirely onto already-mocked paths, so the real
+ *   module import is inert.
+ * - combatData mock key `setCombatSummaryCache` — PURGED phantom (#1910): the component
+ *   imports getCombatSummary ONLY; nothing in this file touches the cache setter.
+ *
+ * FLAG (defects, pinned not fixed — found live, owned here as the player resolution lane;
+ * line refs re-verified against current component bytes 2026-11-27):
+ * - ElementalAttunementModal.jsx:224-253,:516-517 — Thunder push is DEAD CODE for PLAYERS too
  *   (mirrors the NPC flag in .npc-save.test.jsx): queuePlayerSavePrompt dispatches on `damage`
- *   first, so Thunder (effect:'push') queues a plain damage prompt, and the listener routes it to
- *   applyAttunementSaveDamage — applyNpcPush NEVER runs, no 'targetEffects' cell ever appears.
- *   The Thunder arm below pins the ACTUAL behavior (damage lands, push silently dropped).
- *   Product fix: dispatch on `effect` alongside/before `damage`, or compose push with damage.
- * - ElementalAttunementModal.jsx:253-254 — DOUBLE-ROLL/divergence: the listener re-rolls
- *   rollExpression(damage) for the log's `rolls` while `total`/damage math use the EVENT's echoed
- *   rawDamage; with real dice the log row could contradict itself ([5] rolled, total 8). Pinned.
- *   Product fix: send the prompt's rawDamage+rolls back on the event, or stop re-rolling.
- * - ElementalAttunementModal.jsx:501 — save-result with NO rawDamage echo computes damage from
- *   `?? 0`: the player takes ZERO damage even though the prompt promised 1d10. The damage echo is
- *   an unenforced event contract. Pinned. Product fix: read rawDamage from the pending prompt
- *   record stored at queue time, not from the event.
- * - ElementalAttunementModal.jsx:503-504 — a save-result arriving while getCombatSummary is null
- *   is silently DROPPED (early return, prompt stays pending forever, no log). Pinned.
- * - ElementalAttunementModal.jsx:579-603,653 — inline styles (picker + resolved note): same
- *   no-inline-styles flag as .deactivation/.elemental-data lanes; inherited, not fixed here.
+ *   first (:227) so Thunder (effect:'push') queues a plain damage prompt, and the listener
+ *   routes it to applyAttunementSaveDamage (:516-517) — applyNpcPush NEVER runs, no
+ *   'targetEffects' cell ever appears. The Thunder arm below pins the ACTUAL behavior (damage
+ *   lands, push silently dropped). Product fix: dispatch on `effect` alongside/before `damage`,
+ *   or compose push with damage.
+ * - ElementalAttunementModal.jsx:256 vs :266/:285 — DOUBLE-ROLL/divergence: the resolver
+ *   re-rolls rollExpression(damage) for the log's `rolls` while `total`/damage math use the
+ *   EVENT's echoed rawDamage; with real dice the log row could contradict itself ([5] rolled,
+ *   total 8). Pinned. Product fix: send the prompt's rawDamage+rolls back on the event, or
+ *   stop re-rolling.
+ * - ElementalAttunementModal.jsx:496 — save-result with NO rawDamage echo computes damage from
+ *   `?? 0`: the player takes ZERO damage even though the prompt promised 1d10. The damage echo
+ *   is an unenforced event contract. Pinned. Product fix: read rawDamage from the pending
+ *   prompt record stored at queue time, not from the event.
+ * - ElementalAttunementModal.jsx:498-499 — a save-result arriving while getCombatSummary is
+ *   null is silently DROPPED (early return, prompt stays pending forever, no log). Pinned.
+ * - ElementalAttunementModal.jsx:597-621,673 — inline styles (picker + resolved note): same
+ *   no-inline-styles flag as .deactivation/.elemental-data lanes (their headers still cite the
+ *   stale ':579-603,653'); inherited, not fixed here.
+ *
+ * FLAKE HARDENING (2026-11-27, family flush canon #1922/#1970/#1976 — the load-sensitivity fix
+ * is assert-the-settled-state-after-an-explicit-flush, not poll-and-hope): every waitFor that
+ * polled SYNCHRONOUS state — the save-result listener registration, the 2-target pending rows,
+ * addEntry call bytes, live-cell condition writes, the live applyDamage HP movement, and the
+ * rejection-lane console.error — is replaced by `await act(async () => {})` microtask+effect
+ * flushes followed by DIRECT asserts. The only remaining polling primitives are findByText
+ * (the overlay→processing .then microtask) and findByRole('Close') (the passive
+ * pending→summary transition), both riding the pinned 3000ms budget below.
  *
  * Anti-vacuity: live runtime store (cells inspected directly — a never-issued commit is a missing
  * cell, not a call-recorder echo); LIVE applyDamage mutates the ONE by-identity combat fixture so
  * HP movement is proven on the summary itself; frozen Date.now pins promptIds and timestamps
  * exactly ('{ts}-i' / '{ts}-r' from pinned Math.random 0.5/0.75 — dice AND ids are deterministic);
- * exact full log rows field-by-field; exact full-line summary text; role-scoped queries; frozen
- * inputs; fresh vi.fn onClose per render; mockReset + re-arm per test; findBy idiom; no bare
- * setTimeout, no timers of any kind on this seam.
+ * exact full log rows field-by-field (the mock.calls toEqual is itself the count+payload pin —
+ * no separate toHaveBeenCalled() preamble); exact full-line summary text; role-scoped queries;
+ * frozen inputs; fresh vi.fn onClose per render; mockReset + re-arm per test; ONE addEventListener
+ * spy pair (no shadowing re-spies); no bare setTimeout, no timers of any kind on this seam.
  */
-import { render, screen, fireEvent, waitFor, act, cleanup, configure } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ElementalAttunementModal from './ElementalAttunementModal.jsx';
 
 // ── Flake hardening (registered ⚠ bugs.md:552 'Lightning failure' exact-roll-row; sightings
 // #158/#161/#163/#168, batch183/184 fix era) ──
 // Mechanism chain, exhaustively eliminated before pinning: (1) RNG is NOT live on this seam —
-// every die is mocked (rollExpression :73-75) or event-echo-fed (detail.rawDamage), promptIds are
-// frozen (Math.random 0.5 / Date.now FROZEN_TS, :242-243), and the modal's only raw-Math.random
-// d20 (ElementalAttunementModal.jsx:400) is on the NPC branch, unreachable for type:'player'
-// targets; fix#169's unseeded siblings (reactionDebuffHandler:127 etc.) never execute here.
+// every die is mocked (the diceRoller vi.mock below) or event-echo-fed (detail.rawDamage),
+// promptIds are frozen (Math.random 0.5 / Date.now FROZEN_TS in beforeEach), and the modal's
+// only raw-Math.random d20 (ElementalAttunementModal.jsx:395) is on the NPC branch,
+// unreachable for type:'player' targets; fix#169's unseeded siblings never execute here.
 // (2) Cross-file leak structurally impossible — vitest default forks pool gives this file its own
 // process/module registry; setup.js externals are inert mocks; no disk path (addEntry /
 // persistAndNotify / loadMapData are lane-mocked). (3) Wall-clock: no game timers on this seam.
-// SOLE live mechanism: React passive-effect flush starvation under full-suite CPU contention vs
-// testing-library's DEFAULT 1000ms async-util polling budget — archived stall bytes: batch183
-// :473 waitFor expired at 1023ms, batch184 :533 at 1020ms, batch161 file 1425ms. The #183/#184
-// live-listener anchor (saveResultBusLive) makes the event un-losable but every gate here still
-// carried the 1s budget — a flush landing at 1.2s fails a byte-deterministic row. Pin 3000ms
-// (3x observed worst 1.6s, bounded, far below the 5000ms test timeout): assertions unchanged —
-// a wrong or missing commit still fails byte-exact, it merely gets patience, not slack.
+// SOLE live mechanism: React passive-effect flush starvation under full-suite CPU contention.
+// Archived stall bytes: batch183 :473 waitFor expired at 1023ms, batch184 :533 at 1020ms,
+// batch161 file 1425ms. PRIMARY fix (2026-11-27 flush canon): sync-settled state is asserted
+// DIRECTLY after an explicit `await act(async () => {})` flush — no polling budget involved.
+// The live-listener anchor (saveResultBusLive) makes the save-result event un-losable. The
+// remaining findBy calls still ride a budget, so pin 3000ms (3x observed worst 1.6s, bounded,
+// far below the 5000ms test timeout) instead of the 1s default: a wrong or missing commit
+// still fails byte-exact, it merely gets patience, not slack.
 configure({ asyncUtilTimeout: 3000 });
 
 // ── Live runtime store (anti-vacuous): condition/push writes land here; cells inspected directly ──
@@ -118,7 +153,6 @@ vi.mock('../../../services/rules/combat/aoeService.js', () => ({
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => null),
-    setCombatSummaryCache: vi.fn(),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -137,16 +171,10 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
-    default: vi.fn(({ targets, onConfirm, onSkip }) => (
-        <div className="sp-overlay">
-            <div className="sp-modal">
-                <button onClick={() => onConfirm(targets.map(t => t.name))} disabled={targets.length === 0}>Activate</button>
-                <button onClick={onSkip}>Skip</button>
-            </div>
-        </div>
-    )),
-}));
+// CreatureSelectionModal is NOT mocked (2026-11-27 purge of the unreachable-modal mock):
+// every render here passes activeOverlay, so phase jumps targets→processing and the
+// creatureSelection mount can never occur. The real module's import chain lands entirely
+// on paths this file already mocks, so importing it is inert.
 
 // ── Re-import mocked modules ──
 
@@ -221,11 +249,14 @@ function clickElement(element) {
 
 async function clickElementAndWaitForPrompt(element) {
     clickElement(element);
+    // Legitimately async: the prompt queue lands via the processing-effect .then
+    // microtask (ElementalAttunementModal.jsx:477), so the row rides findByText.
     await screen.findByText(/Waiting for save roll/);
-    // Anti-lost-event lane: see saveResultBusLive() — the row bytes can surface before
-    // the listener effect's flush lands under load; anchor every save-result dispatch lane
-    // on the bus actually listening, never on row bytes alone.
-    await waitFor(() => expect(saveResultBusLive()).toBeGreaterThan(0));
+    // Anti-lost-event anchor: flush any still-pending passive effect, then assert the
+    // bus is LIVE before dispatching (never poll-and-hope: saveResultBusLive is sync
+    // bookkeeping, #1976 direct-assert method).
+    await act(async () => {});
+    expect(saveResultBusLive()).toBeGreaterThan(0);
 }
 
 function dispatchSaveResult(detail) {
@@ -240,7 +271,7 @@ function pendingRows() {
 
 // ── save-result bus registration anchor (flake fix CI #183 / #184) ──
 // The modal registers its 'save-result' listener in a passive effect keyed on
-// pendingPrompts (ElementalAttunementModal.jsx:489-532). Under full-suite CPU contention
+// pendingPrompts (ElementalAttunementModal.jsx:484-547; add/remove at :541-546). Under full-suite CPU contention
 // findByText can resolve BEFORE that passive flush lands, so dispatchSaveResult hit a bus
 // nobody listened on: the prompt stayed pending forever and the count-anchored waitFors
 // timed out (observed victims: Thunder damage lane, Cold speed_reduction append lane).
@@ -339,26 +370,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
             expect(diceRoller.rollExpression).not.toHaveBeenCalled();
         });
 
-        it('two player targets get unique pinned promptIds, one exact payload each', async () => {
-            // Sequential pinned randoms: prompt #1 → 0.5 ('i'), prompt #2 → 0.75 ('r').
-            const rolls = [0.5, 0.75];
-            vi.spyOn(Math, 'random').mockImplementation(() => rolls.shift() ?? 0.5);
-            const p1 = makePlayer('Player1', 10, -10);
-            const p2 = makePlayer('Player2', 8, 3);
-            seedPlayers(p1, p2);
-
-            render(<ElementalAttunementModal {...makeProps()} />);
-            clickElement('Fire');
-            await waitFor(() => expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(2));
-
-            expect(savePromptService.sendSavePrompt.mock.calls).toEqual([
-                [CAMPAIGN, { promptId: PROMPT_ID_1, targetName: 'Player1', saveType: 'DEX', saveDc: 12, sourceName: PLAYER, rawDamage: 5 }],
-                [CAMPAIGN, { promptId: PROMPT_ID_2, targetName: 'Player2', saveType: 'DEX', saveDc: 12, sourceName: PLAYER, rawDamage: 5 }],
-            ]);
-            // Unique-by-construction proof straight off the recorded calls, not the constants.
-            expect(savePromptService.sendSavePrompt.mock.calls[0][1].promptId)
-                .not.toBe(savePromptService.sendSavePrompt.mock.calls[1][1].promptId);
-        });
+        // TRIMMED (2026-11-27): the standalone "two player targets get unique pinned
+        // promptIds" test folded into the out-of-order gate test below — same 2-target
+        // fixture, same sequential Math.random pins; its exact 2-call payload toEqual is a
+        // stronger byte-pin of payload + id-uniqueness than a waitFor-count-then-inspect.
     });
 
     describe('save-result resolution — damage path (applyAttunementSaveDamage)', () => {
@@ -375,12 +390,8 @@ describe('ElementalAttunementModal — player save resolution', () => {
                 saveResult: 'success', finalDamage: 2, expectedHp: 18,
                 line: 'Player1: Saved (d20 15+3 = 18). 1d10 fire: 1d10 [5] = 5 → 2 fire damage',
             },
-            {
-                element: 'Lightning', formula: '1d8', damageType: 'lightning',
-                detail: { success: false, roll: 8, saveBonus: 3, total: 11, rawDamage: 5 },
-                saveResult: 'failure', finalDamage: 5, expectedHp: 15,
-                line: 'Player1: Failed (d20 8+3 = 11). 1d8 lightning: 1d8 [5] = 5 → 5 lightning damage',
-            },
+            // TRIMMED (2026-11-27): Lightning arm removed — its '1d8'→dice + payload bytes
+            // are pinned by the Lightning DISPATCH arm; resolution shape is pinned by Fire.
         ])('$element $saveResult: exact roll row, exact applyDamage opts, HP moved THROUGH the live fixture', async ({ element, formula, damageType, detail, saveResult, finalDamage, expectedHp, line }) => {
             const p1 = makePlayer('Player1', 20, 3);
             const summary = seedPlayers(p1);
@@ -390,8 +401,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', ...detail });
 
-            // Exact full row of the damage resolver — every field, frozen timestamp.
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalled());
+            // Exact full row of the damage resolver — every field, frozen timestamp. The
+            // handler commits SYNCHRONOUSLY inside the dispatched event (act has already
+            // flushed), so this toEqual is itself the one-call count+payload pin (#1922:
+            // no-op waitFor preamble deleted).
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, {
                 type: 'roll',
                 characterName: PLAYER,
@@ -430,8 +443,8 @@ describe('ElementalAttunementModal — player save resolution', () => {
         });
 
         it('FLAG pinned: event rawDamage is AUTHORITATIVE — the log can contradict its own re-rolled dice', async () => {
-            // (header flag :253-254) The listener re-rolls for `rolls` but takes damage
-            // math from detail.rawDamage. Feed an echo (8) that differs from the dice (5).
+            // (header flag :256 vs :266/:285) The resolver re-rolls for `rolls` but takes
+            // damage math from detail.rawDamage. Feed an echo (8) that differs from the dice (5).
             const p1 = makePlayer('Player1', 20, 3);
             const summary = seedPlayers(p1);
 
@@ -440,7 +453,6 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: 3, total: 8, rawDamage: 8 });
 
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalled());
             // rolls:[5] comes from the FRESH re-roll; total/finalDamage come from the ECHO (8).
             // With real dice these can diverge — the current contradiction is pinned, not blessed.
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, {
@@ -470,7 +482,7 @@ describe('ElementalAttunementModal — player save resolution', () => {
         });
 
         it('FLAG pinned: save-result with NO rawDamage echo resolves to ZERO damage despite the 1d10 the prompt promised', async () => {
-            // (header flag :501) `detail.rawDamage ?? 0` trusts the event echo; a save that
+            // (header flag :496) `detail.rawDamage ?? 0` trusts the event echo; a save that
             // answers without the echo silently zeroes the commit. Pinned as current behavior.
             const p1 = makePlayer('Player1', 20, 3);
             seedPlayers(p1);
@@ -480,7 +492,6 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: 3, total: 8 });
 
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalled());
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, expect.objectContaining({
                 type: 'roll',
                 targetName: 'Player1',
@@ -496,7 +507,7 @@ describe('ElementalAttunementModal — player save resolution', () => {
         });
 
         it('Thunder: prompt is a plain damage prompt and a failed save lands damage but NO push — push is DEAD CODE for players too', async () => {
-            // (header flag :224-247,:521-525 — mirrors the NPC dead-push pin in .npc-save)
+            // (header flag :224-253,:516-517 — mirrors the NPC dead-push pin in .npc-save)
             const p1 = makePlayer('Player1', 20, 3);
             const summary = seedPlayers(p1);
 
@@ -515,10 +526,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: -10, total: -5, rawDamage: 5 });
 
-            // Flake fix (CI #183): anchor on STATE bytes moving on the live fixture (the
-            // live applyDamage mock mutates it), fold the call pins in AFTER settle.
-            await waitFor(() => expect(p1.currentHp).toBe(15));
-            expect(applyDamageToTarget).toHaveBeenCalled();
+            // Flake fix (CI #183) + flush canon (2026-11-27): the live applyDamage mock
+            // mutates the fixture SYNCHRONOUSLY inside the dispatched handler, already
+            // flushed by dispatchSaveResult's act — direct asserts, no polling.
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
             expect(applyDamageToTarget).toHaveBeenCalledWith(summary, 'Player1', 5, ['thunder'], {
                 campaignName: CAMPAIGN, characters: [p1], ignoreResistance: false, attackerName: PLAYER, suppressHpLog: false,
             });
@@ -539,7 +550,6 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: -10, total: -5 });
 
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalled());
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, {
                 type: 'ability_use',
                 characterName: PLAYER,
@@ -578,9 +588,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: -10, total: -5 });
 
-            // Flake fix (CI #184): anchor on the LIVE CELL bytes (the actual commit), and
-            // fold the call pin in AFTER settle. Same evidence, race-free ordering.
-            await waitFor(() => expect(cells.get('Player1|activeConditions')).toEqual(['prone', 'restrained', 'speed_reduction']));
+            // Flake fix (CI #184) + flush canon (2026-11-27): the cell write is SYNCHRONOUS
+            // in the dispatched handler (mocked setRuntimeValue writes the Map inline) and
+            // the act flush already ran — assert the live bytes directly, calls folded in.
+            expect(cells.get('Player1|activeConditions')).toEqual(['prone', 'restrained', 'speed_reduction']);
             expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Player1', 'activeConditions', ['prone', 'restrained', 'speed_reduction'], CAMPAIGN);
         });
 
@@ -593,7 +604,6 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: true, roll: 15, saveBonus: 10, total: 25 });
 
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalled());
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, {
                 type: 'ability_use',
                 characterName: PLAYER,
@@ -652,7 +662,7 @@ describe('ElementalAttunementModal — player save resolution', () => {
         });
 
         it('FLAG pinned: a save-result arriving while getCombatSummary is null is silently dropped — prompt stays pending forever', async () => {
-            // (header flag :503-504) The listener early-returns with no log, no resolution,
+            // (header flag :498-499) The listener early-returns with no log, no resolution,
             // and no way out of the processing view. Pinned as current behavior.
             const p1 = makePlayer('Player1', 20, 3);
             seedPlayers(p1);
@@ -681,17 +691,23 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             render(<ElementalAttunementModal {...makeProps()} />);
             clickElement('Fire');
-            // Wait for the PENDING ROWS, not just the sendSavePrompt calls: the prompt queue
-            // lands via a .then microtask after fireEvent returns, and the save-result listener
-            // registers in the same render — dispatching before the rows exist loses the event.
-            await waitFor(() => expect(pendingRows()).toHaveLength(2));
-            await waitFor(() => expect(saveResultBusLive()).toBeGreaterThan(0)); // listener live (CI #183/#184 anchor)
-            expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(2);
+            // Flush canon (2026-11-27): the prompt queue lands via the processing-effect
+            // .then microtask (jsx:477) and the save-result listener registers in the same
+            // passive flush — one explicit act-flush settles BOTH, then assert sync bytes
+            // directly (replaces the old two-waitFor poll pair, CI #183/#184 anchor kept).
+            await act(async () => {});
+            expect(pendingRows()).toHaveLength(2);
+            expect(saveResultBusLive()).toBeGreaterThan(0); // listener LIVE before dispatch
+            // Folded payload pin (subsumes the trimmed unique-promptIds test): exact 2-call
+            // payloads with distinct pinned ids — count + bytes + uniqueness in one toEqual.
+            expect(savePromptService.sendSavePrompt.mock.calls).toEqual([
+                [CAMPAIGN, { promptId: PROMPT_ID_1, targetName: 'Player1', saveType: 'DEX', saveDc: 12, sourceName: PLAYER, rawDamage: 5 }],
+                [CAMPAIGN, { promptId: PROMPT_ID_2, targetName: 'Player2', saveType: 'DEX', saveDc: 12, sourceName: PLAYER, rawDamage: 5 }],
+            ]);
 
             // Resolve Player2 FIRST (id '...-r'): only Player2 commits; Player1 stays pending.
             await dispatchSaveResult({ promptId: PROMPT_ID_2, targetName: 'Player2', success: true, roll: 15, saveBonus: 3, total: 18, rawDamage: 5 });
 
-            await waitFor(() => expect(logService.addEntry).toHaveBeenCalledTimes(1));
             expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, expect.objectContaining({
                 targetName: 'Player2', saveResult: 'success', finalDamage: 2,
             })]]);
@@ -722,10 +738,13 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             const { unmount } = render(<ElementalAttunementModal {...makeProps()} />);
             await clickElementAndWaitForPrompt('Fire');
+            expect(saveResultBusLive()).toBe(1); // exactly the live registration this test unmounts
 
-            const removeSpy = vi.spyOn(window, 'removeEventListener');
             unmount();
-            expect(removeSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
+            // ONE spy pair (#1926): the shared removeEventListener spy's add−remove delta
+            // proves teardown — stronger than the old shadowing re-spy + any-Function match,
+            // which an earlier effect re-run could also satisfy.
+            expect(saveResultBusLive()).toBe(0);
 
             logService.addEntry.mockClear();
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: 3, total: 8, rawDamage: 5 });
@@ -775,13 +794,16 @@ describe('ElementalAttunementModal — player save resolution', () => {
             await clickElementAndWaitForPrompt(element);
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', ...detail });
+            // Drain the addEntry .catch microtask, then assert settled bytes directly
+            // (flush canon — the old consoleSpy/pendingRows waitFors polled sync state).
+            await act(async () => {});
 
             // Exact full console message AND the exact rejected Error instance (identity, not any).
-            await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith(consoleMsg, err));
+            expect(consoleSpy).toHaveBeenCalledWith(consoleMsg, err);
             assertCommit(p1);
             // The pending prompt is removed despite the failed log, and the exact result line
             // still renders — the game-state commit is complete, only the log was lost.
-            await waitFor(() => expect(pendingRows()).toHaveLength(0));
+            expect(pendingRows()).toHaveLength(0);
             await screen.findByRole('button', { name: /Close/ });
             const results = document.querySelector('.aoe-results');
             expect(results.children).toHaveLength(1);

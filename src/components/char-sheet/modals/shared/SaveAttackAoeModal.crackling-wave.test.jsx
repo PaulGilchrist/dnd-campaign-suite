@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // MA-0303: Arch-hag Crackling Wave cone picker — DEX DC 22, 5d12 Lightning,
 // half on save. The authored "Failure or Success:" tail names cursed +
 // can't take Reactions, so SUCCESSFUL saves must land the cursed
@@ -170,9 +170,10 @@ describe('MA-0303 Arch-hag Crackling Wave picker', () => {
     expect(runtime.store['Thug 2.activeConditionMeta'].cursed).toMatchObject({ dc: 22, ability: 'dex', source: 'Arch-hag 1' });
 
     expect(tesFor('Thug 2')).toHaveLength(1);
-    expect(tesFor('Thug 2')[0]).toMatchObject({ source: 'Arch-hag 1', duration: 'until_end_of_next_turn' });
+    expect(tesFor('Thug 2')[0]).toMatchObject({ source: 'Arch-hag 1', duration: 'until_end_of_next_turn', actionName: 'Crackling Wave' });
 
     expect(clocksFor('Thug 2')).toHaveLength(1);
+    expect(clocksFor('Thug 2')[0]).toMatchObject({ attackerName: 'Arch-hag 1', rounds: 2 });
     expect(clocksFor('Thug 2')[0].effects).toEqual([
       { type: 'remove_target_effect', effectKey: 'no_reactions', source: 'Arch-hag 1', target: 'Thug 2' },
     ]);
@@ -183,8 +184,11 @@ describe('MA-0303 Arch-hag Crackling Wave picker', () => {
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 2', 10, expect.anything(), expect.anything());
     expect(addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.targetName === 'Thug 2' && e.saveResult === 'failure' && e.finalDamage === 10)).toBeTruthy();
 
-    // ── Cross-lane negatives: neither target leaks into the other's lane ──
+    // ── Cross-lane negatives: neither target leaks into the other's lane,
+    // and the excluded caster (excludeNames) receives no grants at all ──
     expect(expirations.current).toHaveLength(2);
+    expect(tesFor('Arch-hag 1')).toHaveLength(0);
+    expect(runtime.store['Arch-hag 1.activeConditions']).toBeUndefined();
     expect(condLogsFor('Thug 1').some(l => /failed/.test(l.description) || l.condition === 'Slowed')).toBe(false);
     expect(condLogsFor('Thug 2').some(l => /succeeded/.test(l.description))).toBe(false);
   });

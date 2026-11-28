@@ -1,19 +1,21 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Attack-rider maneuver dispatch lane (Fighter superiority): the hook-side seam
 // between resolveAttackDamage's pause, handleAttackRiderManeuverUse/Skip, and the
 // rider service — dispatch result shapes, die→damage folding, ledger flush, popup
 // passthrough, and pipeline resume/strand semantics.
 //
 // Lane ownership (do not duplicate here):
-// - attackRiderManeuvers step prompt gating (hit/miss/crit/no-maneuvers) →
-//   steps/attackRollRiders.test.js (gate census :155-172 + chooser routing :22;
-//   cite retargeted fix#363 #1041 — steps/attackRollDamageSteps.test.js is the
-//   zero-body composition-contract lane since #1039)
+// - attackRiderManeuvers step prompt gating (hit/miss channel routing, isMiss:true
+//   payload bytes, chooser not-called canaries) → steps/attackRollRiders.test.js
+//   (gate census + chooser routing). This file pins only that the hook wires the
+//   prompt sink to setModalState verbatim and holds damage back — one channel.
 // - Precision miss die consumption + spend-log flush → useAttackDamageResolution.mn014.test.js
 // - MN-015 save-DC forwarding + size-gate refusal → .mn015SaveDc.test.js
 // - MN-011 Maneuvering Attack ally picker + plain popup passthrough → .maneuveringAlly.test.js
 // - Cunning Strike step gates/suppression → steps/attackRollRiders.test.js
-// - Cunning Strike resume-after-choice → .cunningStrikeResume.test.js
+// - Cunning Strike variant selection + resume-after-choice → .cunningStrikeResume.test.js
+//   EXCEPT the three-variant highest-priority selection driven through the real
+//   pipeline, which only this file pins.
 // - Pipeline completes without pause → rollDamage → .pausedStates.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
@@ -111,8 +113,7 @@ function UseAttackDamageResolution(overrides = {}) {
     const defaultCtx = { targetName: 'Goblin', sneakAttackDice: 0 };
     const buildCtx = vi.fn(() => Promise.resolve(defaultCtx));
     const buildCtxSync = vi.fn(() => Promise.resolve(defaultCtx));
-    const modalState = {};
-    const setModalState = vi.fn((updates) => Object.assign(modalState, updates));
+    const setModalState = vi.fn();
     const resumeRef = { current: null };
     const api = useAttackDamageResolution({
         playerStats: mockPlayerStats,
@@ -123,13 +124,12 @@ function UseAttackDamageResolution(overrides = {}) {
         rollDamage,
         buildCtx,
         buildCtxSync,
-        modalState,
         setModalState,
         setPendingDamage: vi.fn(),
         resumeRef,
         ...overrides,
     });
-    return { api, setPopupHtml, rollDamage, buildCtx, buildCtxSync, modalState, setModalState, resumeRef };
+    return { api, setPopupHtml, rollDamage, buildCtx, buildCtxSync, setModalState, resumeRef };
 }
 
 // A pipeline paused at attackRiderManeuvers with a live stash whose resume is spyable.
@@ -161,41 +161,21 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
 
     // ── resolveAttackDamage → maneuver prompt seam (real pipeline) ────────
 
-    it.each([
-        {
-            branch: 'a miss offers miss-only maneuvers with isMiss:true',
-            popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
-            maneuvers: [{ name: 'Precision Attack', effect: 'attack_roll_bonus' }],
-            isHit: false,
-        },
-        {
-            branch: 'a hit offers hit riders with no isMiss flag',
-            popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            maneuvers: [{ name: 'Gouging Attack', effect: 'damage_bonus' }],
-            isHit: true,
-        },
-    ])('resolveAttackDamage pauses with $branch and holds damage back', async ({ popupHtml, maneuvers, isHit }) => {
-        if (isHit) {
-            getAttackRiderOptions.mockResolvedValue(maneuvers);
-        } else {
-            getAttackRiderOptionsByContext.mockResolvedValue(maneuvers);
-        }
+    it('resolveAttackDamage wires the prompt sink to setModalState verbatim and holds damage back', async () => {
+        // The hit/miss channel split and the miss payload's isMiss:true bytes are
+        // owned by steps/attackRollRiders.test.js — here only ONE channel proves the
+        // hook-side wiring (one setter line serves both channels).
+        const maneuvers = [{ name: 'Gouging Attack', effect: 'damage_bonus' }];
+        getAttackRiderOptions.mockResolvedValue(maneuvers);
+        const popupHtml = { hit: true, isCrit: false, targetName: 'Goblin' };
         const { api, setModalState, rollDamage } = UseAttackDamageResolution({ popupHtml });
 
         await api.resolveAttackDamage(ATTACK);
         await tick();
 
-        if (isHit) {
-            expect(getAttackRiderOptionsByContext).not.toHaveBeenCalled();
-            expect(setModalState).toHaveBeenCalledWith({
-                attackRiderManeuverPrompt: { maneuvers, attack: ATTACK, popupHtml },
-            });
-        } else {
-            expect(getAttackRiderOptions).not.toHaveBeenCalled();
-            expect(setModalState).toHaveBeenCalledWith({
-                attackRiderManeuverPrompt: { maneuvers, attack: ATTACK, popupHtml, isMiss: true },
-            });
-        }
+        expect(setModalState).toHaveBeenCalledWith({
+            attackRiderManeuverPrompt: { maneuvers, attack: ATTACK, popupHtml },
+        });
         expect(rollDamage).not.toHaveBeenCalled();
     });
 
@@ -204,9 +184,6 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
     it.each([
         {
             branch: 'conversion to a natural-20 crit hit',
-            // run2#307 fix pin: the popup payload for THIS action rides the popupHtmlData
-            // ARG (what the prompt modal passes back), never the popupHtml prop — the prop
-            // is mounted null here to prove the gate no longer consults it.
             popupData: { isMiss: true, hit: false, rolls: [20], bonus: 2, targetAc: 25, isCrit: false },
             dieValue: 4,
             expectedPopup: { isMiss: true, hit: true, rolls: [20], bonus: 2, targetAc: 25, isCrit: true, total: 26, isNatural20: true, superiorityDieAdded: 4, originalTotal: 22, originalD20: 20 },
@@ -334,16 +311,15 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
     });
 
     // ── Passthrough: unresolvable riders must still land base damage ───────
+    // (An undefined maneuver takes the identical hook path — both fail the
+    // precision gate the same way and the service mock never sees the difference.)
 
-    it.each([
-        { branch: 'maneuver is undefined', maneuver: undefined },
-        { branch: 'rider service returns no result', maneuver: { name: 'Unbound Maneuver' } },
-    ])('dispatch $branch passes damage through unchanged, closes the prompt, and resumes', async ({ maneuver }) => {
+    it('unresolvable rider passes damage through unchanged, closes the prompt, and resumes', async () => {
         const { resume, stashCtx, resumeRef } = pausedAtManeuvers(true);
         const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({ resumeRef });
 
         const result = await api.handleAttackRiderManeuverUse(
-            maneuver, ATTACK, { isMiss: false },
+            { name: 'Unbound Maneuver' }, ATTACK, { isMiss: false },
             { formula: '1d8+3', total: 8, rolls: [5, 3] },
         );
 
@@ -354,7 +330,7 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
         expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
     });
 
-    // ── Skip lane ─────────────────────────────────────────────────────────────
+    // ── Skip lane (guard matrix lives in .skipManeuver.test.js) ────────────
 
     it.each([
         { branch: 'hit resumes so base damage lands', hit: true, shouldResume: true },
@@ -427,66 +403,59 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
     // popup payload, passed back verbatim by AttackRiderManeuverPrompt from the
     // attackRollRiders pause). The popupHtml prop is useDiceRollPopup's global UI
     // state — null when no popup is open, stale when another popup replaced it.
+    // A STALE prop is the strictest carrier to mount: a null-prop case would also
+    // pass under a `popupHtmlData ?? popupHtml` fallback, a stale-prop one cannot.
 
     const PRECISION = { name: 'Precision Attack', effect: 'attack_roll_bonus', dieExpression: '1d8' };
 
-    it('fires the precision-miss branch on a miss popupHtmlData with a NULL popupHtml prop — exact spend ledger, no die→damage fold', async () => {
+    it('fires the precision-miss branch from popupHtmlData over a STALE popupHtml prop — exact spend ledger, arg-derived popup, no die→damage fold', async () => {
         // Pre-fix this fell through to applyRiderManeuverPostResolution: executor had
-        // already spent the die, but no conversion, no Precision Attack ledger entry.
-        const logEntries = [
-            { description: 'Rolled d8 for 6' },
-            { description: 'Expend 1 Superiority Die' },
-        ];
-        executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', dieValue: 6, logEntries });
+        // already spent the die, but no conversion, no Precision Attack ledger entry —
+        // or, with a stale popup open, converted the WRONG dice.
+        executeAttackRiderManeuver.mockResolvedValue({
+            type: 'popup',
+            dieValue: 6,
+            logEntries: [
+                { description: 'Rolled d8 for 6' },
+                { description: 'Expend 1 Superiority Die' },
+            ],
+        });
         const { resume, stashCtx, resumeRef } = pausedAtManeuvers(false);
-        // popupHtml prop stays null (harness default) — the gate must not consult it.
-        const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({ resumeRef });
+        // Global UI popup is stale: different dice from an earlier roll — never consulted.
+        const popupData = { isMiss: true, hit: false, rolls: [10], bonus: 5, targetAc: 20, isCrit: false };
+        const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({
+            popupHtml: { rolls: [1], bonus: 0, targetAc: 99, isCrit: false, hit: false, isMiss: true },
+            resumeRef,
+        });
 
         const result = await api.handleAttackRiderManeuverUse(
-            PRECISION, ATTACK,
-            { rolls: [10], bonus: 5, targetAc: 20, isCrit: false, hit: false, isMiss: true },
+            PRECISION, ATTACK, popupData,
             { formula: '1d8+3', total: 8, rolls: [5, 3] },
         );
 
-        expect(result.isMissResult).toBe(true);
-        expect(result.hit).toBe(true); // 10 + 5 + 6 = 21 >= 20
-        expect(result.description).toBe('Precision Attack: Added 6 to the attack roll (10 + 5 + 6 = 21). The attack now hits!');
+        expect(result).toEqual({
+            formula: '1d8+3', total: 8, rolls: [5, 3],
+            isMissResult: true, hit: true,
+            description: 'Precision Attack: Added 6 to the attack roll (10 + 5 + 6 = 21). The attack now hits!',
+        });
+        // Popup rebuilt from the ARG's dice — stale prop rolls/bonus/targetAc never touched.
+        expect(setPopupHtml).toHaveBeenCalledWith({
+            ...popupData,
+            total: 21, hit: true, isCrit: false, isNatural20: false,
+            superiorityDieAdded: 6, originalTotal: 15, originalD20: 10,
+        });
         // Resource-spend ledger exact: executor spends flush first, then the ability_use recalculation.
         expect(addEntry.mock.calls.map(c => c[1].description)).toEqual([
             'Rolled d8 for 6',
             'Expend 1 Superiority Die',
             'Precision Attack: Added 6 to the attack roll (10 + 5 + 6 = 21). The attack now hits!',
         ]);
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            total: 21, hit: true, superiorityDieAdded: 6, originalTotal: 15, originalD20: 10,
-        }));
         expect(setModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
         // Precision boosts the attack roll, never the pending damage formula.
         expect(setRuntimeValue).not.toHaveBeenCalledWith(CHAR, 'attackRiderDieValue', expect.anything(), CAMPAIGN);
         // Conversion rewired the stash before resuming.
         expect(stashCtx.hit).toBe(true);
         expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
-    });
-
-    it('converts the popupHtmlData dice when the popupHtml prop is a STALE different popup', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', dieValue: 3, logEntries: [] });
-        const { resumeRef } = pausedAtManeuvers(false);
-        // Global UI popup is stale: different dice from an earlier roll.
-        const { api, setPopupHtml } = UseAttackDamageResolution({
-            popupHtml: { rolls: [1], bonus: 0, targetAc: 99, isCrit: false, hit: false, isMiss: true },
-            resumeRef,
-        });
-
-        const result = await api.handleAttackRiderManeuverUse(
-            PRECISION, ATTACK,
-            { rolls: [15], bonus: 2, targetAc: 18, isCrit: false, hit: false, isMiss: true },
-            { formula: '1d8+3', total: 8, rolls: [5, 3] },
-        );
-
-        expect(result.description).toBe('Precision Attack: Added 3 to the attack roll (15 + 2 + 3 = 20). The attack now hits!');
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            rolls: [15], bonus: 2, targetAc: 18, total: 20, originalD20: 15,
-        }));
     });
 
     it.each([

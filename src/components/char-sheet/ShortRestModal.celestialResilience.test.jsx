@@ -1,10 +1,17 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Celestial Resilience lane of ShortRestModal: when applyShortRest resolves with a
 // celestialResilienceAllies grant (shape { creatureTargets, allyTempHp, selfTempHp,
-// maxTargets } or null — restRules-shortRest.js:501), the modal opens an ally picker;
-// confirm dispatches setTempHp per selected ally + ability_use log; skip logs and
-// completes. Class/feature/level gating lives in restRules (covered in
-// restRules-shortRest.test.js); this lane gates on the payload's truthiness only.
+// maxTargets } or null), the modal opens an ally picker; confirm dispatches setTempHp
+// per selected ally + ability_use log; skip logs and completes. Class/feature/level
+// gating lives in restRules (covered in restRules-shortRest.test.js); this lane gates
+// on the payload's truthiness only. Self temp HP is granted by the PRODUCER
+// (restRules-shortRest.js setTempHp inside applyShortRest), never here — pinned so a
+// UI-side re-grant can't double it. Picker-internal cap enforcement and the
+// confirm-disabled-until-selection contract are tested against the REAL
+// CreatureSelectionModal in modals/shared/CreatureSelectionModal.test.jsx and
+// modals/CelestialResilienceModal.test.jsx — the stub here only surfaces the props
+// ShortRestModal passes. The no-grant completion path is owned by the base lane
+// (ShortRestModal.test.jsx, whose default mock returns a falsy grant).
 // No timers: flow advances only on explicit user clicks.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
@@ -66,22 +73,18 @@ vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
   setTempHp: (...args) => setTempHpMock(...args),
 }));
 
-// Producer-faithful stub of the shared picker: checkbox rows toggle selection,
-// the toggle clamps at maxTargets and rows disable at the cap (mirrors the real
-// CreatureSelectionModal.jsx:50-58,88,101 so copy↔cap coupling is pinned here),
-// confirm stays disabled until something is selected, onConfirm receives the
-// selected NAMES array (CreatureSelectionModal.jsx:61-64,140).
+// Minimal producer-faithful stub: checkbox rows toggle selection, confirm receives
+// the selected NAMES array (the real CreatureSelectionModal contract). Cap
+// enforcement deliberately NOT mirrored — ShortRestModal only has to pass maxTargets
+// through (pinned via the max-targets testid); enforcement is proven against the
+// real component in its own lane.
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
   const { useState } = await import('react');
   function CreatureSelectionModalStub({ title, description, note, confirmLabel, icon, confirmIcon, onConfirm, onSkip, targets, maxTargets }) {
     const [selected, setSelected] = useState([]);
     const toggle = (name) =>
       setSelected((prev) =>
-        prev.includes(name)
-          ? prev.filter((n) => n !== name)
-          : !maxTargets || prev.length < maxTargets
-            ? [...prev, name]
-            : prev
+        prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
       );
     return (
       <div data-testid="creature-selection-modal">
@@ -95,16 +98,12 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
             <input
               type="checkbox"
               checked={selected.includes(target.name)}
-              disabled={!!maxTargets && selected.length >= maxTargets && !selected.includes(target.name)}
               onChange={() => toggle(target.name)}
             />
             {target.name}
           </label>
         ))}
-        <button
-          disabled={selected.length === 0}
-          onClick={() => onConfirm(selected)}
-        >
+        <button onClick={() => onConfirm(selected)}>
           {confirmIcon && <i data-testid="confirm-icon" className={`fa-solid ${confirmIcon}`} />}
           {confirmLabel || 'Confirm'} ({selected.length})
         </button>
@@ -177,116 +176,55 @@ describe('ShortRestModal - Celestial Resilience', () => {
     getRuntimeValueMock.mockReturnValue(null);
   });
 
-  it('opens the ally picker on completion with the grant copy and every target, staying closed before completion', async () => {
+  it('opens the ally picker on completion with every copy face, cap, target row and icon sourced from the grant payload', async () => {
     renderModal();
     const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
 
-    expect(screen.queryByText('Celestial Resilience')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
 
-    await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
+    // maxTargets 4 differs from the fixture default (3), the target count (3), and
+    // every other number in the payload — so each rendered "4" is interpolated from
+    // celestialResilienceModal.maxTargets, never a retyped literal (fix#158
+    // single-source law; disk source: classes.json automation.maxAllies). self(8)
+    // ≠ ally(7) amounts pin the note template against a swap.
+    await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant({ maxTargets: 4 }) });
 
     expect(screen.getByTestId('modal-title')).toHaveTextContent('Celestial Resilience');
-    // Coupling pin (fix#158 single-source law): the description number is the
-    // SAME celestialResilienceModal.maxTargets the picker enforces — never a
-    // retyped literal. Disk source: classes.json automation.maxAllies.
-    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose up to 3 allies to gain temporary hit points from your Celestial Resilience.');
+    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose up to 4 allies to gain temporary hit points from your Celestial Resilience.');
     expect(screen.getByTestId('modal-note')).toHaveTextContent('You gain 8 temporary hit points.');
     expect(screen.getByTestId('modal-note')).toHaveTextContent('Each selected ally gains 7 temporary hit points.');
-    expect(screen.getByTestId('max-targets')).toHaveTextContent('3');
+    expect(screen.getByTestId('max-targets')).toHaveTextContent('4');
     // Every creatureTarget renders as a checkbox row, player and npc alike.
     expect(screen.getAllByRole('checkbox')).toHaveLength(3);
     expect(screen.getByRole('checkbox', { name: 'Ally1' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Ally2' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Ally3' })).toBeInTheDocument();
-  });
 
-  it('uses fa-shield-heart in header and confirm button (typo regression pin)', async () => {
-    // bug-shortrest-celestial-icon-typo: Font Awesome has no `fa-shield-hart`
-    // glyph (content:none → dead icon). Long-rest lane (LongRestButton.jsx) is
-    // the correct-class precedent.
-    renderModal();
-    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
-
-    await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
-
+    // Typo regression pin (bug-shortrest-celestial-icon-typo): Font Awesome has no
+    // `fa-shield-hart` glyph (content:none → dead icon).
     expect(screen.getByTestId('modal-icon')).toHaveClass('fa-shield-heart');
     expect(screen.getByTestId('confirm-icon')).toHaveClass('fa-shield-heart');
     expect(document.querySelector('.fa-shield-hart')).toBeNull();
   });
 
-  it.each([3, 5, 6])(
-    'description interpolates maxTargets=%i from the grant, matching the picker cap it advertises',
-    async (maxTargets) => {
-      renderModal();
-      const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
-
-      await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant({ maxTargets }) });
-
-      expect(screen.getByTestId('modal-description')).toHaveTextContent(
-        `Choose up to ${maxTargets} allies to gain temporary hit points from your Celestial Resilience.`
-      );
-      expect(screen.getByTestId('max-targets')).toHaveTextContent(String(maxTargets));
-    }
-  );
-
-  it('cap-behavior pin: copy promises the cap and the picker enforces it — 4th selection at maxTargets=3 is blocked', async () => {
-    renderModal();
-    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
-
-    const grant = celestialGrant({
-      maxTargets: 3,
-      creatureTargets: [
-        { name: 'Ally1', type: 'player' },
-        { name: 'Ally2', type: 'npc' },
-        { name: 'Ally3', type: 'player' },
-        { name: 'Ally4', type: 'player' },
-      ],
-    });
-    await completeShortRest(applyShortRest, { celestialResilienceAllies: grant });
-
-    // Copy advertises the same 3 the payload enforces.
-    expect(screen.getByTestId('modal-description')).toHaveTextContent(/up to 3 allies/);
-
-    // Fill to the cap, then the 4th row is disabled and inert.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally1' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally2' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally3' }));
-    const fourth = screen.getByRole('checkbox', { name: 'Ally4' });
-    expect(fourth).toBeDisabled();
-    fireEvent.click(fourth);
-
-    const confirmBtn = screen.getByRole('button', { name: /Grant Resilience/ });
-    expect(confirmBtn).toHaveTextContent('Grant Resilience (3)');
-    fireEvent.click(confirmBtn);
-    await flush();
-
-    expect(setTempHpMock).toHaveBeenCalledTimes(3);
-    expect(setTempHpMock).not.toHaveBeenCalledWith('Ally4', 7, mockCampaignName);
-  });
-
-  it('grants temp HP to exactly the selected allies, logs the ability_use, and completes once', async () => {
+  it('grants temp HP to exactly the selected allies, logs the ability_use, closes the picker, and completes once', async () => {
     const { onComplete } = renderModal();
     const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
     const { addEntry } = await import('../../services/ui/logService.js');
 
     await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
 
-    const confirmBtn = screen.getByRole('button', { name: /Grant Resilience/ });
-    // Nothing selected: confirm is disabled and dispatches nothing.
-    fireEvent.click(confirmBtn);
-    await flush();
-    expect(setTempHpMock).not.toHaveBeenCalled();
-    expect(onComplete).not.toHaveBeenCalled();
-
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ally1' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ally3' }));
-    fireEvent.click(confirmBtn);
+    fireEvent.click(screen.getByRole('button', { name: /Grant Resilience/ }));
     await flush();
 
     expect(setTempHpMock).toHaveBeenCalledTimes(2);
     expect(setTempHpMock).toHaveBeenCalledWith('Ally1', 7, mockCampaignName);
     expect(setTempHpMock).toHaveBeenCalledWith('Ally3', 7, mockCampaignName);
+    // Unselected ally gets nothing, and SELF gets nothing here — the producer
+    // applies selfTempHp inside applyShortRest, so a UI-side re-grant would double it.
     expect(setTempHpMock).not.toHaveBeenCalledWith('Ally2', 7, mockCampaignName);
+    expect(setTempHpMock).not.toHaveBeenCalledWith('Thorin', 8, mockCampaignName);
 
     expect(addEntry).toHaveBeenCalledTimes(1);
     expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
@@ -295,10 +233,11 @@ describe('ShortRestModal - Celestial Resilience', () => {
       abilityName: 'Celestial Resilience',
       description: expect.stringMatching(/grants 7 temporary hit points to Ally1, Ally3/),
     }));
+    expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the grant: zero temp HP, skip logged, completes once, picker closes', async () => {
+  it('skips the grant: zero temp HP, skip logged, picker closes, completes once', async () => {
     const { onComplete } = renderModal();
     const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -318,48 +257,33 @@ describe('ShortRestModal - Celestial Resilience', () => {
     expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
   });
 
-  it('completes immediately without the picker when applyShortRest grants nothing', async () => {
+  // 🐛 HONEST PIN of broken behavior (reported to orchestrator): handleComplete
+  // early-returns when the grant is truthy, and confirm/skip only dispatch the ally
+  // grant + onComplete — the commit block below the branch (currentHitPoints write,
+  // shortRestHitDice write, short_rest log) never runs. A Celestial Patron's staged
+  // hit-dice recovery is silently dropped. Flip this pin when the source is fixed.
+  it('picker branch commits the ally grant but drops the rest own commit: staged hit dice, HP write, dice write, and short_rest log all lost', async () => {
     const { onComplete } = renderModal();
     const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
 
-    // Producer-faithful no-grant shape: restRules-shortRest.js returns null here.
-    await completeShortRest(applyShortRest, { celestialResilienceAllies: null });
-
-    expect(onComplete).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
-    expect(setTempHpMock).not.toHaveBeenCalled();
-  });
-
-  it('still grants and logs without crashing when onComplete is omitted', async () => {
-    render(
-      <ShortRestModal
-        playerStats={{
-          name: 'Thorin',
-          level: 5,
-          hitPoints: 45,
-          proficiency: 3,
-          abilities: [{ name: 'Charisma', bonus: 3 }],
-          class: { name: 'Warlock', major: { name: 'Celestial Patron' } },
-          automation: { passives: [] },
-          specialActions: [{ name: 'Celestial Resilience' }],
-          spellAbilities: { spells: [] },
-          inventory: { equipped: [] },
-        }}
-        campaignName={mockCampaignName}
-        onClose={vi.fn()}
-      />
-    );
-    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+    // Stage one d8 (rolls 4 + CON 2) before completing.
+    fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
 
     await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ally1' }));
+    fireEvent.click(screen.getByRole('button', { name: /Grant Resilience/ }));
+    await flush();
 
-    await expect(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Grant Resilience/ }));
-      await flush();
-    }).not.toThrow();
-
+    // The ally grant itself flows...
     expect(setTempHpMock).toHaveBeenCalledWith('Ally1', 7, mockCampaignName);
-    expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+
+    // ...yet the no-grant path commit block never executes.
+    const writtenKeys = setRuntimeValueMock.mock.calls.map((c) => c[1]);
+    expect(writtenKeys).not.toContain('currentHitPoints');
+    expect(writtenKeys).not.toContain('shortRestHitDice');
+    const loggedTypes = vi.mocked(addEntry).mock.calls.map((c) => c[1]?.type);
+    expect(loggedTypes).not.toContain('short_rest');
   });
 });

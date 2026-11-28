@@ -1,18 +1,21 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27
 // SavePromptModal — actions
-// Behavioral contract for save prompt interactions: queueing (dedupe, campaign
-// scoping, SSE clearing), result submission (posted only on Done/Dismiss-after-
-// roll, never on roll alone), the local `save-result` dispatch consumers read,
-// queue advancement, and the Leading Evasion chooser's gating of Apply.
+// Server-first adjudication surface: campaign scoping of prompt events, the
+// savePromptCleared channel (exact-promptId eviction, foreign-id retention),
+// result submission (held through the roll, posted exactly once on Done with
+// the full-shape payload), the local `save-result` dispatch consumers read,
+// rolled queue advancement, and the Leading Evasion chooser's Apply(0) gating.
 //
-// Rendering/copy lives in SavePromptModal.rendering.test.jsx, roll math in
-// .rolling/.bonuses/.rerolls, CLA-211 stamping/skip in .cla211-leading-evasion,
-// lastAttack persistence in .special-handlers — not re-tested here.
+// Owned elsewhere — not re-tested here: un-rolled Dismiss clears + bucket drops
+// (.dismiss-hygiene), the save-dismissed producer notice (.save-dismissed),
+// same-promptId double-delivery dedupe (.duplicate-mount), prompt/result-panel
+// copy (.rendering/.rolling), roll math (.rolling/.bonuses/.rerolls), CLA-211
+// stamping/skip (.cla211-leading-evasion), chooser row tick UX (.coverage),
+// lastAttack persistence (.special-handlers).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import SavePromptModal from './SavePromptModal.jsx';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
@@ -33,7 +36,10 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
+// sendSavePrompt is a real graph import (savePrompt.js → this module); it must
+// exist on the mock or its access throws, even though this lane never sends.
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
+  sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
   clearSavePrompt: vi.fn(),
 }));
@@ -46,13 +52,17 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }));
 
+// Keys mirror the graph's actual imports: getStore (applyDamage.js),
+// deleteRuntimeKey (savePrompt.js), setRuntimeObject + getAllStoreKeys
+// (applyDamage.js / expirationQueue.js / infernalWoundService.js).
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => null),
   getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
+  deleteRuntimeKey: vi.fn(),
+  setRuntimeObject: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -118,24 +128,54 @@ function renderModal(props = {}) {
   );
 }
 
+// The blessed testid of the ACTIVE prompt (see .active-save-prompt) — its
+// presence/absence IS the open/closed face, no copy-regex archaeology.
 async function openPrompt(testId = 'subscriber-trigger') {
   fireEvent.click(screen.getByTestId(testId));
-  await waitFor(() => {
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-  });
+  await screen.findByTestId('active-save-prompt');
 }
 
+// Every roll in this lane is a success (rollD20→15 vs DC 12), so the result
+// panel is the post-roll flush anchor; its copy is owned by .rolling.
 async function rollAndWaitForResult() {
   fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
-  await waitFor(() => {
-    expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-  });
+  await screen.findByText('SAVE SUCCESS');
 }
 
 describe('SavePromptModal — actions', () => {
   // Capture every local save-result dispatch; consumers (damage appliers) read detail.
   let saveResults = [];
   const collectSaveResult = (event) => saveResults.push(event.detail);
+
+  // rollD20 → 15, no bonus sources (empty roster, no combat creature), DC 12.
+  const expectedSendPayload = {
+    promptId: 'test-prompt-1',
+    success: true,
+    roll: 15,
+    total: 15,
+    saveBonus: 0,
+    rawRolls: [15, 15],
+    mode: 'normal',
+    bonusDetail: undefined,
+    baneRoll: null,
+  };
+  const expectedDispatchDetail = {
+    promptId: 'test-prompt-1',
+    targetName: 'testTarget',
+    saveType: 'con',
+    saveDc: 12,
+    success: true,
+    roll: 15,
+    total: 15,
+    saveBonus: 0,
+    bonusDetail: undefined,
+    rawDamage: undefined,
+    dcSuccess: undefined,
+    rawRolls: [15, 15],
+    mode: 'normal',
+    evasionActive: false,
+    baneRoll: null,
+  };
 
   beforeEach(() => {
     saveResults = [];
@@ -148,27 +188,16 @@ describe('SavePromptModal — actions', () => {
     cleanupDefaults();
   });
 
-  // ── Queueing & dismissal ──
-
-  it('dismisses an unrolled prompt without submitting a fabricated result', async () => {
-    renderModal();
-    await openPrompt();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
-    expect(savePromptService.clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget');
-    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
-  });
+  // ── Queueing & SSE clearing ──
 
   it('ignores save-prompt events from other campaigns', async () => {
     renderModal();
 
     fireEvent.click(screen.getByTestId('subscriber-trigger-other-campaign'));
 
-    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+    // handleEvent prefixes on change-<campaign>-savePrompt-: a foreign key
+    // never queues, so no overlay mounts.
+    expect(screen.queryByTestId('active-save-prompt')).not.toBeInTheDocument();
 
     // Control: an own-campaign event still opens the modal, so the rejection
     // above is campaign scoping, not a broken subscriber wiring.
@@ -176,37 +205,18 @@ describe('SavePromptModal — actions', () => {
     expect(screen.getByText('testTarget')).toBeInTheDocument();
   });
 
-  it('does not add duplicate prompts with the same promptId', async () => {
-    renderModal();
-    await openPrompt();
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'));
-
-    // No queue indicator, and submitting the first prompt closes the modal
-    // entirely — proving the queue held exactly one prompt.
-    expect(screen.queryByText(/\(\d+ of \d+\)/)).not.toBeInTheDocument();
-
-    await rollAndWaitForResult();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledTimes(1);
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
-      promptId: 'test-prompt-1',
-    }));
-  });
-
-  it('removes prompt when savePromptCleared event is received', async () => {
+  it('removes the prompt when a savePromptCleared event names its promptId, submitting nothing', async () => {
     renderModal();
     await openPrompt();
 
     fireEvent.click(screen.getByTestId('subscriber-trigger-cleared'));
 
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
+    // Queue eviction is synchronous state — no waitFor needed.
+    expect(screen.queryByTestId('active-save-prompt')).not.toBeInTheDocument();
+    // The prompt was answered elsewhere; this client never fabricates a
+    // submit or a second clear for it.
+    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
+    expect(savePromptService.clearSavePrompt).not.toHaveBeenCalled();
   });
 
   it('keeps the prompt when savePromptCleared names a different promptId', async () => {
@@ -217,106 +227,71 @@ describe('SavePromptModal — actions', () => {
 
     // handleClearedEvent filters by promptId — a foreign clear must not
     // silently drop the pending adjudication.
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    expect(screen.getByTestId('active-save-prompt')).toBeInTheDocument();
     expect(screen.getByText('testTarget')).toBeInTheDocument();
   });
 
   // ── Result submission ──
 
-  it('submits the rolled result and clears the prompt when Done is clicked', async () => {
+  it('holds the result through the roll, then submits it exactly once on Done and clears the prompt', async () => {
     renderModal();
     await openPrompt();
     await rollAndWaitForResult();
 
-    expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
-    // Rolling swaps Dismiss for the single submit button.
+    // Rolling alone never submits — the result waits for Done.
+    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
+    // Rolling swaps Dismiss for the single submit button: no second exit
+    // that could leak an un-adjudicated close.
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
-    // rollD20 → 15, no bonus sources, DC 12.
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
-      promptId: 'test-prompt-1',
-      roll: 15,
-      total: 15,
-      success: true,
-    }));
+    expect(screen.queryByTestId('active-save-prompt')).not.toBeInTheDocument();
+    // Double-submit detector: one Done, one server post, one key clear.
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledTimes(1);
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expectedSendPayload);
+    expect(savePromptService.clearSavePrompt).toHaveBeenCalledTimes(1);
     expect(savePromptService.clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget');
   });
 
-  it('holds the result locally after rolling and submits it only on Done', async () => {
-    renderModal({ characters: ['testTarget', createCharacter('otherChar')] });
-    await openPrompt();
-
-    await rollAndWaitForResult();
-    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
-      promptId: 'test-prompt-1',
-      roll: 15,
-      success: true,
-    }));
-  });
-
-  it('dispatches save-result custom event with full adjudication detail', async () => {
+  it('dispatches the save-result custom event with full adjudication detail on Done', async () => {
     renderModal();
     await openPrompt();
     await rollAndWaitForResult();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    await waitFor(() => {
-      expect(saveResults).toHaveLength(1);
-    });
-    expect(saveResults[0]).toEqual(expect.objectContaining({
-      promptId: 'test-prompt-1',
-      targetName: 'testTarget',
-      saveType: 'con',
-      saveDc: 12,
-      success: true,
-      roll: 15,
-      total: 15,
-      mode: 'normal',
-      evasionActive: false,
-    }));
-    expect(saveResults[0].rawRolls).toEqual([15, 15]);
+    // The dispatch is synchronous with the Done click.
+    expect(saveResults).toHaveLength(1);
+    expect(saveResults[0]).toEqual(expectedDispatchDetail);
   });
 
   // ── Queue advancement ──
 
-  it('submits the first result and advances to the second prompt on Next Save', async () => {
+  it('submits the first result once and advances to the second prompt on Next Save', async () => {
     renderModal();
     await openPrompt();
 
     fireEvent.click(screen.getByTestId('subscriber-trigger-second'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
+    expect(screen.getByText('(1 of 2)')).toBeInTheDocument();
 
     await rollAndWaitForResult();
 
     fireEvent.click(screen.getByRole('button', { name: 'Next Save' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('testTarget2')).toBeInTheDocument();
-      expect(screen.getByText('DEX')).toBeInTheDocument();
-      expect(screen.getByText('DC 15')).toBeInTheDocument();
-    });
-    // Advancing must not skip submission of the finished prompt, and must not
-    // submit the freshly revealed one.
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
-      promptId: 'test-prompt-1',
-    }));
-    expect(savePromptService.sendSaveResult).not.toHaveBeenCalledWith('test-campaign', 'testTarget2', expect.anything());
+    expect(screen.getByText('testTarget2')).toBeInTheDocument();
+    expect(screen.getByText('DEX')).toBeInTheDocument();
+    expect(screen.getByText('DC 15')).toBeInTheDocument();
+    // Advancing must not skip submission of the finished prompt, must fire it
+    // exactly once, and must not submit the freshly revealed one.
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledTimes(1);
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expectedSendPayload);
+    const secondTargetSubmits = savePromptService.sendSaveResult.mock.calls.filter(([, target]) => target === 'testTarget2');
+    expect(secondTargetSubmits).toEqual([]);
     expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
   });
 
-  // ── Leading Evasion chooser ──
+  // ── Leading Evasion chooser gating (row tick UX in .coverage, stamping in .cla211) ──
 
   it('presents the Leading Evasion chooser with Apply disabled until an ally is selected', async () => {
     // A shareable DEX evasion held by a non-target triggers the chooser for
@@ -325,15 +300,13 @@ describe('SavePromptModal — actions', () => {
     renderModal({ characters: ['testTarget2', paladin] });
 
     fireEvent.click(screen.getByTestId('subscriber-trigger-second'));
-    await waitFor(() => {
-      expect(screen.getByText(/Leading Evasion — Choose Allies/)).toBeInTheDocument();
-    });
+    await screen.findByText('Leading Evasion — Choose Allies');
 
     // The creature making the save is offered as an (initially unticked) row
     // in the chooser list (scoped there — the name also shows in the prompt).
     const row = document.querySelector('.sp-overlay--evasion .secondary-target-row');
     expect(row).toHaveTextContent('testTarget2');
     expect(within(row).getByRole('checkbox')).not.toBeChecked();
-    expect(screen.getByRole('button', { name: /Apply Evasion \(0\)/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply Evasion (0)' })).toBeDisabled();
   });
 });

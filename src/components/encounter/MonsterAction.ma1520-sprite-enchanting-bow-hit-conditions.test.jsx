@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1520: Sprite "Enchanting Bow" — the row's OWN Hit clause carries the
 // Charmed rider ("Hit: 1 Piercing damage, and the target has the Charmed
 // condition until the start of the sprite's next turn") but the row authored
@@ -10,20 +10,21 @@
 // stays byte-unchanged: damage_dice_primary ABSENT → extractFlatHitDamage
 // supplies the constant "1" (MA-0322 lineage, owner flat-hit-damage.test.js;
 // flat never doubles on crit). §108 residual: engine-wide took-damage clears
-// Charmed inside applyDamage BEFORE the hit clause re-grants (handlePlain-
-// Damage.js:1154 → :1181) — live ledger shows removed→applied pairs per hit;
-// accepted. sprite is NOT in handlePlainDamage.hitClause HIT_CLAUSE_ROWS
-// :224-282 (grep-verified), so THIS file is the sole byte-owner: one fused
+// Charmed inside applyDamage BEFORE the hit clause re-grants (applyDamage.js
+// :590 strip → handlePlainDamage.js:1087 re-grant) — live ledger shows
+// removed→applied pairs per hit; accepted. sprite is NOT in
+// handlePlainDamage.hitClause HIT_CLAUSE_ROWS :204-262 (grep-verified), so
+// THIS file is the sole byte-owner: one fused
 // test locks disk row keys BY NAME in transport order + exact bytes (exact
 // toEqual absorbs name/attack_bonus/range, the prose Charmed word, flat-
 // damage-dice absence, and every save-decoy/hit_target_effect/hit_condition_
 // roll field-absence check — this row carries NO 0/"" save decoys, disk keys
 // decide shape), then the "+6" chip press delivers that exact row through
-// onAttack (identity — payload IS the disk object, MonsterAction.jsx:480
+// onAttack (identity — payload IS the disk object, MonsterAction.jsx:56
 // passthrough). Clause arm for the ["charmed"]+escapeDc-null shape and the
 // attack suppression gate are owned generically: hitClause mega-lane data-
-// locks via byte-twins satyr-revelmaster Prance :270 and noble-prodigy
-// Beguiling Strike :266 (charmed, escapeDc null) + clause arm :289-301,
+// locks via byte-twins satyr-revelmaster Prance :250 and noble-prodigy
+// Beguiling Strike :246 (charmed, escapeDc null) + clause arm :288-301,
 // suppression census ma0286:95-121, DC0 save gate ma1071 — per-census (#419,
 // cf. ma1357:17-22) no local buildHitConditionClause/attackRowMissingToHit
 // re-derivation here — exact-bytes + live chip are the tighter pin. Needle

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepInventory from './WizardStepInventory.jsx';
@@ -354,10 +354,16 @@ describe('WizardStepInventory', () => {
         expect(props.onInventoryChange).not.toHaveBeenCalledWith('equipped', expect.anything());
       });
 
-      it('blocks a details-row rename colliding with another item name (case-insensitive)', () => {
+      it('blocks a details-row rename colliding with another item or matching the current name case-insensitively', () => {
         const props = metaProps();
         render(<WizardStepInventory {...props} />);
-        fireEvent.blur(screen.getByLabelText('Rename Rope'), { target: { value: ' torch ' } });
+        const renameInput = screen.getByLabelText('Rename Rope');
+
+        // Collides with the "Torch" entry (case/whitespace-insensitive match).
+        fireEvent.blur(renameInput, { target: { value: ' torch ' } });
+        // Same name, different casing — a no-op, must not rewrite the entry.
+        fireEvent.blur(renameInput, { target: { value: 'rope' } });
+        expect(props.onTempInventoryChange).not.toHaveBeenCalled();
         expect(props.onInventoryChange).not.toHaveBeenCalledWith('backpack', expect.anything());
         expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
       });
@@ -374,21 +380,20 @@ describe('WizardStepInventory', () => {
         });
       });
 
-      it('does NOT migrate meta when two names change in one textarea commit (not a rename)', () => {
+      it('does NOT migrate meta for commits that are not a single-position rename (two names changed, or item count changed)', () => {
         const props = metaProps();
         const { container } = render(<WizardStepInventory {...props} />);
         const textarea = textareaFor(container, 'backpack');
+
+        // Two names changed at once — ambiguous, not treated as a rename.
         fireEvent.change(textarea, { target: { value: 'Silken Rope, Hempen Torch' } });
         fireEvent.blur(textarea);
         expect(props.onInventoryChange).toHaveBeenCalledWith('backpack', ['Silken Rope', 'Hempen Torch']);
         expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
-      });
 
-      it('does NOT migrate meta when the item count changes (add/remove, not a rename)', () => {
-        const props = metaProps();
-        const { container } = render(<WizardStepInventory {...props} />);
-        const textarea = textareaFor(container, 'backpack');
-        fireEvent.change(textarea, { target: { value: 'Silken Rope, Torch, Rations' } });
+        // Item count differs from the previous list — an add/remove, not a rename.
+        props.onInventoryChange.mockClear();
+        fireEvent.change(textarea, { target: { value: 'Silken Rope, Hempen Torch, Rations' } });
         fireEvent.blur(textarea);
         expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
       });

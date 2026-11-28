@@ -1,6 +1,6 @@
-// @maintained-by-ai 2026-10-18
-// SaveAttackAoeModal OVERLAY lane: the branch at SaveAttackAoeModal.jsx:1972
-// (`isOverlayTargeted && activeOverlay`) is the only place in the family that
+// @maintained-by-ai 2026-11-28
+// SaveAttackAoeModal OVERLAY lane: the `isOverlayTargeted && activeOverlay`
+// branch in SaveAttackAoeModal.jsx is the only place in the family that
 // mounts AreaEffectTargetModalBase — so the base is mounted LIVE here (its own
 // wiring to renderBody/renderActions/handleApplyOverride is the behavior under
 // test). The picker lane it competes with is also live (real CreatureSelectionModal,
@@ -8,11 +8,14 @@
 //
 // Owned here (not duplicated in siblings):
 //   1. overlay- + activeOverlay → base lane renders AND round-trips an NPC
-//      save through the base ctx.apply seam (honest full-on-fail damage).
-//   2. either operand falsy → fallback to the CreatureSelectionModal picker.
-// NPC auto-resolve details (lastAttack stamp shape, CLA-109 disadvantage,
-// MA-0563 dual pools, PC prompt halves) are owned by damage-resolution.test.jsx
-// and never re-litigated here.
+//      save through the base ctx.apply seam (honest full-on-fail damage), and
+//      the results face commits atomically with exactly one honest row (#226).
+//   2. either operand falsy → fallback to the CreatureSelectionModal picker
+//      (branch-matrix pin: picker chrome present, base chrome absent).
+// NOT re-litigated here: the `rolled R + B = T vs DC D` equation copy (owned by
+// results-face-equation.test.jsx), picker description copy (creature-selection /
+// damage-resolution), NPC auto-resolve details (lastAttack stamp, CLA-109
+// disadvantage, MA-0563 dual pools, PC prompt halves — damage-resolution.test.jsx).
 //
 // persistAndNotify stays LIVE (#225) — combatData cache setter mocked, storage
 // backed by the inert localStorage/fetch from src/test/setup.js.
@@ -171,8 +174,7 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     expect(errorSpy.mock.calls.map(c => String(c[0])).filter(m => m.includes('Cannot update a component'))).toEqual([]);
     errorSpy.mockRestore();
 
-    // Failed save pays the FULL 12 — honest dice; the row prints the full
-    // adjudicated equation (rolled 1 + 2 = 3 vs DC 15).
+    // Failed save pays the FULL 12 — honest dice (rolled 1 + 2 = 3 vs DC 15).
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
       expect.anything(), 'Goblin A', 12, ['Fire'], expect.objectContaining({ attackerName: 'Cleric1' }));
 
@@ -197,18 +199,21 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     await waitFor(() => expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument());
     const summaryRows = [...document.querySelectorAll('.abjure-results-list .abjure-result')];
     expect(summaryRows).toHaveLength(1);
-    expect(summaryRows[0].textContent).toBe('Goblin A: Failed — takes 12 Fire damage (rolled 1 + 2 = 3 vs DC 15)');
+    // Verdict + adjudicated damage is this lane's commit seam; the trailing
+    // `(rolled 1 + 2 = 3 vs DC 15)` equation copy law is owned by
+    // results-face-equation.test.jsx and not re-pinned here.
+    expect(summaryRows[0].textContent).toMatch(/^Goblin A: Failed — takes 12 Fire damage/);
     expect(document.querySelector('.abjure-result-pending')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the CreatureSelectionModal picker lane when either overlay operand is falsy', () => {
-    // Operand 1: overlay- target but no active overlay.
+    // Operand 1: overlay- target but no active overlay → picker chrome, no base.
+    // (Picker description copy is owned by creature-selection/damage-resolution.)
     const { unmount } = render(<SaveAttackAoeModal {...overlayProps({ activeOverlay: false })} />);
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
-    expect(screen.getByText('On a failed save, target takes 8d6 Fire damage. On a successful save, target takes half damage.')).toBeInTheDocument();
     unmount();
 
     // Operand 2: active overlay but the target is not an overlay target.

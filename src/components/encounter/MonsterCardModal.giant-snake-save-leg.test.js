@@ -1,9 +1,12 @@
-// @maintained-by-ai 2026-10-18
-// Owner legs (keep stable): disk BY-name bytes · save-chip ctx damage
-// fields adjudicating 3d6 Poison through the composite save-leg path.
-// Predicate truth tables owned by secondary-save-transport.test.js (it.each
-// :303-312); this row's predicate satisfaction is covered transitively by
-// the save-chip leg below. Salamander constrict bytes owned by ma1427 twin.
+// @maintained-by-ai 2026-11-28
+// Owner legs (keep stable, cited by ma1329/ma1427 headers): disk BY-name
+// bytes · save-chip ctx damage fields adjudicating 3d6 Poison through the
+// composite save-leg path. Predicate truth tables owned by
+// secondary-save-transport.test.js (describe 'MA-0551/MA-0560 —
+// composite-fork predicate truth tables'); this row's predicate satisfaction
+// is covered transitively by the save-chip leg below (an unarmed predicate
+// would fall through to the legacy branch and pay the attack primary there).
+// Salamander constrict bytes owned by ma1427 twin.
 // MA-0816: Giant Poisonous Snake Bite — save_leg was rolling the attack
 // primary dice ("1d4 + 4" Piercing) because the row lacked damage_dice_secondary,
 // so saveLegCarriesSecondaryDamage was false and resolveSaveLegDamageFields
@@ -28,14 +31,19 @@ describe('MA-0816 giant-poisonous-snake Bite — save-leg secondary data', () =>
         expect(snakeRow.name).toBe('Bite');
         expect(snakeRow.attack_bonus).toBe(6);
         expect(snakeRow.save_dc).toBe(11);
+        expect(snakeRow.save_type).toBe('Constitution');
         expect(snakeRow.damage_dice_primary).toBe('1d4 + 4');
         expect(snakeRow.damage_type_primary).toBe('Piercing');
         expect(snakeRow.damage_dice_secondary).toBe('3d6');
         expect(snakeRow.damage_type_secondary).toBe('Poison');
-        expect(snakeRow.save_effect.includes('3d6')).toBe(true);
+        expect(snakeRow.save_effect).toBe(
+            'On a failure, the target takes 10 (3d6) poison damage. On a success, the target takes half as much damage.'
+        );
     });
 
     it('save chip adjudicates 3d6 Poison, NOT the attack primary "1d4 + 4"', () => {
+        // The chip hands off the primary formula (the pre-fix leak input): the
+        // composite save leg must override it with the authored secondary.
         const ctx = buildAbilitySaveRollContext({
             monsterName: 'Giant Poisonous Snake 1',
             target: { name: 'Bandit 1', type: 'monster' },
@@ -49,6 +57,8 @@ describe('MA-0816 giant-poisonous-snake Bite — save-leg secondary data', () =>
             prerequisite: null,
             getDamageTypesForAction,
         });
+        expect(ctx.saveDc).toBe(11);
+        expect(ctx.dcSuccess).toBe('half');
         expect(ctx.autoDamageFormula).toBe('3d6');
         expect(ctx.autoDamageDamageType).toBe('Poison');
         expect(ctx.autoDamageSecondaryFormula).toBeNull();

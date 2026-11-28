@@ -1,5 +1,22 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27
+/**
+ * Null-stamp face of MapContextSync: null/absent names must NEVER write.
+ * A freshly-mounted tab has local activeMapName = null until the server's
+ * active-map fetch resolves; force-stamping null there used to clobber the
+ * server-authoritative '__map__' (the activate route owns that key). Locks:
+ * the map lane stays silent while the name is null (mount AND back-nav), one
+ * store+server write per null→map transition, .json-suffix normalization on
+ * both lanes, the skipSync=true single-server-writer lock
+ * (improvement-map-open-double-writes: the guard-free force-stamp is the ONLY
+ * POST lane), an empty campaign as a total gate, and render survival when a
+ * stamp POST rejects.
+ *
+ * Sibling lanes (observed current bytes, NOT restated here):
+ * - MapContextSync.dedupe.test.jsx (6 tests): '__campaign__' value-unchanged
+ *   dedupe, campaign switch, fresh-cache re-stamp, failed-stamp cache heal.
+ * - MapContextSync.read-only.test.jsx (2 tests): non-GM client mirrors
+ *   '__map__' locally with zero server writes.
+ */
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MapContextSync, { _resetForTests } from './MapContextSync.jsx';
@@ -24,15 +41,17 @@ function stampsFor(fetchMock, key) {
   return stampRequests(fetchMock).filter(req => req.key === key);
 }
 
-function storeCallsFor(key) {
-  return setRuntimeObject.mock.calls.filter(([storeKey]) => storeKey === key);
+// Expected shape of a local store mirror: skipSync=true, so the mirror never
+// POSTs — the force-stamp lane owns the server write.
+function mirror(key, value) {
+  return [key, value, 'test-campaign', true];
 }
 
 describe('MapContextSync', () => {
   let fetchMock;
 
   beforeEach(() => {
-    // Fresh-session state per test: the module-level __campaign__ last-stamped
+    // Fresh-session state per test: the module-level last-stamped campaign
     // cache survives the file-level module registry (improvement-2026-10-26-C).
     _resetForTests();
     setRuntimeObject.mockClear();
@@ -46,83 +65,68 @@ describe('MapContextSync', () => {
     expect(setRuntimeObject).toHaveBeenCalledWith(
       '__campaign__', { campaignName: 'test-campaign' }, 'test-campaign', true,
     );
-    const campaignStamps = stampsFor(fetchMock, '__campaign__');
-    expect(campaignStamps).toHaveLength(1);
-    expect(campaignStamps[0]).toEqual({
-      method: 'POST',
-      key: '__campaign__',
-      value: { campaignName: 'test-campaign' },
-    });
+    expect(stampRequests(fetchMock)).toEqual([
+      { key: '__campaign__', method: 'POST', value: { campaignName: 'test-campaign' } },
+    ]);
   });
 
-  it('never stamps __map__ null before the active map resolves (server value wins)', () => {
-    render(<MapContextSync campaignName="test-campaign" activeMapName={null} />);
-
-    expect(stampsFor(fetchMock, '__map__')).toHaveLength(0);
-    expect(storeCallsFor('__map__')).toHaveLength(0);
-    // the campaign side of the sync must still happen
-    expect(stampsFor(fetchMock, '__campaign__')).toHaveLength(1);
-  });
-
-  it('stamps the active map with its .json suffix stripped, to store and server', () => {
-    render(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
-
-    expect(setRuntimeObject).toHaveBeenCalledWith(
-      '__map__', { activeMapName: 'battle-arena' }, 'test-campaign', true,
-    );
-    const mapStamps = stampsFor(fetchMock, '__map__');
-    expect(mapStamps).toHaveLength(1);
-    expect(mapStamps[0]).toEqual({
-      method: 'POST',
-      key: '__map__',
-      value: { activeMapName: 'battle-arena' },
-    });
-  });
-
-  // Single-write-on-open lock (improvement-map-open-double-writes): the real
-  // setRuntimeObject issues its own POST when its equality guard sees a change,
-  // so a mount that transitions the map (null -> battle-arena) used to emit a
-  // same-tick IDENTICAL pair (store POST + force-stamp). The store mirror must
-  // stay skipSync=true so the guard-free stamp is the ONLY server write — one
-  // POST per key per mount scenario, while still surviving an admin wipe.
-  it('mount-then-resolve emits exactly one __map__ POST (no double-writer pair)', () => {
+  // The null-stamp core, told as one ordered sequence: mount(null) → resolve
+  // → back-nav(null). Also carries the single-write-on-open lock (improvement-
+  // map-open-double-writes): the real setRuntimeObject issues its own POST
+  // when its equality guard sees a change, so a non-skipSync mirror would
+  // re-introduce a same-tick IDENTICAL pair — every mirror call below must
+  // carry skipSync=true, making the guard-free stamp the ONLY server writer
+  // (one POST per key per transition, while still surviving an admin wipe).
+  it('null map names never write: mount(null) → resolve → back-nav emits exactly one __map__ write per lane', () => {
     const { rerender } = render(
       <MapContextSync campaignName="test-campaign" activeMapName={null} />,
     );
+    // Fresh tab: the server value wins — the map lane is entirely silent
+    // (no POST, no local mirror) while the campaign side still syncs.
     expect(stampsFor(fetchMock, '__map__')).toHaveLength(0);
+    expect(setRuntimeObject.mock.calls.filter(([k]) => k === '__map__')).toHaveLength(0);
+    expect(stampsFor(fetchMock, '__campaign__')).toHaveLength(1);
 
     rerender(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
+    rerender(<MapContextSync campaignName="test-campaign" activeMapName={null} />);
 
-    const mapPosts = fetchMock.mock.calls
-      .map(([url, init]) => ({ url: String(url), method: init?.method }))
-      .filter((req) => req.url.endsWith('/__map__') && req.method === 'POST');
-    expect(mapPosts).toHaveLength(1);
-    const mapStoreCalls = storeCallsFor('__map__');
-    expect(mapStoreCalls).toHaveLength(1);
-    expect(mapStoreCalls[0][3]).toBe(true); // skipSync — stamp owns the server lane
+    // Ordered full server-write census across the whole sequence: exactly one
+    // '__campaign__' + one '__map__' POST; the back-nav null adds nothing.
+    expect(stampRequests(fetchMock)).toEqual([
+      { key: '__campaign__', method: 'POST', value: { campaignName: 'test-campaign' } },
+      { key: '__map__', method: 'POST', value: { activeMapName: 'battle-arena' } },
+    ]);
+    // Full store-mirror census: campaign mirrors on every effect run, the map
+    // mirrors exactly once (null→map transition only), all skipSync=true.
+    expect(setRuntimeObject.mock.calls).toEqual([
+      mirror('__campaign__', { campaignName: 'test-campaign' }),
+      mirror('__campaign__', { campaignName: 'test-campaign' }),
+      mirror('__map__', { activeMapName: 'battle-arena' }),
+      mirror('__campaign__', { campaignName: 'test-campaign' }),
+    ]);
   });
 
-  it('leaves map names without a .json suffix unchanged', () => {
+  it('normalizes map names on both lanes: strips a trailing .json, leaves suffix-free names unchanged', () => {
+    render(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
+
+    expect(stampsFor(fetchMock, '__map__')).toEqual([
+      { key: '__map__', method: 'POST', value: { activeMapName: 'battle-arena' } },
+    ]);
+    expect(setRuntimeObject.mock.calls.filter(([k]) => k === '__map__')).toEqual([
+      mirror('__map__', { activeMapName: 'battle-arena' }),
+    ]);
+
+    // Second mount, suffix-free name: cache-suppressed campaign lane means the
+    // post-clear census isolates the map writes for 'wilds'.
+    fetchMock.mockClear();
+    setRuntimeObject.mockClear();
     render(<MapContextSync campaignName="test-campaign" activeMapName="wilds" />);
 
-    expect(setRuntimeObject).toHaveBeenCalledWith(
-      '__map__', { activeMapName: 'wilds' }, 'test-campaign', true,
-    );
-    expect(stampsFor(fetchMock, '__map__')[0].value).toEqual({ activeMapName: 'wilds' });
-  });
-
-  it('stamps the map only after a mount-then-resolve transition, not before', () => {
-    const { rerender } = render(
-      <MapContextSync campaignName="test-campaign" activeMapName={null} />,
-    );
-    expect(stampsFor(fetchMock, '__map__')).toHaveLength(0);
-
-    rerender(<MapContextSync campaignName="test-campaign" activeMapName="new-arena.json" />);
-
-    expect(stampsFor(fetchMock, '__map__')).toHaveLength(1);
-    expect(stampsFor(fetchMock, '__map__')[0].value).toEqual({ activeMapName: 'new-arena' });
-    expect(storeCallsFor('__map__')).toEqual([
-      ['__map__', { activeMapName: 'new-arena' }, 'test-campaign', true],
+    expect(stampRequests(fetchMock)).toEqual([
+      { key: '__map__', method: 'POST', value: { activeMapName: 'wilds' } },
+    ]);
+    expect(setRuntimeObject.mock.calls.filter(([k]) => k === '__map__')).toEqual([
+      mirror('__map__', { activeMapName: 'wilds' }),
     ]);
   });
 
@@ -137,12 +141,21 @@ describe('MapContextSync', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchMock.mockRejectedValue(new Error('network down'));
 
-    render(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
+    const { container } = render(
+      <MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />,
+    );
     await vi.waitFor(() => {
+      // Each failed key logs its own error (exact source prefix; a failed
+      // campaign stamp also self-heals the dedupe cache — pinned by the
+      // dedupe lane, not restated here).
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining('[MapContextSync]'), expect.any(Error),
+        '[MapContextSync] Failed to stamp __campaign__:', expect.any(Error),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        '[MapContextSync] Failed to stamp __map__:', expect.any(Error),
       );
     });
+    expect(container).toBeEmptyDOMElement(); // the render itself completed
 
     consoleError.mockRestore();
   });

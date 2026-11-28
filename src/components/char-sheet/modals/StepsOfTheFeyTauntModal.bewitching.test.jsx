@@ -1,38 +1,19 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // CLA-037: Bewitching Magic rides the StepsOfTheFeyTauntModal in its own mode —
 // unlimited free Misty Step confirm, never the 4-option chooser, never the
 // Steps_of_the_Fey free-cast counter, and every resolution logs.
 // Payload shape (mode/unlimited flags) is owned by bewitchingMagicHandler.test.js;
-// this lane pins modal-side behavior only: the accept and decline resolutions.
+// the moved/moved:false token-move prose is owned by tokenMove.test.jsx.
+// This lane pins modal-side resolutions only: accept and decline.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
-const promptState = vi.hoisted(() => ({ n: 0 }));
-
+// This mode mints no save prompts (pinned by the not.toHaveBeenCalled asserts
+// below), so a shape-faithful stub is enough to satisfy the module import.
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
-  logSaveDismissed: vi.fn(() => Promise.resolve()),
-    // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
-    // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
-    // the FIRST arg into a fully-shared prompt-<targetName> id: two listeners on
-    // one prompt name would resolve each other (fix#1426/#1431 collision family).
-    // Returns exactly { promptId, promise } with a name-agnostic unique-per-mint
-    // id (mirrors utils.guid(), savePrompt.js:106) and a one-shot 'save-result'
-    // promise routed BY its own promptId (savePrompt.js:121-131). This mode
-    // rolls no saves (pinned below).
-    createSaveListener: vi.fn((_campaignName, _config) => {
-        const promptId = `save-guid-${++promptState.n}`;
-        const promise = new Promise((resolve) => {
-            const handleSaveResult = (event) => {
-                if (event.detail.promptId !== promptId) return;
-                window.removeEventListener('save-result', handleSaveResult);
-                resolve(event.detail);
-            };
-            window.addEventListener('save-result', handleSaveResult);
-        });
-        return { promptId, promise };
-    }),
+    logSaveDismissed: vi.fn(() => Promise.resolve()),
+    createSaveListener: vi.fn(() => ({ promptId: 'spurious', promise: Promise.resolve({}) })),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -92,25 +73,27 @@ describe('StepsOfTheFeyTauntModal — Bewitching Magic mode', () => {
         render(<StepsOfTheFeyTauntModal {...baseProps} />);
         fireEvent.click(screen.getByTestId('bewitching-free-cast-btn'));
 
-        // §8.1 seam: the free-cast leg now awaits the (self-gating) token-move
-        // seam before logging/resolving — OFF degrade lands as microtasks.
+        // Wait on the rendered confirm view (the seam is awaited before
+        // setResult), not on the fire-and-forget addEntry promise.
         await waitFor(() => {
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'HexWarlock',
-                abilityName: 'Bewitching Magic',
-                description: expect.stringContaining('cast Misty Step for free via Bewitching Magic — no spell slot consumed'),
-                freeCastsUnlimited: true,
-            }));
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'HexWarlock',
+            abilityName: 'Bewitching Magic',
+            description: expect.stringContaining('cast Misty Step for free via Bewitching Magic — no spell slot consumed'),
+            freeCastsUnlimited: true,
+        }));
         // Declining is a separate lane — accepting must not log a decline entry.
         expect(addEntry.mock.calls.filter(([, e]) => e && e.automationDetail === 'bewitching_magic_declined')).toHaveLength(0);
         // Never the Steps_of_the_Fey free-cast counter, and bewitching rolls no saves.
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(createSaveListener).not.toHaveBeenCalled();
 
-        expect(screen.getByText(/without expending a spell slot/i)).toBeInTheDocument();
-        expect(screen.getByText(/unlimited — no uses limit/)).toBeInTheDocument();
+        // Confirm view replaces the prompt and reports the unlimited counter text.
+        expect(screen.queryByTestId('bewitching-free-cast-btn')).toBeNull();
+        expect(screen.getByText(/Cast Misty Step without expending a spell slot \(unlimited — no uses limit\)/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
         expect(baseProps.onClose).toHaveBeenCalledTimes(1);
     });

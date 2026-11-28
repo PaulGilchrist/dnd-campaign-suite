@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0084: Adult Bronze Dragon Thunderclap picker — 20-ft Radius, DC 17
 // CON, 3d6 Thunder, dc_success NONE. Copy never carries the half-damage
 // boilerplate (success = no damage), and the picker stays inert until the
@@ -7,7 +7,9 @@
 // conditionDurationNote seam) — the MA-0063 1-minute repeat-save copy only
 // survives on rows without an authored until-clause (byte-exact, MA-0063
 // family canon incl. the literal 'Blinded' variant). Per-target adjudication
-// rides the mixed-confirm RNG seam (2 draws/target: fail, fail, save, save).
+// rides the mixed-confirm RNG seam (2 draws/target: fail, save), whose
+// saved-target leg doubles as the all-saves face (no damage call, no
+// condition log, honest "Saved — takes no damage" row).
 // Data-pins + routing live in MonsterCardModal.thunderclap-sphere.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -155,22 +157,6 @@ describe('MA-0084 Thunderclap picker — save math + Deafened duration honesty',
     expect(runtime.store['Thug 1.activeConditions']).toEqual(['deafened']);
     // Per-target grant (positive leg above): the saving throw succeeds, nothing lands.
     expect(conditionLogsFor('Brute 2')).toHaveLength(0);
-    expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
-  });
-
-  it('succeeded CON saves: zero damage, no Deafened grant, honest "no damage" result rows', async () => {
-    // d20 pinned to 19: Thug 1 (19 − 1 = 18) and Brute 2 (19 + 7 = 26) both beat DC 17.
-    spyRandom([0.9, 0.9]);
-    renderClap();
-    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
-    fireEvent.click(document.querySelector('.sp-roll-btn'));
-    await waitFor(() => expect(document.querySelector('.abjure-result-success')).toBeTruthy());
-    const results = document.querySelector('.abjure-results-list').textContent;
-    expect(results).toMatch(/Thug 1.*Saved — takes no damage \(rolled 19 \+ -1 = 18 vs DC 17\)/s);
-    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19 \+ 7 = 26 vs DC 17\)/s);
-    expect(results).not.toMatch(/Failed/);
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(runtime.store['Thug 1.activeConditions']).toBeUndefined();
     expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
   });
 

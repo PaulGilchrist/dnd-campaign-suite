@@ -1,12 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1584: Thri-Kreen Bite — save_effect carried the deep-band word
 // "paralyzed" AND the repeat-save prose ungated, so extractConditionsFromSaveEffect
 // (§1105 whole-prose harvest) sprayed poisoned AND paralyzed on EVERY failed
 // save and the EOT repeat never fired (§622: prose repeat clause has no parser).
 // Fix (DATA, thri-kreen Bite ONLY): shallow-band save_effect "Failure: poisoned
 // for 1 minute." + structured save_margin {fails_by:5, also:"paralyzed"}
-// (snake_case byte-shape, pseudodragon Sting / drow Hand Crossbow twins
-// §MA-1351/MA-0642) + first-in-repo row-level repeat_save WITH an `effect`
+// (snake_case byte-shape, pseudodragon Sting / drow elite warrior Hand Crossbow
+// twins §MA-1351/MA-0642) + first-in-repo row-level repeat_save WITH an `effect`
 // key — the generic MA-0048 lane: armRepeatSaveClause (saveProcessing.js
 // :825-832) forks on repeatSave.effect to grantRepeatSaveEffect (te
 // thri_kreen_bite_poison, registered Attack group), consumed at turn-END by
@@ -14,12 +14,18 @@
 // stay on the FP-only trackFrightfulPresence leg byte-identical — never
 // route this row there (fork no-op pinned generically by
 // repeatSaveService.test.js; FP lane owned by saveProcessing.frightful-presence.test.js).
-// Parser truth table for parseSaveMarginClause is owned by
-// MonsterCardHelpers.save-margin.test.js — only the thri-kreen disk anchor
-// rides live here. Spellcasting row owned by ma1591 sibling.
+// OWNERSHIP TRIM (2026-11-28): parser truth table → MonsterCardHelpers.save-margin
+// (disk anchors live here); generic margin-band mechanics (deep fail-by-5 rider,
+// merged rounds:10 clock, data-derived prose) on THIS disk row → proved by
+// saveProcessing.save-margin-rider.test.js:210-226; te registry metadata golden →
+// targetEffectDefinitions.test.js census; 1/Day counters / Spellcasting row →
+// ma1591 sibling. This file keeps: Bite two-band disk lock, buildSaveOptions/
+// saveChipPlan transport, sibling twin byte-locks (cite-skip owner, see
+// MonsterCardHelpers.save-margin.test.js header), success boundary (no te arm),
+// shallow fail arm, and the disk-row arm→turn-END-consume e2e.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { extractConditionsFromSaveEffect, parseSaveMarginClause } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 import { buildSaveOptions, saveChipPlan } from './MonsterCardModal.jsx';
 import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
@@ -109,7 +115,7 @@ beforeEach(() => {
 });
 
 describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic repeat lane', () => {
-  it('Bite disk row two-band shape: shallow save_effect harvests POISONED ONLY, save_margin arms the deep band, repeat_save names its te, RAW prose intact', () => {
+  it('Bite disk row two-band shape: shallow save_effect harvests POISONED ONLY, deep band rides the structured save_margin key only, repeat_save names its te, dc_success none + placement, RAW prose intact', () => {
     const row = BITE();
     // shallow band: NO "paralyzed" word and no repeat prose — the §1105
     // whole-prose harvest must not spray the deep condition (live call)
@@ -118,10 +124,9 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
     expect(row.save_effect.toLowerCase()).not.toContain('repeat');
     expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['poisoned']);
     // deep band rides ONLY the structured snake_case key (twins §MA-1351/MA-0642);
-    // live parser forward pinned here, truth table owned by save-margin.test.js
+    // the live parse rides this file's buildSaveOptions transport test below
     expect(row.save_margin).toEqual({ fails_by: 5, also: 'paralyzed' });
     expect(row.save_margin.failsBy).toBeUndefined();
-    expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
     // first-in-repo row-level repeat_save WITH effect key — the `effect`
     // fork separates it from the frightened-hardcoded FP legacy shape
     expect(row.repeat_save).toEqual({
@@ -133,6 +138,7 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
     // fix#172 family: rider-only save leg (formula null, saveChipPlan pin
     // below) — dc_success:"none" authored after save_type (MA-0030 placement)
     // kills the MV-20 fabricated half-damage copy; RAW success = nothing.
+    // dc-success-half-leak-family.test.js cite-skips this row to THIS lane.
     expect(row.dc_success).toBe('none');
     expect(Object.keys(row).indexOf('dc_success')).toBe(Object.keys(row).indexOf('save_type') + 1);
     // housekeeping + rules provenance stay in the description
@@ -142,18 +148,10 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
     expect(row.description).toMatch(/repeat the saving throw at the end of each of its turns/);
   });
 
-  it('te thri_kreen_bite_poison registered Attack group, repeat-save badge copy', () => {
-    const def = getEffectDefinition('thri_kreen_bite_poison');
-    expect(def).toBeTruthy();
-    expect(def).toMatchObject({ label: 'Poisoned', group: 'Attack', cls: 'effect-debuff' });
-    expect(def.fields).toEqual(['source', 'dc', 'saveType']);
-    expect(def.description).toMatch(/repeats the CON save/i);
-    expect(def.description).toMatch(/ending the Poisoned condition on itself on a success/);
-  });
-
   it('modal seams forward the row: save transport threads conditions + margin + repeatSave, save chip stays a clickable condition rider', () => {
     const opts = buildSaveOptions(BITE());
     expect(opts.saveConditions).toEqual(['poisoned']);
+    // live parseSaveMarginClause output on the disk row rides the transport
     expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
     expect(opts.repeatSave).toEqual(BITE().repeat_save);
     expect(saveChipPlan(BITE(), false)).toEqual({ riderOnly: true, formula: null, rollable: false, clickable: true });
@@ -174,7 +172,12 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
 });
 
 describe('MA-1584 margin bands via processSaveRoll (rider-only DC chip seam)', () => {
-  it('SUCCESS boundary (total 11 = DC 11): zero conditions, zero te, zero clock', async () => {
+  // Deep-band mechanics (fail-by-5 paralyzed + ONE merged rounds:10 clock +
+  // data-derived prose) on THIS disk row are proved generically by
+  // saveProcessing.save-margin-rider.test.js (thriKreenContext deep-fail pin)
+  // — never re-pinned here.
+
+  it('SUCCESS boundary (total 11 = DC 11): zero conditions, zero te (repeat save never arms), no clock', async () => {
     await resolveNpcSave(11);
     expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
     expect(appliedLogs()).toHaveLength(0);
@@ -182,41 +185,15 @@ describe('MA-1584 margin bands via processSaveRoll (rider-only DC chip seam)', (
     expect(addExpiration).not.toHaveBeenCalled();
   });
 
-  it('shallow FAIL margin 4 (total 7 vs DC 11): POISONED ONLY — no paralyzed over-grant, no clock', async () => {
+  it('shallow FAIL margin 4 (total 7 vs DC 11): POISONED ONLY (no paralyzed over-grant, no clock) and arms repeat-save te thri_kreen_bite_poison', async () => {
     await resolveNpcSave(7);
     expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned']);
     expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned']);
     expect(runtimeStore[`${TARGET}.activeConditionMeta`].poisoned).toMatchObject({ source: ATTACKER });
     expect(addExpiration).not.toHaveBeenCalled();
-  });
 
-  it('deep FAIL at the margin-5 boundary (total 6 vs DC 11): Poisoned + Paralyzed with source meta, log, ONE merged rounds:10 clock (authored 1 minute ×10)', async () => {
-    await resolveNpcSave(6);
-    expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'paralyzed']);
-    const conds = appliedLogs().map(e => e.condition);
-    expect(conds).toContain('Poisoned');
-    expect(conds).toContain('Paralyzed');
-    const para = appliedLogs().find(e => e.condition === 'Paralyzed');
-    expect(para.sourceName).toBe(ATTACKER);
-    expect(para.sourceAbility).toBe('Bite');
-    expect(para.description).toMatch(/failed the save by 5/);
-    expect(addExpiration).toHaveBeenCalledTimes(1);
-    expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
-      attackerName: ATTACKER,
-      targetName: TARGET,
-      campaignName,
-      rounds: 10,
-      effects: [
-        { type: 'condition', condition: 'poisoned' },
-        { type: 'condition', condition: 'paralyzed' },
-      ],
-    }));
-  });
-});
-
-describe('MA-1584 generic repeat-save lane (disk-row arm through turn-END consumption)', () => {
-  it('failed save arms te thri_kreen_bite_poison with repeatSave descriptor + armed log', async () => {
-    await resolveNpcSave(7);
+    // the row-level repeat_save.effect fork grants the registered te
+    expect(getEffectDefinition('thri_kreen_bite_poison')).toBeTruthy();
     const te = tes().find(t => t.effect === 'thri_kreen_bite_poison');
     expect(te).toBeTruthy();
     expect(te.target).toBe(TARGET);
@@ -227,7 +204,9 @@ describe('MA-1584 generic repeat-save lane (disk-row arm through turn-END consum
     expect(te.duration).toBe('until_repeat_save_succeeds');
     expect(logs.some(e => e.type === 'automation' && e.automationType === 'thri_kreen_bite_poison_repeat_save_armed')).toBe(true);
   });
+});
 
+describe('MA-1584 generic repeat-save lane (disk-row arm through turn-END consumption)', () => {
   it('full turn-END cycle: FAIL keeps te + Poisoned, SUCCESS strips te and ends Poisoned', async () => {
     await resolveNpcSave(7);
 

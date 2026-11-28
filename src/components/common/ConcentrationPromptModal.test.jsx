@@ -1,5 +1,4 @@
-// @maintained-by-ai 2026-10-17
-// @improved-by-ai
+// @maintained-by-ai 2026-11-27 (improved-and-trimmed)
 // ConcentrationPromptModal — queue management, roll submission, and result display.
 //
 // Mock boundaries (true seams only): dice (determinism), the network send
@@ -11,8 +10,13 @@
 // must emerge from actual modifiers, never from a pinned mock return.
 //
 // Covered elsewhere, not repeated here:
-// - Holy Aura te advantage end-to-end: ConcentrationPromptModal.holy-aura.test.jsx
-// - resolveConcentrationRoll te-disadvantage math: concentrationPromptRoll.te-disadvantage.test.js
+// - Holy Aura te advantage end-to-end AND the advantage/disadvantage offset
+//   into one plain d20: ConcentrationPromptModal.holy-aura.test.jsx
+// - resolveConcentrationRoll te-disadvantage math + Starry floor on a
+//   keep-low die: concentrationPromptRoll.te-disadvantage.test.js
+// - cross-tab null echoes, result-echo re-roll refusal, Roll double-click
+//   latch: ConcentrationPromptModal.cross-tab.test.jsx
+// - same-target multi-hit promptId scoping: ConcentrationPromptModal.multi-hit.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
@@ -136,12 +140,10 @@ describe('ConcentrationPromptModal', () => {
     expect(screen.queryByRole('button', { name: /roll con save/i })).not.toBeInTheDocument();
   });
 
-  it('does not subscribe when the browser lacks EventSource support', () => {
-    delete globalThis.EventSource;
-    render(<ConcentrationPromptModal campaignName={CAMPAIGN} characters={[]} activeMapName={null} />);
-    expect(screen.queryByTestId('subscriber')).not.toBeInTheDocument();
-    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-  });
+  // (The `typeof EventSource` feature gate is not pinned: every production
+  // browser has EventSource, the app requires SSE, and the only observable
+  // it changes — "no modal ever appears" — is already the no-prompt baseline
+  // above. Its assertion keyed off the mock's own testid, not app output.)
 
   it('ignores runtime events from channels other than concentrationPrompt', async () => {
     render(<ConcentrationPromptModal campaignName={CAMPAIGN} characters={[makeRoller()]} activeMapName={null} />);
@@ -186,14 +188,16 @@ describe('ConcentrationPromptModal', () => {
 
   it('resolved head with a waiting sibling reads "(1 remaining)" — never the frozen "(1 of 2)"', async () => {
     // Resolved-face counter honesty (QE 2026-11-19 backlog), same pattern as
-    // SavePromptModal: the answered head leaves the pending tally.
+    // SavePromptModal: the answered head leaves the pending tally. The
+    // shared promptQueueCounterText helper has no unit coverage, so this
+    // modal-level mount is what pins the resolved-face copy.
     await openPrompt();
     fireEvent.click(screen.getByTestId('subscriber-trigger-second'));
     await waitFor(() => { expect(screen.getByText('(1 of 2)')).toBeInTheDocument(); });
 
     await rollAndSeeResult();
 
-    expect(document.querySelector('.cnp-header').textContent.trim()).toBe('Concentration Check (1 remaining)');
+    expect(screen.getByText('(1 remaining)')).toBeInTheDocument();
     expect(screen.queryByText(/\d+ of \d+/)).not.toBeInTheDocument();
   });
 
@@ -252,9 +256,10 @@ describe('ConcentrationPromptModal', () => {
 
   // ── Submission contract ──
 
-  it('sends the complete result payload for a plain save', async () => {
+  it('sends the complete result payload and clears only the adjudicated promptId', async () => {
     await openPrompt();
     await rollAndSeeResult();
+    expect(sendConcentrationResult).toHaveBeenCalledTimes(1);
     expect(sendConcentrationResult).toHaveBeenCalledWith(CAMPAIGN, ROLLER, {
       promptId: 'test-prompt-1',
       success: true,
@@ -268,37 +273,41 @@ describe('ConcentrationPromptModal', () => {
       advantageSources: [],
       disadvantageSource: null,
     });
+    // promptId-scoped clear: only the adjudicated prompt's key leaves the
+    // store — a sibling multi-hit prompt keeps its own.
+    expect(clearConcentrationPrompt).toHaveBeenCalledTimes(1);
+    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER, 'test-prompt-1');
   });
 
-  it('dispatches a concentration-result event carrying the resolved outcome', async () => {
-    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
+  it('dispatches the complete concentration-result detail and renders the aura-inclusive breakdown', async () => {
+    // One aura fixture (bonus 2, 'Paladin') pins BOTH the full local
+    // broadcast shape AND its rendered breakdown line in one harness.
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Paladin' });
     const eventHandler = vi.fn();
     window.addEventListener('concentration-result', eventHandler);
     try {
       await openPrompt();
       await rollAndSeeResult();
       await waitFor(() => { expect(eventHandler).toHaveBeenCalledTimes(1); });
-      expect(eventHandler.mock.calls[0][0].detail).toEqual(expect.objectContaining({
+      expect(eventHandler.mock.calls[0][0].detail).toEqual({
         promptId: 'test-prompt-1',
         targetName: ROLLER,
+        success: true,
+        roll: 10,
+        total: 15, // 10 + CON +3 + aura +2
+        saveBonus: 5,
+        bonusDetail: '(+2 aura from Paladin)',
         spellName: 'Bless',
         dc: 10,
-        roll: 10,
-        saveBonus: 6, // CON +3 plus aura +3
-        bonusDetail: '(+3 aura from Paladin)',
-        success: true,
         mode: 'normal',
-      }));
+        rawRolls: [10],
+        advantageSources: [],
+        disadvantageSource: null,
+      });
+      expect(screen.getByText(/d20 \(10\) \+ 5 \(\+2 aura from Paladin\)/)).toBeInTheDocument();
     } finally {
       window.removeEventListener('concentration-result', eventHandler);
     }
-  });
-
-  it('clears the server-side prompt after the roll is sent', async () => {
-    await openPrompt();
-    await rollAndSeeResult();
-    // promptId-scoped clear: only the adjudicated prompt's key leaves the store.
-    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER, 'test-prompt-1');
   });
 
   // ── Advantage / disadvantage from real modifiers ──
@@ -339,18 +348,9 @@ describe('ConcentrationPromptModal', () => {
     }));
   });
 
-  it('offsets advantage against disadvantage into one plain d20 with no mode badge', async () => {
-    await openPrompt([makeRoller({ saveModifiers: [CON_ADVANTAGE_MOD] }), BREAKER_ATTACKER]);
-    await rollAndSeeResult();
-
-    expect(rollD20).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('ADVANTAGE')).not.toBeInTheDocument();
-    expect(screen.queryByText('DISADVANTAGE')).not.toBeInTheDocument();
-    expect(sendConcentrationResult).toHaveBeenCalledWith(CAMPAIGN, ROLLER, expect.objectContaining({
-      mode: 'normal',
-      rawRolls: [10],
-    }));
-  });
+  // (The advantage+disadvantage → single plain d20 offset branch is pinned
+  // twice already — modal-level in holy-aura.test.jsx and unit-level in
+  // concentrationPromptRoll.te-disadvantage.test.js — never a third time.)
 
   // ── Starry Form (Dragon) floor ──
 
@@ -370,14 +370,5 @@ describe('ConcentrationPromptModal', () => {
       total: expectedRoll + 3,
       mode: 'normal',
     }));
-  });
-
-  // ── Result breakdown rendering ──
-
-  it('renders the result breakdown including the aura bonus detail', async () => {
-    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Paladin' });
-    await openPrompt();
-    await rollAndSeeResult();
-    expect(screen.getByText(/d20 \(10\) \+ 5 \(\+2 aura from Paladin\)/)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0963: Half-Dragon "Dragon's Breath" (BY-name disk lock #387 family) — the
 // save row was damage-less on BOTH legs: it authored NO damage_dice_primary/
 // damage_type_primary, so the save/picker route (saveChipPlan.formula ->
@@ -12,7 +12,10 @@
 // the exact-lowercase resistance compare = full-damage cosmetic pass-through).
 // dc_success stays UNAUTHORED = half (§63/MA-0618 prose). OWNED ELSEWHERE, not
 // re-pinned: secondary-null triple #589 (cultist :36-39)+#673, Cone shape parse
-// save-variant-shape:55-57/#640, save math applyDamage.save-full:19 (#597 rec), Claw BY-name #674, usage #571.
+// save-variant-shape:55-57/#640, save math applyDamage.save-full:19 (#597 rec),
+// Claw BY-name #674 (ma0962 file), usage #571. The two extractDamageDice branches
+// pinned here (authored-field short-circuit + HTML-anchor NO-match) are delegated
+// TO this file by MonsterCardModal.extract-damage-dice.test.jsx's ownership note.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -23,46 +26,35 @@ const halfDragon = monsters.find(m => m.index === 'half-dragon');
 const breath = halfDragon.actions.find(a => a.name === "Dragon's Breath");
 
 describe('MA-0963 Half-Dragon Dragon\'s Breath disk row (data lock)', () => {
-    it('is the DC 14 Dexterity 30-foot Cone recharge 5-6 save row', () => {
-        expect(breath.name).toBe("Dragon's Breath");
-        expect(breath.save_dc).toBe(14);
-        expect(breath.save_type).toBe('Dexterity');
-        expect(breath.range).toBe('30-foot Cone');
-        expect(breath.recharge).toBe('5-6');
-    });
-    it('authors damage_dice_primary "8d6" + honest composite type (the fix)', () => {
-        expect(breath.damage_dice_primary).toBe('8d6');
-        expect(breath.damage_type_primary).toBe('Acid/Cold/Fire/Lightning/Poison (GM-chosen)');
-    });
-    it('leaves dc_success UNAUTHORED (half-default honest vs prose half-on-save)', () => {
-        expect(breath.dc_success).toBeUndefined();
-    });
-    it('description prose stays byte-identical (fix is fields-only)', () => {
-        expect(breath.description).toContain('Failure:</strong> 28 (8d6) damage of the type chosen for the Draconic Origin trait');
-        expect(breath.description).toContain('<strong>Success:</strong> Half damage');
+    it('is the exact fixed row: DC 14 Dex 30-ft Cone recharge 5-6, authored 8d6 + honest composite type, full description bytes, dc_success UNAUTHORED (= half-default honest vs prose)', () => {
+        expect(breath).toEqual({
+            name: "Dragon's Breath",
+            description: "Dexterity Saving Throw: DC 14, each creature in a 30-foot <strong>Cone</strong>. <strong>Failure:</strong> 28 (8d6) damage of the type chosen for the Draconic Origin trait. <strong>Success:</strong> Half damage.",
+            save_dc: 14,
+            save_type: 'Dexterity',
+            range: '30-foot Cone',
+            save_effect: 'Half damage',
+            recharge: '5-6',
+            damage_dice_primary: '8d6',
+            damage_type_primary: 'Acid/Cold/Fire/Lightning/Poison (GM-chosen)',
+        });
     });
 });
 
-describe('MA-0963 picker pool transport feeds the 8d6 dice to both legs', () => {
-    it('extractDamageDiceFromDescription short-circuits on the authored field', () => {
+describe('MA-0963 picker transport feeds the 8d6 dice to both legs', () => {
+    it('extractDamageDiceFromDescription short-circuits on the authored field (branch owner: see header)', () => {
         expect(extractDamageDiceFromDescription(breath.description, breath.damage_dice_primary)).toBe('8d6');
     });
-    it('description WITHOUT the authored field stays unparseable (why the field is required)', () => {
+    it('description WITHOUT the authored field stays unparseable — </strong> breaks the prose anchor (why the field is required)', () => {
         // eslint-disable-next-line no-unused-vars
         const { damage_dice_primary, ...bare } = breath;
         expect(extractDamageDiceFromDescription(bare.description, bare.damage_dice_primary)).toBeNull();
     });
-    it('saveChipPlan yields a rollable 8d6 formula for the save chip', () => {
+    it('save chip rolls 8d6 AND picker options arm DC 14 dex + half-on-success default', () => {
         const plan = saveChipPlan(breath, false);
-        expect(plan.formula).toBe('8d6');
-        expect(plan.rollable).toBe(true);
-        expect(plan.clickable).toBe(true);
-    });
-    it('save options arm DC 14 dex + half default (PRIMARY-only pool)', () => {
+        expect(plan).toMatchObject({ formula: '8d6', rollable: true, clickable: true });
         const opts = buildSaveOptions(breath);
-        expect(opts.saveDc).toBe(14);
-        expect(opts.saveType).toBe('dex');
-        expect(opts.dcSuccess).toBe('half');
+        expect(opts).toMatchObject({ saveDc: 14, saveType: 'dex', dcSuccess: 'half' });
     });
 });
 

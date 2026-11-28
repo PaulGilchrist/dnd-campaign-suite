@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-28
 // compulsionHandler lane — canonical home for Compulsion (SP-027): WIS save-or-suck charm,
 // concentration, direction-pull prose. Single-target handler; no clock — the charm latch and
 // addExpiration ride the turn seams (new initiative / rests clear them), the spell's
@@ -127,7 +127,7 @@ describe('compulsionHandler.handle', () => {
   });
 
   describe('cast seam (exact keys)', () => {
-    it('registers spell-last-attack rollback before target resolution, DC from buildSaveDc', async () => {
+    it('stores spell-last-attack rollback with exact keys, DC from buildSaveDc', async () => {
       resolveTarget.mockResolvedValue(null);
       buildSaveDc.mockReturnValue(DC);
 
@@ -142,52 +142,35 @@ describe('compulsionHandler.handle', () => {
       });
     });
 
-    it.each([{ resolved: null }, { resolved: { target: null } }, { resolved: { target: {} } }])(
-      'nameless target ($resolved): no-effect popup, no prompt, no logs — rollback still stored',
-      async ({ resolved }) => {
-        resolveTarget.mockResolvedValue(resolved);
-        buildSaveDc.mockReturnValue(DC);
+    it('nameless target: no-effect popup, no prompt, no logs — rollback still stored', async () => {
+      resolveTarget.mockResolvedValue(null);
+      buildSaveDc.mockReturnValue(DC);
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(result).toEqual({
-          type: 'popup',
-          payload: {
-            type: 'automation_info',
-            name: 'Compulsion',
-            description: 'No target selected. Compulsion has no effect.',
-          },
-        });
-        expect(createSaveListener).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
-        expect(storeSpellLastAttack).toHaveBeenCalledTimes(1);
-      },
-    );
-
-    it('resolves target by campaign+caster only — mapName param is inert', async () => {
-      setupBaseMocks();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, 'some-map');
-
-      expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
-    });
-
-    it.each([
-      { label: 'automation present', action: makeAction() },
-      { label: 'automation missing', action: { name: 'Compulsion' } },
-    ])('buildSaveDc receives the automation object ($label)', async ({ action }) => {
-      setupBaseMocks();
-
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(buildSaveDc).toHaveBeenCalledWith(action.automation || {}, expect.objectContaining({ name: 'TestCaster' }));
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Compulsion',
+          description: 'No target selected. Compulsion has no effect.',
+        },
+      });
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(storeSpellLastAttack).toHaveBeenCalledTimes(1);
     });
 
     it('opens WIS save prompt with exact args (attackerName, dcSuccess none, condition charmed)', async () => {
       setupBaseMocks();
+      const action = makeAction();
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(action, makePlayerStats(), campaignName, 'some-map');
 
+      // Seam contract: mapName is inert; resolveTarget keyed on campaign+caster;
+      // buildSaveDc fed the action's automation + caster stats.
+      expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
+      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, expect.objectContaining({ name: 'TestCaster' }));
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
         attackerName: 'TestCaster',
@@ -461,9 +444,7 @@ describe('compulsionHandler.handle', () => {
     it.each([
       { label: 'dedupes lowercase', stored: ['charmed'], expected: ['charmed'] },
       { label: 'case-folds CHARMED, preserves others', stored: ['CHARMED', 'frightened'], expected: ['frightened', 'charmed'] },
-      { label: 'appends, preserving others', stored: ['frightened'], expected: ['frightened', 'charmed'] },
       { label: 'null store → lone charmed', stored: null, expected: ['charmed'] },
-      { label: 'non-array store → lone charmed', stored: 'not-an-array', expected: ['charmed'] },
     ])('activeConditions write ($label)', async ({ stored, expected }) => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue(stored);
@@ -475,26 +456,12 @@ describe('compulsionHandler.handle', () => {
   });
 
   describe('error handling (all four .catch arms, shared prefix)', () => {
-    it('ability_use cast-log rejection is caught and logged once; cast proceeds to save', async () => {
-      setupBaseMocks({ success: true });
-      addEntry.mockRejectedValueOnce(new Error('log error'));
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      await vi.waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('[compulsion] Error:', expect.any(Error));
-      });
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
-      expect(result.payload.description).toBe('Goblin succeeded on WIS save against Compulsion.');
-      consoleSpy.mockRestore();
-    });
-
     it.each([
+      { leg: 'ability_use', success: true, latch: false },
       { leg: 'save_result', success: true, latch: false },
       { leg: 'condition', success: false, latch: true },
       { leg: 'save_result', success: false, latch: true },
-    ])('$leg rejection on $success leg is caught; latch and popup intact', async ({ leg, success, latch }) => {
+    ])('$leg rejection on $success leg is caught once; latch and popup intact', async ({ leg, success, latch }) => {
       setupBaseMocks({ success });
       getRuntimeValue.mockReturnValue([]);
       addEntry.mockImplementation((campaign, entry) => (

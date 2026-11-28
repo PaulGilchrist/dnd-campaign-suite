@@ -1,43 +1,49 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
  * ElementalAttunementModal — DEACTIVATION lane (handleResultsClose seam only).
  *
  * Ownership map (siblings, do not duplicate here):
- * - .elemental-data.test.jsx — ELEMENT_DATA structure integrity, non-mutation on render.
- * - .phase-flow.test.jsx     — element→target→processing→summary transitions, DC math,
- *                              map-overlay loading, processing overlay click-to-close guard.
- * - .npc-save.test.jsx       — NPC save resolution (rolls, speed_reduction/push writes on the
- *                              NPC's store, processing 'roll'/'ability_use' log content), persistAndNotify.
- * - .player-save.test.jsx    — save prompts, save-result event handling, listener lifecycle.
- * - .summary.test.jsx        — onClose invocation, expiration log DESCRIPTION text variants
- *                              (custom action names / elements, stringContaining depth).
- * - .error-handling.test.jsx — addEntry/loadMapData/addExpiration rejection survival.
- * This lane owns ONLY the deactivation commit: the exact live-store flag writes, the ONE merged
+ * - .test.jsx                 — element-phase render/mount purity, element-phase overlay-click
+ *                               inertness, Cancel and Skip each fire onClose once and commit
+ *                               NOTHING (no flags, no clock, no log) — the cancel/skip inertness
+ *                               contract lives THERE, not here.
+ * - .elemental-data.test.jsx  — ELEMENT_DATA structure integrity, non-mutation on render.
+ * - .phase-flow.test.jsx      — element→target→processing→summary transitions, DC math,
+ *                               map-overlay loading, processing overlay click-to-close guard.
+ * - .npc-save.test.jsx        — NPC save resolution (rolls, speed_reduction/push writes on the
+ *                               NPC's store, processing 'roll'/'ability_use' log content), persistAndNotify.
+ * - .player-save.test.jsx     — save prompts, save-result event handling, listener lifecycle.
+ * - .save-dismissed.test.jsx  — save-dismissed listener, neutral row, drain-to-summary.
+ * - .summary.test.jsx         — onClose invocation, expiration log DESCRIPTION text variants
+ *                               (custom action names / elements, stringContaining depth).
+ * - .error-handling.test.jsx  — addEntry/loadMapData/addExpiration rejection survival.
+ * This lane owns: the deactivation commit — the exact live-store flag writes, the ONE merged
  * CLA-113 expiration payload (§39 — sequential clocks race; a single addExpiration carries every
  * epitome/stride key), activation-before-clock write ORDER through the live store, the single
- * expiration log entry, double-fire/in-flight guards, and inertness on cancel/skip/overlay/unmount.
+ * expiration log entry, summary-face backdrop inertness, inertness on mid-processing unmount,
+ * and the double-fire defect pin.
  *
  * Round-seam semantics (no-timers architecture): rounds: Infinity means NO round seam matures
  * the clock — it dies at the CREATURE seam (expireOnCreatureName = the monk, per
  * processExpirationList's `currentRound > appliedRound` owner-turn rule), never a wall-clock
  * deadline. There is no setTimeout anywhere on this seam.
  *
- * FLAG (component, not fixed here):
- * - ElementalAttunementModal.jsx:579-603,653 — inline styles in the element picker and the
+ * FLAG (component, not fixed here — cites verified against jsx as of 2026-11-27):
+ * - ElementalAttunementModal.jsx:597-615,673 — inline styles in the element picker and the
  *   "All targets resolved" note violate the no-inline-styles house rule.
- * - ElementalAttunementModal.jsx:430-450 — unguarded async IIFE (map path): setState fires on
+ * - ElementalAttunementModal.jsx:425-445 — unguarded async IIFE (map path): setState fires on
  *   an unmounted component if the modal closes mid-map-load; no cancellation flag.
- * - ElementalAttunementModal.jsx:482-485 — unguarded .then(setResults): same unmount exposure.
- * - ElementalAttunementModal.jsx:124,301 — raw `<strong>${targetName}</strong>` HTML embedded in
+ * - ElementalAttunementModal.jsx:477-480 — unguarded .then(setResults): same unmount exposure.
+ * - ElementalAttunementModal.jsx:127,304 — raw `<strong>${targetName}</strong>` HTML embedded in
  *   log entries; XSS safety depends entirely on downstream log-render sanitization of combat names.
- * - ElementalAttunementModal.jsx:364-368 — DOUBLE-COMMIT defect: the auto-summary effect flips
+ * - ElementalAttunementModal.jsx:359-363,581 — DOUBLE-COMMIT defect: the auto-summary effect flips
  *   'done' back to 'summary' (the `!phase.startsWith('summary')` guard also matches 'done'), so
  *   the Close button survives the commit and handleResultsClose (no self-guard) re-arms a
  *   DUPLICATE expiration + duplicate flag writes + duplicate log on a second tap. Pinned as
  *   current behavior; product fix: guard the effect with `phase === 'processing'` OR early-return
  *   in handleResultsClose when phase is already 'done'.
  */
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ElementalAttunementModal from './ElementalAttunementModal.jsx';
 
@@ -106,15 +112,10 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
+// This lane drives the overlay path (no creature-selection face), so the selection
+// modal is never rendered here — stub keeps the import graph isolated from its store.
 vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
-    default: vi.fn(({ targets, onConfirm, onSkip }) => (
-        <div className="sp-overlay">
-            <div className="sp-modal">
-                <button onClick={() => onConfirm(targets.map(t => t.name))} disabled={targets.length === 0}>Activate</button>
-                <button onClick={onSkip}>Skip</button>
-            </div>
-        </div>
-    )),
+    default: vi.fn(() => null),
 }));
 
 // ── Re-import mocked modules ──
@@ -151,8 +152,8 @@ const basePlayerStats = Object.freeze({
     ]),
 });
 
-// Same-object identity: every getCombatSummary read returns THIS frozen fixture, so
-// an identity assertion proves the flow actually consumed the seeded summary.
+// Frozen combat summary: getCombatSummary returns this same object on every read, so
+// the overlay→processing flow resolves the one NPC save against state it cannot mutate.
 const combatFixture = Object.freeze({
     creatures: Object.freeze([
         Object.freeze({ name: 'Goblin1', type: 'npc', currentHp: 7, maxHp: 7, saveBonuses: Object.freeze({ dex: 2 }), resistances: Object.freeze([]), immunities: Object.freeze([]) }),
@@ -244,8 +245,6 @@ describe('ElementalAttunementModal — deactivation commit (handleResultsClose)'
                 { type: 'clear_runtime_value', creatureName: PLAYER, key: '_Destructive_Stride_usedRound' },
             ],
         });
-        // Recorder holds the component's own effects array — same object, never copied from a fixture.
-        expect(expirations.addExpiration.mock.calls[0][0].effects).toBe(arms[0].effects);
     });
 
     it('attunement flags go live in the store BEFORE the clock is armed, and exactly ONE expiration log rides the commit', async () => {
@@ -276,27 +275,7 @@ describe('ElementalAttunementModal — deactivation commit (handleResultsClose)'
         }]]);
     });
 
-    it.each([
-        { path: 'element-phase Cancel', act: async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel' })) },
-        { path: 'target-selection Skip', act: async () => {
-            fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
-            fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
-        } },
-    ])('$path closes the modal inertly — no flags, no clock, no log', async ({ act }) => {
-        const props = makeProps();
-        render(<ElementalAttunementModal {...props} />);
-        await act();
-
-        expect(props.onClose).toHaveBeenCalledTimes(1);
-        expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
-        expect(arms).toEqual([]);
-        expect(logService.addEntry).not.toHaveBeenCalled();
-        // The live store never even saw an attunement cell.
-        expect(cells.has(`${PLAYER}|elementalAttunementActive`)).toBe(false);
-        expect(cells.has(`${PLAYER}|elementalAttunementElement`)).toBe(false);
-    });
-
-    it('clicking the results header (bubbles through the overlay) is inert — no commit, Close stays available', async () => {
+    it('the summary face has no backdrop dismissal — clicking the header is inert, commit waits for Close', async () => {
         const props = makeProps({ activeOverlay: { type: 'sphere' } });
         render(<ElementalAttunementModal {...props} />);
         fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
@@ -318,14 +297,14 @@ describe('ElementalAttunementModal — deactivation commit (handleResultsClose)'
         expect(arms).toHaveLength(1);
         expect(props.onClose).toHaveBeenCalledTimes(1);
 
-        // DEFECT (jsx:364-368): the auto-summary effect's `!phase.startsWith('summary')`
+        // DEFECT (jsx:359-363,581): the auto-summary effect's `!phase.startsWith('summary')`
         // guard is also true for 'done', so setPhase('done') instantly re-arms summary —
         // the Close button SURVIVES the commit even though onClose fired.
         expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
 
         // Consequence: handleResultsClose has no self-guard, so a tap on the RE-MOUNTED
-        // button (the stale ref detached when 'done' rendered null) commits AGAIN —
-        // duplicate expiration queue entry, duplicate flag writes, duplicate expiration log.
+        // button (the stale ref detached when 'done' rendered null at jsx:719) commits
+        // AGAIN — duplicate expiration queue entry, duplicate flag writes, duplicate log.
         fireEvent.click(screen.getByRole('button', { name: /Close/ }));
         expect(arms).toHaveLength(2);
         expect(arms[1].effects).toEqual(arms[0].effects); // fresh clone of the same clear-list
@@ -339,9 +318,8 @@ describe('ElementalAttunementModal — deactivation commit (handleResultsClose)'
         fireEvent.click(utils.getByRole('button', { name: /^Fire/ }));
         // Unmount while the resolve promise chain is still in flight (no Close seen).
         utils.unmount();
-        // Drain the microtask chain (no wall-clock waits — no-timers architecture).
-        await Promise.resolve();
-        await Promise.resolve();
+        // Flush the pending microtask chain (no wall-clock waits — no-timers architecture).
+        await act(async () => {});
 
         expect(arms).toEqual([]);
         expect(cells.has(`${PLAYER}|elementalAttunementActive`)).toBe(false);

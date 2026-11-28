@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // featBuffService.computeAllFeatBuffs.resilient.test.js — LANE #2021/9 of the featBuffService
 // nine-lane cluster (map in featBuffService.applyFeatBuffsToFormData.test.js header, #2016 law).
 // Subject seam: computeAllFeatBuffs (featBuffService.js:583-633) saveType resolution for the
@@ -15,7 +15,7 @@
 // NOT mocked here — it is a pure exact-name lookup (shared/featFinder.js) exercised for real
 // against the disk rows.
 //
-// CARRIED DEFECT/QUIRK PIN x3 (#2016/#2018/#2020 carry; playbook test-setup-playbook.md §13 "Feats/ASI mechanics")
+// CARRIED DEFECT/QUIRK PIN x4 (#2016/#2018/#2020 carry; playbook test-setup-playbook.md §13 "Feats/ASI mechanics")
 // — SPA-CACHE ROW MUTATION at featBuffService.js:626-627:
 //   feature.automation.saveType = resolved; delete feature.automation.fallbackTypes;
 //   feature.automation reaches the resolver as a DIRECT REFERENCE, not a copy, whenever the
@@ -40,7 +40,31 @@
 //
 // SHED (other lanes): envelope aggregation mechanics → #2018 (2024) / #2019 (5e); null/
 // undefined tolerance → #2020; benefit-text parser internals → #2022/#2023; ritual_spells
-// spellCastingAbility branch (L614-618) → #2024.
+// spellCastingAbility branch (L614-618) → #2024 (re-verified 2026-11-27: ritualMaster pins
+// that branch 4 ways — { assignment }, plain string, no-match, and the L617 spread
+// non-mutation — so this lane adds NO ritual legs; its #1960 "saveType/ritual" handoff
+// phrase resolves to saveType here, ritual to #2024's stronger coverage).
+//
+// 2026-11-27 IMPROVE-AND-TRIM (11→9 tests):
+//   - 5e { assignment }-resolution and plain-string-resolution legs MERGED into one test
+//     with TWO independent fresh clones (each leg needs its own pristine row — the resolver
+//     writes through the row reference; only the resolveFeatChosenAbility value-shape
+//     branch differs, the L626-627 write face is identical).
+//   - duplicate-Resilient 4-feature leg REMOVED: selection-order accumulation across
+//     repeated feats is #2019 aggregation law and the #1960 applyFeatBuffs handoff
+//     explicitly sheds multi-feat accumulation pins from this lane; its first-entry-wins
+//     law FOLDED into the raw-quirk leg below; feats[1].automation === row.automation
+//     (the shared-reference root) is already pinned by the baseline + resolution legs.
+//   - raw-quirk leg STRENGTHENED: now TWO matching keys ('Resilient-2' junk inserted
+//     before 'Resilient-1' Constitution) — kills sort/lower-index mutants AND a
+//     startsWith→exact-match mutant in one leg, on top of the existing
+//     normalization mutant.
+//   - formData deep-equal no-write witnesses ADDED to the baseline and resolution legs
+//     (mutation is scoped to the feats row, never the caller's formData).
+//   - Header source citations re-verified vs CURRENT bytes 2026-11-27: L583-633 compute,
+//     L614 ritual branch, L620-623 guard, L626-627 mutation, L563-572 5e passthrough,
+//     L334 parse2024SavingThrow passthrough — all match. Sibling OBSERVED count:
+//     applyFeatBuffs lane is 8 tests (post-#1960 sweep).
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
@@ -119,32 +143,47 @@ describe('computeAllFeatBuffs — 5e Resilient (verbatim public/data/feats.json 
     ]);
     expect(result.proficiencies).toEqual([]);
     expect(result.resistances).toEqual([]);
+    // formData itself is NEVER written — read-only input witness.
+    expect(formData).toEqual({ rules: '5e', feats: ['Resilient'] });
   });
 
-  it('resolves saveType from featAbilityChoices { assignment } on the "<Feat>-0" key — text feature updated fresh, row feature MUTATED in place (defect/quirk pin)', () => {
-    formData.featAbilityChoices = { 'Resilient-0': { assignment: 'Dexterity' } };
+  it('resolves saveType from BOTH featAbilityChoices value shapes — { assignment } object and plain string — each MUTATING the passed row automation in place (defect/quirk pin)', () => {
+    // Two INDEPENDENT fresh clones: each leg writes straight through the row reference
+    // (L626-627), so both need their own pristine row; the legs differ only in the
+    // resolveFeatChosenAbility value-shape branch, not the write face (merged 2026-11-27).
+    const objectRow = cloneDeep(diskRow5e);
+    const stringRow = cloneDeep(diskRow5e);
 
-    const result = computeAllFeatBuffs(formData, [row]);
-    const feats = saveProfs(result);
+    const objectForm = {
+      rules: '5e',
+      feats: ['Resilient'],
+      featAbilityChoices: { 'Resilient-0': { assignment: 'Dexterity' } },
+    };
+    const feats = saveProfs(computeAllFeatBuffs(objectForm, [objectRow]));
 
     expect(feats).toHaveLength(2);
+    // Text-derived feature (FRESH automation object) resolves to the choice...
     expect(feats[0].automation).toEqual({ type: 'save_proficiency', saveType: 'Dexterity' });
+    // ...and the row-reference feature IS the passed row's automation: saveType
+    // overwritten, fallbackTypes DELETED straight onto the row.
+    expect(feats[1].automation).toBe(objectRow.automation);
+    expect(objectRow.automation).toEqual({ type: 'save_proficiency', saveType: 'Dexterity' });
+    // formData itself is NEVER written — the mutation is scoped to the feats row.
+    expect(objectForm).toEqual({
+      rules: '5e',
+      feats: ['Resilient'],
+      featAbilityChoices: { 'Resilient-0': { assignment: 'Dexterity' } },
+    });
 
-    // QUIRK (featBuffService.js:626-627): the row-reference feature is mutated, and it IS
-    // the passed row's cached automation object — saveType overwritten, fallbackTypes DELETED
-    // straight onto the row.
-    expect(feats[1].automation).toBe(row.automation);
-    expect(row.automation).toEqual({ type: 'save_proficiency', saveType: 'Dexterity' });
-  });
-
-  it('resolves saveType from a plain-string choice value via the string branch, deleting fallbackTypes', () => {
-    formData.featAbilityChoices = { 'Resilient-0': 'Constitution' };
-
-    const result = computeAllFeatBuffs(formData, [row]);
-
-    expect(saveProfs(result)[0].automation).toEqual({ type: 'save_proficiency', saveType: 'Constitution' });
-    // Same row mutation as above — the string branch is not gentler to the cache.
-    expect(row.automation).toEqual({ type: 'save_proficiency', saveType: 'Constitution' });
+    // String branch: not gentler to the cache.
+    const stringFeats = saveProfs(
+      computeAllFeatBuffs(
+        { rules: '5e', feats: ['Resilient'], featAbilityChoices: { 'Resilient-0': 'Constitution' } },
+        [stringRow]
+      )
+    );
+    expect(stringFeats[0].automation).toEqual({ type: 'save_proficiency', saveType: 'Constitution' });
+    expect(stringRow.automation).toEqual({ type: 'save_proficiency', saveType: 'Constitution' });
   });
 
   it('keeps Strength + intact fallback ladder when the choice key does not prefix-match the feat name', () => {
@@ -166,35 +205,22 @@ describe('computeAllFeatBuffs — 5e Resilient (verbatim public/data/feats.json 
     expect(row).toEqual(diskRow5e); // unresolvable → zero cache pollution
   });
 
-  it('pins resolveFeatChosenAbility quirks: prefix match is loose (any "Resilient*" key wins, first-entry-wins for duplicates) and assignment is returned RAW (no normalization)', () => {
-    // FT-094 canonical keys are "<Feat>-<idx>", but the implementation is startsWith +
-    // first-entry + raw value. Pinning through this seam (abilityLookup has no own unit
-    // canon): lowercase junk assignment reaches saveType verbatim AND onto the cached row.
-    formData.featAbilityChoices = { 'Resilient-2': { assignment: 'dex' } };
+  it('pins resolveFeatChosenAbility quirks: loose startsWith (any "Resilient*" key wins regardless of index), first-entry-in-insertion-order wins (NOT lowest index), and assignment is returned RAW (no normalization)', () => {
+    // FT-094 canonical keys are "<Feat>-<featListIndex>", but the implementation is
+    // startsWith + first-entry + raw value. Pinning through this seam (abilityLookup has
+    // no own unit canon). With ONE selected feat the only canonical key is 'Resilient-0',
+    // yet 'Resilient-2' still matches and, being inserted first, its lowercase junk wins
+    // over the lower-index key — saveType gets 'dex' verbatim (normalizeAbilityName would
+    // have said 'Dexterity') AND onto the cached row.
+    formData.featAbilityChoices = {
+      'Resilient-2': { assignment: 'dex' },
+      'Resilient-1': { assignment: 'Constitution' },
+    };
 
     const result = computeAllFeatBuffs(formData, [row]);
 
     expect(saveProfs(result)[0].automation).toEqual({ type: 'save_proficiency', saveType: 'dex' });
     expect(row.automation).toEqual({ type: 'save_proficiency', saveType: 'dex' });
-  });
-
-  it('two Resilient entries with two choices still share ONE cached-row automation and both resolve to the FIRST choice entry (first-entry-wins, instance-2 choice is invisible)', () => {
-    formData.feats = ['Resilient', 'Resilient'];
-    formData.featAbilityChoices = {
-      'Resilient-0': { assignment: 'Dexterity' },
-      'Resilient-1': { assignment: 'Constitution' },
-    };
-
-    const result = computeAllFeatBuffs(formData, [row]);
-    const feats = saveProfs(result);
-
-    // 2 feats × (text feature + top-level automation feature) = 4.
-    expect(feats).toHaveLength(4);
-    expect(feats.map(f => f.automation.saveType)).toEqual(['Dexterity', 'Dexterity', 'Dexterity', 'Dexterity']);
-    // The two row-derived features share the single mutated automation reference.
-    expect(feats[1].automation).toBe(feats[3].automation);
-    expect(feats[1].automation).toBe(row.automation);
-    expect(row.automation).toEqual({ type: 'save_proficiency', saveType: 'Dexterity' });
   });
 });
 

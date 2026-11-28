@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0590: Demilich Howl emanation picker — CON DC 19, 20d6 Psychic, half on
 // save. The DATA-marked save_effect ("Failure or Success: The target has the
 // Frightened condition …") arms parseBothOutcomesClause, so SUCCESSFUL saves
@@ -129,7 +129,18 @@ describe('MA-0590 Demilich Howl emanation picker', () => {
     const { getByText } = renderHowl();
     await waitFor(() => expect(seenTargets.current.length).toBe(2));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    // Completeness gate: the grants land AFTER their rows' awaited damage
+    // legs (beguiling-song sequencing), so wait for every observable
+    // artifact — both damage rows, both condition logs, the success clock —
+    // before pinning presences AND absences below.
+    await waitFor(() => {
+      const done = addEntry.mock.calls.map(c => c[1]);
+      expect(done.some(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1' && e.saveResult === 'failure')).toBe(true);
+      expect(done.some(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 2' && e.saveResult === 'success')).toBe(true);
+      expect(done.some(e => e.type === 'condition' && e.characterName === 'Bandit 1')).toBe(true);
+      expect(done.some(e => e.type === 'condition' && e.characterName === 'Bandit 2')).toBe(true);
+      expect(expirations.current.some(e => e.targetName === 'Bandit 2')).toBe(true);
+    });
 
     const logs = addEntry.mock.calls.map(c => c[1]);
 
@@ -160,22 +171,38 @@ describe('MA-0590 Demilich Howl emanation picker', () => {
     expect(expirations.current.filter(e => e.targetName === 'Bandit 1')).toHaveLength(0);
   });
 
-  it('guardrail: bothOutcomesClause null — successful save pays half damage, NO condition/clock/log granted', async () => {
+  // saveConditions stay DEFAULT ([frightened], extracted from the real Howl row):
+  // only the clause is disarmed. Nulling both would not isolate the gate — a
+  // broken success-branch condition could also hide behind the empty list and
+  // the fail leg would lose its MA-0063 grant, making every assertion vacuous.
+  it('guardrail: bothOutcomesClause null with saveConditions intact — clause gates ONLY the success-leg grant (fail leg byte-inert: Frightened + full damage; success: half damage, NO condition/clock/log)', async () => {
     spyRandom([0.99, 0.99]); // nat 20 each: Bandit 1 fails (20-19<19, full dmg), Bandit 2 succeeds (half)
-    const { getByText } = renderHowl({ bothOutcomesClause: null, saveConditions: [] });
+    const { getByText } = renderHowl({ bothOutcomesClause: null });
     await waitFor(() => expect(seenTargets.current.length).toBe(2));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    // Completeness gate: wait for both damage rows and Bandit 1's fail-leg
+    // condition log (grants land after the awaited damage legs) before
+    // pinning the success-leg absences.
+    await waitFor(() => {
+      const done = addEntry.mock.calls.map(c => c[1]);
+      expect(done.some(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1' && e.saveResult === 'failure' && e.finalDamage === 10)).toBe(true);
+      expect(done.some(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 2' && e.saveResult === 'success' && e.finalDamage === 5)).toBe(true);
+      expect(done.some(e => e.type === 'condition' && e.characterName === 'Bandit 1')).toBe(true);
+    });
 
-    // Damage adjudication stays intact — the guardrail must disarm ONLY the
-    // success-leg condition grant.
+    // FAIL leg untouched by the clause (MA-0063): full damage + Frightened land.
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 10, expect.anything(), expect.anything());
+    expect(runtime.store['Bandit 1.activeConditions']).toEqual(['frightened']);
+
+    // SUCCESS leg disarmed: half damage still pays, but no grant of any kind.
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 2', 5, expect.anything(), expect.anything());
     expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 2' && e.saveResult === 'success' && e.finalDamage === 5)).toHaveLength(1);
-
-    expect(runtime.store['Bandit 1.activeConditions'] ?? null).toBeNull();
     expect(runtime.store['Bandit 2.activeConditions'] ?? null).toBeNull();
+    expect(runtime.store['Bandit 2.activeConditionMeta'] ?? null).toBeNull();
+
+    // The only condition log is Bandit 1's fail leg; no clocks fire at all.
+    const condLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition');
+    expect(condLogs.map(l => l.characterName)).toEqual(['Bandit 1']);
     expect(expirations.current).toHaveLength(0);
-    expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition')).toHaveLength(0);
   });
 });

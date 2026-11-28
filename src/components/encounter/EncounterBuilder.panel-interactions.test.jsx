@@ -1,9 +1,9 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // EncounterBuilder lane: table-row / selected-panel interactions + monster card modal.
 // This lane uniquely owns (per lane map): checkbox toggle incl. decrement-to-zero,
 // row qty controls visibility, row + selected-panel remove buttons, Clear All,
-// monster card modal open/close via the REAL viewingMonster runtime-store payloads,
-// and the empty-description initial state.
+// monster card modal open/close as PER-CLIENT state (the synced viewingMonster
+// broadcast was retired 2026-11-07), and the empty-description initial state.
 // Owned elsewhere — do NOT duplicate: sort/Join/save/thresholds (#399
 // additional-interactions), XP summary recomputation (#400 gameplay-flows),
 // localStorage/filter/bands (#401 helpers), load hydration/reconcile (#403
@@ -31,10 +31,13 @@ vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
 // itself is covered by the MonsterCardModal.* lanes.
 vi.mock('./EncounterModal.jsx', () => ({ default: () => null }));
 vi.mock('./EncounterGeneratorModal.jsx', () => ({ default: () => null }));
+// The stub echoes the exact payload bytes the modal receives: xp proves the
+// bestiary object arrived unmutated, and qty is only present when the payload
+// is a SELECTED entry (bestiary bytes + live qty) rather than a raw row monster.
 vi.mock('./MonsterCardModal.jsx', () => ({
   default: ({ monster, onClose }) => (
     <div role="dialog" aria-label={`Monster card: ${monster.name}`}>
-      <span>{monster.name}</span>
+      <span>{`${monster.name} | ${monster.xp}xp${monster.qty !== undefined ? ` | qty ${monster.qty}` : ''}`}</span>
       <button type="button" aria-label="Close monster card" onClick={onClose}>Close</button>
     </div>
   ),
@@ -107,12 +110,15 @@ beforeEach(() => {
 });
 
 describe('EncounterBuilder - panel interactions', () => {
-  it('drives row qty controls: unselected shows em-dash, select reveals qty 1, + raises, decrements to zero deselect', () => {
+  it('mounts with an empty description, then drives row qty controls: unselected shows em-dash, select reveals qty 1, + raises, decrements to zero deselect', () => {
     const { container } = mountBuilder();
     const checkbox = screen.getByRole('checkbox', { name: 'Select Goblin' });
     const qtyCell = () => rowFor(container, 'Goblin').querySelector('.col-qty');
 
-    // Unselected row: em-dash placeholder, no qty controls, no selected panel.
+    // Initial state: empty description...
+    expect(screen.getByLabelText('Description')).toHaveValue('');
+
+    // ...unselected row: em-dash placeholder, no qty controls, no selected panel.
     expect(checkbox.checked).toBe(false);
     expect(qtyCell().querySelector('.qty-value').textContent).toBe('\u2014');
     expect(qtyCell().querySelector('.qty-btn')).toBeNull();
@@ -174,36 +180,37 @@ describe('EncounterBuilder - panel interactions', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Orc' }).checked).toBe(false);
   });
 
-  it('opens the monster card modal from the row and selected panel with the exact bestiary payload, and closes it', () => {
+  it('opens the monster card modal per-client: raw bestiary bytes from the row, bestiary bytes + live qty from the selected panel, and closes both', () => {
     const { container } = mountBuilder();
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
+    const openWrites = () => setRuntimeValue.mock.calls.filter(([key]) => String(key).toLowerCase().includes('viewingmonster'));
 
-    // Row details button opens the modal as PER-CLIENT state — the bestiary
-    // object never touches the synced store (combat-ui/map/encounter
-    // viewingMonster keys retired 2026-11-07: a synced open card broadcast the
-    // monster stat block to every player tab and TV screen).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Goblin' }));
+
+    // Row details button opens the modal with the RAW bestiary monster as
+    // PER-CLIENT state — no qty field, and nothing reaches the synced store
+    // (the synced encounter-viewingMonster key was retired 2026-11-07: an open
+    // card broadcast the stat block to every player tab and TV screen). Pin any
+    // viewingMonster-shaped store write, not just the retired key literal.
     const table = within(container.querySelector('.encounter-monster-table-section'));
     fireEvent.click(table.getByRole('button', { name: 'View details for Goblin' }));
-    expect(screen.getByRole('dialog', { name: 'Monster card: Goblin' })).toBeInTheDocument();
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'encounter-viewingMonster', expect.anything(), CAMPAIGN);
+    const dialog = screen.getByRole('dialog', { name: 'Monster card: Goblin' });
+    expect(within(dialog).getByText('Goblin | 50xp')).toBeInTheDocument();
+    expect(openWrites()).toEqual([]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Close monster card' }));
     expect(screen.queryByRole('dialog')).toBeNull();
 
     // Selected-panel View button drives the same modal but passes the SELECTED
-    // entry — same bestiary bytes plus the live qty.
+    // entry — same bestiary bytes plus the live qty (2).
     fireEvent.click(within(container.querySelector('.encounter-selected')).getByRole('button', { name: 'View details for Goblin' }));
-    expect(screen.getByRole('dialog', { name: 'Monster card: Goblin' })).toBeInTheDocument();
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'encounter-viewingMonster', expect.anything(), CAMPAIGN);
+    const selectedDialog = screen.getByRole('dialog', { name: 'Monster card: Goblin' });
+    expect(within(selectedDialog).getByText('Goblin | 50xp | qty 2')).toBeInTheDocument();
+    expect(openWrites()).toEqual([]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Close monster card' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('starts with an empty description', () => {
-    mountBuilder();
-    expect(screen.getByLabelText('Description')).toHaveValue('');
   });
 });

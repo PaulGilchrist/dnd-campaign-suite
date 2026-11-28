@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18: 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0548 regression: Cyclops Sentry Limited Foresight — pre-roll cloud
 // reaction (recharge "6"). GATED_MONSTER_REACTIONS `limited_foresight` arms
 // the chip; the resolver gates on campaign lastAttack identity (parry
@@ -20,7 +20,6 @@ import {
   getGatedMonsterReaction,
   resolveMonsterGatedReaction,
   limitedForesightGate,
-  limitedForesightIdentityRefusal,
 } from './MonsterCardHelpers.js';
 import { MONSTER_RECHARGE_KEY, rollMonsterRecharges } from '../../services/encounters/monsterRecharge.js';
 import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
@@ -97,18 +96,16 @@ describe('MA-0548 disk row + registry', () => {
   });
 });
 
-describe('MA-0548 gate truth tables', () => {
-  it('limitedForesightIdentityRefusal truth table: armed null + six refusal tokens', () => {
-    expect(limitedForesightIdentityRefusal(lastAttack(), SENTRY)).toBeNull();
-    expect(limitedForesightIdentityRefusal(null, SENTRY)).toBe('trigger');
-    expect(limitedForesightIdentityRefusal(lastAttack({ targetName: 'ElderPaladin' }), SENTRY)).toBe('trigger');
-    expect(limitedForesightIdentityRefusal(lastAttack({ rollType: 'saving-throw' }), SENTRY)).toBe('roll');
-    expect(limitedForesightIdentityRefusal(lastAttack({ damageApplied: true }), SENTRY)).toBe('resolved');
-    expect(limitedForesightIdentityRefusal(lastAttack({ limitedForesightResolved: true }), SENTRY)).toBe('reacted');
-    expect(limitedForesightIdentityRefusal(lastAttack({ attackerName: SENTRY }), SENTRY)).toBe('attacker');
-  });
-
-  it('limitedForesightGate truth table: fresh accept; recharge/target/target/round refusals', () => {
+describe('MA-0548 gate truth table', () => {
+  // The identity probe is exercised THROUGH the gate (it only delegates and
+  // surfaces each token as `reason`) — one table, dispatch-facing tokens only.
+  it('every refusal token + fresh accept: trigger/roll/resolved/reacted/attacker, recharge, target, round', () => {
+    expect(gateCall({ lastAttack: null }).reason).toBe('trigger');
+    expect(gateCall({ lastAttack: lastAttack({ targetName: 'ElderPaladin' }) }).reason).toBe('trigger');
+    expect(gateCall({ lastAttack: lastAttack({ rollType: 'saving-throw' }) }).reason).toBe('roll');
+    expect(gateCall({ lastAttack: lastAttack({ damageApplied: true }) }).reason).toBe('resolved');
+    expect(gateCall({ lastAttack: lastAttack({ limitedForesightResolved: true }) }).reason).toBe('reacted');
+    expect(gateCall({ lastAttack: lastAttack({ attackerName: SENTRY }) }).reason).toBe('attacker');
     expect(gateCall()).toMatchObject({ ok: true, attackerName: KNIGHT, threshold: 6 });
     expect(gateCall({ rechargeMap: spentRecharge() })).toMatchObject({ ok: false, reason: 'recharge' });
     expect(gateCall({ rechargeMap: spentRecharge() }).message).toMatch(/d6 6\+/);

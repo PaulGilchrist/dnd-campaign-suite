@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1354 regression: Psychic Gray Ooze Mind Corrosion (At Will) gated reaction.
 // Gate: RAW campaign lastAttack with the monster as save-fail target on a
 // spell-origin effect (isSpellOriginLastAttack MA-0013 seam) + identifiable
@@ -9,12 +9,15 @@
 // MA-1242); refusals log mind_corrosion_refused and spend nothing; the
 // triggering save failure is stamped mindCorrosionResolved so it cannot refire.
 // Generic legs cite-skipped per REC #508: getGatedMonsterReaction(plainRow)
-// →null and monsterReactionUsesRemaining fresh/spend arithmetic live at
-// owner MonsterCardHelpers.gated-reaction.test.js:66-69.
+// →null + monsterReactionUsesRemaining fresh/spend/plain arithmetic at owner
+// MonsterCardHelpers.gated-reaction.test.js:66-69; the 999-sentinel →null
+// counter-hide (fresh AND after spends) at owner
+// services/encounters/monsterAbilityUses.at-will-sentinel.test.js:36-38 —
+// this file's data test pins the ooze row's uses:999 shape, so the sentinel
+// branch composition is covered without a twin leg here.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
-  monsterReactionUsesRemaining,
   mindCorrosionGate,
   mindCorrosionSpec,
   resolveMonsterGatedReaction,
@@ -89,10 +92,8 @@ describe('MA-1354 Mind Corrosion data + registry', () => {
     expect(MC_ACTION.trigger).toMatch(/fails a saving throw against a spell/);
   });
 
-  it('registry resolves mind_corrosion; At Will sentinel hides the counter (generic plain-row null at owner gated-reaction :66)', () => {
+  it('registry arms mind_corrosion; spec reads authored 1d6 Psychic + refuses a formula-less row (counter-hide at owner at-will-sentinel :36-38)', () => {
     expect(getGatedMonsterReaction(MC_ACTION)?.effect).toBe('mind_corrosion');
-    expect(monsterReactionUsesRemaining(MC_ACTION, {})).toBeNull();
-    expect(monsterReactionUsesRemaining(MC_ACTION, { mind_corrosion: 1 })).toBeNull();
     expect(mindCorrosionSpec({ name: 'Mind Corrosion' }).reason).toBe('formula');
     expect(mindCorrosionSpec(MC_ACTION).spec).toEqual({ formula: '1d6', damageType: 'Psychic' });
   });

@@ -1,19 +1,21 @@
-// @maintained-by-ai 2026-10-18
-/* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx:410-428).
- * handleReset touches ONLY component-local useState (EncounterBuilder.jsx:161-209; sort
- * state at :214-215 is deliberately NOT wiped) —
- * it never calls save/update/delete endpoints and never writes localStorage. The load
- * precondition uses the management-hook mock below (not the real
- * useEncounterManagement/useSyncedState) precisely so that server isolation is provable:
- * no real network layer exists in this file at all.
+// @maintained-by-ai 2026-11-28
+/* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx,
+ * handleReset). handleReset touches ONLY component-local useState (sort state is
+ * deliberately NOT wiped) — it never calls save/update/delete endpoints and never
+ * writes localStorage. The load precondition uses the management-hook mock below
+ * (not the real useEncounterManagement/useSyncedState) precisely so that server
+ * isolation is provable: no real network layer exists in this file at all.
  * Runs the REAL header, filter panel, summary panel, monster table, selected panel,
  * PreviewToggle and EncounterModal (#406 pattern — hand-written panel replicas deleted).
+ * Owned here: full-field wipe (incl. cross-monster Total XP 590 under the MOCKED
+ * multiplier, #2016), Clear-All/selected-panel disappearance after reset (#2047), and
+ * the post-reset Save routing (setCurrentEncounterName(null) severing — toolbar-labels
+ * pins only the button label, additional-interactions never loads an encounter first).
  * Owned elsewhere — do NOT duplicate: load hydrate/reconcile (#403 load-encounter),
  * sort/Join dispatch/save-modal commit (#399 additional-interactions), XP bands (#400
  * gameplay-flows), localStorage/filter persistence (#401 helpers), row chrome/clear-all
  * (#406 panel-interactions), generator-apply/header gate/default-no-Reset chrome (#407
- * remaining). Reset-button-absent-when-no-encounter is green in remaining.test.jsx:171;
- * its post-reset counterpart (setCurrentEncounterName(null)) is pinned here. */
+ * remaining, incl. Reset-absent-when-no-encounter). */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
@@ -141,13 +143,15 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
     expect(h.loadEncounterData).toHaveBeenCalledWith('test-encounter');
     expect(h.updateEncounter).not.toHaveBeenCalled();
 
-    // Dirty every resettable field: selection, qty, dropdown filters, CR bound,
-    // party composition, search, description.
+    // Dirty every resettable field: selection, qty, all dropdown filters, both CR
+    // bounds, party composition, search, description.
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Young Dragon' }));
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Young Dragon' }));
     fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'dragon' } });
+    fireEvent.change(screen.getByLabelText('Environment'), { target: { value: 'underground' } });
     fireEvent.change(screen.getByLabelText('CR Min'), { target: { value: '0.5' } });
+    fireEvent.change(screen.getByLabelText('CR Max'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: /Add player/ }));
     fireEvent.change(screen.getByLabelText('PC 1'), { target: { value: '20' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Search monsters' }), { target: { value: 'orc' } });
@@ -155,9 +159,11 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
 
     // Mutations actually took hold (guards the wipe assertions below from vacuity).
     expect(screen.getByRole('heading', { level: 2, name: /Test Encounter/ })).toBeInTheDocument();
-    expect(summaryValue('Total XP')).toBe('590'); // 50 + 300 + 2×120
+    expect(summaryValue('Total XP')).toBe('590'); // 50 + 300 + 2×120 (mocked multiplier)
     expect(screen.getByLabelText('PC 1')).toHaveValue(20);
+    expect(screen.getByLabelText('Environment')).toHaveValue('underground');
     expect(screen.getByLabelText('CR Min')).toHaveValue(0.5);
+    expect(screen.getByLabelText('CR Max')).toHaveValue(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
@@ -183,6 +189,7 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
     // Filters back to defaults; party re-derived from characters (Thorin 5, Elara 3).
     expect(screen.getByLabelText('Difficulty')).toHaveValue('1');
     expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('Environment')).toHaveValue('');
     expect(screen.getByLabelText('Size')).toHaveValue('');
     // CR bounds are number inputs — empty state reads back as null, not ''.
     expect(screen.getByLabelText('CR Min')).toHaveValue(null);

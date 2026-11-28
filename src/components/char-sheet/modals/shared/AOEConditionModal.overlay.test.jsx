@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 //
 // Overlay lane: the early-return render switch in AOEConditionModal.jsx
 // (targetName starts with 'overlay-' AND activeOverlay set → AreaEffectTargetModalBase)
@@ -204,6 +204,7 @@ describe('AOEConditionModal Overlay', () => {
             const goblinWrites = setRuntimeValue.mock.calls.filter(
                 call => call[0] === 'Goblin' && call[1] === 'activeConditions'
             );
+            expect(goblinWrites.length).toBeGreaterThan(0);
             expect(goblinWrites[0][2]).toContain('blinded');
 
             // ...player target prompted and tracked in the base ctx, not resolved locally.
@@ -268,11 +269,17 @@ describe('AOEConditionModal Overlay', () => {
             eligibleTargets: [],
             toggleTarget: vi.fn(),
         });
-        render(<div>{renderBody(ctx)}</div>);
+        const positive = render(<div>{renderBody(ctx)}</div>);
 
         const note = screen.getByText('All targets resolved.');
         expect(note.classList.contains('sp-note')).toBe(true);
         expect(note.classList.contains('aoe-condition-resolved-note')).toBe(true);
         expect(note.getAttribute('style')).toBeNull();
+        positive.unmount();
+
+        // Negative: on the still-pending arm (processing, not allResolved) the
+        // note must stay conditional — never render unconditionally.
+        render(<div>{renderBody({ ...ctx, allResolved: false })}</div>);
+        expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
     });
 });

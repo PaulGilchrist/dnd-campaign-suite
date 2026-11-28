@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27 — IMPROVE-AND-TRIM pass (#1922): 22→18 cases; '1_minute'→10 minutes×10 re-pinned as honest bytes with #1822 divergence cite; custom-value tracking legs folded into one distinctive full-shape pin; saveType/condition fallbacks + mapData-null + log-radius-composition pairs consolidated; ordered exact-array censuses replace mid-test mockClear; *Once chains → beforeEach-rebaselined persistent rejections (leak-safe); header line refs re-verified (modalMap :287→:337, false conditionSaveService/damageRollback-mock claim corrected)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── PAIR seam map (greaseAreaSaveHandler.js — handle.test.js #1922 + areaSave.test.js #1921) ─
@@ -9,14 +9,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   (remove_grease_area), setCondition modal payload (full-shape — mine).
 // SIBLING greaseAreaSaveHandler.areaSave.test.js (#1921) — processGreaseAreaSave
 //   content + reader-side tracking guards: do NOT re-pin process* internals here.
-// Liveness (verified 2026-10-16, own greps):
+// Liveness (re-verified 2026-11-27 against current bytes):
 //   LIVE: handle() registered index.js:556 — 'grease_area_save' (5e spells.json
-//     grease automation[1]; 2024 parity entry added 2026-11-19 — both rulesets
-//     now route the recurring lane). Its setCondition modal is consumed live:
-//     useCharActionsAutomation.js:287 modalMap → CharActionModals.jsx renders
-//     SetConditionModal.jsx whose props destructure every pinned payload field
-//     (combatSummary/attackerName/attackerPos/saveDc/campaignName/mapData/
-//     featureName/conditionName/saveType/rangeFeet/durationRounds).
+//     grease automation[1]; 2024 parity entry present in
+//     public/data/2024/spells.json — both rulesets route the recurring lane).
+//     Its setCondition modal is consumed live: useCharActionsAutomation.js:337
+//     modalMap (`setCondition: simpleModal('setConditionModal')`, dispatch
+//     :269) → CharActionModals renders SetConditionModal.jsx whose props
+//     destructure every pinned payload field (:16 — combatSummary/attackerName/
+//     attackerPos/saveDc/campaignName/mapData/featureName/conditionName/
+//     saveType/rangeFeet/durationRounds).
 //   WIRED (2026-11-19, owner decision "WIRE IT" — SP-126 pattern copied):
 //     the tracking store's reader processGreaseAreaSave is now dispatched by
 //     expireStaleEffects.js Phase 6 (SP-111/SP-126 processZoneTurnStartSaves
@@ -33,9 +35,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //     durationRounds undefined and addExpiration dormant — pinned honestly in
 //     the 'raw spell JSON shape' test. snake_case '1_minute' remains the lane
 //     fixture convention (cf. index.test.js eyebite/SP-042).
-// Notes: rangeValidation + automationImmunities + conditionSaveService/damageRollback
-//   graph mocks isolate module-import side effects only — handle() itself calls
-//   neither playerIsImmuneToCondition nor isDistanceInRange (those are process-lane).
+// DURATION POLICY (#1891 carry): the '1_minute'→10 rounds minutes×10 encoding
+//   (source :106-112, first face :108) diverges from the ≥1min-combat-scoped
+//   canon (AGENTS.md: durations ≥1 minute last the whole combat, cleared by new
+//   initiative/short/long rest — never a minutes×10 countdown). Pinned as
+//   HONEST BYTES with the #1822 owner-pending precedent cited at the pin site;
+//   contract preservation, not re-specification. Source not fixed here.
+// Prose verdict (#1891 ⚠ check): handle() composes NO condition prose — the
+//   cast log (:76) carries only name/saveType/DC/radius and conditionName
+//   travels as a derived payload field. The hardcoded-'Becomes Prone' prose is
+//   process-lane (recordGreaseFailure :184), owned by the .areaSave sibling.
+// Registry-integrity branch :98-100 (`!getEffectDefinition('grease')` →
+//   console.error) is dormant while the REAL registry carries 'grease' — its
+//   presence is registry-own lane territory, unpinned here both ways.
+// Notes: rangeValidation/rangeCheck/automationImmunities/savePrompt.
+//   createSaveListener/expirations-free mocks — handle() calls none of
+//   isWithinRange/isDistanceInRange/playerIsImmuneToCondition/createSaveListener
+//   (those are process-lane); those mocks isolate import side effects only.
+//   conditionSaveService, damageRollback, targetEffectDefinitions and
+//   areaSpellUtils run REAL here (no factory): resolveSelectedSpellTargets is
+//   the real callee exercised by the te-selection tests.
 //   makeAction MERGES automation overrides (never replaces) — fixture convention.
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -51,11 +70,11 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn().mockResolvedValue(undefined),
+  addExpiration: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -68,7 +87,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
   isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isWithinRange: vi.fn(async () => true),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
@@ -137,15 +156,30 @@ function greaseStoreCalls() {
   return useRuntimeState.setRuntimeValue.mock.calls.filter((c) => c[1] === TRACKING_KEY);
 }
 
+// The campaign targetEffects write, if any.
+const teWrites = () => useRuntimeState.setRuntimeValue.mock.calls.filter((c) => c[1] === 'targetEffects');
+
+// Full expiration arg as source :115-117 composes it.
+const zoneExpiration = (rounds) => ({
+  attackerName: casterName,
+  targetName: casterName,
+  effects: [{ type: 'remove_grease_area', greaseKey: TRACKING_KEY }],
+  campaignName,
+  rounds,
+});
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('greaseAreaSaveHandler.handle', () => {
   beforeEach(() => {
+    // clearAllMocks keeps implementations — re-baseline every stub whose
+    // behaviour a test may override (leak-safe, no resetAllMocks needed).
     vi.clearAllMocks();
-    // Deterministic baseline stubs (clearAllMocks keeps implementations — stub fresh).
     damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
     savePrompt.buildSaveDc.mockReturnValue(13);
     mapsService.loadMapData.mockResolvedValue(onMapData);
+    logService.addEntry.mockResolvedValue({});
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
   });
 
   describe('return value', () => {
@@ -171,12 +205,13 @@ describe('greaseAreaSaveHandler.handle', () => {
           conditionName: 'Prone',
           saveType: 'DEX',
           rangeFeet: 10,
+          // minutes×10 honest bytes — see #1822 cite in the duration describe.
           durationRounds: 10,
         },
       });
     });
 
-    it('includes attackerPos from map data or null when caster not on map', async () => {
+    it('takes attackerPos from map data, null when the caster is not on the map', async () => {
       // caster found on map at a different cell than combatSummary
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 12, gridY: 20 }],
@@ -190,38 +225,24 @@ describe('greaseAreaSaveHandler.handle', () => {
       expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('includes mapData when mapName provided, null when mapName is null', async () => {
-      let result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-      expect(result.payload.mapData).toEqual(onMapData);
-
-      mapsService.loadMapData.mockClear();
-      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.mapData).toBeNull();
-    });
-  });
-
-  describe('save type and condition defaults', () => {
-    it('uses custom saveType from automation, defaults to DEX', async () => {
+    it('falls back to DEX/Prone when automation omits them and honours custom values', async () => {
       savePrompt.buildSaveDc.mockReturnValue(14);
 
-      let result = await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, null);
-      expect(result.payload.saveType).toBe('CON');
+      const custom = await handle(
+        makeAction({ saveType: 'CON', conditionInflicted: 'Blinded' }),
+        makePlayerStats(), campaignName, null);
+      expect(custom.payload.saveType).toBe('CON');
+      expect(custom.payload.conditionName).toBe('Blinded');
+      expect(custom.payload.saveDc).toBe(14);
 
-      result = await handle(makeAction({ saveType: undefined }), makePlayerStats(), campaignName, null);
-      expect(result.payload.saveType).toBe('DEX');
+      const defaulted = await handle(
+        makeAction({ saveType: undefined, conditionInflicted: undefined }),
+        makePlayerStats(), campaignName, null);
+      expect(defaulted.payload.saveType).toBe('DEX');
+      expect(defaulted.payload.conditionName).toBe('Prone');
     });
 
-    it('uses custom conditionInflicted from automation, defaults to Prone', async () => {
-      let result = await handle(makeAction({ conditionInflicted: 'Blinded' }), makePlayerStats(), campaignName, mapName);
-      expect(result.payload.conditionName).toBe('Blinded');
-
-      result = await handle(makeAction({ conditionInflicted: undefined }), makePlayerStats(), campaignName, mapName);
-      expect(result.payload.conditionName).toBe('Prone');
-    });
-  });
-
-  describe('area radius parsing', () => {
-    it('parses size values correctly, defaulting to 10', async () => {
+    it('parses size values into rangeFeet, defaulting to 10', async () => {
       let result = await handle(makeAction({ size: '10-foot' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.rangeFeet).toBe(10);
 
@@ -237,28 +258,37 @@ describe('greaseAreaSaveHandler.handle', () => {
   });
 
   describe('duration and expiration', () => {
-    it('sets expiration and payload durationRounds for 1_minute (10 rounds)', async () => {
+    it("pins the '1_minute'→10 rounds minutes×10 encoding as honest bytes", async () => {
+      // HONEST-BYTES PIN (#1822 owner-pending divergence, per #1891): source
+      // :106-112 encodes '1_minute' as 10 rounds (minutes×10, first face
+      // :108). Repo canon says ≥1-minute durations are combat-scoped — last
+      // the whole combat, cleared by new initiative/short rest/long rest,
+      // never a minutes×10 countdown. Pinned as-is to preserve the current
+      // contract; the divergence is a SOURCE defect, not re-specified here.
       const result = await handle(makeAction({ duration: '1_minute' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(10);
-      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [{ type: 'remove_grease_area', greaseKey: TRACKING_KEY }], campaignName, rounds: 10 });
+      expect(expirations.addExpiration.mock.calls).toEqual([[zoneExpiration(10)]]);
     });
 
-    it('sets expiration and payload durationRounds for round-based durations', async () => {
+    it('parses N_round durations and commits one remove_grease_area expiration per cast, in order', async () => {
       let result = await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(3);
-      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [{ type: 'remove_grease_area', greaseKey: TRACKING_KEY }], campaignName, rounds: 3 });
 
-      expirations.addExpiration.mockClear();
       result = await handle(makeAction({ duration: '1_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(1);
 
-      expirations.addExpiration.mockClear();
       result = await handle(makeAction({ duration: '5_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(5);
-      expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+
+      // ordered exact-array census across all three casts
+      expect(expirations.addExpiration.mock.calls).toEqual([
+        [zoneExpiration(3)],
+        [zoneExpiration(1)],
+        [zoneExpiration(5)],
+      ]);
     });
 
-    it('does not set expiration or durationRounds for unrecognized duration values', async () => {
+    it("unrecognized durations arm no expiration; absent duration defaults tracking and tes to '1 minute'", async () => {
       let result = await handle(makeAction({ duration: 'unknown' }), makePlayerStats(), campaignName, mapName);
       expect(expirations.addExpiration).not.toHaveBeenCalled();
       expect(result.payload.durationRounds).toBeUndefined();
@@ -266,8 +296,12 @@ describe('greaseAreaSaveHandler.handle', () => {
       result = await handle(makeAction({ duration: '' }), makePlayerStats(), campaignName, mapName);
       expect(expirations.addExpiration).not.toHaveBeenCalled();
 
+      // undefined duration: expiration dormant, but source :91/:102 fall back
+      // to the literal '1 minute' in BOTH the tracking store and the te stamp.
       result = await handle(makeAction({ duration: undefined }), makePlayerStats(), campaignName, mapName);
       expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(greaseStoreCalls()[2][2].duration).toBe('1 minute');
+      expect(teWrites()[2][2].every((te) => te.duration === '1 minute')).toBe(true);
     });
 
     it('dormant on raw spell JSON shape: "1 minute" (space) parses to no rounds and no expiration', async () => {
@@ -281,8 +315,13 @@ describe('greaseAreaSaveHandler.handle', () => {
   });
 
   describe('tracking data storage (WIRED — read by the expireStaleEffects Phase 6 turn-start sweep)', () => {
-    it('stores the exact-key tracking shape once when caster found on map', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+    it('writes the exact key and full tracking shape once, derived from the automation (no hardcoding)', async () => {
+      // Distinctive values on every derived field so a hardcoded shape field
+      // in source :81-92 cannot survive this pin.
+      savePrompt.buildSaveDc.mockReturnValue(14);
+      await handle(
+        makeAction({ saveType: 'CON', conditionInflicted: 'Blinded', size: '15-foot', duration: '5_rounds' }),
+        makePlayerStats(), campaignName, mapName);
 
       const calls = greaseStoreCalls();
       expect(calls).toHaveLength(1);
@@ -297,11 +336,11 @@ describe('greaseAreaSaveHandler.handle', () => {
         center: { gridX: 5, gridY: 10 },
         mapName,
         campaignName,
-        saveDc: 13,
-        saveType: 'DEX',
-        condition: 'Prone',
-        radius: 10,
-        duration: '1_minute',
+        saveDc: 14,
+        saveType: 'CON',
+        condition: 'Blinded',
+        radius: 15,
+        duration: '5_rounds',
       });
       expect(typeof timestamp).toBe('number');
     });
@@ -310,40 +349,20 @@ describe('greaseAreaSaveHandler.handle', () => {
       // caster not found on map
       mapsService.loadMapData.mockResolvedValue({ players: [] });
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-      expect(greaseStoreCalls()[0][2].center).toBeNull();
-      expect(greaseStoreCalls()[0][2].mapName).toBe(mapName);
 
       // mapName is null
-      useRuntimeState.setRuntimeValue.mockClear();
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(greaseStoreCalls()[0][2].center).toBeNull();
-      expect(greaseStoreCalls()[0][2].mapName).toBeNull();
-    });
 
-    it('stores custom values from automation in tracking data', async () => {
-      await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, null);
-      expect(greaseStoreCalls()[0][2].duration).toBe('3_rounds');
-
-      useRuntimeState.setRuntimeValue.mockClear();
-      await handle(makeAction({ size: '15-foot' }), makePlayerStats(), campaignName, mapName);
-      expect(greaseStoreCalls()[0][2].radius).toBe(15);
-
-      useRuntimeState.setRuntimeValue.mockClear();
-      await handle(makeAction({ conditionInflicted: 'Blinded' }), makePlayerStats(), campaignName, mapName);
-      expect(greaseStoreCalls()[0][2].condition).toBe('Blinded');
-
-      useRuntimeState.setRuntimeValue.mockClear();
-      savePrompt.buildSaveDc.mockReturnValue(14);
-      await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
-      expect(greaseStoreCalls()[0][2].saveType).toBe('CON');
-      expect(greaseStoreCalls()[0][2].saveDc).toBe(14);
+      const calls = greaseStoreCalls();
+      expect(calls).toHaveLength(2);
+      expect(calls[0][2].center).toBeNull();
+      expect(calls[0][2].mapName).toBe(mapName);
+      expect(calls[1][2].center).toBeNull();
+      expect(calls[1][2].mapName).toBeNull();
     });
   });
 
   describe('zone marker te stamp (expireStaleEffects Phase 6 carrier list)', () => {
-    // Helper — the campaign targetEffects write, if any.
-    const teWrites = () => useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-
     it('stamps a grease te per combat creature (cast-time default: every creature incl. the caster) with exact shape, once, in target order', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
@@ -367,7 +386,7 @@ describe('greaseAreaSaveHandler.handle', () => {
       ]);
     });
 
-    it('merges into stored zone effects and replaces this caster\'s own grease te (foreign tes survive)', async () => {
+    it("merges into stored zone effects and replaces this caster's own grease te (foreign tes survive)", async () => {
       const stored = [
         { target: 'Thug', effect: 'stinking_cloud', source: 'Other', dc: 18, duration: 'concentration' },
         { target: 'Goblin', effect: 'grease', source: casterName, dc: 11, duration: '1_minute' },
@@ -400,13 +419,15 @@ describe('greaseAreaSaveHandler.handle', () => {
   });
 
   describe('map handling', () => {
-    it('does not load map data when mapName is null', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+    it('skips the map load entirely when mapName is null, carrying null mapData', async () => {
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(mapsService.loadMapData).not.toHaveBeenCalled();
+      expect(result.payload.mapData).toBeNull();
     });
 
     it('handles map load failure gracefully', async () => {
-      mapsService.loadMapData.mockRejectedValueOnce(new Error('not found'));
+      // beforeEach re-stubs loadMapData — a persistent rejection cannot leak.
+      mapsService.loadMapData.mockRejectedValue(new Error('not found'));
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, 'bad-map');
 
@@ -420,27 +441,30 @@ describe('greaseAreaSaveHandler.handle', () => {
   });
 
   describe('log entries', () => {
-    it('calls addEntry with ability_use type and the exact composed description', async () => {
+    it('records one full-shape ability_use log per cast, composing the parsed radius into the description', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: casterName,
-        abilityName: 'Grease',
-        description: 'Grease activated — DEX save DC 13, 10ft square area.',
-      });
-    });
-
-    it('composes the parsed radius into the log description', async () => {
       await handle(makeAction({ size: '15-foot' }), makePlayerStats(), campaignName, mapName);
 
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        description: 'Grease activated — DEX save DC 13, 15ft square area.',
-      }));
+      // ordered exact-array census: one entry per cast, full shape.
+      expect(logService.addEntry.mock.calls).toEqual([
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Grease',
+          description: 'Grease activated — DEX save DC 13, 10ft square area.',
+        }],
+        [campaignName, {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Grease',
+          description: 'Grease activated — DEX save DC 13, 15ft square area.',
+        }],
+      ]);
     });
 
     it('still completes the cast when the log write rejects', async () => {
-      logService.addEntry.mockRejectedValueOnce(new Error('log down'));
+      // beforeEach re-baselines addEntry — a persistent rejection cannot leak.
+      logService.addEntry.mockRejectedValue(new Error('log down'));
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 

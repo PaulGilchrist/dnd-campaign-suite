@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CalmEmotionsModal from './CalmEmotionsModal.jsx';
@@ -113,7 +113,7 @@ beforeEach(() => {
 });
 
 describe('CalmEmotionsModal - rendering', () => {
-    it('renders title, spell description, save info, and every combat creature as a target', () => {
+    it('renders title, spell description, save info, and every combat creature as a target with HP shown for NPCs only', () => {
         render(<CalmEmotionsModal {...makeProps()} />);
         expect(screen.getByText('Calm Emotions')).toBeInTheDocument();
         expect(screen.getByText(/20-foot-radius sphere/)).toBeInTheDocument();
@@ -123,16 +123,13 @@ describe('CalmEmotionsModal - rendering', () => {
         expect(screen.getByText('Goblin')).toBeInTheDocument();
         expect(screen.getByText('Orc')).toBeInTheDocument();
         expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Cast Calm Emotions \(3\)/ })).toBeEnabled();
-        // Heighten radios only appear when the metamagic is active.
-        expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
-    });
-
-    it('shows HP percentage for NPCs but hides HP for players', () => {
-        render(<CalmEmotionsModal {...makeProps()} />);
+        // NPC rows surface wound state; player rows never show HP.
         expect(rowFor('Goblin').textContent).toContain('71% HP');
         expect(rowFor('Orc').textContent).toContain('68% HP');
         expect(rowFor('PlayerAlly').textContent).not.toContain('% HP');
+        expect(screen.getByRole('button', { name: /Cast Calm Emotions \(3\)/ })).toBeEnabled();
+        // Heighten radios only appear when the metamagic is active.
+        expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
     });
 
     it('shows the empty state with a disabled cast button for empty or null combat summary', () => {
@@ -233,6 +230,15 @@ describe('CalmEmotionsModal - target interactions', () => {
         });
         expect(screen.queryByText('Orc')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Cast Calm Emotions \(2\)/ })).toBeEnabled();
+        // The gate is scoped to this campaign/caster over the live combat roster.
+        expect(resolveCalmEmotionsEligibility).toHaveBeenCalledWith(expect.objectContaining({
+            campaignName,
+            casterName: 'Wizard1',
+            creatures: expect.arrayContaining([
+                expect.objectContaining({ name: 'Goblin' }),
+                expect.objectContaining({ name: 'PlayerAlly' }),
+            ]),
+        }));
     });
 
     it('Skip closes the modal without touching the cast pipeline', () => {

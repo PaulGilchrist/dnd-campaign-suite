@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PrimalCompanionSummonModal from './PrimalCompanionSummonModal.jsx';
@@ -85,7 +85,7 @@ describe('PrimalCompanionSummonModal', () => {
     expect(body.textContent).toContain('Beak: 1d4 + WIS modifier Piercing');
   });
 
-  it('omits speed and attack lines for sparse companion data', () => {
+  it('omits stat lines for missing fields rather than rendering "undefined" (ledger :194)', () => {
     renderModal({
       action: {
         name: 'Summon Primal Companion',
@@ -99,8 +99,6 @@ describe('PrimalCompanionSummonModal', () => {
     const body = screen.getByText('Choose a primal beast to bond with:').parentElement;
     expect(body.textContent).toContain('Peaceful Beast');
     expect(body.textContent).toContain('HP 10+3xRanger level');
-    // ledger :194 — absent acFormula omits the AC bit, never renders "AC undefined"
-    // (disk BY-name rows Beast of the Land/Sea/Sky all supply acFormula).
     expect(body.textContent).not.toContain('undefined');
     expect(body.textContent).not.toContain('AC');
     expect(body.textContent).not.toContain('Speed');
@@ -108,20 +106,24 @@ describe('PrimalCompanionSummonModal', () => {
     expect(body.textContent).not.toContain('Bite');
   });
 
-  it('enables Summon only after a companion is selected and submits that type', async () => {
+  it('gates Summon on a selection, submits the newest pick, and stays on the selection screen when the handler returns no result', async () => {
     primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(null);
-    renderModal();
+    const onClose = vi.fn();
+    renderModal({ onClose });
     const summonBtn = screen.getByRole('button', { name: /Summon Primal Companion/ });
 
     fireEvent.click(summonBtn);
     expect(primalCompanionHandler.confirmPrimalCompanionSummon).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('radio', { name: /Beast of the Land/ }));
     expect(summonBtn).toBeEnabled();
 
-    // switching selection stays enabled and submits the newest pick
+    // switching selection stays enabled, marks only the newest pick, and submits it
     fireEvent.click(screen.getByRole('radio', { name: /Beast of the Sea/ }));
     expect(summonBtn).toBeEnabled();
+    expect(screen.getByRole('radio', { name: /Beast of the Sea/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Beast of the Land/ })).not.toBeChecked();
 
     await act(async () => {
       fireEvent.click(summonBtn);
@@ -133,6 +135,11 @@ describe('PrimalCompanionSummonModal', () => {
       'test-campaign',
       'Beast of the Sea',
     );
+
+    // a null result keeps the selection UI in place — no result screen, no close
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('replaces the selection UI with the HTML description and closes via Done after a successful summon', async () => {
@@ -157,15 +164,6 @@ describe('PrimalCompanionSummonModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('stays on the selection screen when the handler returns null', async () => {
-    primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(null);
-    renderModal();
-    await summonSelected();
-
-    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
-  });
-
   it('closes on Cancel but not on overlay click', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
@@ -177,14 +175,12 @@ describe('PrimalCompanionSummonModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders safely when the action or its companion data is missing', () => {
-    for (const action of [null, { name: 'Summon Primal Companion' }, { name: 'x', automation: {} }]) {
-      const { unmount } = renderModal({ action });
-      expect(screen.getByText('Primal Companion')).toBeInTheDocument();
-      expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
-      expect(screen.queryAllByRole('radio')).toHaveLength(0);
-      expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
-      unmount();
-    }
+  it('renders an empty, disabled selection screen when the action data is missing', () => {
+    // action?.automation?.companionTypes || [] — the null action exercises every optional link
+    renderModal({ action: null });
+    expect(screen.getByText('Primal Companion')).toBeInTheDocument();
+    expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
   });
 });

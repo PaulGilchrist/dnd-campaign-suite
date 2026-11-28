@@ -1,14 +1,17 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution, { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 // BASE LANE — only surface no sibling lane owns, verified against the real
-// buildPipelineForAction chain: public API shape, default no-op manual-click
-// run (housekeeping + plain-damage seam bytes), the mapName buildCtx/buildCtxSync
-// ternary, crit-doubling seam + popup clear, dice-fail halt, two-weapon-fighting
-// fold, runtime targetEffects damage_bonus rider, and Hunter's Prey horde-breaker
-// latches. TWF (hasTwoWeaponFighting) and the runtime damage_bonus targetEffects
-// step are exercised byte-exactly nowhere else in the cluster.
+// buildPipelineForAction chain: default no-op manual-click run (housekeeping +
+// plain-damage seam bytes), the mapName buildCtx/buildCtxSync ternary,
+// crit-doubling seam + popup clear, dice-fail halt, the two-weapon-fighting and
+// runtime targetEffects damage_bonus riders END-TO-END into the rollDamage
+// payload, and the Hunter's Prey horde-breaker latch write. Step-body branch
+// matrices (TWF guards, targetEffects append/clear bytes, step conditions) are
+// owned by attackRollDamageSteps-bonuses-basic.test.js (steps[7..9]); this lane
+// proves only what step tests cannot see: the fold survives the real hook
+// pipeline (housekeeping's isBonusActionAttack wiring + merged payload bytes).
 // Owned elsewhere: normalizeAutoDamage.test.js (#283 normalizer canon),
 // advancedAutomations #298, automationDamage #299, automations #300 (automation
 // action riders — distinct from the runtime targetEffects rider here),
@@ -19,7 +22,10 @@ import useAttackDamageResolution, { normalizeAutoDamage } from './useAttackDamag
 // and was vacuous), maneuvers/mn014 #306/#307 (die math), pausedStates #311,
 // optionSelect #310, tacticalMaster #316, resume lanes #303/#312/#314,
 // standalone #315, opportunity-transport #309, skipManeuver #313,
-// maneuveringAlly #305, mn015SaveDc #308.
+// maneuveringAlly #305, mn015SaveDc #308. The six exported handlers are each
+// exercised in its own lane (resolveAttackDamage here; optionSelect/skipManeuver/
+// mn015SaveDc; resume lanes) — the old public-API key-set shape test was pruned
+// as a redundant internals pin.
 
 // Mock audit vs. this seam's live transitive graph:
 // - diceRoller: rollExpression + rollExpressionDoubled — both invoked (rollBaseDamage).
@@ -102,6 +108,17 @@ function makeAttack(overrides = {}) {
     return { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [], ...overrides };
 }
 
+// Spell-flavoured autoDamage run through the real normalizer: every production
+// caller feeds normalizeAutoDamage output, so this is the byte-exact shape a
+// spell cast presents to resolveAttackDamage.
+function spellShapedAttack() {
+    const autoDamage = {
+        name: 'Fire Bolt', formula: '2d10', damageType: 'fire',
+        autoDamageSchool: 'evocation', attackType: 'Spell', targetName: 'Goblin',
+    };
+    return normalizeAutoDamage(autoDamage, false, makePlayerStats()).attack;
+}
+
 // Exact merged ctx the hook hands rollDamage on a manual click with no
 // overrides — the mergeDamagePipelineCtx null-shape (attackRollPostDamage:338
 // passes critLabels: undefined, so no crit keys appear).
@@ -129,19 +146,6 @@ describe('useAttackDamageResolution — base hook seam', () => {
         getCurrentCombatRound.mockReturnValue(1);
         hasTwoWeaponFighting.mockReturnValue(false);
         deps = createMockDeps();
-    });
-
-    it('exposes the exact public API: the six handlers, nothing less', () => {
-        const api = useAttackDamageResolution(deps);
-
-        expect(Object.keys(api).sort()).toEqual([
-            'handleAttackRiderManeuverSkip',
-            'handleAttackRiderManeuverUse',
-            'handleAttackRiderOptionSelect',
-            'proceedWithDamage',
-            'resolveAttackDamage',
-            'resumeAttackPipeline',
-        ].sort());
     });
 
     describe('resolveAttackDamage over the real pipeline', () => {
@@ -178,40 +182,38 @@ describe('useAttackDamageResolution — base hook seam', () => {
             });
         });
 
-        it('runs housekeeping on every attack: pendingSuddenStrike keys clear to null', async () => {
+        // Mandatory housekeeping clears (attackRollHousekeeping.js:38-44) run on
+        // EVERY attack-lane pass. fix#344(b) PROOF ARM — DISCHARGED-STALE (ledger
+        // fix#337S housekeeping row): the step subscribes 'housekeeping:do' only on
+        // the attack lane (attackRollHousekeeping.js:77, registered by
+        // attackRollDamageSteps.js:9) while the spell lane subscribes 'spell:do'
+        // (directSpellDamageSteps.js:109), and a chain with no matching subscriber
+        // runs ZERO steps (actionPipeline.js:27-28). Skip-proof: buildNormalizedAttack
+        // stamps weaponType UNCONDITIONALLY, so steps/index.js forces the attack lane
+        // even for spell-flavoured autoDamage — the second case observes cleanup with
+        // the spell lane's subscriber absent.
+        it.each([
+            {
+                scenario: 'plain weapon attack clears every pending prompt key',
+                attack: () => makeAttack(),
+                context: undefined,
+                laneByte: false,
+            },
+            {
+                scenario: 'fix#344(b) spell-shaped autoDamage is forced onto the attack lane and clears every pending key',
+                attack: spellShapedAttack,
+                context: { hit: true, targetName: 'Goblin' },
+                laneByte: true,
+            },
+        ])('$scenario', async ({ attack, context, laneByte }) => {
+            const normalized = attack();
+            if (laneByte) {
+                // The non-skippable byte: attack-lane routing is unconditional post-normalize.
+                expect(normalized.weaponType).toBeTruthy();
+            }
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
 
-            await resolveAttackDamage(makeAttack());
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrike', null, CAMPAIGN);
-            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrikeTarget', null, CAMPAIGN);
-        });
-
-        // fix#344(b) PROOF ARM — DISCHARGED-STALE, not a code fix (ledger fix#337S
-        // housekeeping row). Mechanism quoted at bytes: the mandatory housekeeping step
-        // subscribes 'housekeeping:do' ONLY on the attack lane (attackRollHousekeeping.js:77,
-        // registered by attackRollDamageSteps.js:9); the spell lane subscribes 'spell:do'
-        // instead (directSpellDamageSteps.js:109), and the chain runs ZERO steps when no
-        // subscriber matches (actionPipeline.js:27-28). What it cleans: the pending-prompt
-        // keys _Stalker's_Flurry_option / stalkersFlurryChosenTarget / pendingSuddenStrike /
-        // pendingSuddenStrikeTarget → null (attackRollHousekeeping.js:38-44). Skip-proof at
-        // live bytes: every production caller of resolveAttackDamage/…Standalone feeds
-        // normalizeAutoDamage output, and buildNormalizedAttack stamps weaponType
-        // UNCONDITIONALLY (:122 `weaponType: isUnarmed ? 'unarmed' : (weaponAttack?.weaponType || 'weapon')`),
-        // so steps/index.js:36 forces the attack lane even for spell-flavoured autoDamage —
-        // this arm observes the cleanup side-effects with the spell lane's subscriber absent.
-        it('fix#344(b) housekeeping runs without the spell-lane subscriber: spell-shaped autoDamage is forced onto the attack lane and clears every pending key', async () => {
-            const autoDamage = {
-                name: 'Fire Bolt', formula: '2d10', damageType: 'fire',
-                autoDamageSchool: 'evocation', attackType: 'Spell', targetName: 'Goblin',
-            };
-            const { attack } = normalizeAutoDamage(autoDamage, false, makePlayerStats());
-            // The non-skippable byte: attack-lane routing is unconditional post-normalize.
-            expect(attack.weaponType).toBeTruthy();
-
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-
-            await resolveAttackDamage(attack, { hit: true, targetName: 'Goblin' });
+            await resolveAttackDamage(normalized, context);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrike', null, CAMPAIGN);
             expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrikeTarget', null, CAMPAIGN);
@@ -231,7 +233,7 @@ describe('useAttackDamageResolution — base hook seam', () => {
             expect(critDeps.rollDamage).toHaveBeenCalledWith({
                 name: 'Longsword',
                 // DH crit-ledger-shape (2026-11-06): doubled sheet-lane groups log with the
-                // monster-lane `*2` marker; roller still receives the plain formula (line 228).
+                // monster-lane `*2` marker; roller still receives the plain formula (line above).
                 formula: '1d8*2+3 [slashing]',
                 total: 10,
                 rolls: [5, 5],
@@ -267,50 +269,40 @@ describe('useAttackDamageResolution — base hook seam', () => {
         });
     });
 
-    describe('two-weapon fighting fold', () => {
+    describe('two-weapon fighting fold end-to-end', () => {
+        // The guard arms (feature off, non-Light, missing abilityName, mod ≤ 0,
+        // already-folded) are byte-owned by attackRollDamageSteps-bonuses-basic
+        // t1–t3 with zero-writes pins. Only this seam can prove the two pipeline
+        // wiring facts: housekeeping derives isBonusActionAttack from attack.type,
+        // and the folded rider lands in the final rollDamage payload.
         beforeEach(() => {
             hasTwoWeaponFighting.mockReturnValue(true);
         });
 
         it.each([
             {
-                scenario: 'appends STR mod for a Light off-hand bonus attack',
+                scenario: 'a Light off-hand Bonus Action attack gets the STR mod appended exactly once',
                 attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
                 expected: { formula: '1d6 [slashing] + 3 [Strength]', total: 8, rolls: [5, 3] },
             },
             {
-                scenario: 'appends exactly once when the mod is already in the base formula',
-                attack: { name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
-                expected: { formula: '1d6+3 [slashing] + 3 [Strength]', total: 8, rolls: [5, 3] },
-            },
-            {
-                scenario: 'no append for a non-Light bonus attack',
-                attack: { name: 'Warhammer', damage: '1d8', damageType: 'bludgeoning', type: 'Bonus Action', properties: [], abilityName: 'Strength' },
-                expected: { formula: '1d8 [bludgeoning]', total: 5, rolls: [5] },
-            },
-            {
-                scenario: 'no append when abilityName is missing',
-                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'] },
+                scenario: 'a main-hand Light attack never folds the mod (isBonusActionAttack wiring)',
+                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', properties: ['Light'], abilityName: 'Strength' },
                 expected: { formula: '1d6 [slashing]', total: 5, rolls: [5] },
             },
-            {
-                scenario: 'no append when the ability modifier is zero',
-                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
-                stats: makePlayerStats({ abilities: [{ name: 'Strength', bonus: 0 }] }),
-                expected: { formula: '1d6 [slashing]', total: 5, rolls: [5] },
-            },
-        ])('$scenario', async ({ attack, stats, expected }) => {
-            const testDeps = createMockDeps({ playerStats: stats || makePlayerStats() });
-            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
+        ])('$scenario', async ({ attack, expected }) => {
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
 
             await resolveAttackDamage(makeAttack(attack));
 
-            expect(testDeps.rollDamage).toHaveBeenCalledTimes(1);
-            expect(testDeps.rollDamage).toHaveBeenCalledWith(expect.objectContaining(expected));
+            expect(deps.rollDamage).toHaveBeenCalledTimes(1);
+            expect(deps.rollDamage).toHaveBeenCalledWith(expect.objectContaining(expected));
         });
     });
 
     describe("Hunter's Prey horde breaker latch", () => {
+        // Sole writer-pin for '_Hunters_Prey_HordeBreaker_UsedRound' in the tree
+        // (CharBonusActions.edgeCases only READS it to show/hide the row).
         const hordeBreaker = { name: 'Horde Breaker', damage: '1d6', damageType: 'force', type: 'Bonus Action' };
 
         it.each([

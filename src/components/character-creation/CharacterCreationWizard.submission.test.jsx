@@ -1,47 +1,48 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * Submission lane for CharacterCreationWizard — isolates the handleSubmit
  * boundary (CharacterCreationWizard.jsx handleSubmit) by mocking every hook,
- * validator and chrome. Pins what the integration lane (#363, real
+ * validator and chrome. Pins what the integration lane (#2048, real
  * validators) cannot see: submit-chain ordering, byte-exact validator-call
- * args, and the three early-return branches (step / final / ability-cap).
+ * args, and the four early-return branches (step / final / ability-cap /
+ * selection-cap re-check).
  *
  * Owned elsewhere (do not restate here):
  *  - edit-flow onComplete byte-exact payload with real validators
- *    -> CharacterCreationWizard.integration.test.jsx test 3
+ *    -> CharacterCreationWizard.integration.test.jsx
+ *  - loaded over-cap feats/skills disabling the sidebar + footer Save with
+ *    REAL validators -> CharacterCreationWizard.over-cap-save-gate.test.jsx
  *  - footer button labels / disabled states -> WizardFooter.test.jsx
  *  - per-step field behavior -> WizardStep*.test.jsx
+ *  - validator business logic -> src/config/utils*.test.js
  *
  * There is no create-vs-edit API dispatch, no fetch POST assembly, and no
  * double-submit guard in the source — submit runs the same
- * validateStep -> validateFinalFormData -> validateAbilityTotals chain and
- * calls onComplete(formData) in both modes — so nothing is pinned for those.
+ * validateStep -> validateFinalFormData -> validateAbilityTotals ->
+ * validateSelectionCaps chain and calls onComplete(formData) in both modes —
+ * so nothing is pinned for those.
  *
  * Trim log vs previous revision:
- *  - "calls onComplete with formData when all validations pass" folded into
- *    the chain test below (the standalone happy payload is strictly weaker
- *    than #363's real-validator edit-flow pin; the chain test keeps the
- *    call wiring that #363 cannot spy).
- *  - "passes the character ruleset to validateStep" + "calls
- *    validateFinalFormData after validateStep passes" consolidated into one
- *    byte-exact chain test (same execution path, both validator calls).
- *  - "does not call validateFinalFormData when step validation fails"
- *    merged into "blocks submit when step validation fails" (identical
- *    setup and assertions split across two tests).
- *  - dead mocks purged: updateClass (component never destructures it),
- *    sidebar goToStep buttons / step-1 ruleset buttons / header close
- *    (nothing in this lane clicks them), getTotalSteps/getDisplayNumber
- *    (never imported by the component), calculateTotalPointsSpent
- *    (never destructured), per-step mock components for steps 1-11
- *    (unreachable — currentStep is always the last canonical step here).
- *  - useWizardData mock now supplies every destructured key
- *    (allRacesData / allClassesData were missing); useWizardFeatAbilityChoices
- *    mock supplies the missing handleFeatAbilityModeChange.
+ *  - the three refusal tests (step-fail, final-fail, FT-001 submit-recheck)
+ *    consolidated into one parameterized walk over all four branch failures
+ *    — identical harness shape (fail one validator, click submit, assert the
+ *    surfaced errors + which later validators submit never reached). This
+ *    also adds the previously-uncovered selection-cap re-check branch
+ *    (handleSubmit's defense-in-depth against the shipped over-cap FT-002
+ *    bug: the gate can be open per navigation hook yet submit must still
+ *    refuse an over-cap build).
+ *  - FT-001 trimmed to its unique face: the mount-time ability-cap audit
+ *    closing the sidebar Save gate (saveGateEnabled wiring). Its submit
+ *    refusal half now lives in the parameterized walk.
+ *  - happy-chain test extended to pin all four validator args + the chain
+ *    ordering (previously pinned only validateStep/validateFinalFormData).
+ *  - beforeEach now restores the validateSelectionCaps default too — it was
+ *    the one mock a test could permanently override.
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
-import { validateStep, validateFinalFormData, validateAbilityTotals } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals, validateSelectionCaps } from '../../config/utils.js';
 
 const mockFormData = {
   name: 'Submission Test',
@@ -223,7 +224,7 @@ vi.mock('./WizardFooter.jsx', () => ({
   },
 }));
 
-// isSaveEnabled span is the cap-gate prop oracle for the FT-001 test.
+// saveGateEnabled oracle for the ability-cap audit test.
 vi.mock('./WizardSidebar.jsx', () => ({
   default: function WizardSidebarMock({ isSaveEnabled }) {
     return (
@@ -268,12 +269,45 @@ vi.mock('../../config/utils.js', () => ({
   CHARACTER_NAME_REQUIRED_ERROR: 'Character name is required',
 }));
 
+// One branch failure per handleSubmit gate. `maxCalls` pins which later
+// validators submit must NOT reach: 0 = never called at all; 1 = only the
+// component's mount-time cap audit ran, never a submit-path call (ability
+// and selection validators each get exactly one mount audit from the static
+// fixture, so a second call would prove submit reached them).
+const REFUSAL_BRANCHES = [
+  {
+    label: 'step',
+    fail: () => validateStep.mockImplementation(() => Promise.resolve({ name: 'Name is required' })),
+    errors: { name: 'Name is required' },
+    maxCalls: [[validateFinalFormData, 0], [validateAbilityTotals, 1], [validateSelectionCaps, 1]],
+  },
+  {
+    label: 'final',
+    fail: () => validateFinalFormData.mockImplementation(() => ({ name: 'Name collides with an existing character' })),
+    errors: { name: 'Name collides with an existing character' },
+    maxCalls: [[validateAbilityTotals, 1], [validateSelectionCaps, 1]],
+  },
+  {
+    label: 'ability-cap',
+    fail: () => validateAbilityTotals.mockImplementation(() => Promise.resolve({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' })),
+    errors: { ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' },
+    maxCalls: [[validateSelectionCaps, 1]],
+  },
+  {
+    label: 'selection-cap',
+    fail: () => validateSelectionCaps.mockImplementation(() => Promise.resolve({ feats: 'You have selected 1 of 0 allowed feat(s)' })),
+    errors: { feats: 'You have selected 1 of 0 allowed feat(s)' },
+    maxCalls: [],
+  },
+];
+
 describe('CharacterCreationWizard - Submission', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     validateStep.mockImplementation(() => Promise.resolve({}));
     validateFinalFormData.mockImplementation(() => ({}));
     validateAbilityTotals.mockImplementation(() => Promise.resolve({}));
+    validateSelectionCaps.mockImplementation(() => Promise.resolve({}));
   });
 
   function renderWizard(props = {}) {
@@ -294,77 +328,67 @@ describe('CharacterCreationWizard - Submission', () => {
     return { onComplete };
   }
 
-  it('routes create-flow submit through the validation chain and completes with the live form state', async () => {
-    const { onComplete } = renderWizard({ existingCharacters: ['Brutus'] });
-
+  const submit = async () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
     });
+  };
+
+  it('routes create-flow submit through the full validation chain and completes with the live form state', async () => {
+    const { onComplete } = renderWizard({ existingCharacters: ['Brutus'] });
+
+    await submit();
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledWith(mockFormData));
-    // Byte-exact wiring #363 cannot spy (its validators are real): submit
-    // runs each validator exactly once against the live step, live form
-    // state, the character's ruleset, and the campaign name list.
+    // Byte-exact wiring the integration lane cannot spy (its validators are
+    // real): submit runs each validator against the live step, live form
+    // state, the character's ruleset, and the campaign name list — and the
+    // two cap validators are re-checked with the audit args.
     expect(validateStep).toHaveBeenCalledTimes(1);
     expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e', allFeats: [] });
     expect(validateFinalFormData).toHaveBeenCalledTimes(1);
     expect(validateFinalFormData).toHaveBeenCalledWith(mockFormData, ['Brutus']);
+    expect(validateAbilityTotals).toHaveBeenLastCalledWith(mockFormData, { allFeats: [], racesData: [], ruleset: '5e' });
+    expect(validateSelectionCaps).toHaveBeenLastCalledWith(mockFormData, { allFeats: [] });
+    // Chain ordering: each stage completes before the next runs, and
+    // onComplete fires only after the last validator.
+    const lastOrder = (m) => m.mock.invocationCallOrder[m.mock.invocationCallOrder.length - 1];
+    expect(lastOrder(validateStep)).toBeLessThan(lastOrder(validateFinalFormData));
+    expect(lastOrder(validateFinalFormData)).toBeLessThan(lastOrder(validateAbilityTotals));
+    expect(lastOrder(validateAbilityTotals)).toBeLessThan(lastOrder(validateSelectionCaps));
+    expect(lastOrder(validateSelectionCaps)).toBeLessThan(lastOrder(onComplete));
+    // A clean submit mutates no form state on the way out.
     expect(mockSetErrors).not.toHaveBeenCalled();
     expect(mockSetFormData).not.toHaveBeenCalled();
   });
 
-  it('blocks submit when step validation fails: surfaces step errors without running later validators', async () => {
-    validateStep.mockImplementation(() => Promise.resolve({ name: 'Name is required' }));
-    const { onComplete } = renderWizard();
+  it.each(REFUSAL_BRANCHES)(
+    'refuses submit when the $label validator reports errors: surfaces them, skips later validators, never completes',
+    async ({ fail, errors, maxCalls }) => {
+      fail();
+      const { onComplete } = renderWizard();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-    });
+      await submit();
 
-    await waitFor(() => {
-      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
-    });
-    expect(validateFinalFormData).not.toHaveBeenCalled();
-    // Only the render-time cap-gate effect may have called it — submit
-    // returns before the ability check.
-    expect(validateAbilityTotals).toHaveBeenCalledTimes(1);
-    expect(onComplete).not.toHaveBeenCalled();
-  });
+      await waitFor(() => expect(mockSetErrors).toHaveBeenCalledWith(errors));
+      for (const [validator, max] of maxCalls) {
+        expect(validator).toHaveBeenCalledTimes(max);
+      }
+      expect(onComplete).not.toHaveBeenCalled();
+    }
+  );
 
-  it('blocks submit when final validation fails: surfaces final errors before the ability-cap check', async () => {
-    validateFinalFormData.mockImplementation(() => ({ name: 'Name collides with an existing character' }));
-    const { onComplete } = renderWizard();
+  it('mount-time ability-cap audit closes the sidebar Save gate (FT-001)', async () => {
+    validateAbilityTotals.mockImplementation(() =>
+      Promise.resolve({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' })
+    );
+    renderWizard();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-    });
-
-    await waitFor(() => {
-      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name collides with an existing character' });
-    });
-    // Only the render-time cap-gate effect may have called it — submit
-    // returns before the ability check.
-    expect(validateAbilityTotals).toHaveBeenCalledTimes(1);
-    expect(onComplete).not.toHaveBeenCalled();
-  });
-
-  it('FT-001: blocks submit and keeps sidebar save disabled when an ability total exceeds the cap', async () => {
-    const capErrors = { ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' };
-    validateAbilityTotals.mockImplementation(() => Promise.resolve(capErrors));
-    const { onComplete } = renderWizard({ characterData: { rules: '2024' } });
-
-    // Cap-gate effect closes the sidebar save gate (isSaveEnabled prop)...
+    // The wizard's real saveGateEnabled = isSaveEnabled && abilitiesWithinCap
+    // && selectionsWithinCap: an over-cap audit must flip the sidebar off
+    // without any submit click.
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-save-enabled')).toHaveTextContent('false');
     });
-    // ...and handleSubmit re-checks the cap on click, refusing to complete.
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
-    });
-
-    await waitFor(() => {
-      expect(mockSetErrors).toHaveBeenCalledWith(capErrors);
-    });
-    expect(onComplete).not.toHaveBeenCalled();
   });
 });

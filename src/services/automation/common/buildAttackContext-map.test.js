@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 // Map-present branch of buildAttackContextForDamage.
 // The map-absent branch is covered by buildAttackContext-noMap.test.js.
 //
@@ -29,11 +29,14 @@ vi.mock('../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+// isHostileNPC stays REAL (rangeValidation.js:197-202: null attitude is
+// hostile, 'extreme opposition' counts too) so the threat-filter tests pin
+// production semantics, not a drifted mock.
+vi.mock('../../rules/combat/rangeValidation.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     computeRangeEffect: vi.fn(),
     computeMeleeProximityEffect: vi.fn(),
     getDistanceFeet: vi.fn(),
-    isHostileNPC: vi.fn(),
     getNearestPlacedItem: vi.fn(),
     rangeToFeet: vi.fn(),
 }));
@@ -85,6 +88,10 @@ function makeAttackContext(overrides = {}) {
     };
 }
 
+async function build(overrides = {}) {
+    return buildAttackContextForDamage(makeAttackContext(overrides), playerName, campaignName, mapName);
+}
+
 // ── buildAttackContextForDamage (map present) ──────────────────
 
 describe('buildAttackContextForDamage (map present)', () => {
@@ -103,13 +110,12 @@ describe('buildAttackContextForDamage (map present)', () => {
         rangeValidation.computeRangeEffect.mockReturnValue({ mode: 'normal' });
         rangeValidation.computeMeleeProximityEffect.mockReturnValue({ mode: 'normal' });
         rangeValidation.getNearestPlacedItem.mockReturnValue(null);
-        rangeValidation.isHostileNPC.mockImplementation(npc => npc.attitude === 'negative');
         coverService.computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
     });
 
     describe('map loading and fallbacks', () => {
         it('loads map data and NPCs for the campaign', async () => {
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
+            const result = await build();
 
             expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, mapName);
             expect(npcsService.loadNPCs).toHaveBeenCalledWith(campaignName);
@@ -128,7 +134,7 @@ describe('buildAttackContextForDamage (map present)', () => {
             for (const mapData of incompleteMaps) {
                 mapsService.loadMapData.mockResolvedValue(mapData);
 
-                const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
+                const result = await build();
 
                 expect(result.damageType).toBe('fire');
                 expect(result.attackerName).toBe(playerName);
@@ -142,7 +148,7 @@ describe('buildAttackContextForDamage (map present)', () => {
         it('returns base context when map or NPC loading rejects', async () => {
             npcsService.loadNPCs.mockRejectedValue(new Error('Failed to load NPCs'));
 
-            let result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
+            let result = await build();
 
             expect(result.damageType).toBe('fire');
             expect(result.attackerName).toBe(playerName);
@@ -151,26 +157,14 @@ describe('buildAttackContextForDamage (map present)', () => {
             npcsService.loadNPCs.mockResolvedValue({ npcs: [] });
             mapsService.loadMapData.mockRejectedValue(new Error('Failed to load map'));
 
-            result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
+            result = await build();
 
             expect(result.damageType).toBe('fire');
             expect(result.attackerName).toBe(playerName);
         });
-
-        it('skips distance checks when combat context disappears during target resolution', async () => {
-            damageUtils.getCombatContext
-                .mockResolvedValueOnce(cs)
-                .mockResolvedValueOnce(null);
-
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
-
-            expect(result.damageType).toBe('fire');
-            expect(result.targetName).toBe('Enemy');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-        });
     });
 
-    describe('range effects', () => {
+    describe('range and cover effects', () => {
         it('forces disadvantage when the range effect is disadvantage', async () => {
             rangeValidation.rangeToFeet.mockReturnValue(60);
             rangeValidation.getDistanceFeet.mockReturnValue(50);
@@ -179,10 +173,7 @@ describe('buildAttackContextForDamage (map present)', () => {
                 reason: 'Long range beyond half',
             });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
             expect(result.forcedMode).toBe('disadvantage');
             expect(result.rangeReason).toBe('Long range beyond half');
@@ -198,13 +189,11 @@ describe('buildAttackContextForDamage (map present)', () => {
                 reason: 'Beyond maximum range',
             });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60/240 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60/240 ft.' });
 
             expect(result.isAutoMiss).toBe(true);
             expect(result.rangeReason).toBe('Beyond maximum range');
+            expect(result.coverAcBonus).toBeUndefined();
         });
 
         it('applies melee proximity disadvantage for ranged attacks without target position', async () => {
@@ -216,10 +205,7 @@ describe('buildAttackContextForDamage (map present)', () => {
                 reason: 'Threatened by nearby enemy',
             });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
             expect(result.forcedMode).toBe('disadvantage');
             expect(result.rangeReason).toBe('Threatened by nearby enemy');
@@ -227,6 +213,11 @@ describe('buildAttackContextForDamage (map present)', () => {
             expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(true, attackerPlayer, [], {});
         });
 
+        // NOTE: damageRoll.js:96 re-calls rangeToFeet(attackContext.range) and
+        // requires it FALSY to enter the cover lane — with the real rangeToFeet
+        // that is unreachable for any ranged attack (isRanged implies > 8).
+        // Reported as a source defect; these two tests pin the unit behaviour of
+        // computeCoverAdjustment via the double-call mock sequence.
         it('marks auto-miss on full cover, defaulting missing walls and placedItems', async () => {
             mapsService.loadMapData.mockResolvedValue({ players: [attackerPlayer, targetPlayer] });
             rangeValidation.rangeToFeet
@@ -234,10 +225,7 @@ describe('buildAttackContextForDamage (map present)', () => {
                 .mockReturnValueOnce(0);
             coverService.computeCover.mockReturnValue({ level: 'full', acBonus: 0 });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
             expect(result.isAutoMiss).toBe(true);
             expect(result.coverReason).toBe('Target has full cover');
@@ -255,24 +243,21 @@ describe('buildAttackContextForDamage (map present)', () => {
                 .mockReturnValueOnce(0);
             coverService.computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
             expect(result.coverAcBonus).toBe(2);
             expect(result.coverLevel).toBe('half');
         });
 
-        it('returns unmodified context when no range or cover effects apply', async () => {
+        it('measures distance to the target player token and returns base context when nothing applies', async () => {
             rangeValidation.rangeToFeet.mockReturnValue(60);
             rangeValidation.getDistanceFeet.mockReturnValue(20);
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
+            // Target position resolves from the players list, not placed items.
+            expect(rangeValidation.getDistanceFeet).toHaveBeenCalledWith(attackerPos, { gridX: 10, gridY: 15 });
+            expect(rangeValidation.getNearestPlacedItem).not.toHaveBeenCalled();
             expect(result.forcedMode).toBeUndefined();
             expect(result.isAutoMiss).toBeUndefined();
             expect(result.coverAcBonus).toBeUndefined();
@@ -281,22 +266,13 @@ describe('buildAttackContextForDamage (map present)', () => {
     });
 
     describe('target position resolution', () => {
-        it('resolves target position from the players list on the map', async () => {
-            rangeValidation.rangeToFeet.mockReturnValue(60);
-
-            await buildAttackContextForDamage(makeAttackContext({ range: '60 ft.' }), playerName, campaignName, mapName);
-
-            expect(rangeValidation.getDistanceFeet).toHaveBeenCalledWith(attackerPos, { gridX: 10, gridY: 15 });
-            expect(rangeValidation.getNearestPlacedItem).not.toHaveBeenCalled();
-        });
-
         it('falls back to the nearest placed item when the target is not a player token', async () => {
             const targetNpc = { name: 'Enemy', type: 'npc', gridX: 20, gridY: 25 };
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [targetNpc]));
             damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
             rangeValidation.getNearestPlacedItem.mockReturnValue(targetNpc);
 
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
+            const result = await build();
 
             expect(rangeValidation.getNearestPlacedItem).toHaveBeenCalledWith([targetNpc], 'Enemy', attackerPos);
             expect(rangeValidation.getDistanceFeet).toHaveBeenCalledWith(attackerPos, { gridX: 20, gridY: 25 });
@@ -305,6 +281,8 @@ describe('buildAttackContextForDamage (map present)', () => {
     });
 
     describe("Nature's Sanctuary resistance", () => {
+        // Full branch table lives here (shared pre-branch code; the no-map file
+        // only pins one pass-through case).
         const targetName = 'Goblin';
 
         beforeEach(() => {
@@ -314,53 +292,32 @@ describe('buildAttackContextForDamage (map present)', () => {
         });
 
         function mockSanctuary(creatures, resistance) {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(creatures)
-                .mockReturnValueOnce(resistance);
+            runtimeState.getRuntimeValue.mockImplementation((p, key) =>
+                key === 'naturesSanctuaryCreatures' ? creatures : resistance);
         }
 
-        it('adds resistance notice when target is in sanctuary list and damage matches', async () => {
-            mockSanctuary(['Goblin'], 'fire');
+        it('adds resistance notice when target is in the sanctuary list and damage matches case-insensitively', async () => {
+            mockSanctuary(['Goblin'], 'Fire');
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ damageType: 'fire' });
 
             expect(result.resistanceNotice).toBe("Goblin resists fire (Nature's Sanctuary)");
         });
 
-        it('does not add resistance when target is not in the sanctuary creature list', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(['Ogre']);
+        it('adds no notice when the target is outside the list, resistance is unset, or the type differs', async () => {
+            const noMatchCases = [
+                [['Ogre'], 'fire', 'target not in the sanctuary creature list'],
+                [['Goblin'], null, 'sanctuary resistance type unset'],
+                [['Goblin'], 'cold', 'damage type mismatch'],
+            ];
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
+            for (const [creatures, resistance, why] of noMatchCases) {
+                mockSanctuary(creatures, resistance);
 
-            expect(result.resistanceNotice).toBeNull();
-        });
+                const result = await build({ damageType: 'fire' });
 
-        it('does not add resistance when the sanctuary resistance type is unset', async () => {
-            mockSanctuary(['Goblin'], null);
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not add resistance when damage type does not match sanctuary resistance', async () => {
-            mockSanctuary(['Goblin'], 'cold');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
+                expect(result.resistanceNotice, why).toBeNull();
+            }
         });
 
         it('does not consult sanctuary when a resistance notice already exists', async () => {
@@ -371,24 +328,10 @@ describe('buildAttackContextForDamage (map present)', () => {
             });
             damageUtils.getResistanceNotice.mockReturnValue('Goblin resists fire');
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ damageType: 'fire' });
 
             expect(result.resistanceNotice).toBe('Goblin resists fire');
             expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('matches sanctuary resistance case-insensitively', async () => {
-            mockSanctuary(['Goblin'], 'Fire');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBe("Goblin resists fire (Nature's Sanctuary)");
         });
     });
 
@@ -399,25 +342,37 @@ describe('buildAttackContextForDamage (map present)', () => {
             rangeValidation.rangeToFeet.mockReturnValue(60);
         });
 
-        it('collects hostile NPCs with attitude mapped from the NPC service', async () => {
+        it('collects hostile NPCs, unwrapping the wire envelope and matching numeric-suffix names', async () => {
             const thug = { type: 'npc', name: 'Thug', gridX: 6, gridY: 11 };
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [thug]));
+            const goblin2 = { type: 'npc', name: 'Goblin 2', gridX: 7, gridY: 12 };
+            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [thug, goblin2]));
             // ENVELOPE-FIXTURE pin (#1181): GET /npcs resolves { npcs:[...] }
-            // (jsonEntityCrud.js:49) — collectHostileThreats must unwrap, not .find the envelope.
-            npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Thug', attitude: 'negative' }] });
+            // (jsonEntityCrud.js:49) — collectHostileThreats must unwrap, not
+            // .find the envelope; the suffix-stripped lookup must still match.
+            npcsService.loadNPCs.mockResolvedValue({
+                npcs: [
+                    { name: 'Thug', attitude: 'negative' },
+                    { name: 'Goblin', attitude: 'negative' },
+                ],
+            });
             rangeValidation.computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Flanked' });
 
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
+            const result = await build({ range: '60 ft.' });
 
-            expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(true, attackerPlayer, [{ gridX: 6, gridY: 11, name: 'Thug' }], {});
+            expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(
+                true,
+                attackerPlayer,
+                [
+                    { gridX: 6, gridY: 11, name: 'Thug' },
+                    { gridX: 7, gridY: 12, name: 'Goblin 2' },
+                ],
+                {},
+            );
             expect(result.forcedMode).toBe('disadvantage');
             expect(result.rangeReason).toBe('Flanked');
         });
 
-        it('excludes non-NPC items, friendly NPCs, and NPCs unknown to the NPC service', async () => {
+        it('excludes non-NPC items and friendly NPCs, and counts service-unknown NPCs as hostile', async () => {
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [
                 { type: 'furniture', name: 'Table', gridX: 6, gridY: 11 },
                 { type: 'npc', name: 'Ally', gridX: 7, gridY: 12 },
@@ -425,26 +380,16 @@ describe('buildAttackContextForDamage (map present)', () => {
             ]));
             npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Ally', attitude: 'positive' }] });
 
-            await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
+            // Real isHostileNPC treats null attitude as hostile, so 'Mystery'
+            // (unknown to the NPC service) is a threat in production.
+            await build({ range: '60 ft.' });
+
+            expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(
+                true,
+                attackerPlayer,
+                [{ gridX: 8, gridY: 13, name: 'Mystery' }],
+                {},
             );
-
-            expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(true, attackerPlayer, [], {});
-        });
-
-        it('matches placed NPCs with numeric suffixes to base NPC names', async () => {
-            const goblin2 = { type: 'npc', name: 'Goblin 2', gridX: 6, gridY: 11 };
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [goblin2]));
-            // ENVELOPE-FIXTURE pin (#1181): unwrapped lookup must still match the numeric suffix.
-            npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Goblin', attitude: 'negative' }] });
-
-            await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(rangeValidation.computeMeleeProximityEffect).toHaveBeenCalledWith(true, attackerPlayer, [{ gridX: 6, gridY: 11, name: 'Goblin 2' }], {});
         });
     });
 });

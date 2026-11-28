@@ -1,21 +1,25 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
 // Lane map (#346-#352 family): this file owns ONLY the INITIATIVE_CLEARED_EFFECT_KEYS
-// wholesale sweep at useInitiativeEffects.js:33-41 / :367-369 — each of the 7 keys
-// (pass_without_trace_bonus, blur, globe_barrier, forcecage, antimagic_field,
-// regenerate, beacon_of_hope) is removed from campaign targetEffects regardless of
-// source, re-reading the store per sweep (sequential snapshot semantics).
-// Distinct from siblings (verified against current disk, grep for the 7 keys across
-// all useInitiativeEffects.*.test.js matches nothing outside this file):
+// wholesale sweep — clearCampaignEffectsWith(effectKey + effectInvolves) in the
+// initiative-rolled handler. Each of the 7 keys (pass_without_trace_bonus, blur,
+// globe_barrier, forcecage, antimagic_field, regenerate, beacon_of_hope) is removed
+// from campaign targetEffects when the row involves the roller, re-reading the store
+// per sweep (sequential snapshot semantics).
+// Distinct from siblings (grep for the 7 keys across all useInitiativeEffects.*.test.js
+// matches nothing outside this file):
 //   - source-scoped clears (clearSourceEffects tables) → #350/#351/#348
 //   - per-character activeBuffs / activeConditions / tracker resets → #346
 //   - unowned guards (Perfect Focus FP>=max, falsy concentration on found
 //     creature) → edgeCases #352
+//   - regenerateActive/currentHitPoints RESTORE lane → invisibilityRegen.test.js
+//     (sole owner; its per-creature negatives, null/0 max-HP edges and
+//     getAllStoreKeys-independence pin are a strict superset of what lived here)
 // Known source defect (never enshrined here): restoreCalmEmotions multi-condition
-// clobber (useInitiativeEffects.js:163-171) — owned by #351 lane.
+// clobber — owned by #351 lane.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     // Exactly the four exports live in this import graph: useInitiativeEffects.js:2
     // and its loaded collaborator boonOfCombatProwess.js:2 import
@@ -87,8 +91,8 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
         actions: [],
     };
 
-    // One entry per swept key, in INITIATIVE_CLEARED_EFFECT_KEYS table order
-    // (:33-41). Per-creature seam law (owner ruling 2026-11-10): the sweep
+    // One entry per swept key, in INITIATIVE_CLEARED_EFFECT_KEYS table order.
+    // Per-creature seam law (owner ruling 2026-11-10): the sweep
     // clears ONLY rows INVOLVING the roller (source OR target) — every cleared
     // row below carries 'TestMonk' on one side. FOREIGN twins share swept keys
     // but involve nobody else — they must survive byte-identical (the old
@@ -140,8 +144,8 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
         rollInitiative();
 
         // One write per table key, shrinking byte-exactly in table order; every
-        // call pins campaign scoping with the exact 4-arg store signature
-        // (useRuntimeState.js:78) — a 5th arg is ignored by the callee and must
+        // call pins campaign scoping with the exact 4-arg setRuntimeValue
+        // signature — a 5th arg is ignored by the callee and must
         // never reappear; these clears originate locally and must POST/broadcast.
         // Foreign rows (never source/target TestMonk) ride every payload.
         expect(teWrites()).toEqual([
@@ -155,24 +159,13 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
         ]);
     });
 
-    it('restores ONLY the roller\'s regenerate state (other regenerators untouched)', () => {
-        store.set('TestMonk|regenerateActive', true);
-        store.set('TestMonk|hitPoints', 90);
-        store.set('Ally4|regenerateActive', true);
-        store.set('Ally4|hitPoints', 33);
-
-        renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
-        rollInitiative();
-
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'regenerateActive', false, campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'currentHitPoints', 90, campaignName);
-        // Another creature's Regenerate flag + HP are never written by this roll.
-        expect(setRuntimeValue.mock.calls.filter(([name]) => name === 'Ally4')).toEqual([]);
-    });
+    // NOT restated here: the regenerateActive/currentHitPoints restore that the
+    // 'regenerate' sweep pairs with — invisibilityRegen.test.js is its sole owner
+    // with strictly stronger negatives (enumerated foreign regenerators survive,
+    // null/0 max-HP edges, getAllStoreKeys independence).
 
     it.each([
-        ['a null store', null],
-        ['an empty store', []],
+        ['a null store (key never written)', null],
         [
             'only unlisted bystanders',
             [SURVIVOR, { effect: 'bless_bonus', source: 'Cleric' }, { effect: 'bane_penalty', source: 'OtherCaster' }],

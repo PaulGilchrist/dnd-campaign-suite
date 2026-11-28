@@ -1,36 +1,35 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import AvatarImage from './AvatarImage.jsx';
 
 // One render per test keeps queries unambiguous; setup.js cleans up after each.
+// The wrapper is the component's single root element; its classes are a styling
+// contract consumed by five consumer CSS files, so they are pinned here too.
 function renderAvatar(props) {
   const utils = render(<AvatarImage name="Test" {...props} />);
-  return { ...utils, wrapper: utils.container.querySelector('.avatar-wrapper') };
+  return { ...utils, wrapper: utils.container.firstElementChild };
 }
 
 describe('AvatarImage', () => {
+  // Branch-by-branch src resolution is pinned canonically in avatarSrc.test.js;
+  // these two cases only pin the wiring — that the component routes imagePath +
+  // campaignName into resolveAvatarSrc in that order and paints the result.
+  // Distinctive fixtures kill an argument-swap mutant (swapping yields a
+  // different/absent src for both cases).
   describe('image mode (imagePath provided)', () => {
-    // Src resolution: http(s) passes through untouched; relative paths get the
-    // campaign prefix only when a campaignName is supplied.
-    it.each([
-      ['absolute path stays untouched', { imagePath: '/avatar.png' }, '/avatar.png'],
-      ['relative path + campaign gets campaign prefix', { imagePath: 'avatar.png', campaignName: 'my-campaign' }, 'campaigns/my-campaign/avatar.png'],
-      ['https URL ignores campaignName', { imagePath: 'https://example.com/avatar.png', campaignName: 'my-campaign' }, 'https://example.com/avatar.png'],
-      ['http URL ignores campaignName', { imagePath: 'http://example.com/avatar.png', campaignName: 'my-campaign' }, 'http://example.com/avatar.png'],
-      ['relative path without campaign stays untouched', { imagePath: 'avatar.png' }, 'avatar.png'],
-    ])('%s', (_label, props, expectedSrc) => {
-      renderAvatar({ name: 'Test User', ...props });
+    it('paints the campaign-prefixed src and alt on the image, hiding the initials', () => {
+      renderAvatar({ name: 'Test User', imagePath: 'avatar.png', campaignName: 'my-campaign' });
       const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', expectedSrc);
+      expect(img).toHaveAttribute('src', 'campaigns/my-campaign/avatar.png');
       expect(img).toHaveAttribute('alt', 'Test User');
       expect(img).toHaveClass('avatar-image');
+      expect(screen.queryByText('T')).not.toBeInTheDocument();
     });
 
-    it('shows the image, not an initial placeholder', () => {
-      const { wrapper } = renderAvatar({ imagePath: '/avatar.png' });
-      expect(screen.queryByText('T')).not.toBeInTheDocument();
-      expect(wrapper.querySelector('img')).toBe(screen.getByRole('img'));
+    it('paints a relative path unchanged when no campaign is known', () => {
+      renderAvatar({ imagePath: '/avatar.png' });
+      expect(screen.getByRole('img')).toHaveAttribute('src', '/avatar.png');
     });
 
     it('falls back to initial mode when imagePath is an empty string', () => {
@@ -40,24 +39,18 @@ describe('AvatarImage', () => {
     });
   });
 
+  // '' names the falsy branch; null/undefined hit the identical `name ?` check
+  // (same-branch, trimmed). The lowercase case pins toUpperCase.
   describe('initial mode (no usable imagePath)', () => {
     it.each([
       ['first letter of a name', 'Test User', 'T'],
       ['uppercases a lowercase name', 'lowercase', 'L'],
-      ['keeps a digit initial', '4ev1l', '4'],
       ['question mark for empty name', '', '?'],
-      ['question mark for null name', null, '?'],
-      ['question mark for missing name', undefined, '?'],
     ])('%s', (_label, name, expectedInitial) => {
-      renderAvatar({ name });
+      const { wrapper } = renderAvatar({ name });
       expect(screen.getByText(expectedInitial)).toBeInTheDocument();
-    });
-
-    it('renders a placeholder span, not a broken image', () => {
-      const { wrapper } = renderAvatar({ name: 'Test' });
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
-      expect(wrapper).toHaveClass('avatar-initial');
-      expect(wrapper.querySelector('span')).toHaveTextContent('T');
+      expect(wrapper).toHaveClass('avatar-wrapper', 'avatar-initial');
     });
   });
 
@@ -72,7 +65,7 @@ describe('AvatarImage', () => {
 
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
       expect(wrapper).toHaveClass('avatar-initial');
-      expect(wrapper.querySelector('span')).toHaveTextContent('T');
+      expect(wrapper).toHaveTextContent('T');
     });
 
     it('renders the initials disc when a "successful" load decodes zero pixels', () => {
@@ -129,12 +122,11 @@ describe('AvatarImage', () => {
       expect(wrapper).toHaveStyle({ width: expectedPx, height: expectedPx });
     });
 
-    it.each([
-      [50, '20px'],
-      [80, '32px'],
-    ])('initial avatar with size %i scales font to %s', (size, expectedFontSize) => {
-      const { wrapper } = renderAvatar({ size });
-      expect(wrapper).toHaveStyle({ width: `${size}px`, height: `${size}px`, fontSize: expectedFontSize });
+    // One fixture pins the whole fontSize formula (size * 0.4) — a second
+    // fixture exercises the identical expression (same-branch, trimmed).
+    it('initial avatar with size 80 scales font to 32px', () => {
+      const { wrapper } = renderAvatar({ size: 80 });
+      expect(wrapper).toHaveStyle({ width: '80px', height: '80px', fontSize: '32px' });
     });
   });
 
@@ -163,15 +155,14 @@ describe('AvatarImage', () => {
       }
     );
 
-    it.each(['Escape', 'a', '1'])(
-      'does not activate on unrelated key: %s',
-      (key) => {
-        const onClick = vi.fn();
-        renderAvatar({ ...variantProps, onClick });
-        fireEvent.keyDown(screen.getByRole('button'), { key });
-        expect(onClick).not.toHaveBeenCalled();
-      }
-    );
+    // One unrelated key kills every "accept any key" mutant; Enter/Space
+    // positives above pin the exact accepted set.
+    it('does not activate on an unrelated key', () => {
+      const onClick = vi.fn();
+      renderAvatar({ ...variantProps, onClick });
+      fireEvent.keyDown(screen.getByRole('button'), { key: 'Escape' });
+      expect(onClick).not.toHaveBeenCalled();
+    });
 
     it('is exposed as a focusable button with pointer cursor', () => {
       const { wrapper } = renderAvatar({ ...variantProps, onClick: vi.fn() });

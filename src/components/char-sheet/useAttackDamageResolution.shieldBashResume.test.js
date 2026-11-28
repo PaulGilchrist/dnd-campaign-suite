@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Shield Bash RESUME lane at the useAttackDamageResolution seam. Since
 // bug-sheet-attack-shield-bash-rider-drops-weapon-damage the chooser pauses
 // the real pipeline at _pausedStep:'shieldBashRider' AFTER proceedToDamage —
@@ -133,7 +133,7 @@ describe('useAttackDamageResolution — Shield Bash post-damage pause resume', (
     vi.clearAllMocks();
   });
 
-  it('weapon damage commits BEFORE the chooser opens; the approved shieldBash pause resumes once through the stash instances and never re-pushes damage (Apply and Skip both close through this resume)', async () => {
+  it('weapon damage commits BEFORE the chooser opens; the approved shieldBash pause resumes once through the stash instances, never re-pushes damage, and a stray second resume is inert (Apply and Skip both close through this resume)', async () => {
     const resumeRef = { current: null };
     const deps = makeDeps(resumeRef);
     const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
@@ -198,20 +198,16 @@ describe('useAttackDamageResolution — Shield Bash post-damage pause resume', (
     expect(resumeRef.current).toBeNull();
     expect(deps.setModalState).toHaveBeenCalledTimes(1);
     expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
 
-  it('resume after the pause has completed is inert — no double damage, latch stays cleared (Skip then stray close)', async () => {
-    const resumeRef = { current: null };
-    const deps = makeDeps(resumeRef);
-    const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
-
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Zombie 1' });
-    await resumeAttackPipeline();
-    expect(resumeRef.current).toBeNull();
-
+    // Stray second resume (Skip then a duplicate modal close): the latch is
+    // already cleared, so the whole call short-circuits on the allow-list —
+    // not even a resume ATTEMPT on the completed stash.
     await resumeAttackPipeline();
 
+    expect(resumeSpy).toHaveBeenCalledTimes(1);
     expect(deps.rollDamage).toHaveBeenCalledTimes(1);
+    expect(deps.setModalState).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(resumeRef.current).toBeNull();
   });
 

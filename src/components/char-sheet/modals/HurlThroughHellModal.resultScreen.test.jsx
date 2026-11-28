@@ -1,21 +1,44 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 /**
- * HurlThroughHellModal — result-screen lane (jsx :270-294).
+ * HurlThroughHellModal — result-screen lane (jsx :290-316).
  *
  * Ownership map (siblings — do not duplicate here):
  * - .test.jsx (base) — info-screen ternary arms, Cancel/Done close, confirm transition,
  *   round-latch + uses stamps.
  * - .saveResults.test.jsx — save-resolution side effects (store writes, ledger fields,
  *   popup detail, addExpiration payload).
- * - -branches.test.jsx — branch/fallback matrix, byte-exact ledgers, promptId guard,
- *   listener lifecycle, null interim stage.
- * This lane owns ONLY the user-facing result screen: exact copy for both save arms plus
- * the fiend-target fail interpolation (jsx :274-278 keys off saveSuccess alone — the
- * fiend-ness lives in the ledgers, not this screen) and the Done-button contract — the
- * copy closer + Done-click trimmed out of -branches.test.jsx's save-arm ledger it.each
- * (rec). The previous single test here asserted the INFO-screen pact note (/level 4/) —
- * misnamed and already covered by base (:98-150) and the branch pact arms; trimmed.
- * Microtask flushes only (no bare setTimeout); per-test onClose.
+ * - -branches.test.jsx (18 blocks / 28 cases) — branch/fallback matrix, byte-exact
+ *   ledgers, promptId guard, listener lifecycle, null interim stage.
+ * - .save-dismissed.test.jsx — the dismissed-arm copy (:295) and Done, pinned stronger
+ *   there (findByText + zero-harm ledger); never re-pinned here.
+ * This lane owns ONLY the user-facing fail/success result copy (:297/:299) plus the
+ * Done-button contract — the copy closer + Done-click trimmed out of -branches.test.jsx's
+ * save-arm ledger it.each (rec).
+ *
+ * Trim pass 2026-11-27 (3 cases → 2): the old third arm 'failed save (fiend target)'
+ * hit the SAME :297 branch as arm 1 with only the target name differing (the result
+ * screen never consults combatSummary — no fiend variant exists here, and the fiend
+ * routing is saveResults/branches' ledger face, off-limits per the #1956 handoff).
+ * Its interpolation duty now rides arm 1: fail arm uses targetName 'Orc Warrior' +
+ * saveType 'DEX' so a hardcoded-name/-saveType refactor of :297 is mutant-discriminating;
+ * the success arm keeps fixture defaults. Both arms cross-pin the opposite branch's
+ * byte (notCopy), falsifying a :296/:298 branch swap in either direction.
+ *
+ * Split compliance (#1956 handoff): confirms with hasUse=true only (pact ledger is
+ * -branches' exclusive); pins no addEntry rows, popup details or Done payloads — the
+ * component calls onClose() with no arguments, so there is no payload to project.
+ * window.dispatchEvent is the correct dispatch face here: the component registers its
+ * own window listeners at :233-234 (not via the mocked factory); -save-dismissed
+ * dispatches the same way.
+ * No Date.now freeze: neither pinned outlet (copy, Done click) stamps — the stamping
+ * outlets (:47/:70/:88/:102/:129/:200) are verified and owned by -branches. Microtask
+ * flushes only (no bare setTimeout, no sleeps — #1956 method); fresh onClose per test.
+ * Mock-key audit: all 7 vi.mock modules are imported by the component and every exported
+ * key is consumed (savePrompt {createSaveListener, logSaveDismissed}, logService
+ * {addEntry}, useRuntimeState {getRuntimeValue, setRuntimeValue}, applyDamage
+ * {applyDamageToTarget}, combatData {getCombatSummary, getCurrentCombatRound},
+ * diceRoller {rollExpression}, expirations {addExpiration}) — no phantoms; only
+ * useOverlayEntranceFocus imports unmocked (pure DOM focus hook, jsdom-safe).
  */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -97,11 +120,14 @@ async function resolveSave(props, detail) {
 describe('HurlThroughHellModal — result screen', () => {
   it.each([
     {
+      // Fail arm interpolates targetName + saveType away from the fixture defaults so
+      // the :297 template is pinned, not a hardcoded byte (retired fiend-target arm's
+      // duty folded in — same branch, single leg).
       arm: 'failed save',
-      props: {},
+      props: { targetName: 'Orc Warrior', saveType: 'DEX' },
       detail: { roll: 8, total: 10, success: false },
-      copy: 'Goblin1 failed WIS save — hurled through the lower planes.',
-      notCopy: 'Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
+      copy: 'Orc Warrior failed DEX save — hurled through the lower planes.',
+      notCopy: 'Orc Warrior succeeded on DEX save — resists the effect and is not hurled through the lower planes.',
     },
     {
       arm: 'succeeded save',
@@ -109,15 +135,6 @@ describe('HurlThroughHellModal — result screen', () => {
       detail: { roll: 15, total: 17, success: true },
       copy: 'Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
       notCopy: 'Goblin1 failed WIS save — hurled through the lower planes.',
-    },
-    {
-      // Home for the fiend-arm copy byte retired from -branches ledger test (:549):
-      // same fail copy, fiend target name interpolated — no fiend variant exists here.
-      arm: 'failed save (fiend target)',
-      props: { targetName: 'Orc Warrior' },
-      detail: { roll: 8, total: 10, success: false },
-      copy: 'Orc Warrior failed WIS save — hurled through the lower planes.',
-      notCopy: 'Orc Warrior succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
     },
   ])('$arm: exact result copy, Done-only actions, Done closes once', async ({ props: overrides, detail, copy, notCopy }) => {
     const props = makeProps(overrides);

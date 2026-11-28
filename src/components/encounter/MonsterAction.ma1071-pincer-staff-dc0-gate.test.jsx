@@ -1,17 +1,17 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1071: Kuo-toa Whip "Pincer Staff" — household save_dc:0/save_type:""/
 // save_effect:"" empty-noise decoy (MA-1021 census family) previously ADMITTED
 // the ActionSaveRoll save lane (gate tested save_dc == null, 0 ≠ null): every
 // hit adjudicated vs a guaranteed-success DC 0 with dcSuccess:'half' and HALVED
 // the flat "Hit: 9 (2d6 + 2) Piercing" damage (live fingerprint 2026-09-24).
-// Fix = code gate Number(save_dc) > 0 (MonsterAction.jsx:116 — DC0 renders NO
+// Fix = code gate Number(save_dc) > 0 (MonsterAction.jsx:148 — DC0 renders NO
 // save chip at all, MA-0551 convention); DATA stays authored (not stripped).
-// OWNERS OUTSIDE THIS FILE (trimmed, cited):
-//  - isCompositeAttackSaveRow save_dc:0 false arm → MonsterCardModal.secondary-save-transport.test.js:115
+// OWNERS OUTSIDE THIS FILE (trimmed, cited — line-drift refresh 2026-11-28):
+//  - isCompositeAttackSaveRow save_dc:0 false arm → MonsterCardModal.secondary-save-transport.test.js:301
 //  - positive-DC clickable chip render + save-seam press → MonsterAction.ma1546-succubus-charm-save-effect.test.jsx / ma1847-apep-devour-the-boat-save.test.jsx
-//  - buildSaveOptions dc>0 half-default → MonsterCardModal.cockatrice-bite.test.jsx:44, ma1971-wing-defense.test.jsx:46 (line-drift refresh #336T: assertion moved from :95)
+//  - buildSaveOptions dc>0 half-default → MonsterCardModal.cockatrice-bite.test.jsx:38-42, MonsterCard.ma1971-wing-defense.test.jsx:71
 //  - breathAoeShape save_dc:0 → null + prose-cone parse → MonsterCardModal.save-variant-shape.test.jsx:59-61/:55-57
-//  - Rapport Spores DC0 disk pins/zone lane → MonsterAction.ma1212-rapport-spores-zone-chip.test.jsx:55
+//  - Rapport Spores DC0 disk pins/zone lane → MonsterAction.ma1212-rapport-spores-zone-chip.test.jsx:59-63
 //  - Bone Whip (MA-1070) byte-twin gate = same fork as Pincer Staff row below — redundant arm, trimmed.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -72,13 +72,15 @@ describe('MA-1071 render gate: save_dc:0 boundary suppresses the save lane entir
   });
 });
 
-describe('MA-1071 save-transport gate: DC0 arms no saveDc AND no half-default dcSuccess', () => {
+describe('MA-1071 save-transport gate: DC0 decoy arms NO save payload field', () => {
   // Unowned arm: no other suite feeds an INTEGER save_dc:0 to buildSaveOptions
   // (other toBeNull() hits are save_dc-absent rows; MA-1071 twin comment
-  // MonsterCardModal.jsx:1330 marks this exact `|| null` / >0 collapse).
-  it('buildSaveOptions: save_dc:0 decoy collapses saveDc to null and dcSuccess stays null (no half leak riding a null DC)', () => {
+  // MonsterCardModal.jsx:1624 marks this exact `|| null` / >0 collapse).
+  it('buildSaveOptions: save_dc:0 collapses saveDc to null, dcSuccess stays null (no half leak riding a null DC), and the "" save_type/save_effect noise arms no saveType or conditions', () => {
     const opts = buildSaveOptions(PINCER);
     expect(opts.saveDc).toBeNull();
     expect(opts.dcSuccess).toBeNull();
+    expect(opts.saveType).toBeNull();
+    expect(opts.saveConditions).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Terminal chooser handlers (confirm/cancel) of useCharActionsAttackHandlers —
 // the modal-resolved half of the attack lane: buff arming, sticky arm/clear
 // safety (CLA-044), once-per-turn spend, logs, and the terminal roll through
@@ -31,7 +31,9 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 vi.mock('../../services/automation/common/oncePerTurn.js', () => ({
-    markOncePerTurn: vi.fn(() => Promise.resolve({ round: 1, activeCreature: 'TestFighter' })),
+    // The terminal lanes never read markOncePerTurn's resolution — a bare
+    // resolve keeps the mock from implying a consumed return value (#2065).
+    markOncePerTurn: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock hygiene: the old vi.mock('../../hooks/runtime/useRuntimeState.js') was
@@ -58,15 +60,14 @@ function makeAttack(overrides = {}) {
 
 /**
  * Runtime-store read stub with sensible defaults; override individual keys
- * instead of hand-rolling a switch in every test.
+ * instead of hand-rolling a switch in every test. Seeds only the two keys
+ * this lane reads (the latch/offer keys belong to the handleAttackClick
+ * chooser-gate lane owned by the base suite).
  */
 function makeRuntimeStore(overrides = {}) {
     const store = {
         activeCreatureName: playerName,
-        activeBuffs: [],
         targetEffects: [],
-        '_recklessAttack_offeredThisTurn': null,
-        '_BrutalStrike_usedRound': null,
         ...overrides,
     };
     return vi.fn((_charKey, key) => store[key]);

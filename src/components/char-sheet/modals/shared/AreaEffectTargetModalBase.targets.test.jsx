@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
@@ -20,7 +20,7 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
 
 const campaignName = 'test-campaign';
 
-// Attacker is Wizard1; base roster has no Wizard1 so includeCaster rows add it.
+// Attacker is Wizard1; it is added to rosters only where a test pins includeCaster.
 const baseCreatures = [
   { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { cha: 0 } },
   { name: 'Orc', type: 'npc', currentHp: 15, maxHp: 22, saveBonuses: { cha: 2 } },
@@ -52,6 +52,7 @@ function captureTargetNames(props = {}) {
     return <div>Captured</div>;
   });
   render(<AreaEffectTargetModalBase {...baseProps} renderBody={renderBody} {...props} />);
+  if (!capturedCtx) throw new Error('AreaEffectTargetModalBase never invoked renderBody');
   return capturedCtx.eligibleTargets.map(t => t.name);
 }
 
@@ -127,36 +128,58 @@ describe('AreaEffectTargetModalBase - Eligible Targets', () => {
     });
   });
 
-  // Trapped-effects gate consolidated in #171 (TRAP_BLOCKING_EFFECTS loop over the
-  // trapEffectBlocksAttack core, fix#227 house pattern) — keep one describe per effect
-  // key so each axis of the former four get*Blocked clones stays independently falsifiable.
-  describe.each(['forcecage', 'maze', 'banishment', 'imprisonment'])('%s blocking', (effect) => {
-    const te = (target, source) => ({ effect, target, source });
+  // Trapped-effects gate consolidated in #171 into ONE TRAP_BLOCKING_EFFECTS.some()
+  // loop over the shared trapEffectBlocksAttack core (AreaEffectTargetModalBase.jsx:101)
+  // — all four keys exercise a byte-identical path, so the former 4-keys × 4-scenarios
+  // matrix collapsed to: the source-matching semantics pinned once on a representative
+  // key, plus a single membership test proving every key (and only those keys) gates.
+  describe('trapped-effects gate', () => {
+    const te = (effect, target, source) => ({ effect, target, source });
+
     it.each([
       {
         // A trapped attacker blocks every target except ones sharing its source.
         scenario: 'attacker and target share the same source — target stays eligible',
-        effects: [te('Wizard1', 'SrcA'), te('Goblin', 'SrcA')],
+        effects: [te('forcecage', 'Wizard1', 'SrcA'), te('forcecage', 'Goblin', 'SrcA')],
         expected: ['Goblin'],
       },
       {
         scenario: 'attacker and target have different sources — target is blocked',
-        effects: [te('Wizard1', 'SrcA'), te('Goblin', 'SrcB')],
+        effects: [te('forcecage', 'Wizard1', 'SrcA'), te('forcecage', 'Goblin', 'SrcB')],
         expected: [],
       },
       {
         scenario: 'only the attacker is trapped — every target is blocked',
-        effects: [te('Wizard1', 'SrcA')],
+        effects: [te('forcecage', 'Wizard1', 'SrcA')],
         expected: [],
       },
       {
         scenario: 'only the target is trapped — that target is blocked',
-        effects: [te('Goblin', 'SrcA')],
+        effects: [te('forcecage', 'Goblin', 'SrcA')],
         expected: ['Orc', 'PlayerAlly'],
       },
     ])('$scenario', ({ effects, expected }) => {
       getRuntimeValue.mockReturnValue(effects);
       expect(captureTargetNames()).toEqual(expected);
+    });
+
+    it('gates on all four trap effect keys and on no other effect', () => {
+      const combatSummary = {
+        creatures: [
+          ...baseCreatures,
+          { name: 'Kobold', type: 'npc', currentHp: 6, maxHp: 6 },
+          { name: 'Bogey', type: 'npc', currentHp: 6, maxHp: 6 },
+        ],
+      };
+      getRuntimeValue.mockReturnValue([
+        te('forcecage', 'Goblin', 'SrcA'),
+        te('maze', 'Orc', 'SrcA'),
+        te('banishment', 'PlayerAlly', 'SrcA'),
+        te('imprisonment', 'Kobold', 'SrcA'),
+        // Non-trap effect holder stays selectable.
+        te('restrained', 'Bogey', 'SrcA'),
+      ]);
+      expect(captureTargetNames({ combatSummary })).toEqual(['Bogey']);
     });
   });
 

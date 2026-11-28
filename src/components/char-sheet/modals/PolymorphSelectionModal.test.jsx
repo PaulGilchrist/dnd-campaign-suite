@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-17
+// @maintained-by-ai 2026-11-27
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -109,6 +109,12 @@ function getSelectedItemNames() {
     return Array.from(document.querySelectorAll('.wild-shape-beast-item.selected')).map(beastNameOf);
 }
 
+// Full expected list under baseProps (CR<=1), shared by the list test and the
+// search-restore assertion — one pin of the CR/type filter + CR-then-name sort.
+const EXPECTED_BEAST_ORDER = [
+    'Badger', 'Eagle', 'Rat', 'Panther', 'Wolf', 'Crocodile', 'Brown Bear', 'Giant Spider',
+];
+
 function waitForBeastsLoaded() {
     return waitFor(() => {
         expect(document.querySelectorAll('.wild-shape-beast-item').length).toBeGreaterThan(0);
@@ -168,7 +174,9 @@ describe('PolymorphSelectionModal (core)', () => {
         expect(screen.queryByPlaceholderText('Search beasts...')).not.toBeInTheDocument();
     });
 
-    it('lists exactly the CR<=1 beasts, sorted by CR then name, with wild shape copy', async () => {
+    // One mount, one set of props: the list/sort/copy face and the row-speed
+    // face share this execution path, so they live in a single test.
+    it('lists CR<=1 beasts sorted by CR then name, byte-pins the walk-only Movement panel, and renders only walk speeds on every row', async () => {
         render(<PolymorphSelectionModal {...baseProps} />);
         await waitForBeastsLoaded();
 
@@ -176,19 +184,13 @@ describe('PolymorphSelectionModal (core)', () => {
         // Type filter (no Ghast), CR filter and no-walk filter in one exact-list
         // assertion, plus CR-then-name sort order. Every disk beast has a walk
         // speed, so Eagle (CR 0) and Badger (CR 0) legitimately remain listed —
-        // with their forbidden extra modes hidden (see speed regression below).
-        expect(getBeastNames()).toEqual([
-            'Badger', 'Eagle', 'Rat', 'Panther', 'Wolf', 'Crocodile', 'Brown Bear', 'Giant Spider',
-        ]);
+        // with their forbidden extra modes hidden (speed asserts below).
+        expect(getBeastNames()).toEqual(EXPECTED_BEAST_ORDER);
 
-        const movement = Array.from(document.querySelectorAll('.wild-shape-info'))
-            .find(d => d.textContent.startsWith('Movement:'));
-        expect(movement).toHaveTextContent('walk only');
-    });
-
-    it('renders only walk speeds on every row under walk-only limitations', async () => {
-        render(<PolymorphSelectionModal {...baseProps} />);
-        await waitForBeastsLoaded();
+        // Exact bytes of the whole info line: the <strong> carries the label,
+        // the div's textContent is "Movement: <prose>".
+        expect(screen.getByText('Movement:').closest('.wild-shape-info').textContent)
+            .toBe(`Movement: ${WALK_ONLY}`);
 
         // Exact rendered speed lists: no swim/climb/fly/burrow may surface under
         // 'walk only (no swim or fly)' (pass #150 polarity defect).
@@ -228,17 +230,18 @@ describe('PolymorphSelectionModal (core)', () => {
             expect(getBeastNames()).toEqual(['Wolf']);
         });
 
+        // Exact beast-mode no-results branch of computeListCopy (the
+        // creature-mode branches are pinned by the features lane); the
+        // listbox/rows also un-render (plain list container + <p>).
         fireEvent.change(input, { target: { value: 'xyznonexistent' } });
         await waitFor(() => {
-            expect(screen.getByText(/No beasts match/)).toBeInTheDocument();
+            expect(screen.getByText('No beasts match your Wild Shape limitations.')).toBeInTheDocument();
             expect(document.querySelectorAll('.wild-shape-beast-item')).toHaveLength(0);
         });
 
         fireEvent.change(input, { target: { value: '' } });
         await waitFor(() => {
-            expect(getBeastNames()).toEqual([
-                'Badger', 'Eagle', 'Rat', 'Panther', 'Wolf', 'Crocodile', 'Brown Bear', 'Giant Spider',
-            ]);
+            expect(getBeastNames()).toEqual(EXPECTED_BEAST_ORDER);
         });
     });
 
@@ -275,43 +278,37 @@ describe('PolymorphSelectionModal (core)', () => {
         expect(baseProps.onCancel).toHaveBeenCalledTimes(2);
     });
 
-    it('loads monsters exactly once when maxCR and excludeTypes are omitted, even across rerenders (CLA-391)', async () => {
+    // One guard (the joined excludeTypes key in the effect deps), two caller
+    // prop-shapes — both exercised in a single test.
+    it('loads monsters exactly once across rerenders, whether excludeTypes is defaulted or passed inline (CLA-391)', async () => {
         const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-        const renderModal = () => (
+        const renderModal = (props) => (
             <PolymorphSelectionModal
                 playerStats={druidStats2024}
                 campaignName="test-campaign"
                 onConfirm={vi.fn()}
                 onCancel={vi.fn()}
+                {...props}
             />
         );
 
+        // Shape 1: mirrors the wild_shape_select caller (CharSheet.modals.jsx)
+        // which omits excludeTypes and maxCR — the fresh `[]` default in the
+        // effect deps used to refire loadBeasts every render (loop -> crash).
         const { rerender } = render(renderModal());
         await waitForBeastsLoaded();
         rerender(renderModal());
         await new Promise(resolve => setTimeout(resolve, 50));
-
         expect(loadMonsters).toHaveBeenCalledTimes(1);
-    });
 
-    it('keeps the load effect stable when given an inline excludeTypes array by value (CLA-391)', async () => {
-        const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-        const renderModal = () => (
-            <PolymorphSelectionModal
-                playerStats={druidStats2024}
-                maxCR={1}
-                campaignName="test-campaign"
-                excludeTypes={['undead']}
-                onConfirm={vi.fn()}
-                onCancel={vi.fn()}
-            />
-        );
-
-        const { rerender } = render(renderModal());
+        // Shape 2: inline non-empty array — a new identity per render must stay
+        // dep-stable by VALUE, not identity.
+        vi.clearAllMocks(); // mockClear only: the async implementation survives
+        const inline = { maxCR: 1, excludeTypes: ['undead'] };
+        const { rerender: rerenderInline } = render(renderModal(inline));
         await waitForBeastsLoaded();
-        rerender(renderModal());
+        rerenderInline(renderModal(inline));
         await new Promise(resolve => setTimeout(resolve, 50));
-
         expect(loadMonsters).toHaveBeenCalledTimes(1);
     });
 });
