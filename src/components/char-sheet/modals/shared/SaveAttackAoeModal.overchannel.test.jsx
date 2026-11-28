@@ -1,11 +1,15 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // CLA-244 consumer lane: with overchannel context present, SaveAttackAoeModal rolls the
 // tagged damage formula through the REAL maximizer (diceRoller stays live) and delegates
-// backlash ONCE, verbatim, to handleOverchannelSelfDamage. The useCount dice gate is owned
-// by handleOverchannelSelfDamage.test.js — this lane pins pass-through integrity only, so
+// backlash ONCE PER CAST (jsx:1730, after the target loop), verbatim, to
+// handleOverchannelSelfDamage. The useCount dice gate is owned by
+// handleOverchannelSelfDamage.test.js — this lane pins pass-through integrity only, so
 // useCount value changes never alter the modal's behavior here (one delegation test).
+// The delegation assertions ride the ACTIVE-DAMAGE test's 2-target cast: exactly-once with
+// two victims is the stronger pin (a per-target delegation bug would fire twice).
 // Family roles: picker rendering → creature-selection.test.jsx; half-on-save round trip →
-// damage-resolution.test.jsx; CLA-120 INT-fold → cla120-empowered-evocation.test.jsx.
+// damage-resolution.test.jsx; CLA-120 INT-fold → cla120-empowered-evocation.test.jsx;
+// upstream payload tagging → savePath-aoe-overchannel.test.js.
 // Real CreatureSelectionModal (proven inert in damage-resolution.test.jsx — no campaignName
 // passed, its overlay lookup early-returns); AreaEffectTargetModalBase never mounts here
 // (requires an 'overlay-' targetName), so it is not stubbed. persistAndNotify stays live.
@@ -133,13 +137,15 @@ beforeEach(() => {
 afterEach(() => randomSpy.mockRestore());
 
 describe('SaveAttackAoeModal — CLA-244 overchannel consumer', () => {
-  it('rolls damage dice at MAXIMUM through the real maximizer and applies full 21 Fire to every failing target', async () => {
+  it('active lane: rolls MAXIMUM damage through the real maximizer, applies full 21 Fire to every failing target, and delegates backlash exactly once per cast with the verbatim context', async () => {
+    // Upstream savePath shape: tagged formula arrives pre-annotated. Distinct
+    // useCount/spellLevel values pin verbatim passthrough — the modal stamps
+    // identically on 1st and 2nd+ use (the dice gate is the handler's own lane).
     render(<SaveAttackAoeModal {...makeProps({
-      // Upstream savePath shape: tagged formula arrives pre-annotated.
       damage: '3d6 + 3 [Empowered Evocation] [Overchannel Maximize]',
       overchannelActive: true,
-      overchannelUseCount: 1,
-      overchannelSpellLevel: 1,
+      overchannelUseCount: 2,
+      overchannelSpellLevel: 3,
     })} />);
 
     // Pre-confirm inertness: nothing rolls or fires before the picker confirms.
@@ -165,29 +171,20 @@ describe('SaveAttackAoeModal — CLA-244 overchannel consumer', () => {
       expect(log.saveResult).toBe('failure');
       expect(log.finalDamage).toBe(21);
     }
-  });
 
-  it('delegates backlash to handleOverchannelSelfDamage once with the verbatim overchannel context whenever active', async () => {
-    // Distinct useCount/spellLevel values pin the full-context passthrough — the modal
-    // stamps identically on 1st and 2nd+ use (the gate is the handler's own lane).
-    render(<SaveAttackAoeModal {...makeProps({
-      damage: '3d6 [Overchannel Maximize]',
-      overchannelActive: true,
-      overchannelUseCount: 2,
-      overchannelSpellLevel: 3,
-    })} />);
-    await pick('Zombie 1');
-
+    // Backlash delegation (jsx:1730): exactly once for the WHOLE cast — two victims
+    // must not produce two delegations — with the full context passed verbatim.
     expect(handleOverchannelSelfDamage).toHaveBeenCalledTimes(1);
     const [casterName, campaignName, ctx, logFn, characters] = handleOverchannelSelfDamage.mock.calls[0];
     expect(casterName).toBe('TestWizard');
     expect(campaignName).toBe('test-campaign');
     expect(ctx).toEqual({ overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 });
     // Call-and-assert (#245 sharpen): logFn is the addEntry write-channel
-    // wrapper (jsx:1650) — invoking it must log to the exact campaign verbatim.
+    // wrapper (jsx:1733) — invoking it must log to the exact campaign verbatim.
     const probe = { text: 'overchannel backlash probe' };
     logFn(probe);
     expect(addEntry).toHaveBeenCalledWith('test-campaign', probe);
+    // Party roster rides along as a real array (handler feeds it to its applyDamage options).
     expect(Array.isArray(characters)).toBe(true);
   });
 

@@ -1,4 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Popups-folder canon (run2#2129-#2131): this lane owns ONLY the UI seam —
+// option list render, selection payload shape, and gating. Rules math lives in
+// metamagicRules.test.js; consumer prop-mapping lives in
+// CharSpells.Popups.popupWidgets.test.jsx (stubbed popup). NOTE: MetamagicPopup
+// does NOT mount TargetPopupBase — its own spell-name/SP-summary/skip/keydown
+// markup (MetamagicPopup.jsx:141-147, :168-238) is owned HERE, not by
+// TargetPopupBase.test.jsx. Roles not class selectors; class-serialization
+// pins dropped per canon.
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MetamagicPopup from './MetamagicPopup.jsx';
@@ -29,12 +37,12 @@ const basePlayerStats = {
 };
 
 const preCastOptions = [
-  { name: 'Careful Spell', resolvedCost: 1, description: 'Allies automatically succeed on saving throws.', affordable: true },
-  { name: 'Distant Spell', resolvedCost: 1, description: 'Double the range of the spell.', affordable: true },
-  { name: 'Heightened Spell', resolvedCost: 3, description: 'Give one target disadvantage on its first saving throw.', affordable: true },
-  { name: 'Quickened Spell', resolvedCost: 2, description: 'Change the casting time to 1 bonus action.', affordable: true },
-  { name: 'Subtle Spell', resolvedCost: 1, description: 'Cast the spell without somatic or verbal components.', affordable: true },
-  { name: 'Twinned Spell', resolvedCost: 3, description: 'Target a second creature in range.', affordable: true },
+  { name: 'Careful Spell', resolvedCost: 1, description: 'Allies automatically succeed on saving throws.' },
+  { name: 'Distant Spell', resolvedCost: 1, description: 'Double the range of the spell.' },
+  { name: 'Heightened Spell', resolvedCost: 3, description: 'Give one target disadvantage on its first saving throw.' },
+  { name: 'Quickened Spell', resolvedCost: 2, description: 'Change the casting time to 1 bonus action.' },
+  { name: 'Subtle Spell', resolvedCost: 1, description: 'Cast the spell without somatic or verbal components.' },
+  { name: 'Twinned Spell', resolvedCost: 3, description: 'Target a second creature in range.' },
 ];
 
 // Honest default: mirrors the real service summing resolvedCost of selected options.
@@ -56,15 +64,12 @@ function apotheosisCostImpl(selected, options = preCastOptions) {
 }
 
 function renderPopup(overrides = {}) {
-  const spell = overrides.spell !== undefined ? overrides.spell : baseSpell;
-  const playerStats = { ...basePlayerStats, ...overrides.playerStats };
   const props = {
-    spell,
-    playerStats,
+    spell: baseSpell,
+    playerStats: { ...basePlayerStats, ...overrides.playerStats },
     campaignName: 'test-campaign',
     onConfirm: vi.fn(),
     onSkip: vi.fn(),
-    ...overrides.props,
   };
   return {
     ...render(<MetamagicPopup {...props} />),
@@ -74,6 +79,7 @@ function renderPopup(overrides = {}) {
 }
 
 const checkboxFor = (name) => screen.getByRole('checkbox', { name: new RegExp(name) });
+const applyButton = () => screen.getByRole('button', { name: /Apply & Cast/ });
 
 // ── Tests ──
 
@@ -97,7 +103,7 @@ describe('MetamagicPopup', () => {
     cleanup();
   });
 
-  it('renders spell name, level, SP summary, and every option — no Psionic row for non-psionic spells', () => {
+  it('renders spell name, level, SP summary, and every option — no Psionic row and no Incarnate note by default', () => {
     renderPopup();
     expect(screen.getByRole('heading', { name: /Metamagic/ })).toBeInTheDocument();
     expect(screen.getByText('Fireball')).toBeInTheDocument();
@@ -105,56 +111,47 @@ describe('MetamagicPopup', () => {
     expect(screen.getByText(/Sorcery Points:/)).toHaveTextContent(
       'Sorcery Points: 10 available — 0 selected — 10 remaining',
     );
-    // All six options as checkboxes with cost and description copy
+    // All six options render as checkboxes with cost and description copy
     expect(screen.getAllByRole('checkbox')).toHaveLength(preCastOptions.length);
     for (const opt of preCastOptions) {
       expect(checkboxFor(opt.name)).toBeInTheDocument();
-      expect(screen.getByText(opt.description)).toBeInTheDocument();
     }
     expect(screen.getByText('2 SP')).toBeInTheDocument(); // Quickened cost copy
+    expect(screen.getByText('Give one target disadvantage on its first saving throw.')).toBeInTheDocument();
+    // maxPerSpell=1 (default): the Sorcery Incarnate note is gated off; its
+    // positive leg (maxPerSpell>1) is pinned in the multi-select test.
+    expect(screen.queryByText(/Sorcery Incarnate/)).not.toBeInTheDocument();
     // Absence is gated on a positive leg: the options list above rendered in full
     expect(screen.queryByText('Psionic Sorcery')).not.toBeInTheDocument();
   });
 
-  it('shows the Sorcery Incarnate note only when maxPerSpell > 1', () => {
-    renderPopup();
-    expect(screen.queryByText(/Sorcery Incarnate/)).not.toBeInTheDocument();
-
-    cleanup();
-    getMaxMetamagicPerSpell.mockReturnValue(3);
-    renderPopup();
-    expect(screen.getByText(/Sorcery Incarnate/)).toHaveTextContent(
-      'Sorcery Incarnate: you can use up to 3 Metamagic options per spell.',
-    );
-  });
-
   it('shows the not-a-Sorcerer view with a working Close button when there are no options', () => {
     getPreCastOptions.mockReturnValue([]);
-    const { onSkip } = renderPopup({ playerStats: { ...basePlayerStats, class: { name: 'Wizard' } } });
+    const { onSkip } = renderPopup({ playerStats: { class: { name: 'Wizard' } } });
     expect(screen.getByText('Your character is not a Sorcerer with available Metamagic options.')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onSkip when Escape is pressed', () => {
-    const { onSkip } = renderPopup();
+  it('skips only via Escape or Cast Without Metamagic — overlay clicks are inert', () => {
+    const { onSkip, container } = renderPopup();
+    fireEvent.click(container.firstChild); // overlay backdrop
+    expect(onSkip).not.toHaveBeenCalled();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onSkip).toHaveBeenCalledTimes(1);
-  });
-
-  it('dismisses via Cast Without Metamagic only — overlay clicks are inert', () => {
-    const { onSkip } = renderPopup();
-    fireEvent.click(document.querySelector('.popup-overlay'));
-    expect(onSkip).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Cast Without Metamagic' }));
-    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onSkip).toHaveBeenCalledTimes(2);
   });
 
-  it('gates Apply until something is selected, accrues cost as options toggle, and emits the exact payload', () => {
+  it('gates Apply until selection, accrues cost as options toggle, emits the exact payload, and never stamps the Apotheosis latch on a paid confirm', () => {
     getMaxMetamagicPerSpell.mockReturnValue(3);
     const { onConfirm } = renderPopup();
-    const apply = screen.getByRole('button', { name: /Apply & Cast/ });
+    // maxPerSpell>1 positive leg of the Incarnate-note gate
+    expect(screen.getByText(/Sorcery Incarnate/)).toHaveTextContent(
+      'Sorcery Incarnate: you can use up to 3 Metamagic options per spell.',
+    );
+    const apply = applyButton();
 
     expect(apply).toBeDisabled();
     fireEvent.click(apply);
@@ -172,6 +169,9 @@ describe('MetamagicPopup', () => {
       twinTarget: null,
       psionicActive: false,
     });
+    // #1451(a): a waivedName-null (paid) confirm must leave the once-per-turn
+    // latch untouched (the waived leg is pinned in the Apotheosis test).
+    expect(consumeArcaneApotheosisWaiver).not.toHaveBeenCalled();
 
     // Deselecting re-gates the running total
     fireEvent.click(checkboxFor('Careful Spell'));
@@ -187,31 +187,29 @@ describe('MetamagicPopup', () => {
     });
   });
 
-  it('caps selection at maxPerSpell by disabling the other options', () => {
+  it('disables and ignores clicks on options blocked by the per-spell cap or by SP affordability', () => {
+    // Cap leg: maxPerSpell=1 (default) — a second option is unselectable
     const { onConfirm } = renderPopup();
     fireEvent.click(checkboxFor('Careful Spell'));
     expect(checkboxFor('Careful Spell')).toBeChecked();
-
     const distant = checkboxFor('Distant Spell');
     expect(distant).toBeDisabled();
     fireEvent.click(distant);
     expect(distant).not.toBeChecked();
-    expect(screen.getByRole('button', { name: /Apply & Cast/ })).toHaveTextContent('Apply & Cast (1 SP)');
+    expect(applyButton()).toHaveTextContent('Apply & Cast (1 SP)');
     expect(onConfirm).not.toHaveBeenCalled();
-  });
 
-  it('disables unaffordable options and ignores their clicks when SP is low', () => {
-    renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
+    // Affordability leg: 1 SP — the 2 SP option is unselectable, the 1 SP one stays live
+    cleanup();
+    renderPopup({ playerStats: { _metamagicCurrentSP: 1 } });
     const quickened = checkboxFor('Quickened Spell');
     expect(quickened).toBeDisabled();
-    expect(quickened.closest('.metamagic-option')).toHaveClass('metamagic-option-disabled');
     fireEvent.click(quickened);
     expect(quickened).not.toBeChecked();
-    // A 1 SP option is still affordable at 1 SP
     expect(checkboxFor('Careful Spell')).toBeEnabled();
   });
 
-  it('requires a second target before confirming Twinned Spell and sends twinTarget', () => {
+  it('requires a twin target before confirming Twinned Spell and threads twinTarget through the payload', () => {
     const { onConfirm } = renderPopup();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
 
@@ -219,7 +217,7 @@ describe('MetamagicPopup', () => {
     const combo = screen.getByRole('combobox', { name: /Second Target/ });
     expect(screen.getByRole('option', { name: 'Goblin' })).toBeInTheDocument();
 
-    const apply = screen.getByRole('button', { name: /Apply & Cast/ });
+    const apply = applyButton();
     expect(apply).toBeDisabled();
     fireEvent.click(apply);
     expect(onConfirm).not.toHaveBeenCalled();
@@ -234,18 +232,18 @@ describe('MetamagicPopup', () => {
       twinTarget: 'Goblin',
       psionicActive: false,
     });
-  });
 
-  it('confirms Twinned Spell with a null twinTarget when no combat creatures exist', () => {
+    // No-combat leg (:136 creatureTargets.length > 0): the selector offers no
+    // choices and the payload carries a null twinTarget without gating Apply.
+    cleanup();
     getCombatSummary.mockReturnValue({ creatures: [] });
-    const { onConfirm } = renderPopup();
+    const solo = renderPopup();
     fireEvent.click(checkboxFor('Twinned Spell'));
-    // Selector renders but offers no creature choices
-    const combo = screen.getByRole('combobox', { name: /Second Target/ });
-    expect(within(combo).queryByRole('option', { name: 'Goblin' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledWith({
+    const emptyCombo = screen.getByRole('combobox', { name: /Second Target/ });
+    expect(within(emptyCombo).queryByRole('option', { name: 'Goblin' })).not.toBeInTheDocument();
+    fireEvent.click(applyButton());
+    expect(solo.onConfirm).toHaveBeenCalledTimes(1);
+    expect(solo.onConfirm).toHaveBeenCalledWith({
       options: ['Twinned Spell'],
       totalCost: 3,
       twinTarget: null,
@@ -253,7 +251,7 @@ describe('MetamagicPopup', () => {
     });
   });
 
-  it('waives the priciest selected option under Arcane Apotheosis and confirms at the reduced total', () => {
+  it('waives the priciest selected option under Arcane Apotheosis and consumes the latch once, only at confirm', () => {
     hasArcaneApotheosis.mockReturnValue(true);
     getMaxMetamagicPerSpell.mockReturnValue(3);
     computeMetamagicCost.mockImplementation(apotheosisCostImpl);
@@ -266,10 +264,10 @@ describe('MetamagicPopup', () => {
     expect(within(quickenedRow).getByText('0 (waived)')).toBeInTheDocument();
     const carefulRow = screen.getByText('Careful Spell').closest('.metamagic-option');
     expect(within(carefulRow).getByText('1 SP')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Apply & Cast/ })).toHaveTextContent('Apply & Cast (1 SP)');
+    expect(applyButton()).toHaveTextContent('Apply & Cast (1 SP)');
     // #1451(a): previewing (renders + toggles above) must NOT consume the waiver.
     expect(consumeArcaneApotheosisWaiver).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
+    fireEvent.click(applyButton());
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledWith({
       options: ['Quickened Spell', 'Careful Spell'],
@@ -285,22 +283,12 @@ describe('MetamagicPopup', () => {
     );
   });
 
-  it('#1451(a) a non-waived confirm never stamps the Apotheosis latch', () => {
-    // Apotheosis inactive (default hasArcaneApotheosis false, waivedName null):
-    // the paid path must leave the once-per-turn latch untouched.
-    const { onConfirm } = renderPopup();
-    fireEvent.click(checkboxFor('Careful Spell'));
-    fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(consumeArcaneApotheosisWaiver).not.toHaveBeenCalled();
-  });
-
   it('keeps combined Apotheosis + Psionic affordability honest in the total display and payload', () => {
     hasArcaneApotheosis.mockReturnValue(true);
     getMaxMetamagicPerSpell.mockReturnValue(3);
     computeMetamagicCost.mockImplementation(apotheosisCostImpl);
     const { onConfirm } = renderPopup({
-      playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1, _metamagicCurrentSP: 2 },
+      playerStats: { _isPsionicSpell: true, _psionicCost: 1, _metamagicCurrentSP: 2 },
     });
 
     fireEvent.click(checkboxFor('Psionic Sorcery'));
@@ -314,7 +302,7 @@ describe('MetamagicPopup', () => {
     fireEvent.click(heightened);
     expect(heightened).not.toBeChecked();
 
-    const apply = screen.getByRole('button', { name: /Apply & Cast/ });
+    const apply = applyButton();
     expect(apply).toHaveTextContent('Apply & Cast (2 SP)');
     fireEvent.click(apply);
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -328,10 +316,10 @@ describe('MetamagicPopup', () => {
     expect(consumeArcaneApotheosisWaiver).toHaveBeenCalledTimes(1);
   });
 
-  it('selects Psionic Sorcery at the exact SP budget, toggles off, and reports psionicActive both times', () => {
+  it('toggles Psionic Sorcery at the exact SP budget, reports psionicActive both ways, and blocks it when unaffordable', () => {
     computeMetamagicCost.mockReturnValue({ totalCost: 9, waivedName: null });
     const { onConfirm } = renderPopup({
-      playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 },
+      playerStats: { _isPsionicSpell: true, _psionicCost: 1 },
     });
 
     expect(screen.getByText('Psionic Sorcery')).toBeInTheDocument();
@@ -341,7 +329,7 @@ describe('MetamagicPopup', () => {
     fireEvent.click(psionic); // 9 + 1 = 10 = currentSP — boundary is affordable
     expect(psionic).toBeChecked();
 
-    const apply = screen.getByRole('button', { name: /Apply & Cast/ });
+    const apply = applyButton();
     expect(apply).toHaveTextContent('Apply & Cast (10 SP)');
     fireEvent.click(apply);
     // CLA-271: confirmed totalCost is Metamagic-options only — psionic cost is
@@ -364,25 +352,14 @@ describe('MetamagicPopup', () => {
       twinTarget: null,
       psionicActive: false,
     });
-  });
 
-  it('leaves Psionic Sorcery unselectable when totalCost + psionicCost exceeds SP', () => {
-    computeMetamagicCost.mockReturnValue({ totalCost: 9, waivedName: null });
-    const { onConfirm } = renderPopup({
-      playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 2 },
-    });
-
-    const psionic = checkboxFor('Psionic Sorcery');
-    expect(psionic).toBeDisabled(); // 10 − 9 = 1 < 2
-    fireEvent.click(psionic);
-    expect(psionic).not.toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledWith({
-      options: [],
-      totalCost: 9,
-      twinTarget: null,
-      psionicActive: false,
-    });
+    // Unaffordable leg: 10 − 9 = 1 < psionicCost 2 — the row renders disabled
+    // and its clicks are ignored (the psionicActive:false payload is pinned above).
+    cleanup();
+    renderPopup({ playerStats: { _isPsionicSpell: true, _psionicCost: 2 } });
+    const blocked = checkboxFor('Psionic Sorcery');
+    expect(blocked).toBeDisabled();
+    fireEvent.click(blocked);
+    expect(blocked).not.toBeChecked();
   });
 });

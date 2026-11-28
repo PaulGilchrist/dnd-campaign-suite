@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0031: monster cone rows reuse the PC-spell AoE area picker — each
 // picked creature rolls its OWN save at DC 18; fail = full, success = half
 // (existing per-target math untouched); attacker excluded via excludeNames;
@@ -73,6 +73,7 @@ vi.mock('./CreatureSelectionModal.jsx', async () => {
 });
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { storeSpellLastAttack } from '../../../../services/automation/common/damageRollback.js';
 
@@ -118,6 +119,7 @@ describe('MA-0031 area picker as monster cone save', () => {
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1']));
     expect(document.querySelector('.sp-header').textContent).toContain('30-ft Cone (GM positions tokens; selection advisory)');
     // Browsing the picker rolls, logs and damages nothing.
+    expect(rollExpression).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
   });

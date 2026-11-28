@@ -2429,3 +2429,32 @@ files/166.**
 - 📌 Re-cite on next turns: ma0459-cambion header :11, ma0532 header :14, ma0536 header cite 'ma0543:213' -> render face now ma0543-cyclops-oracle:146 (moved at #2094 restore).
 - 📌 ma0552-dao :205 post-refusal store byte = mild redundancy pattern cut at #2096; low-priority trim on its turn (pass #2096).
 - NOTE #2094: prior-pass lesson generalizes — before treating a cite as dangling-owner, CHECK whether the cited face was deleted from the owner lane (restored dual-tier render here).
+
+## Batch #259 flush (2026-11-28, run2#2120-#2134)
+- 🗑 src/components/char-sheet/popups/TargetWithCheckboxesPopup.jsx:4 — dead component/dead export: zero production importers across src/, server/, public/ (only its .css + own test). Pass run2#2130. Deletion candidate, owner sign-off needed (test lane maintained meanwhile).
+- 🗑 src/components/char-sheet/popups/TargetWithTypePopup.jsx:5 — dead export: zero production importers (grep-verified same sweep). Pass run2#2131. Same deletion candidate as the Checkboxes twin.
+- 📌 src/components/char-sheet/useAttackDamageResolution.js:449 — trailing `...ctxOverrides` raw spread re-applies every override verbatim, making resolveDamageContextFlags' per-key `?? ctxOverrides` lines behaviorally redundant/untestable through the hook seam. Pass run2#2132.
+- 📌 src/components/char-sheet/useAttackDamageResolution.js:604 — push branch `String(option.effect).match(/(\d+)/)?.[1] || 15` inherently indistinguishable from hardcoded 15 (exact-match gate admits only 'push_15ft'); no test can separate. Pass run2#2133.
+- 📌 src/components/creature-selection/CreatureSelectionModal.test.jsx (path per its own folder) — heavy CSS class-name pins (secondary-target-selected/-disabled, .secondary-target-row) candidate for class-pin-shedding pass; also :289 'unlimited selection when maxTargets undefined/0' lane deserves a NaN-tolerance audit so tolerance isn't silently widened. Rec from run2#2127.
+
+## Batch #260 flush (2026-11-28, run2#2135-#2149)
+- 🔴 src/components/character-creation/WizardStepSpells.jsx:364 — `{levelKey.replace('level','')}th level:` renders ungrammatical "1th/2th/3th level:" (pre-existing, earlier-pass flagged; re-confirmed unfixed pass run2#2143; feature-touched + WizardStepSpells.test.jsx:131/:198 pin the broken text honestly — flip pins when fixed).
+- 📌 src/components/character-creation/MagicInitiateModal.test-utils.js:470 — tautology `allSpells: allSpells || allSpells` (dead right operand, behaviorally inert, misleading); tidy pass candidate (passes run2#2139/#2140).
+- 📌 src/components/char-sheet/useInitiativeEffects.effectClearing.test.js:33 + useInitiativeEffects.buffClearing.test.js:26 — stale getAllStoreKeys mocks + comments claiming boonOfCombatProwess imports it (false since per-creature-seam-law retirement; only getRuntimeValue/setRuntimeValue imported). Purge on their turns (rec from run2#2138).
+- 📌 useInitiativeEffects.buffClearing.test.js:137-141 exact-name table — could gain 'Awakened Mind' row to generalize mechanics (optional; run2#2138).
+- ⚠ (observation, by-design-flagged) src/components/char-sheet/...ModalHandlers trio — `!targetNames` guard admits empty array through to bulwarkOfForce/zealousPresence/psychicWhispers services (modals gate selection themselves; unpinned by choice; run2#2137).
+
+## Batch #261 flush (2026-11-28, run2#2150-#2165)
+- 📌 MonsterCardHelpers.flat-hit-damage.test.js header — TRIPLE stale-cite: cites ma0747-composite-damage ':53,69'/':52-57' (dead ranges; retract inert-row cite-skip, actual coverage auto-damage-roll/enlarged-damage) + goat-ram-charge ':202' (file ~155 lines; re-point to 'MA-0885 monsters.json data lock' describe). Passes run2#2160/#2161.
+- 📌 MonsterCardModal.cultist-flat-secondary.test.js header cites ma0747 ':54-57' — dead range; live owner is handlePlainDamage.secondaryDamage.test.js:334. Pass run2#2160.
+- 📌 MonsterCardHelpers.ma0314-archmage-counterspell.test.js header cites ma1120:104/:116 + gated-reaction :244-259 — lines no longer exist after rewrites. Passes run2#2152/#2156.
+- 📌 MonsterCardHelpers.usage.test.js header :3-4 cites ma0305:14 by line number — shifted after rewrite; convert to describe ref. Pass run2#2153.
+- 📌 MonsterCardHelpers.ma1563-swarm-save-damage.test.js:13 + MonsterCardModal.ma1563-swarm-save-damage.test.js:12 — cite tarrasque swarm lock at dead ranges :156-165/:150-165 (lock now ~:82-91 first describe); Helpers-side :14 'same file :55' Swallow parse leg should drop (re-read shed). Pass run2#2162.
+- 📌 ma1264 + ma1266 parser tests — '+'-joined unparseable grammar guards fold candidate into diceRoller.test.js rejection tables; row-derived roll legs become inert once rows are verbatim locks (ma1267 recipe). ma1608 test 2 re-pins bytes now full-row-locked in owners — shed-with-cites candidate. Pass run2#2157.
+- 📌 src/components/char-sheet/modals/WeaponMasteryModal.jsx — uses inline styles, conflicts with no-inline-styles convention. Pass run2#2164.
+
+## Batch #262 flush (2026-11-28, run2#2166-#2180)
+- 🗑 Dead mock cluster RESIDUE: `getAllStoreKeys: vi.fn(() [])` + "four exports" comment confirmed dead and purged in buffClearing/concentrationClearing/concentrationClearing2/edgeCases (passes #2174-#2177). STILL PRESENT (bisect-and-purge when each is visited): useInitiativeEffects.cleanup.test.js, .effectClearing.test.js, .initiativeRolled.test.js, .batchResets.test.js, .turnUndeadResult.test.js. Origin pass #2138, systemic flag #2070.
+- 📌 useInitiativeEffects.js:293 — `currentFP >= maxFP` clause outcome-redundant with later `newFP > currentFP` check (no distinguishing input). Non-defect; tests correctly pin observable no-write. Pass run2#2177.
+- 📌 Audit overlap: CharActionModals.stalkersFlurry-resume.test.jsx vs useAttackDamageResolution.stalkersFlurryResume.test.js — possible twin coverage; keep stronger owner when either is queued. Pass run2#2172.
+- ⚠ CARRY (standing): WizardStepSpells.jsx:364 ordinals render '1th/2th/3th level:' — unfixed source defect, pinned honestly by summary/feature-touched lanes.

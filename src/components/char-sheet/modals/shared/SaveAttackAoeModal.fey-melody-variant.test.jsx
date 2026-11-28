@@ -1,11 +1,13 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1436: Fey Melody variant picker — the GM-chosen variant threaded via the
 // saveVariant prop drives per-variant outcomes on the emanation picker:
 // Charming fail = charmed+incapacitated + ONE rounds:10 §37 clock + ZERO damage
 // (dc_success none, no formula); Frightening fail = full 2d6+3 Psychic +
-// frightened only + clock; Frightening success = half damage, nothing granted,
-// clock inert; chooserless rows (saveVariant falsy) arm NO clock but still
-// grant their saveConditions. Mirrors the MA-1058 toxic-ink emanation harness.
+// frightened only + clock. The saved-target face of both variants (nothing
+// granted / HALF damage, clock inert via the success short-circuit) rides the
+// mixed-confirm Bandit 2 leg inside each test. The chooserless-row guardrail
+// (saveVariant falsy → condition granted, NO clock) is pinned by the sibling
+// SaveAttackAoeModal.kraken-toxic-ink.test.jsx (MA-1058 harness mirrored here).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -188,37 +190,4 @@ describe('MA-1436 Fey Melody variant picker', () => {
     expect(clocksFor('Bandit 2')).toHaveLength(0);
   });
 
-  it('Frightening SUCCESS (both save): half damage, NOTHING granted, clock inert', async () => {
-    summaryCfg.b1Wis = 19;
-    spyRandom([0.99, 0.99]);
-    const { getByText } = renderVariant(byKey.frightening);
-    await confirmPicker(getByText);
-
-    expect(runtime.store['Bandit 1.activeConditions'] ?? null).toBeNull();
-    expect(expirations.current).toHaveLength(0);
-    expect(damageCallsFor('Bandit 1')).toEqual([
-      [expect.anything(), 'Bandit 1', 5, ['Psychic'], expect.objectContaining({ attackerName: 'Satyr Revelmaster 1' })],
-    ]);
-    expect(damageCallsFor('Bandit 2')).toEqual([
-      [expect.anything(), 'Bandit 2', 5, ['Psychic'], expect.objectContaining({ attackerName: 'Satyr Revelmaster 1' })],
-    ]);
-  });
-
-  it('guardrail: chooserless row (no saveVariant) still grants its condition but arms NO clock', async () => {
-    spyRandom([0.01, 0.01]);
-    renderAoe({
-      range: 60,
-      damage: null,
-      damageType: null,
-      dcSuccess: 'half',
-      saveConditions: ['blinded'],
-    });
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
-    fireEvent.click(document.querySelector('.sp-roll-btn'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-
-    // Non-vacuous: the fail-leg condition grant DID land — only the clock is guarded.
-    expect(runtime.store['Bandit 1.activeConditions']).toEqual(['blinded']);
-    expect(expirations.current).toHaveLength(0);
-  });
 });

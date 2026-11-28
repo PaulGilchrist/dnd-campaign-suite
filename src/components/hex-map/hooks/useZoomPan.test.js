@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-19
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useState } from 'react';
@@ -107,37 +107,31 @@ describe('useZoomPan', () => {
         expect(result.current.gridPixelBounds.width).toBeCloseTo(colStep.width + hexW / 2, 6);
     });
 
-    describe('clampPan', () => {
-        it('passes pans between the edges through untouched and saturates beyond them', () => {
-            const { result } = setup({ initialZoom: 8 });
-            const min = result.current.clampPan(8, -1e6, -1e6);
-            const max = result.current.clampPan(8, 1e6, 1e6);
-            expect(min.x).toBeLessThan(max.x);
-            expect(min.y).toBeLessThan(max.y);
-            // Golden: right edge of the 10x10 grid at zoom 8 minus the pan margin.
-            expect(max.x).toBeCloseTo(399.4542, 3);
-            // Saturating: pushing further out never moves further — edges are stable.
-            expect(result.current.clampPan(8, 1e6 + 1, 1e6 + 1)).toEqual(max);
-            expect(result.current.clampPan(8, -1e6 - 1, -1e6 - 1)).toEqual(min);
-            // Idempotent at the edges, exact passthrough between them.
-            expect(result.current.clampPan(8, max.x, max.y)).toEqual(max);
-            const mid = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2 };
-            expect(result.current.clampPan(8, mid.x, mid.y)).toEqual(mid);
-        });
+    it('clampPan passes/mid and saturates at the grid edges; centerView centers the grid', () => {
+        // Exact edge geometry is owned by services/maps/hexViewMath.test.js;
+        // this tier pins that the hook binds clamp/center to ITS live grid.
+        const { result } = setup({ initialZoom: 8 });
+        const min = result.current.clampPan(8, -1e6, -1e6);
+        const max = result.current.clampPan(8, 1e6, 1e6);
+        expect(min.x).toBeLessThan(max.x);
+        expect(min.y).toBeLessThan(max.y);
+        // Golden: right edge of the 10x10 grid at zoom 8 minus the pan margin.
+        expect(max.x).toBeCloseTo(399.4542, 3);
+        // Saturating: pushing further out never moves further — edges are stable.
+        expect(result.current.clampPan(8, 1e6 + 1, 1e6 + 1)).toEqual(max);
+        expect(result.current.clampPan(8, -1e6 - 1, -1e6 - 1)).toEqual(min);
+        // Idempotent at the edges, exact passthrough between them.
+        expect(result.current.clampPan(8, max.x, max.y)).toEqual(max);
+        const mid = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2 };
+        expect(result.current.clampPan(8, mid.x, mid.y)).toEqual(mid);
+
+        const b = result.current.gridPixelBounds;
+        const c = result.current.centerView(4);
+        expect(c.x + b.width / 4 / 2).toBeCloseTo(b.centerX, 6);
+        expect(c.y + b.height / 4 / 2).toBeCloseTo(b.centerY, 6);
     });
 
-    describe('centerView', () => {
-        it('centers the grid in the viewport at the given zoom', () => {
-            const { result } = setup();
-            const b = result.current.gridPixelBounds;
-            const zoom = 4;
-            const c = result.current.centerView(zoom);
-            expect(c.x + b.width / zoom / 2).toBeCloseTo(b.centerX, 6);
-            expect(c.y + b.height / zoom / 2).toBeCloseTo(b.centerY, 6);
-        });
-    });
-
-    it('steps zoom, re-centers every transition, clamps at MAX/MIN, and resets to default', () => {
+    it('steps zoom, re-centers every transition, clamps at MAX/MIN, and resetView falls back to legacy geometry with no stored view', () => {
         const { result, hostRef } = setup({ initialZoom: 4, initialPanX: 300, initialPanY: 150 });
 
         act(() => { result.current.zoomIn(); });
@@ -179,26 +173,12 @@ describe('useZoomPan', () => {
     });
 
     // Unified hex R law (owner 2026-11-26): a loaded doc's stored/mount-adopted
-    // view (the loader's storedViewRef) is the reset target — byte-verbatim, so
-    // R round-trips the autosave envelope back to the doc's own stored truth.
-    // The stored-bytes-win / fallback derivation itself is pinned purely in
-    // services/maps/hexViewMath.test.js; this tier pins the WIRING.
-    it('resetView restores the stored/mount-adopted view bytes verbatim', () => {
-        const stored = { zoom: 0.9483204134366925, panX: -53.589746375870845, panY: -40.21798365122615 };
-        const { result, hostRef } = setup({
-            initialZoom: 4, initialPanX: 300, initialPanY: 150,
-            storedViewRef: { current: stored },
-        });
-        act(() => { result.current.resetView(); });
-        expect(hostRef.zoom).toBe(stored.zoom);
-        expect(hostRef.panX).toBe(stored.panX);
-        expect(hostRef.panY).toBe(stored.panY);
-        // NOT the retired law's VIEW_RESET_ZOOM-centered geometry.
-        expect(hostRef.zoom).not.toBe(VIEW_RESET_ZOOM);
-        const legacyCenter = result.current.centerView(VIEW_RESET_ZOOM);
-        expect(hostRef.panX).not.toBe(legacyCenter.x);
-        expect(hostRef.panY).not.toBe(legacyCenter.y);
-    });
+    // view (the loader's storedViewRef) is the reset target — byte-verbatim.
+    // resetView is ONE function for both entry points (toolbar button and the
+    // keyboard R — HexMap.test.jsx pins the button routing), so the stored-win
+    // wiring is pinned once, in the keyboard lane below; the stored-bytes-win /
+    // fallback derivation itself is pinned purely in hexViewMath.test.js, and
+    // the fresh-doc fallback branch right here in the steps-zoom test above.
 
     it('pans on left-drag with viewBox-scaled deltas, clamps, ends, and detaches safely', () => {
         // viewBox differs from the client rect (x2 scale) so the
@@ -382,33 +362,27 @@ describe('useZoomPan keyboard lane (hex)', () => {
         );
         expect(hostRef.panX).toBeCloseTo(clamped.x, 9);
         expect(hostRef.panY).toBeCloseTo(clamped.y, 9);
-        for (let i = 0; i < 500; i++) keyFrame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
+        // 100 frames overshoot both caps by ~3x the frames needed to saturate
+        // from 2 (ln 4 ≈ 31 frames in, ln 32 ≈ 77 out at dt 0.05).
+        for (let i = 0; i < 100; i++) keyFrame({ forward: 0, strafe: 0, zoom: 1, shift: false, dt: 0.05 });
         expect(hostRef.zoom).toBe(MAX_ZOOM);
-        for (let i = 0; i < 800; i++) keyFrame({ forward: 0, strafe: 0, zoom: -1, shift: false, dt: 0.05 });
+        for (let i = 0; i < 100; i++) keyFrame({ forward: 0, strafe: 0, zoom: -1, shift: false, dt: 0.05 });
         expect(hostRef.zoom).toBe(MIN_ZOOM);
     });
 
-    it('R commits the toolbar reset view (no stored view → legacy reset geometry)', () => {
-        const { result, hostRef } = armedSetup();
-        keyFrame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
-        act(() => { keyLane.opts.onAction('reset'); });
-        const centered = result.current.centerView(VIEW_RESET_ZOOM);
-        expect(hostRef.zoom).toBe(VIEW_RESET_ZOOM);
-        expect(hostRef.panX).toBe(centered.x);
-        expect(hostRef.panY).toBe(centered.y);
-    });
-
-    it('R restores the stored/mount-adopted view when one exists (unified law)', () => {
+    // The only reset test here: proves the onAction → resetView wiring AND the
+    // storedViewRef binding in one shot (stored bytes win, verbatim — the
+    // fresh-doc fallback branch is pinned by the steps-zoom test above and
+    // the derivation itself in hexViewMath.test.js).
+    it('R commits resetView: stored/mount-adopted view bytes win verbatim', () => {
         const stored = { zoom: 1.37, panX: 250.5, panY: 77.25 };
-        const { result, hostRef } = armedSetup({ storedViewRef: { current: stored } });
+        const { hostRef } = armedSetup({ storedViewRef: { current: stored } });
         keyFrame({ forward: 1, strafe: 1, zoom: 1, shift: false, dt: 0.1 });
         act(() => { keyLane.opts.onAction('reset'); });
         expect(hostRef.zoom).toBe(stored.zoom);
         expect(hostRef.panX).toBe(stored.panX);
         expect(hostRef.panY).toBe(stored.panY);
-        // The retired VIEW_RESET_ZOOM-center law must NOT answer when a
-        // stored view exists.
+        // NOT the retired VIEW_RESET_ZOOM-center law.
         expect(hostRef.zoom).not.toBe(VIEW_RESET_ZOOM);
-        expect(hostRef.panX).not.toBe(result.current.centerView(VIEW_RESET_ZOOM).x);
     });
 });

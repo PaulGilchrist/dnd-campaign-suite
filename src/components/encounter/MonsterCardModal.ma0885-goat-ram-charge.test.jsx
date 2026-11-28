@@ -1,10 +1,20 @@
-// @maintained-by-ai 2026-10-18
-// MA-0885: Goat Ram — two-field DATA fix: damage_dice_primary "1" (flat base,
-// MA-0322 constant dice-less resolve) + modifier-less conditional_damage
-// {dice:"1d4", damage_type:"Bludgeoning"} authored on monsters.json actions[0]
-// (MA-0007 charge-bonus seam) so the HIT popup offers the "2 (1d4) Bludgeoning"
-// charge alternative instead of always-on 1d4. NO hit_conditions — NOT the
-// MA-0809 giant-goat prone shape. This lane keeps exactly two seams, one press
+// @maintained-by-ai 2026-11-28
+// Re-maintain 2026-11-28: dead-mock purge bisected per-mock on THIS lane — the six
+// module mocks left from the pre-#583 grant/decline era (sanitize, logService,
+// conditionEffects, rangeValidation, mapsService, useRuntimeState) never fire with
+// rollAttack mocked and popup never rendered: all removed (each bisect passed on
+// the real modules). Hook mock shed its popupHtml closure + setPopupHtml/
+// rollDamage members (never written/called here) down to { popupHtml: null,
+// rollAttack }; the beforeEach clearAllMocks/_setPopupHtml(null) ceremony gone
+// (single click-press in the file). Empirically KEPT: damageUtils mock (click
+// test fails on the real module — findCreatureByName is the target-arm knob) and
+// the creatures/creatureName props in makeProps (both load-bearing for the chip).
+// Below, the 2026-10-18 lane rationale — MA-0885: Goat Ram, two-field DATA fix:
+// damage_dice_primary "1" (flat base, MA-0322 constant dice-less resolve) +
+// modifier-less conditional_damage {dice:"1d4", damage_type:"Bludgeoning"} authored
+// on monsters.json actions[0] (MA-0007 charge-bonus seam) so the HIT popup offers
+// the "2 (1d4) Bludgeoning" charge alternative instead of always-on 1d4. NO
+// hit_conditions — NOT the MA-0809 giant-goat prone shape. Two seams, one press
 // each (trim 2026-10-18):
 //   1. Disk-row bytes BY-name (#387 family): flat "1" primary + modifier-less
 //      cd after damage_type_primary, last key (MA-0007 twin placement) +
@@ -41,40 +51,19 @@
 // members gone (settled #667/#669 baseline proves minimal hook renders).
 // No timers 🔴 — no waitFor needed, ctx lands synchronously.
 import { render, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import { extractFlatHitDamage } from './MonsterCardHelpers.js';
 
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue(),
-}));
-
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn().mockResolvedValue();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
   return {
-    default: vi.fn(() => ({
-      get popupHtml() { return _popupHtml; },
-      setPopupHtml: _setPopupHtml,
-      rollAttack: _rollAttack,
-      rollDamage: _rollDamage,
-    })),
+    default: vi.fn(() => ({ popupHtml: null, rollAttack: _rollAttack })),
     _rollAttack,
-    _setPopupHtml,
   };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ attackAdvantageCount: 0, attackDisadvantageCount: 0 })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => {
   let _findCreatureReturn = null;
@@ -89,27 +78,10 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => {
   };
 });
 
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((range) => (typeof range === 'number' ? range : 5)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn(() => null),
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn().mockResolvedValue(),
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
-const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const GOAT = monsters.find((m) => m.index === 'goat');
@@ -133,16 +105,10 @@ const CREATURES = [
 ];
 
 function renderRam() {
-  _setPopupHtml(null);
   const m = makeMonster({ name: 'Goat', actions: GOAT.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Goat 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Goat 1' })} />);
 }
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  _setPopupHtml(null);
-});
 
 describe('MA-0885 monsters.json data lock: Goat Ram flat base + charge rider', () => {
   it('BY-name row bytes: flat "1" primary + modifier-less conditional_damage after damage_type_primary, last key (MA-0007 twin placement) + cd key-parity vs giant-goat + flat "1" extracted despite trailing "or 2 (1d4)" dice (MA-0747 guard stays quiet)', () => {

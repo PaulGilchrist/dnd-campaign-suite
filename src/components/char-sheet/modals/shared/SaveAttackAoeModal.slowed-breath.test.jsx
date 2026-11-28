@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0087 lane: damageless "slowed" rider picker (Adult Copper Slowing Breath
 // shape — CON DC 18, dc_success none, no damage formula). Given an authored
 // slowedClauses prop, the picker shows the Slowed rider copy (never null-null /
@@ -120,16 +120,19 @@ beforeEach(() => {
 describe('MA-0087 Adult Copper Slowing Breath picker', () => {
   it('damageless picker copy states the full Slowed rider and stays inert until Confirm — no null / half-damage boilerplate', async () => {
     spyRandom([0.5]);
-    renderBreath();
+    const { container } = renderBreath();
     await waitFor(() => expect(seenTargets.current).toHaveLength(2));
+    // Caster excluded from its own cone; both other NPCs offered.
     expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Acolyte 2']);
 
-    const copy = document.querySelector('.sp-note-copy').textContent;
+    const copy = container.querySelector('.sp-note-copy').textContent;
     expect(copy).toContain("Slowed: can't take Reactions, Speed halved, and one action or Bonus Action (not both) until the end of its next turn.");
-    expect(document.querySelector('.sp-desc').textContent).toContain('Constitution');
-    expect(document.querySelector('.sp-desc').textContent).toContain('DC 18');
-    expect(document.querySelector('.sp-overlay').textContent).not.toMatch(/null/i);
-    expect(document.querySelector('.sp-overlay').textContent).not.toMatch(/half damage/i);
+    const desc = container.querySelector('.sp-desc').textContent;
+    expect(desc).toContain('Constitution');
+    expect(desc).toContain('DC 18');
+    const overlay = container.querySelector('.sp-overlay').textContent;
+    expect(overlay).not.toMatch(/null/i);
+    expect(overlay).not.toMatch(/half damage/i);
 
     expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
     expect(expirations.current).toHaveLength(0);
@@ -155,7 +158,10 @@ describe('MA-0087 Adult Copper Slowing Breath picker', () => {
     }
 
     expect(expirations.current).toHaveLength(3);
-    expect(expirations.current.every(e => e.rounds === 2 && e.targetName === 'Thug 1')).toBe(true);
+    for (const clock of expirations.current) {
+      expect(clock.rounds).toBe(2);
+      expect(clock.targetName).toBe('Thug 1');
+    }
     expect(expirations.current.map(e => e.effects[0].effectKey).sort()).toEqual(['no_action_and_bonus_action', 'no_reactions', 'speed_half']);
 
     const slowedLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.condition === 'Slowed');

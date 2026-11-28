@@ -1,4 +1,7 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Consolidated option-list tests (dedupe + Graze-exclusion + unknown fallback) into one
+// two-render test; folded dispatch-args coverage into the activate/result flow and switched
+// it to select the non-default option (Push) so the dispatched name is pinned to selection.
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WeaponMasteryModal from './WeaponMasteryModal.jsx';
@@ -108,20 +111,22 @@ describe('WeaponMasteryModal', () => {
     expect(screen.getAllByText('Feature')).toHaveLength(1);
   });
 
-  it('deduplicates a mastery present in both baseMastery and extraMasteries', async () => {
-    await renderModal({ extraMasteries: ['Vex', 'Push'] });
+  it('derives the option list: dedupes overlapping sources, skips Graze in both sources, raw name for unknowns', async () => {
+    const view = await renderModal({ baseMastery: 'Vex', extraMasteries: ['Vex', 'Graze', 'CustomMastery'] });
 
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getByText('Advantage on Next Attack')).toBeInTheDocument();
-  });
+    // Base Vex appears once (extra duplicate dropped); extras Graze skipped;
+    // unknown mastery renders as a feature option with its raw name.
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(2);
+    expect(radios.map(r => r.labels[0].textContent)).toEqual([
+      expect.stringMatching(/^Advantage on Next Attack/),
+      expect.stringMatching(/^CustomMasteryFeature/),
+    ]);
 
-  it('excludes Graze from both sources and falls back to the raw name for unknown masteries', async () => {
-    await renderModal({ baseMastery: 'Graze', extraMasteries: ['Graze', 'CustomMastery'] });
-
-    // Only the unknown mastery survives — Graze never appears, even as a fallback label.
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
-    expect(screen.getByText('CustomMastery')).toBeInTheDocument();
-    expect(screen.queryByText(/Graze/)).not.toBeInTheDocument();
+    // Base-source Graze is excluded too — the modal renders inert, no Graze row.
+    view.unmount();
+    await renderModal({ baseMastery: 'Graze', extraMasteries: [] });
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
   it('prefers loaded mastery descriptions and falls back to MASTERY_EFFECTS text', async () => {
@@ -166,29 +171,22 @@ describe('WeaponMasteryModal', () => {
     expect(radios[1]).toBeChecked();
   });
 
-  it('dispatches applyMasteryEffect with exactly the selected mastery, stats, campaign, and target', async () => {
-    await renderModal({ targetName: 'Goblin' });
-
-    fireEvent.click(screen.getAllByRole('radio')[0]);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
-    });
-
-    expect(applyMasteryEffect).toHaveBeenCalledTimes(1);
-    expect(applyMasteryEffect).toHaveBeenCalledWith('Vex', mockPlayerStats, mockCampaignName, 'Goblin');
-  });
-
-  it('replaces the selection screen with the rendered result and closes via Done', async () => {
+  it('dispatches the selected mastery with stats, campaign, and target, then replaces the screen with the rendered result and closes via Done', async () => {
     const onClose = vi.fn();
-    applyMasteryEffect.mockResolvedValue(popup('<strong>Vex</strong> applied to Goblin.'));
+    applyMasteryEffect.mockResolvedValue(popup('<strong>Push</strong> applied to Goblin.'));
     await renderModal({ targetName: 'Goblin', onClose });
 
-    await selectAndActivate('Advantage');
+    // Select the second option (Push), not the default-first Vex, so the
+    // dispatch arg is pinned to the actual selection.
+    await selectAndActivate('Push');
+
+    expect(applyMasteryEffect).toHaveBeenCalledTimes(1);
+    expect(applyMasteryEffect).toHaveBeenCalledWith('Push', mockPlayerStats, mockCampaignName, 'Goblin');
 
     const done = await screen.findByRole('button', { name: 'Done' });
     expect(screen.getByText('Weapon Mastery')).toBeInTheDocument();
-    // Result description renders as HTML: bold 'Vex' element + trailing text node.
-    expect(screen.getByText('Vex').tagName).toBe('STRONG');
+    // Result description renders as HTML: bold 'Push' element + trailing text node.
+    expect(screen.getByText('Push').tagName).toBe('STRONG');
     expect(screen.getByText(/applied to Goblin\./)).toBeInTheDocument();
     // Selection UI fully replaced.
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
@@ -230,10 +228,9 @@ describe('WeaponMasteryModal', () => {
 
     await renderModal();
 
-    // Fixed form: target name renders as a real <b> element, no literal markup in text.
+    // Fixed form: target name renders as a real <b> element.
     const prompt = await screen.findByText(/Choose a mastery property to activate/);
     expect(prompt.textContent).toBe('Choose a mastery property to activate against Ogre:');
-    expect(prompt.textContent).not.toContain('<b>');
     const boldTarget = prompt.querySelector('b');
     expect(boldTarget).not.toBeNull();
     expect(boldTarget.textContent).toBe('Ogre');

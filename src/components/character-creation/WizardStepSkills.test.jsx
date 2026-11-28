@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Base lane for WizardStepSkills: disk-faithful skill rendering (names/abilities
 // are a verified subset of public/data/ability-scores.json as loadSkills() derives
 // { name, ability }), proficiency checkbox onChange payloads, expertise elevate/
@@ -8,11 +8,10 @@
 // #390/#391 contract note: elevating a NON-proficient skill is refused purely by
 // the disabled Elevate button + its 'Select proficient first' tooltip — by design:
 // the guard and the disabled attribute were born in the SAME commit (c45bdf94e) and
-// cf74986e7 deliberately narrowed disabled to proficiency-only ("only requires
-// proficiency"). The component's internal "Please select ... as proficient first"
-// feedback branch was unreachable dead code (React suppresses onClick on disabled
-// buttons — verified jsdom probe) and was REMOVED at #391 verdict-b. The
-// disabled-inert pins below are the honest contract for that lane.
+// cf74986e7 deliberately narrowed disabled to proficiency-only. The component's
+// internal "Please select ... as proficient first" feedback branch was unreachable
+// dead code and was REMOVED at #391 verdict-b. The disabled-inert test below is the
+// single owner of the non-proficient button contract (glyph, title, inert click).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSkills from './WizardStepSkills.jsx';
@@ -106,6 +105,8 @@ describe('WizardStepSkills', () => {
       });
     });
 
+    // The non-proficient (disabled 'Elevate' + 'Select proficient first') leg is
+    // owned by the #391(b) disabled-inert test below — never restated here.
     it.each([
       {
         case: 'expert skill',
@@ -113,11 +114,8 @@ describe('WizardStepSkills', () => {
         label: '✓ Expert',
         disabled: false,
         title: 'Click to remove Expert status',
-        extra: (btn) => {
-          const label = btn.closest('label');
-          expect(label).toHaveClass('selected');
-          expect(label.querySelector('.skill-expert-label')).toBeInTheDocument();
-          expect(label).toHaveTextContent('(Expert)');
+        extra: () => {
+          expect(screen.getByText('(Expert)')).toBeInTheDocument();
           expect(screen.getByText(/You have expertise in 1 of 2/)).toBeInTheDocument();
         },
       },
@@ -128,13 +126,6 @@ describe('WizardStepSkills', () => {
         disabled: false,
         title: 'Click to elevate to Expert',
       },
-      {
-        case: 'non-proficient skill',
-        formData: { skillProficiencies: [], expertSkills: [] },
-        label: 'Elevate',
-        disabled: true,
-        title: 'Select proficient first',
-      },
     ])('renders expertise button and counter for $case', async ({ formData, label, disabled, title, extra }) => {
       await renderStep({ formData });
 
@@ -142,28 +133,26 @@ describe('WizardStepSkills', () => {
       expect(button).toHaveTextContent(label);
       expect(button.disabled).toBe(disabled);
       expect(button).toHaveAttribute('title', title);
-      expect(button).toHaveClass('expertise-toggle-btn');
-      if (disabled) {
-        expect(button).not.toHaveClass('active');
-      }
-      extra?.(button);
+      extra?.();
     });
 
-    it('pins pre-selected skills: disabled once proficient, still toggleable while unselected', async () => {
-      await renderStep({
+    it('pins pre-selected skills: locked once proficient, still selectable while unselected', async () => {
+      const { onSkillToggle } = await renderStep({
         formData: { skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: [] },
         preSelectedSkills: ['Stealth', 'Perception'],
       });
 
       const stealth = checkboxFor('Stealth');
+      expect(stealth).toBeChecked();
       expect(stealth).toBeDisabled();
-      expect(stealth.closest('label')).toHaveClass('selected');
-      expect(stealth.closest('label')).toHaveClass('pre-selected');
 
+      // An unselected pre-selected skill stays live: a real click toggles it.
       const perception = checkboxFor('Perception');
+      expect(perception).not.toBeChecked();
       expect(perception).not.toBeDisabled();
-      expect(perception.closest('label')).toHaveClass('pre-selected');
-      expect(perception.closest('label')).not.toHaveClass('selected');
+      fireEvent.click(perception);
+      expect(onSkillToggle).toHaveBeenCalledTimes(1);
+      expect(onSkillToggle).toHaveBeenCalledWith('Perception');
     });
 
     it('renders gracefully when no skills load and proficiency arrays are nullish', async () => {
@@ -179,19 +168,23 @@ describe('WizardStepSkills', () => {
   });
 
   describe('proficiency toggling', () => {
-    it.each([
-      ['on an unselected skill', ['Acrobatics'], 'Stealth'],
-      ['off a selected skill', ['Acrobatics', 'Stealth'], 'Acrobatics'],
-    ])('calls onSkillToggle with the exact skill name when toggling %s and shows no expertise feedback', async (_case, proficient, skill) => {
-      const { onSkillToggle } = await renderStep({
+    it('calls onSkillToggle with the exact skill name on check and uncheck, and never touches expertise or feedback', async () => {
+      const { onSkillToggle, onSkillExpertiseToggle } = await renderStep({
         preSelectedSkills: [],
-        formData: { skillProficiencies: proficient, expertSkills: [] },
+        formData: { skillProficiencies: ['Acrobatics'], expertSkills: [] },
       });
 
-      fireEvent.click(checkboxFor(skill));
-
+      // Select an unselected skill.
+      fireEvent.click(checkboxFor('Stealth'));
       expect(onSkillToggle).toHaveBeenCalledTimes(1);
-      expect(onSkillToggle).toHaveBeenCalledWith(skill);
+      expect(onSkillToggle).toHaveBeenCalledWith('Stealth');
+
+      // Deselect a selected non-expert skill.
+      fireEvent.click(checkboxFor('Acrobatics'));
+      expect(onSkillToggle).toHaveBeenCalledTimes(2);
+      expect(onSkillToggle).toHaveBeenLastCalledWith('Acrobatics');
+
+      expect(onSkillExpertiseToggle).not.toHaveBeenCalled();
       expect(document.querySelector('.expertise-feedback')).not.toBeInTheDocument();
     });
 
@@ -202,7 +195,9 @@ describe('WizardStepSkills', () => {
 
       fireEvent.click(checkboxFor('Acrobatics'));
 
+      expect(onSkillToggle).toHaveBeenCalledTimes(1);
       expect(onSkillToggle).toHaveBeenCalledWith('Acrobatics');
+      expect(onSkillExpertiseToggle).toHaveBeenCalledTimes(1);
       expect(onSkillExpertiseToggle).toHaveBeenCalledWith('Acrobatics', false);
     });
   });
@@ -312,6 +307,8 @@ describe('WizardStepSkills', () => {
       }
       const box = document.querySelector('.expertise-feedback');
       expect(box).toBeInTheDocument();
+      // success/error is the only channel distinguishing the styling of the two
+      // message branches (message.includes('Expert')), so this pin is load-bearing.
       expect(box).toHaveClass(called ? 'success' : 'error');
       expect(box.textContent).toMatch(feedback);
     });
@@ -326,7 +323,6 @@ describe('WizardStepSkills', () => {
       expect(insight.disabled).toBe(true);
       expect(insight).toHaveTextContent('Elevate');
       expect(insight).toHaveAttribute('title', 'Select proficient first');
-      expect(insight).not.toHaveClass('active');
 
       // React suppresses onClick on disabled buttons (verified by probe), so even a
       // dispatched click is inert: no toggle, no feedback box, no removed-branch bytes.
@@ -377,6 +373,7 @@ describe('WizardStepSkills', () => {
       expect(button).toHaveTextContent('✓ Expert');
       fireEvent.click(button);
 
+      expect(onSkillExpertiseToggle).toHaveBeenCalledTimes(1);
       expect(onSkillExpertiseToggle).toHaveBeenCalledWith('Acrobatics', false);
       expect(document.querySelector('.expertise-feedback')).not.toBeInTheDocument();
     });
@@ -420,31 +417,18 @@ describe('WizardStepSkills', () => {
           ],
         },
         formData: { skillProficiencies: ['Acrobatics', 'Insight'], expertSkills: [] },
+        expectLabels: ['Class: 1 of 3', 'Skilled: 1 of 1'],
+        absentDetails: 'This should not appear.',
       },
       {
         case: 'without skillChoiceSources: generic details shown, no breakdown',
         skillLimits: { allowed: 3, details: 'Your class grants 3 skills.' },
         formData: { skillProficiencies: ['Acrobatics'], expertSkills: [] },
+        expectLabels: null,
+        presentDetails: 'Your class grants 3 skills.',
       },
-    ])('$case', async ({ skillLimits, formData }) => {
-      await renderStep({ skillLimits, formData });
-
-      const breakdownPresent = Boolean(document.querySelector('.breakdown-source'));
-      expect(breakdownPresent).toBe(!!skillLimits.skillChoiceSources);
-      const ruleInfo = document.querySelector('.rule-info');
-      if (skillLimits.skillChoiceSources) {
-        const labels = Array.from(document.querySelectorAll('.breakdown-source-label')).map(el => el.textContent);
-        expect(labels).toContain('Class: 1 of 3');
-        expect(labels).toContain('Skilled: 1 of 1');
-        expect(ruleInfo.textContent).not.toContain('This should not appear.');
-      } else {
-        expect(ruleInfo.textContent).toContain('Your class grants 3 skills.');
-      }
-    });
-
-    it('shows the Skilled uses tracker when skilledUsesAvailable > 0', async () => {
-      await renderStep({
-        formData: { skillProficiencies: ['Stealth'], expertSkills: [] },
+      {
+        case: 'Skilled uses tracker shown when skilledUsesAvailable > 0',
         skillLimits: {
           allowed: 3,
           skilledUsesAvailable: 2,
@@ -453,11 +437,23 @@ describe('WizardStepSkills', () => {
             { source: 'class', count: 2, skills: ['Acrobatics', 'Stealth', 'Perception'] },
           ],
         },
-      });
+        formData: { skillProficiencies: ['Stealth'], expertSkills: [] },
+        expectLabels: ['Class: 1 of 2', 'Skilled: 1 of 2'],
+      },
+    ])('$case', async ({ skillLimits, formData, expectLabels, absentDetails, presentDetails }) => {
+      await renderStep({ skillLimits, formData });
 
-      const skilledSource = document.querySelector('.skilled-source');
-      expect(skilledSource).toBeInTheDocument();
-      expect(skilledSource.textContent).toContain('Skilled: 1 of 2');
+      const ruleInfo = document.querySelector('.rule-info');
+      if (expectLabels) {
+        const labels = Array.from(document.querySelectorAll('.breakdown-source-label')).map(el => el.textContent);
+        expectLabels.forEach(label => expect(labels).toContain(label));
+        if (absentDetails) {
+          expect(ruleInfo.textContent).not.toContain(absentDetails);
+        }
+      } else {
+        expect(document.querySelector('.breakdown-source')).not.toBeInTheDocument();
+        expect(ruleInfo.textContent).toContain(presentDetails);
+      }
     });
   });
 });

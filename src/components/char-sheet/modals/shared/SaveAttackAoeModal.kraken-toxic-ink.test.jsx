@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1058: Kraken Toxic Ink emanation picker (CON DC 23, 15-ft Emanation,
 // DAMAGELESS). Pre-fix the row had NO numeric save_dc and NO range → the save
 // chip never armed and the gated "Expend Legendary" chip spent the use then hit
@@ -13,7 +13,10 @@
 // Row-data byte-pins (save_dc:23, range field, clause→null, blinded+poisoned
 // extraction) live canon in MonsterCardModal.legendary-uses-kraken.test.jsx;
 // explicit-null-clause guardrail canon lives in the demilich-howl sibling —
-// this file owns ONLY the live picker adjudication.
+// this file owns ONLY the live picker adjudication PLUS the chooserless-row
+// guardrail cited by the fey-melody-variant sibling: saveVariant falsy →
+// condition grants still land, NO expiration clock is ever queued
+// (applySaveVariantClockGrant's !saveVariant early-return).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -129,14 +132,16 @@ beforeEach(() => {
 });
 
 describe('MA-1058 Kraken Toxic Ink emanation picker', () => {
-  it('mixed confirms: FAIL grants Blinded+Poisoned w/ source+dc meta + named log; SUCCESS grants NOTHING (§157 inert reuse-limit tail); damageless pays zero', async () => {
+  it('mixed confirms: FAIL grants Blinded+Poisoned w/ source+dc meta + named log; SUCCESS grants NOTHING (§157 inert reuse-limit tail); chooserless row pays zero damage and queues zero clocks', async () => {
     // Honest arm: the reuse-limit tail parses to null (byte-pinned canon in the
     // legendary-uses-kraken sibling) — this run IS the fail-only + inert-null path.
     expect(parseBothOutcomesClause(TOXIC_INK.save_effect)).toBeNull();
 
+    // Rng is consumed in picker-list order, so pin the exact list: excludeNames
+    // drops the origin Kraken and the two bandits map 1:1 to the seq below.
     spyRandom([0.01, 0.99]); // Bandit 1: nat 1 − 19 < 23 FAIL; Bandit 2: nat 20 + 19 ≥ 23 SUCCESS
     const { getByText } = renderToxicInk();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Bandit 1', 'Bandit 2']));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
 
@@ -151,10 +156,15 @@ describe('MA-1058 Kraken Toxic Ink emanation picker', () => {
     expect(condRow.condition).toContain('Poisoned');
 
     // SUCCESS leg: §157 — the reuse-limit clause names no condition, so NOTHING grants:
-    // no conditions, no meta, no success-leg condition log, no expiry clock.
+    // no conditions, no meta, no success-leg condition log.
     expect(runtime.store['Bandit 2.activeConditions'] ?? null).toBeNull();
     expect(runtime.store['Bandit 2.activeConditionMeta'] ?? null).toBeNull();
     expect(logs.filter(l => l.type === 'condition' && l.characterName === 'Bandit 2')).toHaveLength(0);
+
+    // Chooserless-row guardrail (owner pin, cited by fey-melody-variant): with
+    // saveVariant falsy, applySaveVariantClockGrant early-returns — Bandit 1's
+    // FAILED grant lands its conditions WITHOUT an expiry clock despite the
+    // conditionDurationNote, and nothing queues for the untouched SUCCESS leg.
     expect(expirations.current).toHaveLength(0);
 
     // damageless row: applyDamageToTarget never pays any damage, to either victim.

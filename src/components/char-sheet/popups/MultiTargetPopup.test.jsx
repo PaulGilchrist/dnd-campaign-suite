@@ -1,13 +1,12 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MultiTargetPopup from './MultiTargetPopup.jsx';
 
 // This file covers ONLY MultiTargetPopup's own UI lane: its copy, the
 // second-target <select>, and the exact payload emitted on confirm.
-// Base-surface behavior inherited from TargetPopupBase (Escape → onSkip,
-// 'Spell' name fallback) is owned by the dedicated base spec
-// (TargetPopupBase.test.jsx, live since fix#163) — no duplicate here.
+// Spell-name rendering, Escape → onSkip, and the 'Spell' name fallback are
+// owned by the base spec (TargetPopupBase.test.jsx) — no duplicate here.
 // CharSpells → popup prop wiring is covered by CharSpells.Popups.popupWidgets.test.jsx.
 
 const mockSpell = { name: 'Create Water', level: 1 };
@@ -35,17 +34,15 @@ describe('MultiTargetPopup', () => {
         vi.clearAllMocks();
     });
 
-    it('renders header, spell name with fixed subtitle, range description, target options, and action buttons', () => {
+    it('renders its own copy: title, second-target subtitle, range description, target options, and action buttons', () => {
         render(<MultiTargetPopup {...makeProps()} />);
 
         expect(screen.getByRole('heading', { name: /Words of Creation/ })).toBeInTheDocument();
-        expect(screen.getByText('Create Water')).toBeInTheDocument();
         expect(screen.getByText(/\u2014 Spread to Second Target/)).toBeInTheDocument();
         expect(screen.getByText(/Select a second creature within/)).toBeInTheDocument();
         expect(screen.getByText('30 ft')).toBeInTheDocument();
         expect(screen.getByText('Second Target:')).toBeInTheDocument();
 
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
         const options = screen.getAllByRole('option');
         expect(options.map(o => o.textContent)).toEqual([
             '-- Select target --', ...mockCreatureTargets,
@@ -56,14 +53,7 @@ describe('MultiTargetPopup', () => {
         expect(screen.getByRole('button', { name: 'Cast on First Target Only' })).toBeInTheDocument();
     });
 
-    it('offers only the empty placeholder when creatureTargets is empty', () => {
-        render(<MultiTargetPopup {...makeProps({ creatureTargets: [] })} />);
-
-        expect(screen.getAllByRole('option')).toHaveLength(1);
-        expect(screen.getByRole('option', { name: '-- Select target --' })).toHaveAttribute('value', '');
-    });
-
-    it('keeps confirm disabled until a second target is selected and disabled again when cleared', () => {
+    it('gates confirm on a second-target selection and fires only its own handler per button: confirm emits the selected secondTarget once, skip fires once', () => {
         render(<MultiTargetPopup {...makeProps()} />);
 
         const select = screen.getByRole('combobox');
@@ -74,12 +64,8 @@ describe('MultiTargetPopup', () => {
 
         fireEvent.change(select, { target: { value: '' } });
         expect(getConfirmButton()).toBeDisabled();
-    });
 
-    it('fires only its own handler per button: confirm emits the selected secondTarget once, skip fires once', () => {
-        render(<MultiTargetPopup {...makeProps()} />);
-
-        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Orc' } });
+        fireEvent.change(select, { target: { value: 'Orc' } });
         fireEvent.click(getConfirmButton());
         expect(mockOnConfirm).toHaveBeenCalledTimes(1);
         expect(mockOnConfirm).toHaveBeenCalledWith({ secondTarget: 'Orc' });

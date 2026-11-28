@@ -1,10 +1,10 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Save-routing lane for SaveAttackHealModal: NPC auto-resolve vs player prompt routing,
-// NPC save arithmetic (lowercase saveBonuses key, total = roll + bonus vs DC, honest
-// half-on-success / full-on-failure mocks), pending-player UI, save-result event
-// resolution/inertness (fix#156: adjudicated damage applies on BOTH outcomes — half
-// lands on player save success per disk law, pinned at the save-result seam), roll
-// logging, and combatSummary persistence (cache + storage +
+// the selection→results phase swap, NPC save arithmetic (lowercase saveBonuses key,
+// total = roll + bonus vs DC, honest half-on-success / full-on-failure), pending-player
+// UI, save-result event resolution/inertness (fix#156: adjudicated damage applies on
+// BOTH outcomes — half lands on player save success per disk law, pinned at the
+// save-result seam), roll logging, and combatSummary persistence (cache + storage +
 // window event). Sibling lanes: SaveAttackHealModal.test.jsx owns initial render and
 // target selection; healFlows.test.jsx owns heal-radio arbitration/report/Done
 // (applyHealing mocked); npc-heal.test.jsx owns real HP restoration via applyHealing.js.
@@ -100,6 +100,29 @@ function diceFor(saveRoll) {
   };
 }
 
+// Deterministic damage sink computed from the arguments (echoes the adjudicated
+// amount), NOT a fixed-return mirror: the ledger's finalDamage assertion then
+// traces whatever the modal actually passed to apply, so a wrong split or a
+// log-vs-apply divergence fails loudly. Full write-back integration lives in
+// npc-heal.test.jsx.
+function spyOnDamageSink() {
+  return vi.spyOn(applyDamage, 'applyDamageToTarget').mockImplementation(
+    (_combatSummary, _targetName, damage) => ({ finalDamage: damage })
+  );
+}
+
+// The resolved result row for a target, located by its full visible text
+// ("<name>: <outcome>") — no CSS-class scope, and name-pinned so two NPCs with
+// identical outcomes can never collide.
+function getResultRow(name, outcomeText) {
+  const full = `${name}: ${outcomeText}`;
+  // The row itself is the only div whose text is exactly this AND that carries
+  // the name in a direct <strong> child (a single-row wrapper would otherwise
+  // share the textContent).
+  return screen.getByText((_content, element) =>
+    element?.textContent === full && !!element?.querySelector(':scope > strong'));
+}
+
 // ── Tests ──
 
 describe('SaveAttackHealModal — save flows', () => {
@@ -108,9 +131,9 @@ describe('SaveAttackHealModal — save flows', () => {
     diceRoller.rollExpression.mockImplementation(diceFor(12));
   });
 
-  // ── Apply saves: type routing, dice scope, logging, persistence ──
+  // ── Apply saves: type routing, phase swap, dice scope, logging, persistence ──
 
-  it('routes by creature type: auto-resolves NPC saves, prompts players, and persists the summary', async () => {
+  it('routes by creature type: auto-resolves NPC saves, prompts players, swaps the selection UI for results, and persists the summary', async () => {
     const listener = vi.fn();
     window.addEventListener('combat-summary-updated', listener);
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
@@ -130,11 +153,15 @@ describe('SaveAttackHealModal — save flows', () => {
     // Dice roll only for NPC save + damage rounds — none for the prompted player.
     expect(diceRoller.rollExpression).toHaveBeenCalledTimes(4);
 
+    // The selection UI is replaced by the resolving/results view.
+    expect(screen.getByText(/Resolving.*CON.*saving throws/)).toBeInTheDocument();
+    expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Divine Smite/ })).not.toBeInTheDocument();
+
     // Resolved NPC rows show alongside the pending-player row.
-    const resultsList = document.querySelector('.abjure-results-list');
-    expect(resultsList.textContent).toContain('Saved — takes 5 Radiant damage (rolled 10, halved)');
-    expect(resultsList.textContent).toContain('Player One');
-    expect(resultsList.textContent).toContain('Waiting for save roll');
+    getResultRow('Goblin A', 'Saved — takes 5 Radiant damage (rolled 10, halved)');
+    const pendingRow = screen.getByText('Waiting for save roll...').closest('div');
+    expect(pendingRow.textContent).toBe('Player One: Waiting for save roll...');
 
     // One save log + one damage log per NPC; nothing logged for pending players.
     const rollLogs = logService.addEntry.mock.calls.filter(c => c[1].type === 'roll');
@@ -171,7 +198,7 @@ describe('SaveAttackHealModal — save flows', () => {
       saveBonus,
     }));
 
-    expect(document.querySelector('.abjure-results-list').textContent).toContain(expectedText);
+    getResultRow('Goblin A', expectedText);
 
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'roll',
@@ -185,27 +212,15 @@ describe('SaveAttackHealModal — save flows', () => {
     }));
   });
 
-  // ── Apply button flow: selection UI replaced by results view ──
-
-  it('replaces the selection UI with the results view after apply', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A']);
-
-    expect(screen.getByText(/Resolving.*CON.*saving throws/)).toBeInTheDocument();
-    expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(0);
-    expect(screen.queryByRole('button', { name: /Divine Smite/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
-
   // ── Save-result events: pending player resolution ──
 
   it.each([
     { label: 'success', success: true, expectedText: 'Saved — takes 5 Radiant damage (rolled 10, halved)', expectedApplied: 5 },
     { label: 'failure', success: false, expectedText: 'Failed — takes 10 Radiant damage (rolled 10)', expectedApplied: 10 },
   ])('resolves a pending player on save-result event (%s)', async ({ success, expectedText, expectedApplied }) => {
-    // Deterministic damage sink — the resistance engine is not this lane's subject
-    // (npc-heal.test.jsx covers its write-back integration).
-    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: expectedApplied });
+    // Resistance engine is not this lane's subject (npc-heal.test.jsx covers its
+    // write-back integration); the sink echoes the adjudicated amount it receives.
+    const applySpy = spyOnDamageSink();
 
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applySaves(getByRole, ['Player One']);
@@ -219,12 +234,13 @@ describe('SaveAttackHealModal — save flows', () => {
       }));
     });
 
+    // The pending row becomes a resolved row and the heal phase unlocks —
+    // on BOTH outcomes, a resolved save is a resolved save.
     await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Player One');
-      expect(resultsList.textContent).toContain(expectedText);
-      expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument();
+      expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Waiting for save roll...')).not.toBeInTheDocument();
+    getResultRow('Player One', expectedText);
 
     // Save logged with the event's numbers, and the summary persists at this seam.
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -247,7 +263,8 @@ describe('SaveAttackHealModal — save flows', () => {
     expect(applySpy).toHaveBeenCalledTimes(1);
     expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', expectedApplied, ['Radiant'], expect.objectContaining({ campaignName: 'test-campaign' }));
 
-    // Damage ledger entry reports the honest result and the adjudicated amount.
+    // Damage ledger entry reports the honest result and the adjudicated amount
+    // (the sink echoes the applied damage, so this pins log == apply).
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       rollType: 'save-damage',
       targetName: 'Player One',
@@ -256,9 +273,6 @@ describe('SaveAttackHealModal — save flows', () => {
       finalDamage: expectedApplied,
     }));
 
-    if (success) {
-      expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
-    }
     applySpy.mockRestore();
   });
 
@@ -273,8 +287,9 @@ describe('SaveAttackHealModal — save flows', () => {
       }));
     });
 
-    expect(document.querySelector('.abjure-results-list').textContent).toContain('Waiting for save roll');
-    // Inert: the stale event must not log or persist anything.
+    expect(screen.getByText('Waiting for save roll...')).toBeInTheDocument();
+    // Inert: the stale event must not roll, log, or persist anything.
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();
     expect(storage.set).not.toHaveBeenCalled();
     expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
@@ -292,13 +307,13 @@ describe('SaveAttackHealModal — save flows', () => {
     expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ targetName: 'Mystery Creature' }));
     expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
     expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-    expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
+    expect(screen.getByText('Waiting for save roll...')).toBeInTheDocument();
   });
 
   it('keeps an unanswered player pending while another player responds', async () => {
-    // Deterministic damage sink (saveFlows house pattern) — the adjudicated
-    // half-on-success must land on the RESPONDING target only, never the pending one.
-    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: 5 });
+    // fix#156: the success-half must land on the RESPONDING target only, never
+    // the pending one — the echoing sink makes the applied amount observable.
+    const applySpy = spyOnDamageSink();
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({
       combatSummary: {
         creatures: [
@@ -318,15 +333,16 @@ describe('SaveAttackHealModal — save flows', () => {
     });
 
     await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Saved');
-      expect(resultsList.textContent).toContain('Player Two');
-      expect(resultsList.textContent).toContain('Waiting for save roll');
+      getResultRow('Player One', 'Saved — takes 5 Radiant damage (rolled 10, halved)');
     });
-    // fix#156: success-half applies — to Player One only (4d6 rolled 10 → floor-half 5).
+    // The sibling prompt is untouched and the heal phase stays locked.
+    const pendingRow = screen.getByText('Waiting for save roll...').closest('div');
+    expect(pendingRow.textContent).toBe('Player Two: Waiting for save roll...');
+    expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
+
+    // Exactly one apply, aimed at the responder (4d6 rolled 10 → floor-half 5).
     expect(applySpy).toHaveBeenCalledTimes(1);
     expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', 5, ['Radiant'], expect.any(Object));
-    expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
     expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
     applySpy.mockRestore();
   });

@@ -1,21 +1,24 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
 // Lane map (#346-#351 family prune): this file keeps ONLY the initiative-seam
 // branches no sibling owns, verified against current disk:
-//   1) recoverPerfectFocus no-write via `currentFP >= maxFP` (useInitiativeEffects.js:269)
-//      when maxFP collapses to 0 through a failed class_levels lookup (the
-//      `classLevel?.focus_points || 0` collapse is the same outcome as a stored
-//      focus_points: 0, so that twin row is folded here) or when focusPoints
-//      already sit at maxFP. initiativeRolled.test.js owns the positive recoveries,
-//      the above-threshold and uncannyMetabolismUsed guards.
+//   1) recoverPerfectFocus no-write via `currentFP >= maxFP` (function
+//      recoverPerfectFocus, useInitiativeEffects.js) when maxFP collapses to 0
+//      through a failed class_levels lookup (the `classLevel?.focus_points || 0`
+//      collapse is the same outcome as a stored focus_points: 0, so that twin
+//      row is folded here) or when focusPoints already sit at maxFP.
+//      initiativeRolled.test.js owns the positive recoveries, the
+//      above-threshold and uncannyMetabolismUsed guards.
 //   2) clearConcentrationOnInitiative guard `!creature?.concentration` with the
-//      creature FOUND (useInitiativeEffects.js:193-194). concentrationClearing.test.js
-//      (#350) seeds null / no-creatures / empty-array / creature-absent and a truthy
-//      spell-undefined concentration, but never a falsy concentration on a found
-//      creature — so that guard sub-branch was unowned.
+//      creature FOUND (function clearConcentrationOnInitiative).
+//      concentrationClearing.test.js (#350) seeds null / no-creatures /
+//      empty-array / creature-absent and a truthy spell-undefined
+//      concentration, but never a falsy concentration on a found creature —
+//      so that guard sub-branch was unowned; this file is its declared sole
+//      owner (cited at concentrationClearing.test.js's guard-table comment).
 // Removed here (covered elsewhere, reported to orchestrator):
 //   - FT-007 boon latch + strokeOfLuck find() checks → batchResets.test.js (#347)
 //     byte-exact batch payload contains both keys with toHaveBeenCalledTimes(1).
@@ -36,19 +39,22 @@ import useInitiativeEffects from './useInitiativeEffects.js';
 //     completion assertions; `.not.toThrow()` around dispatchEvent is vacuous
 //     anyway (jsdom reports listener exceptions instead of rethrowing them).
 // Fixed + pinned 2026-10-22: restoreCalmEmotions multi-condition clobber
-// (useInitiativeEffects.js:163-171) — one merged write per effect-target now;
-// multi-suppressedConditions byte pins live in concentrationClearing2.test.js.
+// (useInitiativeEffects.js, function restoreCalmEmotions) — one merged write
+// per effect-target now; multi-suppressedConditions byte pins live in
+// concentrationClearing2.test.js.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    // Exactly the four exports live in this import graph: useInitiativeEffects.js:2
-    // and its loaded collaborator boonOfCombatProwess.js:2 import
-    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys
-    // (probed: useRuntimeState.js exports at :5,:21,:63,:78,:201,:242).
-    // Dead-mock purge: getStore/useSyncedState/listeners were never read by any
-    // module loaded here — and useSyncedState is not even an export of that file.
+    // Exactly the three bindings live in this import graph:
+    // useInitiativeEffects.js:2 imports getRuntimeValue/setRuntimeBatch/
+    // setRuntimeValue and its only unmocked collaborator,
+    // boonOfCombatProwess.js:2, imports getRuntimeValue/setRuntimeValue.
+    // Dead-mock purge (#2174/#2175 carry): getAllStoreKeys was never read by
+    // any module loaded here (grep: its readers — concentrationService,
+    // savePromptService, expirationQueue, zoneDurationClock,
+    // clearAllExpirationEffects, infernalWoundService — are all outside this
+    // graph); getStore/useSyncedState/listeners were purged earlier.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
-    getAllStoreKeys: vi.fn(() => []),
 }));
 
 // Each factory supplies every named binding useInitiativeEffects.js imports (:3-10);
@@ -121,6 +127,10 @@ describe('useInitiativeEffects - unowned edge branches at the initiative seam', 
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // clearAllMocks does not undo mockReturnValue, so reset the combat
+        // summary each test: the FP lane needs the null early-return in
+        // clearConcentrationOnInitiative regardless of run order.
+        getCombatSummary.mockReturnValue(null);
         store = new Map();
         getRuntimeValue.mockImplementation((name, key) =>
             store.has(`${name}|${key}`) ? store.get(`${name}|${key}`) : null
@@ -187,13 +197,15 @@ describe('useInitiativeEffects - unowned edge branches at the initiative seam', 
     });
 
     describe('Concentration: rolling creature found with falsy concentration', () => {
-        it.each([
-            ['the concentration property is absent', {}],
-            ['concentration is explicitly undefined', { concentration: undefined }],
-        ])('persists no summary and clears no effects when %s', (_label, monkShape) => {
+        // Declared sole owner of this branch (cited by
+        // concentrationClearing.test.js:276-277). One test suffices:
+        // `!creature?.concentration` cannot distinguish an absent property from
+        // an explicit `undefined` — separate rows would test JS
+        // optional-chaining, not business logic.
+        it('persists no summary and clears no effects', () => {
             getCombatSummary.mockReturnValue({
                 creatures: [
-                    { name: 'TestMonk', ...monkShape, hp: 30 },
+                    { name: 'TestMonk', hp: 30 },
                     { name: 'Ally', concentration: { spell: 'Bless' } },
                 ],
             });
@@ -207,7 +219,8 @@ describe('useInitiativeEffects - unowned edge branches at the initiative seam', 
             rollInitiative();
 
             // Seam fired (batch is the handler's last statement) — a guard removal
-            // would throw on creature.concentration.spell and skip it.
+            // would throw on creature.concentration.spell and skip it. The Ally row
+            // pins that clearing is scoped to the rolling creature.
             expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
             expect(storageService.default.set).not.toHaveBeenCalled();
             expect(teWrites()).toHaveLength(0);

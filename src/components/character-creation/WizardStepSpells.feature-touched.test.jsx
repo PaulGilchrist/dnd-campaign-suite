@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent, waitFor, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './WizardStepSpells.jsx';
@@ -179,7 +179,7 @@ describe('WizardStepSpells feat wiring', () => {
   describe('Magic Initiate', () => {
     it.each([
       ['no instances recorded', ['Magic Initiate'], undefined],
-      ['an empty instances array', ['Magic Initiate'], []],
+      // 2 feats / 1 instance covers the []-length arm of the count guard too
       ['fewer instances than feats', ['Magic Initiate', 'Magic Initiate'], [miInstance()]],
     ])('auto-opens the modal while configured instances mismatch ($#)', async (_label, feats, instances) => {
       render(<WizardStepSpells {...makeProps({
@@ -212,17 +212,17 @@ describe('WizardStepSpells feat wiring', () => {
       { feat: 'Shadow Touched', field: 'shadowTouchedSpell', spell: 'Invisibility', modalId: 'shadow-touched-modal', banner: 'Edit Shadow Magic', close: 'CloseShadowTouched' },
     ];
 
-    it.each(touchedCases)('$feat auto-opens its modal while unconfigured', ({ feat, modalId, close }) => {
-      render(<WizardStepSpells {...makeProps({ formData: { feats: [feat] } })} />);
+    it.each(touchedCases)('$feat auto-opens its modal while unconfigured; only once configured does the banner reopen it', ({ feat, field, spell, modalId, banner, close }) => {
+      const unconfigured = render(<WizardStepSpells {...makeProps({ formData: { feats: [feat] } })} />);
 
       expect(screen.getByTestId(modalId)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: close }));
       expect(screen.queryByTestId(modalId)).not.toBeInTheDocument();
-    });
+      // Unlike Magic Initiate, an unconfigured Touched feat shows no edit banner (:114/:117)
+      expect(screen.queryByRole('button', { name: banner })).not.toBeInTheDocument();
+      unconfigured.unmount();
 
-    it.each(touchedCases)('$feat banner reopens the modal once its spell is configured', ({ feat, field, spell, modalId, banner }) => {
       render(<WizardStepSpells {...makeProps({ formData: { feats: [feat], [field]: spell } })} />);
-
       expect(screen.queryByTestId(modalId)).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: banner }));
       expect(screen.getByTestId(modalId)).toBeInTheDocument();

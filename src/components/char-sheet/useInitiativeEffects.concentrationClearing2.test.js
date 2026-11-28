@@ -1,29 +1,28 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
 // Lane map: this file owns the spell-specific concentration branches NOT reached by
 // concentrationClearing.test.js (#350, which owns the CONCENTRATION_SOURCE_EFFECTS
-// table + Protection from Energy sweep): restoreCalmEmotions (useInitiativeEffects.js:158),
-// Circle of Power clear+sweep (:210-213), LATE_CONCENTRATION_SOURCE_EFFECTS Compulsion /
-// Enhance Ability (:27-30, dispatched :214-216), and revertShapeEffects Polymorph /
-// Shapechange (:181-187, dispatched :217-222). Split consolidated from 20 tests to 6
-// parameterized tests (13 runs); Calm Emotions restore-guard rows that also lived in
-// edgeCases.test.js are folded into one it.each here (edgeCases pruning reported upstream).
+// table + Protection from Energy sweep): restoreCalmEmotions, the 'Circle of Power'
+// clear+sweep branch, the LATE_CONCENTRATION_SOURCE_EFFECTS Compulsion / Enhance
+// Ability rows, and revertShapeEffects Polymorph / Shapechange — all dispatched from
+// clearConcentrationOnInitiative. Consolidated from 20 tests to 7 parameterized
+// blocks; Calm Emotions restore-guard rows that also lived in edgeCases.test.js are
+// folded into one it.each here (edgeCases pruning reported upstream).
 // Project rule honored: concentration stays concentration — every assertion is event-driven
 // at the initiative seam, never a wall-clock gate.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    // Exactly the four live bindings in this import graph: useInitiativeEffects.js:2
-    // and its loaded collaborator boonOfCombatProwess.js:2 import
-    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys.
-    // Dead-mock purge: getStore/useSyncedState/listeners were never read by any module
-    // loaded here (probed exports at useRuntimeState.js:5,21 — useSyncedState is not
-    // even an export of that file; #350 justification adopted).
+    // Exactly the three live bindings in this import graph: useInitiativeEffects.js:2
+    // imports getRuntimeValue/setRuntimeBatch/setRuntimeValue and its loaded
+    // collaborator boonOfCombatProwess.js:2 imports a subset of those.
+    // Dead-mock purge (#2174/#2175 verified): getAllStoreKeys was imported by NO
+    // module loaded here (grep of useInitiativeEffects.js + boonOfCombatProwess.js
+    // is empty); getStore/useSyncedState/listeners were likewise never read.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
-    getAllStoreKeys: vi.fn(() => []),
 }));
 
 // Each factory supplies every named binding useInitiativeEffects.js imports (:3-9);
@@ -166,7 +165,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             ]);
             expect(store.get(`Enemy1|${CONDS}`)).toEqual(['Frightened', 'Charmed']);
             expect(store.get(`Enemy2|${CONDS}`)).toEqual(['Charmed']);
-            // One 4-arg POST write (exact store signature, useRuntimeState.js:78)
+            // One 4-arg POST write (exact setRuntimeValue signature in useRuntimeState.js)
             // holding every survivor byte-exactly: an
             // over-clear (allyCalm) or under-clear breaks these bytes.
             const survivors = [allyCalm, unrelated];
@@ -178,7 +177,10 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
                 ['Ally1', BUFFS, [PRESERVED], campaignName],
             ]);
             // Concentration flag persists cleared, once, with bystanders intact.
-            expect(storageService.default.set).toHaveBeenCalledTimes(1);
+            // Verbatim tuple pins the storage key + campaign arg, not just the count.
+            expect(storageService.default.set.mock.calls).toEqual([
+                ['combatSummary', cs, campaignName],
+            ]);
             expect(cs.creatures).toEqual([
                 { name: 'TestMonk', concentration: null, hp: 30 },
                 { name: 'Ally1' },
@@ -195,9 +197,12 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
         // effect-target — house §39 canon (calmEmotionsHandler.js:190-194: un-awaited
         // per-key writes to the same endpoint reorder network-side).
         it.each([
-            ['capitalized restore bytes', ['Frightened', 'Charmed'], ['Other'], ['Other', 'Frightened', 'Charmed']],
-            ['producer-lowercase bytes preserved', ['charmed', 'frightened'], ['poisoned'], ['poisoned', 'charmed', 'frightened']],
-            ['one condition already re-applied', ['Frightened', 'Charmed'], ['Frightened'], ['Frightened', 'Charmed']],
+            // Mixed-case row covers both halves of the byte-purity contract in one
+            // run: capitalized suppressed entries append verbatim AND a lowercase
+            // suppressed entry is written back lowercase (the code lowercases only
+            // for the already-present comparison, never the written bytes).
+            ['multi conditions, bytes appended verbatim (mixed case preserved)', ['Charmed', 'frightened'], ['Other'], ['Other', 'Charmed', 'frightened']],
+            ['one condition already re-applied (case-insensitive dedupe)', ['Frightened', 'Charmed'], ['Frightened'], ['Frightened', 'Charmed']],
         ])('restores %s in ONE merged 4-arg write, final store byte-exact', (_label, suppressed, seed, expected) => {
             concentrate('Calm Emotions');
             const calmMulti = { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: suppressed, target: 'Enemy1' };
@@ -223,8 +228,9 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             expect(storedTE()).toEqual([unrelated]);
         });
 
-        // Guard branch (useInitiativeEffects.js:162-163): malformed/satisfied effects
-        // skip the restore, but the strip (filter on effect+source only, :173) and the
+        // Guard branch (the `continue` clause in restoreCalmEmotions): malformed/
+        // satisfied effects skip the restore, but the strip (filter on effect+source
+        // only, below the loop) and the
         // concentration break still fire — positive legs keep the absence non-vacuous.
         it.each([
             ['mode is not immunity', { effect: 'calm_emotions', source: 'TestMonk', mode: 'suppressed', suppressedConditions: ['Frightened'], target: 'Enemy1' }, {}],

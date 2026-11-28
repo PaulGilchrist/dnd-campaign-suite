@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0146: Adult White Dragon Freezing Burst sphere picker — CON DC 14,
 // 2d6 Cold, 30-ft radius. Owns the two speed_zero gate legs not pinned by
 // the ancient-white data lane (freezing-burst-ancient-white.test.jsx covers
@@ -165,7 +165,7 @@ describe('MA-0146 Adult White Freezing Burst picker speed-zero grant', () => {
 
     expect((runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_zero')).toHaveLength(0);
     expect(runtime.store['Thug 1.activeConditions'] || []).toHaveLength(0);
-    expect(expirations.current.filter(x => x.effects?.some(e => e.effectKey === 'speed_zero' || e.type === 'speed_zero'))).toHaveLength(0);
+    expect(expirations.current.filter(x => x.targetName === 'Thug 1')).toHaveLength(0);
     expect(logEntries().filter(e => e.condition === 'Speed 0')).toHaveLength(0);
   });
 });

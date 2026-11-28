@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // CLA-326 Stalker's Flurry AFFIRMATIVE-RESUME lane at the useAttackDamageResolution
 // seam: the choice modal pauses the real pipeline at _pausedStep:'featureRiders'
 // BEFORE proceedToDamage, stranding the triggering hit's damage. This lane owns the
@@ -97,34 +97,13 @@ vi.mock('../../services/ui/logService.js', () => ({
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-const attack = {
-  name: 'Longbow',
-  damage: '1d8+2',
-  damageType: 'Piercing',
-  weaponType: 'weapon',
-  properties: ['Heavy'],
-  type: 'Action',
-};
+// Only the fields this seam actually reads survive: name/damageType ride into
+// the byte-exact rollDamage pin below. The passive/ability fixture does NOT
+// drive the pause here — the fake featureRiders step manufactures it directly
+// (option-dice selection internals → steps/features/stalkersFlurry.test.js).
+const attack = { name: 'Longbow', damageType: 'Piercing' };
 
-const playerStats = {
-  name: 'FeyRanger',
-  level: 17,
-  proficiency: 6,
-  abilities: [{ name: 'Dexterity', bonus: 5 }],
-  automation: {
-    passives: [{
-      name: "Stalker's Flurry",
-      type: 'attack_rider',
-      trigger: 'weapon_attack_hit',
-      oncePerTurn: true,
-      chooseOne: true,
-      options: [
-        { name: 'Sudden Strike', effect: 'sudden_strike' },
-        { name: 'Mass Fear', effect: 'mass_fear' },
-      ],
-    }],
-  },
-};
+const playerStats = { name: 'FeyRanger' };
 
 // Fresh deps (and fresh mocks) per call — no state crosses tests.
 function makeDeps(resumeRef) {
@@ -161,21 +140,18 @@ describe('useAttackDamageResolution — Stalker\'s Flurry featureRiders pause re
 
     await resolveAttackDamage(attack, { hit: true, targetName: 'Thug 1' });
 
-    // Pause landed (stash-shape matrix owned by pausedStates #311): the keys the
-    // approval branch reads, the chooser opened byte-exact by the step, and the
-    // weapon damage stranded at the pause.
+    // Pause landed carrying the exact (pausedStep, _modalType) combo the
+    // approval branch gates on (stash-shape matrix owned by pausedStates #311;
+    // chooser-open payload at the hook seam owned by classFeatures #301 — not
+    // restated, it is this file's own fake-step input).
     expect(resumeRef.current?._pausedStep).toBe('featureRiders');
     expect(resumeRef.current?._modalType).toBe('stalkersFlurry');
-    expect(deps.setModalState).toHaveBeenCalledTimes(1);
-    expect(deps.setModalState).toHaveBeenCalledWith({
-      attackRiderModal: { action: { name: "Stalker's Flurry" }, targetName: 'Thug 1' },
-    });
-    expect(deps.rollDamage).not.toHaveBeenCalled();
 
-    // A macrotask flush: the choice prompt waits indefinitely — no auto-resolve,
-    // no stranding escape hatch, pause persists untouched (no-game-timers 🔴).
+    // A macrotask flush: the choice prompt waits indefinitely — no fire-and-
+    // forget auto-resolve leaks the stranded damage past the pause (a resumed
+    // chain would push rollDamage here; a completed one would strand the
+    // stash grab below) (no-game-timers 🔴).
     await tick();
-    expect(resumeRef.current?._pausedStep).toBe('featureRiders');
     expect(deps.rollDamage).not.toHaveBeenCalled();
 
     const stash = resumeRef.current.pipelineStash;

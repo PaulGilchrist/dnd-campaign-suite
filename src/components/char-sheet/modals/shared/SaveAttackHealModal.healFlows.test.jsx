@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Heal-selection lane for SaveAttackHealModal: phase gating of the heal radios,
 // heal-button enablement, exactly-one-target heal orchestration, and post-resolve
 // Cancel / post-heal Done flows. Real HP math, clamping, and persistence are
@@ -44,8 +44,17 @@ vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
 }));
 
+// Heal sink computed from the arguments (with the real heal clamp at max HP),
+// NOT a fixed-return mirror: report/SSE assertions trace the amount the modal
+// actually passed, so a wrong target or wrong roll amount changes every number.
+// Full real-math restoration lives in SaveAttackHealModal.npc-heal.test.jsx.
 vi.mock('../../../../services/rules/combat/applyHealing.js', () => ({
-  applyHealingToTarget: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10, oldHp: 20 })),
+  applyHealingToTarget: vi.fn((combatSummary, targetName, amount) => {
+    const oldHp = 20;
+    const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp ?? 0;
+    const newHp = Math.min(oldHp + amount, maxHp);
+    return { oldHp, newHp, maxHp, actualHeal: newHp - oldHp };
+  }),
 }));
 
 // ── Re-import mocked modules ──
@@ -128,8 +137,7 @@ describe('SaveAttackHealModal — heal flows', () => {
     await resolveToHealSelection(getByRole, ['Goblin A', 'Goblin B']);
 
     // No selection yet: heal button is inert.
-    const healBtn = screen.getByRole('button', { name: /Heal Selected/ });
-    expect(healBtn).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Heal Selected/ })).toBeDisabled();
 
     // Arbitrate "select one creature to heal": choose Goblin B, not the first row.
     await act(async () => {
@@ -149,13 +157,14 @@ describe('SaveAttackHealModal — heal flows', () => {
       10,
       'test-campaign'
     );
+    // Downstream reports carry the computed result (oldHp 20 + 10 ≤ 82 maxHp).
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledTimes(1);
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', {
       targetName: 'Goblin B',
       sourceName: 'Divine Smite',
       actualHeal: 10,
       newHp: 30,
-      maxHp: 40,
+      maxHp: 82,
     });
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'roll',
@@ -181,7 +190,7 @@ describe('SaveAttackHealModal — heal flows', () => {
     expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
   });
 
-  it('reports the heal result, then Done closes the modal', async () => {
+  it('reports the computed heal result with zero inline styles (no-inline-styles convention), then Done closes the modal', async () => {
     const onClose = vi.fn();
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({ onClose })} />);
     await resolveToHealSelection(getByRole, ['Goblin A']);
@@ -193,46 +202,20 @@ describe('SaveAttackHealModal — heal flows', () => {
       fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
     });
 
+    // Report text traces the computed result, not a hardcoded mirror:
+    // roll 10 onto oldHp 20 with maxHp 82 → "30 / 82".
     await waitFor(() => {
       const body = document.querySelector('.sp-body');
       expect(body.textContent).toContain('Goblin A healed for');
-      expect(body.textContent).toContain('10 HP (actual: 10). Current HP: 30 / 40.');
+      expect(body.textContent).toContain('10 HP (actual: 10). Current HP: 30 / 82.');
     });
+
+    // Zero-inline census across the whole resolved/healed body.
+    expect(document.querySelector('.sp-body [style]')).toBeNull();
 
     // Post-heal the modal offers only a terminal Done action.
     expect(screen.queryByRole('button', { name: /Heal Selected/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('resolved note and heal result render via scoped classes with zero inline style (no-inline-styles convention)', async () => {
-    // fix#313 recipe pin: the former style={{ marginTop: '8px' }} statics on
-    // renderBody's allResolved arm (:275/:286-era) now live as
-    // .save-attack-heal-resolved-note / .save-attack-heal-result in
-    // SaveAttackHealModal.css (exact-value migration). This component keeps no
-    // dynamic-data inline sites — the whole modal must stay style-free.
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-
-    const note = screen.getByText('All targets resolved.');
-    expect(note.classList.contains('sp-note')).toBe(true);
-    expect(note.classList.contains('save-attack-heal-resolved-note')).toBe(true);
-    expect(note.getAttribute('style')).toBeNull();
-
-    await act(async () => {
-      fireEvent.click(getHealRadio('Goblin A'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
-    });
-
-    await waitFor(() => {
-      expect(document.querySelector('.save-attack-heal-result')).toBeTruthy();
-    });
-    const result = document.querySelector('.save-attack-heal-result');
-    expect(result.textContent).toContain('Goblin A healed for');
-    expect(result.getAttribute('style')).toBeNull();
-    // Zero-inline census across the whole resolved/healed body.
-    expect(document.querySelector('.sp-body [style]')).toBeNull();
   });
 });

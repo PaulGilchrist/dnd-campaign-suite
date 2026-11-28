@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0042: area picker persisting-zone arm seam — with a zoneTe payload
 // (byte-inert when null) the confirm writes a zone te per covered creature
 // (`lair_insect_cloud`, source=caster, repeatTurnEnd) + caster tracking
@@ -123,31 +123,20 @@ describe('MA-0042 area picker persisting-zone arm', () => {
   it('mixed confirm arms the zone: te per creature + caster tracking + honest arm log; save math halves damage only', async () => {
     await openAndConfirm();
 
-    // Zone te: one per covered creature, source=caster, DC/radius carried,
-    // persistent (until_end_of_zone) with the Constitution repeat-save
-    // descriptor riding on the te for the turn-end consumer.
-    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_insect_cloud');
-    expect(tes.map(t => t.target).sort()).toEqual(['Thug 1', 'Thug 2']);
-    expect(tes.every(t => (
-      t.source === 'Adult Black Dragon 1'
-      && t.dc === 15
-      && t.radiusFt === 20
-      && t.repeatTurnEnd === true
-      && t.duration === 'until_end_of_zone'
-      && t.saveType === 'Constitution'
-    ))).toBe(true);
-
-    // MA-0610 #217 clobber-fix, strongest form: exact full-set on EVERY armed
-    // zone te — the H3 damage-derived recurringDie '3d6' (from zoneTe.damage,
-    // insect-cloud's ONLY authored die) must SURVIVE the ma0610TeDescriptors
-    // spread. Pre-fix the unconditional `recurringDie: zoneTe.recurringDie ||
+    // Zone te: one per covered creature. MA-0610 #217 clobber-fix, strongest
+    // form: exact full-set on EVERY armed te — source=caster, DC/radius
+    // carried, persistent (until_end_of_zone) with the Constitution
+    // repeat-save descriptor riding on the te for the turn-end consumer, and
+    // the H3 damage-derived recurringDie '3d6' (from zoneTe.damage, insect-
+    // cloud's ONLY authored die) SURVIVING the ma0610TeDescriptors spread.
+    // Pre-fix the unconditional `recurringDie: zoneTe.recurringDie ||
     // undefined` key spread AFTER h3TeRepeatDescriptors clobbered it to
     // undefined, so zoneRepeatTurnEndService.resolveZoneDice saw nothing on
     // the te. toEqual treats the still-inert undefined recurringType/
     // repeatSave/noun keys as absent — identical to the on-disk JSON shape.
-    const armedByName = Object.fromEntries(tes.map(t => [t.target, t]));
-    expect(armedByName['Thug 1']).toEqual({
-      target: 'Thug 1',
+    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_insect_cloud');
+    expect(tes.map(t => t.target).sort()).toEqual(['Thug 1', 'Thug 2']);
+    const expectedTe = {
       effect: 'lair_insect_cloud',
       source: 'Adult Black Dragon 1',
       duration: 'until_end_of_zone',
@@ -156,18 +145,10 @@ describe('MA-0042 area picker persisting-zone arm', () => {
       repeatTurnEnd: true,
       saveType: 'Constitution',
       recurringDie: '3d6',
-    });
-    expect(armedByName['Thug 2']).toEqual({
-      target: 'Thug 2',
-      effect: 'lair_insect_cloud',
-      source: 'Adult Black Dragon 1',
-      duration: 'until_end_of_zone',
-      dc: 15,
-      radiusFt: 20,
-      repeatTurnEnd: true,
-      saveType: 'Constitution',
-      recurringDie: '3d6',
-    });
+    };
+    for (const target of ['Thug 1', 'Thug 2']) {
+      expect(tes.find(t => t.target === target)).toEqual({ ...expectedTe, target });
+    }
 
     // Caster tracking blob for any future zone consumer.
     const tracking = runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1'];

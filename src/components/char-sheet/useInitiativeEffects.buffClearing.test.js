@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
@@ -6,24 +6,28 @@ import useInitiativeEffects from './useInitiativeEffects.js';
 // Lane map: this file owns the buff-clearing MECHANICS of the initiative seam —
 // clearBuffByName exact-name matching, clearActiveBuffsWhere predicate matching,
 // the starry_form clearSourceEffects campaign lane, the write-only-if-changed
-// guard, and the buff-absent no-write negatives (per the #346/#347 lane map:
-// activeStateClearing:52 and batchResets:10 cite this file as their owner).
-// Event guard clauses (null playerStats/detail, name mismatch) are pinned, with
-// stronger whole-handler negatives, in useInitiativeEffects.initiativeRolled.test.js:84-131;
-// byte-exact active-state snapshots + tracker loop in activeStateClearing.test.js;
-// exact batch payloads in batchResets.test.js; concentration / invisibility /
+// guard, and the buff-absent no-write negatives (the sibling "active state
+// clearing" and "buildInitiativeUpdates batch payload" describes cite this file
+// as their owner). Event guard clauses (null playerStats/detail, name mismatch)
+// are pinned, with stronger whole-handler negatives, in the "guard clauses"
+// describe of useInitiativeEffects.initiativeRolled.test.js; byte-exact
+// active-state snapshots + tracker loop in activeStateClearing.test.js; exact
+// batch payloads in batchResets.test.js; concentration / invisibility /
 // regenerate lanes in their own siblings.
+// Deliberate split: the exact-name table below covers the Revelation/Starry/
+// Superior Defense/Haste clearBuffByName calls; the 'Awakened Mind' call is
+// pinned by the stronger buff+target test in activeStateClearing.test.js and
+// must NOT be duplicated here.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    // Exactly the four exports live in this import graph: useInitiativeEffects.js
-    // and its only real collaborator, boonOfCombatProwess.js, import
-    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys
-    // (probed: lines 2 of useInitiativeEffects.js, line 2 of boonOfCombatProwess.js).
-    // Dead-mock purge: getStore/useSyncedState/listeners were never read through
-    // any module loaded here.
+    // Exactly the three exports live in this import graph: useInitiativeEffects.js
+    // imports getRuntimeValue/setRuntimeValue/setRuntimeBatch and its only real
+    // collaborator, boonOfCombatProwess.js, imports getRuntimeValue/setRuntimeValue.
+    // Dead-mock purge (#2070/#2138 getAllStoreKeys retirement, bisect-confirmed):
+    // no module loaded here imports getAllStoreKeys anymore; getStore/useSyncedState/
+    // listeners were purged earlier.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
-    getAllStoreKeys: vi.fn(() => []),
 }));
 
 // Each factory supplies every named binding useInitiativeEffects.js imports;
@@ -134,18 +138,16 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
         );
 
     describe('clearBuffByName exact-name matching', () => {
-        it.each([
-            ['Revelation in Flesh', 'revelation'],
-            ['Starry Form', 'starry_form'],
-            ['Haste', 'haste'],
-            ['Superior Defense', 'superior_defense'],
-        ])('clears %s and writes the survivors byte-exactly', (name, effect) => {
-            store.set(`TestMonk|${BUFFS_KEY}`, [buff(name, effect), PRESERVED]);
+        // One representative single-clear pass; the full set of cleared names
+        // (Revelation/Starry/Superior Defense/Haste) is pinned call-site by
+        // call-site in the multi-buff final-state test below.
+        it('clears an exact-name buff and writes the survivors byte-exactly', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff('Superior Defense', 'superior_defense'), PRESERVED]);
             renderHookWithStats();
             rollInitiative();
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk', BUFFS_KEY, [PRESERVED], campaignName
-            );
+            expect(activeBuffsWrites()).toEqual([
+                ['TestMonk', BUFFS_KEY, [PRESERVED], campaignName],
+            ]);
             expect(activeBuffs()).toEqual([PRESERVED]);
         });
 
@@ -162,24 +164,19 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
             ]);
         });
 
-        it.each([
-            'Revelation in Flesh',
-            'Starry Form',
-            'Haste',
-            'Superior Defense',
-        ])('leaves %s Enhanced (similar name, no exact match) unwritten', (name) => {
-            store.set(`TestMonk|${BUFFS_KEY}`, [buff(`${name} Enhanced`, 'unrelated_effect')]);
+        it('matches exactly: every similar name survives untouched and nothing is written', () => {
+            const similar = [
+                buff('Revelation in Flesh Enhanced', 'unrelated_effect'),
+                buff('Starry Form Enhanced', 'unrelated_effect'),
+                buff('Haste Enhanced', 'unrelated_effect'),
+                buff('Superior Defense Enhanced', 'unrelated_effect'),
+                PRESERVED,
+            ];
+            store.set(`TestMonk|${BUFFS_KEY}`, similar);
             renderHookWithStats();
             rollInitiative();
             expect(activeBuffsWrites()).toHaveLength(0);
-            expect(activeBuffs()).toEqual([buff(`${name} Enhanced`, 'unrelated_effect')]);
-        });
-
-        it('writes nothing when no buff matches any cleared name or effect', () => {
-            store.set(`TestMonk|${BUFFS_KEY}`, [PRESERVED]);
-            renderHookWithStats();
-            rollInitiative();
-            expect(activeBuffsWrites()).toHaveLength(0);
+            expect(activeBuffs()).toEqual(similar);
         });
 
         it('writes nothing when activeBuffs is unset (store default null)', () => {
@@ -200,13 +197,16 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
     });
 
     describe('clearActiveBuffsWhere predicate matching (See Invisibility)', () => {
-        it.each([
-            ['its matching name', 'See Invisibility'],
-            ['an unrelated name', 'Owl Sight'],
-        ])('clears see_invisibility held under %s via the effect predicate', (_label, name) => {
-            store.set(`TestMonk|${BUFFS_KEY}`, [buff(name, 'see_invisibility'), PRESERVED]);
+        it('clears see_invisibility by effect predicate regardless of buff name in one write', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [
+                buff('See Invisibility', 'see_invisibility'),
+                buff('Owl Sight', 'see_invisibility'),
+                PRESERVED,
+            ]);
             renderHookWithStats();
             rollInitiative();
+            // The 'Owl Sight' entry passes only under the effect predicate — a
+            // name-matching regression would leave it and change these bytes.
             expect(activeBuffsWrites()).toEqual([
                 ['TestMonk', BUFFS_KEY, [PRESERVED], campaignName],
             ]);
@@ -230,8 +230,7 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
         });
 
         it.each([
-            ['same effect sourced from another caster', [ALLY_STARRY_TE]],
-            ['only unrelated effects', [{ effect: 'bane_penalty', source: 'TestMonk', target: 'Enemy1' }]],
+            ['only non-matching rows (other source, other effect)', [ALLY_STARRY_TE, { effect: 'bane_penalty', source: 'TestMonk', target: 'Enemy1' }]],
             ['no stored effects at all', null],
         ])('writes no campaign targetEffects when it holds %s', (_label, stored) => {
             store.set(`TestMonk|${BUFFS_KEY}`, [buff('Starry Form', 'starry_form')]);

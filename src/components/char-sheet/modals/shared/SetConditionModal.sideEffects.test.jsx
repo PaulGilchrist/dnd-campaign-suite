@@ -1,17 +1,14 @@
-// @maintained-by-ai 2026-10-18
-// Lane: SetConditionModal side effects only — immunity denial, Channel Divinity
-// charge spend, and the roll/condition/expiration log seams. Render, target
-// filtering, and Turn Undead behavior live in the sibling test files.
+// @maintained-by-ai 2026-11-28
+// Lane: SetConditionModal side effects only — immunity denial on the player-prompt
+// seam, Channel Divinity charge spend, and the roll/condition/expiration log seams on
+// both save legs. Render, target filtering, prompt payloads, and Turn Undead behavior
+// live in the sibling test files (SetConditionModal.test.jsx owns the sendSavePrompt
+// payload; SetConditionModal.turnUndead.test.jsx the TU contract).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SetConditionModal from './SetConditionModal.jsx';
 
 // ── Mocked modules ──
-
-vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-  rangeToFeet: vi.fn(() => 60),
-}));
 
 vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
@@ -127,15 +124,6 @@ describe('SetConditionModal - Side Effects', () => {
 
     const view = render(<SetConditionModal {...makeProps({ characters })} />);
     selectAndConfirm(2); // Player Ally goes through the prompt lane — no auto-roll
-
-    expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      promptId: expect.any(String),
-      targetName: 'Player Ally',
-      saveType: 'WIS',
-      saveDc: 14,
-      sourceName: 'Attacker',
-      condition: 'frightened',
-    }));
     const promptId = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
     window.dispatchEvent(new CustomEvent('save-result', {
       detail: { promptId, targetName: 'Player Ally', success: false, total: 8, roll: 8, saveBonus: 0 },
@@ -143,13 +131,13 @@ describe('SetConditionModal - Side Effects', () => {
 
     // The prompt fully resolves…
     await waitFor(() => expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument());
-    // …yet immunity means the condition never reaches the apply seam.
+    // …yet immunity means the condition never reaches the apply seam, and the denial
+    // mints no ledger: no expiration clock, no 'applied' condition log —
+    // only the honest immunity advisory (phantom pin, bug ledger SetConditionModal —
+    // see logImmunity in SetConditionModal.jsx).
     expect(conditionSaveService.addCondition).not.toHaveBeenCalled();
-    // Denied conditions mint no ledger: no expiration clock, no 'applied' log —
-    // only the honest immunity advisory (phantom pin, bug ledger SetConditionModal:144-147).
     expect(expirations.addExpiration).not.toHaveBeenCalled();
     expect(entriesOf('condition')).toHaveLength(0);
-    expect(logService.addEntry.mock.calls.map(c => c[1]).filter(e => e?.action === 'applied')).toHaveLength(0);
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
       type: 'automation',
       automationType: 'condition_immune_advisory',
@@ -162,12 +150,13 @@ describe('SetConditionModal - Side Effects', () => {
     view.unmount();
 
     // Positive leg gating the denial above: same failed prompt, not immune → applied once.
+    // saveBonus 2 distinguishes the player-prompt roll-log fold (detail.saveBonus → formula).
     vi.clearAllMocks();
     automationService.playerIsImmuneToCondition.mockReturnValue(false);
     render(<SetConditionModal {...makeProps({ characters })} />);
     selectAndConfirm(2);
     window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: savePromptService.sendSavePrompt.mock.calls[0][1].promptId, targetName: 'Player Ally', success: false, total: 8, roll: 8, saveBonus: 0 },
+      detail: { promptId: savePromptService.sendSavePrompt.mock.calls[0][1].promptId, targetName: 'Player Ally', success: false, total: 10, roll: 8, saveBonus: 2 },
     }));
 
     await waitFor(() => expect(conditionSaveService.addCondition).toHaveBeenCalledTimes(1));
@@ -178,7 +167,8 @@ describe('SetConditionModal - Side Effects', () => {
       ability: 'WIS',
       campaignName: 'test-campaign',
     }));
-    // Applied leg keeps the full ledger: one expiration clock, one 'applied' log, no advisory.
+    // Applied leg keeps the full ledger: one expiration clock, one 'applied' log,
+    // one roll log on the save-result seam, no advisory.
     expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
     expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({
       attackerName: 'Attacker',
@@ -193,6 +183,17 @@ describe('SetConditionModal - Side Effects', () => {
       condition: 'Frightened',
       dc: 14,
       sourceName: 'Attacker',
+    }));
+    const promptRollLogs = entriesOf('roll');
+    expect(promptRollLogs).toHaveLength(1);
+    expect(promptRollLogs[0]).toEqual(expect.objectContaining({
+      rollType: 'save-damage',
+      name: 'Abjure Foes',
+      targetName: 'Player Ally',
+      formula: '1d20+2',
+      bonus: 2,
+      total: 10,
+      saveResult: 'failure',
     }));
     expect(entriesOf('automation')).toHaveLength(0);
   });

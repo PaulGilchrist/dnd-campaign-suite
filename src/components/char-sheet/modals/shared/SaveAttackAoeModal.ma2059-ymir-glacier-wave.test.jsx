@@ -1,24 +1,27 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-2059: Ymir "Glacier Wave" picker-lane consumer unit — the two-field fix
 // (recharge:"5-6" + save_effect Restrained) on the LIVE Line picker seam
 // (SaveAttackAoeModal, MA-2033 lane: press opens "120-ft Line (GM positions
 // tokens; selection advisory)"). Pre-fix the row carried no save_effect →
 // extractConditionsFromSaveEffect [] → applySaveFailConditions early-return
 // (:654) → Restrained NEVER landed after failed saves (§567 bait). Post-fix,
-// driven from the disk row's OWN bytes through the picker props:
-//   mixed-confirm face per family canon (#200-#220): one picker, two bandits —
-//     FAIL (full-word saveBonuses.strength:-19 → any nat ≤20-19 < DC 26):
-//       full 14d10 damage AND Restrained granted (activeConditions + meta +
-//       `condition applied` log carrying the AUTHORED until-clause, not the
-//       MA-0063 1-minute boilerplate — MA-0084 seam).
-//     SUCCESS (+30 → any nat ≥1+30 ≥ DC 26): half damage floor(Σ/2), NO
-//       Restrained (fail-only grant lane, MA-1921 twin). The ±19/+30 fold pins
-//       make both faces deterministic regardless of RNG draw order; the
-//       [0.01,0.01,0.99,0.99] seam (2 raw d20s per save, :59-60) is the belt.
+// driven from the disk row's OWN bytes through the picker props, in ONE
+// family-canon mixed-confirm run (ma2063 Frost Geyser twin):
+//   armed picker: both bandits listed (Ymir excluded), honest Line + Str
+//     DC 26 + half-default copy — fully inert until confirm (no roll, no
+//     damage, no grant).
+//   FAIL (full-word saveBonuses.strength:-19 → any nat ≤20-19 < DC 26):
+//     full 14d10 damage AND Restrained granted (activeConditions + meta +
+//     `condition applied` log carrying the AUTHORED until-clause, not the
+//     MA-0063 1-minute boilerplate — MA-0084 seam).
+//   SUCCESS (+30 → any nat ≥1+30 ≥ DC 26): half damage floor(Σ/2), NO
+//     Restrained (fail-only grant lane, MA-1921 twin). The ±19/+30 fold pins
+//     make both faces deterministic regardless of RNG draw order; the
+//     [0.01,0.01,0.99,0.99] seam (2 raw d20s per save, :59-60) is the belt.
 // dc_success transported 'half' (row authors none — the half-default IS the
-// RAW "Success: Half damage"; copy pinned in the open-lane test). Row data
-// pins live on their owning lanes (monsterRecharge.ma2059 name/desc/recharge;
-// ma2063 sibling WAVE save_effect/dc/dice twin) — not re-pinned here.
+// RAW "Success: Half damage"; copy pinned in the armed-picker phase). Row
+// data pins live on their owning lanes (monsterRecharge.ma2059 name/desc/
+// recharge; ma2063 sibling WAVE save_effect/dc/dice twin) — not re-pinned here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -80,6 +83,7 @@ vi.mock('./CreatureSelectionModal.jsx', async () => {
   return { default: createStaticPickerModal(seenTargets, { descClass: 'sp-desc', noteClass: 'sp-note-copy' }) };
 });
 
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
@@ -130,30 +134,25 @@ beforeEach(() => {
   ];
 });
 
-describe('MA-2059 Line picker opens from the disk row inputs — honest copy, inert until confirmed', () => {
-  it('both bandits pickable (Ymir excluded); header/desc/copy carry Line + Str DC 26 + half-default; zero state pre-confirm', async () => {
-    spyRandom([0.5]);
+describe('MA-2059 Line picker from the disk row: inert until confirm, then FAIL face lands full 14d10 AND Restrained together (was zero-grant bait); SAVE face halves only', () => {
+  it('pre-confirm inert; one picker, two bandits: Bandit 1 (-19) takes 81 + restrained + authored-clause grant log; Bandit 2 (+30) takes floor(81/2)=40, zero grant', async () => {
+    spyRandom([0.01, 0.01, 0.99, 0.99]); // canon seam: 2 raw d20s per save; ±fold pins make faces order-proof
     renderWave();
     await waitFor(() => expect(seenTargets.current.length).toBe(2));
     expect(seenTargets.current.map(t => t.name)).toEqual(['Bandit 1', 'Bandit 2']); // §567 bait would leave the grant lane empty — picker must still list both
     expect(document.querySelector('.sp-header').textContent).toMatch(/120-ft Line/);
-    expect(document.querySelector('.sp-desc').textContent).toMatch(/Strength/);
-    expect(document.querySelector('.sp-desc').textContent).toMatch(/DC 26/);
+    const desc = document.querySelector('.sp-desc').textContent;
+    expect(desc).toMatch(/Strength/);
+    expect(desc).toMatch(/DC 26/);
     const copy = document.querySelector('.sp-note-copy').textContent;
     expect(copy).toMatch(/On a failed save, target takes 14d10 Bludgeoning damage\./);
     expect(copy).toMatch(/On a successful save, target takes half damage\./); // dc_success UNSET → half-default IS RAW
     // Pre-confirm inertness: nothing rolled, no damage, no conditions, no grant log.
+    expect(rollExpression).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(grantLogs()).toHaveLength(0);
     expect(Object.keys(runtime.store).filter(k => /activeCondition/.test(k))).toHaveLength(0);
-  });
-});
 
-describe('MA-2059 mixed-confirm: FAIL face lands full 14d10 AND Restrained together (was zero-grant bait); SAVE face halves only', () => {
-  it('one picker, two bandits: Bandit 1 (-19) takes 81 + restrained + authored-clause grant log; Bandit 2 (+30) takes floor(81/2)=40, zero grant', async () => {
-    spyRandom([0.01, 0.01, 0.99, 0.99]); // canon seam: 2 raw d20s per save; ±pins make faces order-proof
-    renderWave();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
     fireEvent.click(document.querySelector('.sp-roll-btn'));
     await waitFor(() => expect(applyDamageToTarget.mock.calls.filter(c => c[1] === 'Bandit 1' || c[1] === 'Bandit 2')).toHaveLength(2));
 
@@ -162,10 +161,12 @@ describe('MA-2059 mixed-confirm: FAIL face lands full 14d10 AND Restrained toget
     const saveCall = applyDamageToTarget.mock.calls.find(c => c[1] === 'Bandit 2');
     expect(saveCall[2]).toBe(40); // floor(81/2) — half-default matches RAW "Success: Half damage"
 
-    // Results UI shows BOTH faces per-target in one panel.
-    const results = document.querySelector('.abjure-results-list').textContent;
-    expect(results).toMatch(/Failed/);
-    expect(results).toMatch(/Saved — takes .*damage \(rolled .*halved\)/);
+    // Results UI: per-target rows — each face pinned to its OWN target so a
+    // mislabelled face can never hide behind the other row's text.
+    const rowText = name => [...document.querySelectorAll('.abjure-results-list .abjure-result')]
+      .find(r => r.querySelector('strong')?.textContent === name).textContent;
+    expect(rowText('Bandit 1')).toMatch(/^Bandit 1: Failed — takes 81 Bludgeoning damage \(rolled .* vs DC 26\)/);
+    expect(rowText('Bandit 2')).toMatch(/^Bandit 2: Saved — takes 40 Bludgeoning damage \(rolled .* halved\)/);
 
     // Restrained is fail-ONLY: exactly one grant, on Bandit 1, never Bandit 2.
     expect(runtime.store['Bandit 1.activeConditions']).toEqual(['restrained']);

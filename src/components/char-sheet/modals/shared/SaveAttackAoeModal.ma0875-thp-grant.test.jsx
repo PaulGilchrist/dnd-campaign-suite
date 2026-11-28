@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" Cube picker THP grant lane.
 // Unique seam: SaveAttackAoeModal armed by the tempHpGrant prop (threaded by
 // MonsterCardModal.ma0875-cube-shape) must grant the ATTACKER 10 THP via the
@@ -6,7 +6,10 @@
 // successful saves, and stay byte-inert when the prop is null (every other
 // picker row). replace-if-larger VALUE semantics are owned by
 // tempHpBuffHandler.bolsteringTreats.test.js; the inline block-save twin seam
-// and its stacking cases live in saveProcessing.ma0875-thp-grant.test.js;
+// lives in saveProcessing.ma0875-thp-grant.test.js. One log PER FAILED SAVE
+// (MA-0816 count-by-log) is pinned below by the mixed-outcome and double-fail
+// cells: single-target lanes cannot separate a per-target grant from a hoisted
+// once-per-attack one;
 // clause parsing + data pins live in MonsterCardHelpers.ma0875-thp-clause.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -44,12 +47,13 @@ vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
 }));
 vi.mock('../../../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 
-const csFixture = vi.hoisted(() => ({ dexBonus: -19 }));
+const csFixture = vi.hoisted(() => ({ dexBonus: -19, bandit2Bonus: 19 }));
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Gnoll Demoniac 1', type: 'npc', currentHp: 135, maxHp: 135, saveBonuses: {}, resistances: [], immunities: [] },
       { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, saveBonuses: { dexterity: csFixture.dexBonus }, resistances: [], immunities: [] },
+      { name: 'Bandit 2', type: 'npc', currentHp: 999, maxHp: 999, saveBonuses: { dexterity: csFixture.bandit2Bonus }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -105,50 +109,71 @@ function renderHunger(tempHpGrant = { tempHp: 10 }) {
   );
 }
 
-// Render the picker, wait for the one eligible target, confirm, wait for logs.
+// Render the picker, wait for both eligible targets, confirm, wait for logs.
 async function pick(tempHpGrant) {
   const { getByText } = renderHunger(tempHpGrant);
-  await waitFor(() => expect(seenTargets.current.length).toBe(1));
+  await waitFor(() => expect(seenTargets.current.length).toBe(2));
   fireEvent.click(getByText('Confirm'));
   await waitFor(() => expect(addEntry).toHaveBeenCalled());
 }
 
 const grantLogs = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.automationType === 'temp_hp_granted');
-const banditDamage = () => addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1');
+const damageFor = (targetName) => addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.targetName === targetName);
 
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
   csFixture.dexBonus = -19;
+  csFixture.bandit2Bonus = 19;
 });
 
 describe('MA-0875 Hunger of Yeenoghu picker THP grant', () => {
-  it('failed NPC Dex save: attacker granted 10 THP + one temp_hp_granted log; target takes FULL damage and never receives the THP', async () => {
+  it('mixed outcome (Bandit 1 fails, Bandit 2 saves): exactly ONE grant log for the failed save, attacker gets 10 THP, targets never receive it; full vs half damage per outcome', async () => {
     spyRandom([0.01, 0.01, 0.01, 0.01]);
     await pick({ tempHp: 10 });
+    // Both targets fully processed before counting grants — a lone grant log
+    // must reflect per-target dispatch, not a run that stopped after target 1.
+    await waitFor(() => expect(damageFor('Bandit 2')).toBeTruthy());
 
     expect(runtime.store[`${GNOLL}.tempHp`]).toBe(10);
     expect(runtime.store['Bandit 1.tempHp']).toBeUndefined(); // attacker-side clause
+    expect(runtime.store['Bandit 2.tempHp']).toBeUndefined();
 
     const grants = grantLogs();
     expect(grants).toHaveLength(1);
     expect(grants[0]).toMatchObject({ characterName: GNOLL, abilityName: 'Hunger of Yeenoghu' });
     expect(grants[0].description).toMatch(/gains 10 temporary hit points \(now 10 THP, replace-if-larger\)/);
 
-    const dmg = banditDamage();
-    expect(dmg.saveResult).toBe('failure');
-    expect(dmg.finalDamage).toBe(26);
+    expect(damageFor('Bandit 1').saveResult).toBe('failure');
+    expect(damageFor('Bandit 1').finalDamage).toBe(26);
+    expect(damageFor('Bandit 2').saveResult).toBe('success');
+    expect(damageFor('Bandit 2').finalDamage).toBe(13);
   });
 
-  it('successful NPC Dex save: ZERO THP grant, zero grant log, half damage still lands (flow ran)', async () => {
+  it('both NPC Dex saves fail: ONE temp_hp_granted log PER failed save (2 logs, MA-0816 count-by-log); replace-if-larger collapses the pool at 10, never adds', async () => {
+    csFixture.bandit2Bonus = -19;
+    spyRandom([0.01, 0.01, 0.01, 0.01]);
+    await pick({ tempHp: 10 });
+    await waitFor(() => expect(damageFor('Bandit 2')).toBeTruthy());
+
+    const grants = grantLogs();
+    expect(grants).toHaveLength(2);
+    expect(grants.every(g => g.characterName === GNOLL)).toBe(true);
+    expect(runtime.store[`${GNOLL}.tempHp`]).toBe(10); // collapsed, not 20
+    expect(runtime.store['Bandit 1.tempHp']).toBeUndefined();
+    expect(runtime.store['Bandit 2.tempHp']).toBeUndefined();
+  });
+
+  it('successful NPC Dex saves: ZERO THP grant, zero grant log, half damage still lands (flow ran)', async () => {
     csFixture.dexBonus = 19;
     spyRandom([0.01, 0.01, 0.01, 0.01]);
     await pick({ tempHp: 10 });
+    await waitFor(() => expect(damageFor('Bandit 2')).toBeTruthy());
 
     expect(runtime.store[`${GNOLL}.tempHp`]).toBeUndefined();
     expect(grantLogs()).toHaveLength(0);
-    const dmg = banditDamage();
+    const dmg = damageFor('Bandit 1');
     expect(dmg.saveResult).toBe('success');
     expect(dmg.finalDamage).toBe(13);
   });
@@ -156,11 +181,12 @@ describe('MA-0875 Hunger of Yeenoghu picker THP grant', () => {
   it('null tempHpGrant (every other picker row) is inert on a FAILED save: no THP, no grant log — but the save and damage still resolve', async () => {
     spyRandom([0.01, 0.01, 0.01, 0.01]);
     await pick(null);
+    await waitFor(() => expect(damageFor('Bandit 2')).toBeTruthy());
 
     expect(runtime.store[`${GNOLL}.tempHp`]).toBeUndefined();
     expect(grantLogs()).toHaveLength(0);
     // Non-vacuous: the failed-save path genuinely ran without the grant clause.
-    const dmg = banditDamage();
+    const dmg = damageFor('Bandit 1');
     expect(dmg.saveResult).toBe('failure');
     expect(dmg.finalDamage).toBe(26);
   });

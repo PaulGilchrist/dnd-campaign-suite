@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0035 monster LINE breath row — modal-side consumption ONLY: header
 // shows the "60-ft Line" label, the row's 60-ft line geometry flows through
 // the canonical isWithinRange gate from the attacker (the mock passes ONLY
@@ -76,12 +76,14 @@ const seenTargets = vi.hoisted(() => ({ current: [] }));
 
 vi.mock('./CreatureSelectionModal.jsx', async () => {
   const { createStaticPickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
-  return { default: createStaticPickerModal(seenTargets, { listWrapper: true, dataName: true }) };
+  return { default: createStaticPickerModal(seenTargets) };
 });
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 
 const ACTION = { name: 'Acid Breath (Recharge 5-6)', save_dc: 18, save_type: 'Dexterity', recharge: '5-6', damage_dice_primary: '12d8', damage_type_primary: 'Acid' };
 
@@ -113,19 +115,21 @@ function renderMonsterLine() {
 describe('MA-0035 area picker as monster line save', () => {
   it('opens the labelled 60-ft Line picker: gate queried from the dragon at 60 ft, attacker excluded, inert until confirm', async () => {
     renderMonsterLine();
-    // Survivors prove the 60-ft line gate fired at exactly the authored range.
+    // Survivors prove the 60-ft line gate fired at exactly the authored range:
+    // a dropped or mis-sized gate empties this list (the mock answers true ONLY at 60 ft).
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
     expect(document.querySelector('.sp-header').textContent).toContain('60-ft Line (GM positions tokens; selection advisory)');
-    expect(isWithinRange).toHaveBeenCalledTimes(2);
-    expect(isWithinRange.mock.calls).toEqual(expect.arrayContaining([
+    // Exact call list: one 60-ft query per survivor from the attacker, in picker
+    // order — pins count, arguments, and the attacker-exclusion (the dragon is
+    // never queried) in a single assertion.
+    expect(isWithinRange.mock.calls).toEqual([
       ['Adult Black Dragon 1', 'Thug 1', 60],
       ['Adult Black Dragon 1', 'Thug 2', 60],
-    ]));
-    // Both thug rows must carry the attacker-exclusion (dragon never queried, never listed).
-    expect(isWithinRange.mock.calls.every(c => c[1] !== 'Adult Black Dragon 1')).toBe(true);
-    expect(seenTargets.current.some(t => t.name === 'Adult Black Dragon 1')).toBe(false);
-    // Browsing the picker rolls, logs and damages nothing.
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    ]);
+    // Browsing the picker rolls, prompts, logs and damages nothing.
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(sendSavePrompt).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 });

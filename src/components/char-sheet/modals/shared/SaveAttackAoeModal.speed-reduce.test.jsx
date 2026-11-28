@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1530: Steam Mephit Steam Breath cone picker — CON DC 10, 2d4 Fire,
 // 15-ft Cone. Confirms the picker grants the authored fail clause
 // "the target's Speed decreases by 10 feet until the end of the mephit's
@@ -169,15 +169,17 @@ describe('MA-1530 Steam Mephit Steam Breath picker speed_reduction grant', () =>
     });
     expect(logs[0].description).toMatch(/failed the Constitution save \(DC 10\) in Steam Mephit 1's Steam Breath — Speed Reduced \u221210 ft until the end of Steam Mephit 1's next turn/);
 
-    const dmg = entriesOfType(e => e.rollType === 'save-damage' && e.saveResult === 'failure')[0];
-    expect(dmg).toBeTruthy();
-    expect(dmg.finalDamage).toBe(7); // fail pays FULL raw 7
-    expect(dmg.saveResult).toBe('failure');
+    const failDmgLogs = () => entriesOfType(e => e.rollType === 'save-damage' && e.saveResult === 'failure');
+    expect(failDmgLogs()).toHaveLength(1);
+    expect(failDmgLogs()[0].finalDamage).toBe(7); // fail pays FULL raw 7
 
     // Second breath from the same mephit: registerTargetEffect dedupes per
     // (target, effect, source) — the te is REPLACED, never stacked (consumer
-    // conditionEffects accumulates −N only across DISTINCT sources).
+    // conditionEffects accumulates −N only across DISTINCT sources). Wait on
+    // breath 2's OWN damage log (addEntry already fired for breath 1, so the
+    // generic confirmBreath wait would resolve early and re-check vacuously).
     await confirmBreath();
+    await waitFor(() => expect(failDmgLogs()).toHaveLength(2));
     const tes2 = (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_reduction');
     expect(tes2).toHaveLength(1);
     expect(tes2[0]).toMatchObject({ target: 'Bandit 1', source: 'Steam Mephit 1', value: 10 });

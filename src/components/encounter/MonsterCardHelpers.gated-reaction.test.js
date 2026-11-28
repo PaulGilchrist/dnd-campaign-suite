@@ -1,12 +1,28 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Gated monster reaction COMPUTATION owner (MA-0006 feather_fall archetype, MA-0013
 // counterspell, MA-0341 parry gate + MA-0681 elemental_absorption): trigger identity,
 // actor, round latch (initiative seam, never a wall-clock timer), uses arithmetic,
-// spend/refusal logs. Chip press + card rendering are component lane #417 — computation
-// only here. Standing rec #417/#500: the file keeps ONE getGatedMonsterReaction(plainRow)
-// →null leg (feather_fall registry test below; the MA-0341 :360 and MA-0681 :640 twins
-// are deleted). Parry DATA twins (MA-0565/0573/0643/0702/0869/0997/1048/1140/1236/1238)
-// fold into one it.each locking each monster's authored acBonus end-to-end.
+// spend/refusal logs. Chip press + card rendering are component lane
+// MonsterAction.gated-reaction.test.jsx — computation only here. This file is the
+// shared-seam owner the sibling counterspell lanes (ma0300/ma0305/ma0314/ma1120) and
+// usage.test.js delegate to: uses arithmetic + plain-row null-negative (MA-0006
+// registry block), limit-999 admit (MA-0341 parryGate block), CLA-322 check
+// arithmetic (MA-0013 pure-check block), auto/check press ladder + zero-spend
+// refusals (MA-0013 resolve block), and the usage-less-row fabricated-1/Day seam
+// (end-of-file block). Standing rec #417/#500: ONE getGatedMonsterReaction(plainRow)
+// →null leg file-wide; parry DATA twins folded into one it.each locking each
+// monster's authored acBonus end-to-end. 2026-11-28 sweep: data locks upgraded to
+// disk-faithful verbatim full-row toEqual; isSpellOriginLastAttack table completed
+// with one mutation-distinguishable row per OR clause (spell-attack, spell-save,
+// saveType+saveDc pair + lone-saveType negative); parry identity table splits the
+// resolved-clause OR into its two stamps (damageApplied / actualDamage) and drops
+// the attackType-spell row (clause now pinned in the isSpellOrigin owner table —
+// the damageSchool row keeps the parry spell-guard itself pinned here); MA-0006 gate
+// table adds the nested attackEvent.trigger admit (lastAttackTrigger fallback);
+// absorption lane purges the dead tempHp getRuntimeValue branch (mock-bisect: the
+// resolver never reads tempHp through the store) and pins the full
+// replace-if-larger delegation (name, amount, campaign) with the service-returned
+// standing buffer surfaced in result + spend log.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -62,26 +78,22 @@ describe('MA-0006 gated monster reaction registry', () => {
   it('feather_fall row arms, plain rows inert; uses arithmetic fresh/spent/plain', () => {
     expect(getGatedMonsterReaction(FEATHER_FALL_ACTION)?.effect).toBe('feather_fall');
     // #417: the ONLY getGatedMonsterReaction(plainRow)→null leg file-wide
-    // (old MA-0341 :360 Scimitar and MA-0681 :640 Scimitar duplicates deleted per #500).
+    // (old MA-0341 Scimitar and MA-0681 Scimitar duplicates deleted per #500).
     expect(getGatedMonsterReaction({ name: 'Mace', description: 'Hit: 1d6+2 bludgeoning.' })).toBeNull();
     expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, {})).toBe(1);
     expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, { feather_fall: 1 })).toBe(0);
     expect(monsterReactionUsesRemaining({ name: 'Plain' }, {})).toBeNull();
   });
 
-  it('monsters.json carries the uses field + automation on reactions[0]', () => {
-    const monster = monsters.find(m => m.index === 'aarakocra-aeromancer');
-    const reaction = monster.reactions[0];
-    expect(reaction.automation).toMatchObject({ type: 'reaction', trigger: 'falling', effect: 'feather_fall' });
-    expect(reaction.maxUses).toBe(1);
-    expect(reaction.usage).toBe('1/Day');
+  it('monsters.json aarakocra-aeromancer reactions[0] is disk-verbatim for the armed fixture', () => {
+    expect(monsters.find(m => m.index === 'aarakocra-aeromancer').reactions[0]).toEqual(FEATHER_FALL_ACTION);
   });
 });
 
 describe('MA-0006 monsterReactionGate truth table', () => {
   const def = getGatedMonsterReaction(FEATHER_FALL_ACTION);
 
-  it('refuses trigger/trigger/actor/round/uses; allows fresh falling trigger', () => {
+  it('refuses trigger/trigger/actor/round/uses; admits fresh falling trigger incl. nested attackEvent', () => {
     const rows = [
       ['trigger: no lastAttack', null, 1, {}, 0, 'trigger'],
       ['trigger: non-falling lastAttack (CLA-315)', { trigger: 'hit', attackerName: 'Thug 1', targetName: MONSTER }, 1, {}, 0, 'trigger'],
@@ -97,6 +109,10 @@ describe('MA-0006 monsterReactionGate truth table', () => {
     const ok = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack(), currentRound: 1, storedUses: {}, usedRound: 0 });
     expect(ok.ok).toBe(true);
     expect(ok.limit).toBe(1);
+    // lastAttackTrigger fallback: the falling stamp can ride inside
+    // attackEvent.trigger instead of the top-level field.
+    const nested = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: { attackEvent: { trigger: 'falling' }, attackerName: MONSTER, targetName: MONSTER }, currentRound: 1, storedUses: {}, usedRound: 0 });
+    expect(nested.ok).toBe(true);
   });
 });
 
@@ -150,7 +166,7 @@ function csWithPC(round = 1) {
   return { round, creatures: [{ name: PC, type: 'player' }, { name: CULTIST, type: 'npc' }] };
 }
 
-function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, d20 = 1, resolveSpellLevel } = {}) {
+function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, d20 = 1 } = {}) {
   const state = { ...store };
   const logs = [];
   const campaignWrites = [];
@@ -169,25 +185,34 @@ function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, 
       addEntry: vi.fn(async (c, e) => { logs.push(e); }),
       rollD20: vi.fn(() => d20),
       spellAbilityMod: 4,
-      resolveSpellLevel: resolveSpellLevel || vi.fn(async la => (la?.isCantrip ? 0 : 3)),
+      resolveSpellLevel: vi.fn(async la => (la?.isCantrip ? 0 : 3)),
     },
   };
 }
 
 describe('MA-0013 Counterspell registry + pure check', () => {
-  it('monsters.json aberrant-cultist reactions[0] data-lock arms the gate', () => {
-    expect(COUNTERSPELL_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' });
-    expect(COUNTERSPELL_ACTION.uses).toBe(2);
-    expect(COUNTERSPELL_ACTION.maxUses).toBe(2);
+  it('monsters.json aberrant-cultist reactions[0] disk-verbatim, arms the gate', () => {
+    expect(COUNTERSPELL_ACTION).toEqual({
+      name: 'Counterspell (2/Day)',
+      description: "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+      usage: '2/Day',
+      uses: 2,
+      maxUses: 2,
+      automation: { type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' },
+    });
     expect(getGatedMonsterReaction(COUNTERSPELL_ACTION)?.effect).toBe('counterspell');
   });
 
-  it('isSpellOriginLastAttack truth table: spell origins true, null/weapon false', () => {
+  it('isSpellOriginLastAttack: one admit row per OR clause, null/weapon/lone-saveType false', () => {
     const rows = [
       [null, false],
+      [{ rollType: 'spell-attack' }, true],
+      [{ rollType: 'spell-save' }, true],
+      [{ attackType: 'spell' }, true],
       [{ rollType: 'save', isSpellDamage: true }, true],
-      [{ attackType: 'spell', spellLevel: 3 }, true],
       [pcSpellAttack(), true],
+      [{ saveType: 'wis', saveDc: 15 }, true],
+      [{ saveType: 'wis' }, false],
       [{ attackerName: PC, attackName: 'Mace', weaponType: 'melee' }, false],
     ];
     for (const [la, expected] of rows) {
@@ -207,10 +232,12 @@ describe('MA-0013 Counterspell registry + pure check', () => {
     expect(miss).toMatchObject({ total: 12, targetDC: 13, countered: false });
   });
 
-  it('counterspellGate refuses a monster-origin spell cast (attackerIsPC=false)', () => {
-    // Non-spell origin (Mace) is the same refusal reason already pinned via
-    // isSpellOriginLastAttack above and the resolve-level no-spell row below.
+  it('counterspellGate refuses a spell-origin cast whose attacker is not a PC (monster casts never arm)', () => {
+    // The attackerIsPC conjunct is its own branch: dropping it would arm this
+    // row even though isSpellOriginLastAttack is true. The Mace non-spell leg
+    // lives in the resolve-level refusals below.
     const g = counterspellGate({ lastAttack: pcSpellAttack({ attackerName: 'Thug 1' }), attackerIsPC: false, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
+    expect(g.ok).toBe(false);
     expect(g.reason).toBe('trigger');
   });
 });
@@ -243,7 +270,7 @@ describe('MA-0013 resolveMonsterGatedReaction — Counterspell', () => {
 
   it('refusals log counterspell_refused zero-spend (resolved cast / no spell / 2/Day)', async () => {
     const scenarios = [
-      ['second click on the SAME resolved cast', { lastAttack: pcSpellAttack({ spellLevel: 0, counterspellResolved: true }), store: { [`${CULTIST}._counterspell_usedRound`]: 1, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } } }, { counterspell: 1 }, /countered|resolved/],
+      ['second click on the SAME resolved cast', { lastAttack: pcSpellAttack({ spellLevel: 0, counterspellResolved: true }), store: { [`${CULTIST}._counterspell_usedRound`]: 1, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } } }, { counterspell: 1 }, /already resolved against/],
       ['no spell lastAttack (trigger)', { lastAttack: { attackerName: PC, attackName: 'Mace', weaponType: 'melee' } }, undefined, /trigger/],
       ['2/Day exhaustion on a fresh PC spell', { lastAttack: pcSpellAttack({ spellLevel: 0 }), round: 5, store: { [`${CULTIST}._counterspell_usedRound`]: 2, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 2 } } }, { counterspell: 2 }, /2\/Day/],
     ];
@@ -300,11 +327,15 @@ function makeParryDeps({ lastAttack = meleeHitOnCaptain(), round = 1, store = {}
 }
 
 describe('MA-0341 Parry owner — registry + gate truth tables', () => {
-  it('monsters.json bandit-captain reactions[0] byte-shape + At Will sentinel', () => {
-    expect(PARRY_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
-    expect(PARRY_ACTION.usage).toBe('At Will');
-    expect(PARRY_ACTION.uses).toBe(999);
-    expect(PARRY_ACTION.maxUses).toBe(999);
+  it('monsters.json bandit-captain reactions[0] disk-verbatim + At Will sentinel', () => {
+    expect(PARRY_ACTION).toEqual({
+      name: 'Parry',
+      description: 'Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss.',
+      usage: 'At Will',
+      uses: 999,
+      maxUses: 999,
+      automation: { type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 },
+    });
     expect(getGatedMonsterReaction(PARRY_ACTION)?.effect).toBe('parry');
   });
 
@@ -314,10 +345,10 @@ describe('MA-0341 Parry owner — registry + gate truth tables', () => {
       ['save roll, not an attack', { ...meleeHitOnCaptain(), rollType: 'save' }, 'trigger'],
       ['ranged weapon attack', { ...meleeHitOnCaptain(), weaponType: 'ranged' }, 'melee'],
       ['spell-origin with melee fallback (MA-0245 stamp guard)', { ...meleeHitOnCaptain(), damageSchool: 'Evocation', isCantrip: true }, 'spell'],
-      ['attackType spell stamp', { ...meleeHitOnCaptain(), attackType: 'spell' }, 'spell'],
       ['wrong target', meleeHitOnCaptain({ targetName: 'Thug 1' }), 'trigger'],
       ['miss', meleeHitOnCaptain({ hit: false }), 'miss'],
-      ['damage already committed', meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }), 'resolved'],
+      ['damageApplied stamp', meleeHitOnCaptain({ damageApplied: true }), 'resolved'],
+      ['actualDamage stamp, no flag', meleeHitOnCaptain({ actualDamage: 8 }), 'resolved'],
       ['already parried', meleeHitOnCaptain({ parryResolved: true }), 'reacted'],
       ['self-inflicted attack', meleeHitOnCaptain({ attackerName: CAPTAIN }), 'attacker'],
       ['unresolved melee hit accepted', meleeHitOnCaptain(), null],
@@ -468,7 +499,7 @@ function pendingFireHitOnCultist(overrides = {}) {
   return { attackerName: AZER, targetName: CULTIST_681, attackName: 'Flame Burst', rollType: 'attack', weaponType: 'ranged', hit: true, d20: 13, bonus: 7, total: 20, targetAc: 16, effectiveAc: 16, primaryDamage: 22, primaryDamageType: 'Fire', damageTypes: ['Fire'], damageApplied: undefined, elementalAbsorptionResolved: undefined, ...overrides };
 }
 
-function makeAbsorbDeps({ lastAttack = pendingFireHitOnCultist(), round = 1, store = {}, tempHp = 0 } = {}) {
+function makeAbsorbDeps({ lastAttack = pendingFireHitOnCultist(), round = 1, store = {}, standingTempHp = 0 } = {}) {
   const state = { ...store };
   const logs = [];
   const campaignWrites = [];
@@ -481,26 +512,32 @@ function makeAbsorbDeps({ lastAttack = pendingFireHitOnCultist(), round = 1, sto
     deps: {
       findLastAttack: vi.fn(async () => lastAttack),
       getCombatContext: vi.fn(async () => ({ round })),
-      getRuntimeValue: vi.fn((key, prop) => (prop === 'tempHp' ? tempHp : (state[`${key}.${prop}`] ?? null))),
+      getRuntimeValue: vi.fn((key, prop) => state[`${key}.${prop}`] ?? null),
       setRuntimeValue: vi.fn(async (key, prop, value) => {
         if (key === 'campaign' && prop === 'lastAttack') campaignWrites.push(value);
         state[`${key}.${prop}`] = value;
       }),
       addEntry: vi.fn(async (c, e) => { logs.push(e); }),
-      // tempHpService replace-if-larger stand-in: never adds, keeps the larger.
-      setTempHp: vi.fn((name, amount) => { thpGrants.push({ name, amount }); return Math.max(Number(tempHp) || 0, amount); }),
+      // tempHpService replace-if-larger stand-in (MA-0275 owns the real
+      // service logic): never adds, keeps the larger, returns the standing
+      // total. Mock-bisect note: the resolver only reads activeBuffs through
+      // the store — the old tempHp getRuntimeValue branch was dead.
+      setTempHp: vi.fn((name, amount, campaign) => { thpGrants.push({ name, amount, campaign }); return Math.max(standingTempHp, amount); }),
     },
   };
 }
 
 describe('MA-0681 Elemental Absorption data-lock + gate truth tables', () => {
-  it('monsters.json elemental-cultist reactions[0] locks RAW, arms the gate', () => {
-    expect(ABSORPTION_ACTION.name).toBe('Elemental Absorption');
-    expect(ABSORPTION_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'damage_taken_elemental', effect: 'elemental_absorption', tempHp: 10 });
-    expect(ABSORPTION_ACTION.automation.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
-    expect(ABSORPTION_ACTION.uses).toBe(1);
-    expect(ABSORPTION_ACTION.maxUses).toBe(1);
-    expect(ABSORPTION_ACTION.usage).toBe('1/Day');
+  it('monsters.json elemental-cultist reactions[0] disk-verbatim RAW, arms the gate', () => {
+    expect(ABSORPTION_ACTION).toEqual({
+      name: 'Elemental Absorption',
+      trigger: 'The cultist takes Acid, Cold, Fire, Lightning, or Thunder damage.',
+      description: 'The cultist gives itself Resistance to that instance of damage and gains 10 <strong>Temporary Hit Points</strong>.',
+      usage: '1/Day',
+      uses: 1,
+      maxUses: 1,
+      automation: { type: 'reaction', trigger: 'damage_taken_elemental', effect: 'elemental_absorption', damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'], tempHp: 10 },
+    });
     // Uses-remaining arithmetic is the MA-0006 table's lane — not re-pinned here.
     expect(getGatedMonsterReaction(ABSORPTION_ACTION)?.effect).toBe('elemental_absorption');
   });
@@ -542,13 +579,13 @@ describe('MA-0681 Elemental Absorption data-lock + gate truth tables', () => {
 });
 
 describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP', () => {
-  it('press on a pending Fire hit: spends 1/Day, grants 10 THP replace-if-larger, arms resistance, stamps lastAttack absorbed, ability_use log', async () => {
+  it('press on a pending Fire hit: spends 1/Day, delegates THP grant to the replace-if-larger channel, arms resistance, stamps lastAttack absorbed, ability_use log', async () => {
     const { state, logs, campaignWrites, thpGrants, deps } = makeAbsorbDeps({ round: 5 });
     const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);
     expect(result.tempHp).toBe(10);
     expect(result.halved).toBe(11);
-    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10 }]);
+    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10, campaign: CAMPAIGN }]);
     expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ elemental_absorption: 1 });
     expect(state[`${CULTIST_681}._elemental_absorption_usedRound`]).toBe(5);
     const buffs = state[`${CULTIST_681}.activeBuffs`];
@@ -561,12 +598,13 @@ describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP'
     expect(spend.description).toMatch(/1\/Day · 0 left today/);
   });
 
-  it('THP replace-if-larger respects a larger standing buffer', async () => {
-    const { deps, thpGrants } = makeAbsorbDeps({ tempHp: 25 });
+  it('helper rides the injected setTempHp channel and surfaces the returned standing buffer (never adds)', async () => {
+    const { logs, deps, thpGrants } = makeAbsorbDeps({ standingTempHp: 25 });
     const result = await resolveMonsterElementalAbsorption({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, lastAttack: pendingFireHitOnCultist(), currentRound: 1, storedUses: {}, usedRound: 0, latchKey: '_elemental_absorption_usedRound', deps });
     expect(result.ok).toBe(true);
-    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10 }]);
+    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10, campaign: CAMPAIGN }]);
     expect(result.tempHp).toBe(25);
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/now 25 THP/);
   });
 
   it('refusals log elemental_absorption_refused zero-THP zero-spend (reacted / uses / type)', async () => {
@@ -590,16 +628,15 @@ describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP'
 // MA-0013 usage-less-row default seam — RELOCATED here from the ma0305
 // arch-hag helper lane per pass #517 rec / #518 carry (fabrication legs
 // live at the owner where the default is implemented: reactionMaxUses
-// MonsterCardHelpers.js:2226-2229 returns 1 when uses/maxUses are absent,
-// and counterspellGate :1553-1556 renders that default into the
-// '1/Day uses already spent' refusal). Appended at end-of-file so every
-// existing cross-file line citation into this lane stays byte-exact.
-// Authored-row ADMITS (limit 999, used < 999) are owned once by the
-// shared-gate limit-999 arm :330-334 (same reactionMaxUses limit) plus the
-// live counterspell press via resolveMonsterCounterspell :2672 →
-// counterspellGate in ma0300 helper :77-101 — never re-simulated per
-// monster (arch-hag/arcanaloth rows are gate-input twins: byte-identical
-// maxUses:999/effect:counterspell fields; the gate reads neither name).
+// MonsterCardHelpers.js returns 1 when uses/maxUses are absent, and
+// counterspellGate renders that default into the '1/Day uses already spent'
+// refusal). Authored-row ADMITS (limit 999, used < 999) are owned once by the
+// shared-gate limit-999 arm in the MA-0341 parryGate block (same
+// reactionMaxUses limit) plus the live counterspell press via
+// resolveMonsterCounterspell → counterspellGate driven end-to-end by the
+// ma0300 helper — never re-simulated per monster (arch-hag/arcanaloth rows
+// are gate-input twins: byte-identical maxUses:999/effect:counterspell
+// fields; the gate reads neither name).
 describe('MA-0013 usage-less-row seam — fabricated 1/Day cap (relocated from ma0305)', () => {
   it('usage-less counterspell row defaults limit 1 and refuses after one spend; owners At-Will rows carry honest 999 instead', () => {
     const usageless = { name: 'Generic Counterspell', automation: { type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' } };

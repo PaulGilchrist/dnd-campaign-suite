@@ -1,11 +1,16 @@
-// @maintained-by-ai 2026-10-18
-// MA-0260: Ancient White Dragon Freezing Burst sphere picker — CON DC 20,
-// canonical 4d6 Cold (data drift: save_effect previously said 17/5d6 and
-// omitted the Speed-0 clause). Confirms the authored row: canonical
-// save_effect text byte-carries "Speed is 0 until the end of the target's
-// next turn", arms parseSpeedZeroClause, and the picker grants speed_zero te
-// + activeCondition + rounds:2 clock + Speed 0 log on each failed save only;
-// successful saves take exact floor-half damage and grant no speed effect.
+// @maintained-by-ai 2026-11-28
+// MA-0260: Ancient White Dragon Freezing Burst canonical-data lane.
+// This file owns two legs and nothing else:
+//   1. Byte-pin of the authored Ancient row (data drift previously said
+//      DC 17 / 5d6 with no Speed-0 clause): CON DC 20, canonical 4d6 Cold,
+//      save_effect byte-carries "Speed is 0 until the end of the target's
+//      next turn", so parseSpeedZeroClause arms { effect: 'speed_zero' }
+//      and the key is a registered targetEffect.
+//   2. Successful-save inertness of the speed_zero branch: with the clause
+//      armed, a success pays exact floor-half damage and grants zero
+//      speed_zero artifacts — the only test covering the !success half of
+//      the modal's `!success && speedZeroClause` gate (the sibling
+//      speed-zero.test.jsx pins the failed-save grant + null-clause legs).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -107,6 +112,10 @@ function renderBurst() {
   );
 }
 
+function logEntries() {
+  return addEntry.mock.calls.map(c => c[1]);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
@@ -114,64 +123,31 @@ beforeEach(() => {
   expirations.current = [];
 });
 
-describe('MA-0260 Ancient White Freezing Burst picker speed-zero lane', () => {
-  it('failed NPC CON save: canonical row (4d6 Cold DC 20 + Speed-0 clause) arms speed_zero te + activeCondition + rounds:2 clock + Speed 0 log, full damage', async () => {
-    // Canonical data pin (MA-0260 owns these dice/save_effect — data drift
-    // previously said DC 17 / 5d6 with no Speed-0 clause; the picker below
-    // consumes this exact row, so a byte drift fails here too).
+describe('MA-0260 Ancient White Freezing Burst canonical-data lane', () => {
+  it('authored Ancient row: CON DC 20, 4d6 Cold (never 5d6), Speed-0 clause parses and is a registered effect', () => {
     expect(BURST.damage_dice_primary).toBe('4d6');
+    expect(BURST.damage_dice_primary).not.toMatch(/5d6/);
     expect(BURST.save_dc).toBe(20);
     expect(BURST.save_type).toBe('Constitution');
     expect(BURST.save_effect).toBe("Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Success: Half damage.");
-    expect(BURST.save_effect).not.toMatch(/5d6/);
     expect(parseSpeedZeroClause(BURST.save_effect)).toEqual({ effect: 'speed_zero' });
     expect(getEffectDefinition('speed_zero')).toBeTruthy();
-
-    // Thug con:+10 vs DC 20: nat-1 (11) fails, nat-20 (30) succeeds.
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
-    const { getByText } = renderBurst();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    const te = tes.find(t => t.effect === 'speed_zero' && t.target === 'Thug 1');
-    expect(te).toBeTruthy();
-    expect(te).toMatchObject({ source: 'Ancient White Dragon 1', duration: 'until_end_of_next_turn', actionName: 'Freezing Burst' });
-
-    expect(runtime.store['Thug 1.activeConditions']).toContain('speed_zero');
-    const meta = runtime.store['Thug 1.activeConditionMeta'];
-    expect(meta.speed_zero).toMatchObject({ dc: 20, ability: 'con', source: 'Ancient White Dragon 1' });
-
-    const clock = expirations.current.find(x => x.rounds === 2 && x.targetName === 'Thug 1');
-    expect(clock).toBeTruthy();
-    expect(clock.effects.some(e => e.type === 'remove_target_effect' && e.effectKey === 'speed_zero')).toBe(true);
-    expect(clock.effects.some(e => e.type === 'speed_zero')).toBe(true);
-
-    const speedLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'Speed 0');
-    expect(speedLog).toBeTruthy();
-    expect(speedLog.characterName).toBe('Thug 1');
-    expect(speedLog.description).toMatch(/Speed is 0 until the end of Thug 1's next turn/);
-
-    const dmgLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'damage' || e.finalDamage != null);
-    expect(dmgLog).toBeTruthy();
-    expect(dmgLog.finalDamage).toBe(7);
   });
 
-  it('successful NPC CON save takes exact floor-half damage and grants no speed effect', async () => {
+  it('successful NPC CON save with the clause armed takes exact floor-half damage and grants zero speed_zero artifacts', async () => {
     spyRandom([0.99, 0.99, 0.99, 0.99]);
     const { getByText } = renderBurst();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(1));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
 
-    expect((runtime.store['campaign.targetEffects'] || []).some(t => t.effect === 'speed_zero')).toBe(false);
-    expect(runtime.store['Thug 1.activeConditions']).toBeFalsy();
-    expect(expirations.current.some(x => x.effects?.some(e => e.effectKey === 'speed_zero' || e.type === 'speed_zero'))).toBe(false);
-    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.condition === 'Speed 0')).toBeFalsy();
+    // Positive leg first: the save/damage flow provably ran — success pays
+    // the floor-halved mocked 7 (floor(7/2) = 3), so the absence below is
+    // the !success gate, not a dead flow.
+    await waitFor(() => expect(logEntries().some(e => e.finalDamage === 3)).toBe(true));
 
-    const dmgLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'damage' || e.finalDamage != null);
-    expect(dmgLog).toBeTruthy();
-    expect(dmgLog.finalDamage).toBe(3);
+    expect((runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_zero')).toHaveLength(0);
+    expect(runtime.store['Thug 1.activeConditions'] || []).toHaveLength(0);
+    expect(expirations.current.filter(x => x.effects?.some(e => e.effectKey === 'speed_zero' || e.type === 'speed_zero'))).toHaveLength(0);
+    expect(logEntries().filter(e => e.condition === 'Speed 0')).toHaveLength(0);
   });
 });

@@ -1,30 +1,24 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Lane: the STANDALONE (no-hook) path of useAttackDamageResolution.js — the only
-// exported entry point here is resolveAttackDamageStandalone; every assertion is a
-// pure function call through the pipeline seam, no React render.
-// Canon ownership: normalizeAutoDamage full-shape/crit/registry/EE contracts live in
-// normalizeAutoDamage.test.js. EXCISION CENSUS (fix#54 zero-dup; ledger run2#283):
-// the former describe('normalizeAutoDamage') block at old :288-481 (11 its) was
-// deleted here — 7 its subsumed byte-exact by home full-shape/minimal/crit-matrix/
-// lookup/EE-null arms (2 of them, the self-admitted weak mock-0 EE pin and the
-// Greataxe registry pin, were strictly weaker than home and carried nothing out);
-// 4 unique arms migrated into home as 3 units: school-rides-without-attackType
-// (lookup arm), empty-payload-{}-defaults (own it), unarmed-name-derived across
-// empty-registry AND null-playerStats (own it.each). OA-true
-// transport to both gates is pinned by useAttackDamageResolution.opportunity-transport.test.js.
-// Owned here: byte-exact run-ctx defaults + overrides spread, the exact callable ctx
-// surface consumed by pipeline steps, no-op modal-setter contract, and the byte-exact
-// minimalCtx payload at the rollDamage seam (pass-through and default branches).
-// FOLD DISPOSITION (ledger run2#309, 🗑 old :168-285): DISCHARGED — the ctx-defaults
-// twin its (old :97/:120) and the proceedWithDamage twin its (old :169/:200/:233/:258)
-// were folded into the two it.each blocks below at the Test Quality reshape (f59d311cd,
-// 481→225). The two describes stay split per fix#220 honest-split: normalized-diff of
-// the it.each bodies shows they differ beyond parameters — different mock behavior
-// (inert run vs run invoking proceedWithDamage) pinning different seams (run-ctx
-// snapshot vs rollDamage payload); merging would branch assertions and blur attribution
-// (fix#230 standard). This turn hoists the per-case byte-identical mock-skeleton out
-// of the proceedWithDamage it.each body into its beforeEach. Census: nothing further
-// foldable — the full-shape expected/expectedContext tables are intentional byte-pins.
+// entry point exercised here is resolveAttackDamageStandalone (source:33-103);
+// every assertion is a pure function call through the pipeline seam, no React render.
+// Owned here (unique to this path, distinct from the hook twin at :360-457):
+//   • byte-exact run-ctx default + override spread (:62-99) and the exact callable
+//     ctx surface pipeline steps consume;
+//   • the literal `{ current: null }` resume arg (hook passes resumeRef instead);
+//   • the no-op modal-setter contract — deps are destructured as `_setModalState`
+//     (source:33) so consumers (CharSpells/CharReactions) may omit it entirely;
+//   • byte-exact minimalCtx at the rollDamage seam (:39-58), including the keys the
+//     STANDALONE path has and the hook twin (:379-394) omits: attackName, overridable
+//     attackerName (o.attackerName || attack.name), doubledRolls, playerStats,
+//     metamagicTwinTarget/metamagicHeighten.
+// Split rationale (two describes, no merge): the two it.each bodies differ beyond
+// parameters — inert pipeline.run vs a run() that invokes proceedWithDamage pin
+// different seams (run-ctx snapshot vs rollDamage payload); merging would branch
+// assertions and blur attribution.
+// Not owned here: normalizeAutoDamage full-shape/crit/registry/EE -> normalizeAutoDamage.test.js;
+// hook-seam ctx matrix + ...ctxOverrides trailing-spread precedence -> .ctxOverrides.test.js;
+// OA-true transport at both gates + hook-path parity -> .opportunity-transport.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock audit: the only collaborator reachable from resolveAttackDamageStandalone's
@@ -148,25 +142,41 @@ describe('resolveAttackDamageStandalone — pipeline seam', () => {
         expect(setPopupHtml).not.toHaveBeenCalled();
     });
 
-    it('modal-setter choices are absorbed silently — never forwarded to the deliberately-ignored setModalState dep', async () => {
+    it('modal-setter choices are absorbed silently — never forwarded to the deliberately-ignored setModalState dep, and safe when the dep is omitted', async () => {
         // The standalone entry destructures the dep as _setModalState (source:33):
         // consumers like CharSpells/CharReactions may omit it entirely, so forwarding
-        // a pipeline choice through these setters would TypeError. Pin the no-op
-        // contract: each choice lands nowhere observable and the injected setter stays cold.
-        const setModalState = vi.fn();
-        const attack = makeAttack();
+        // a pipeline choice through these setters would TypeError. Pin both halves of
+        // the no-op contract: an injected setter stays cold, and a call with the dep
+        // fully omitted still absorbs every choice without throwing or leaking into
+        // the other injected deps.
+        const MODAL_SETTERS = ['setDamageTypeChoice', 'setDivineFuryChoice', 'setAttackRiderModal',
+            'setAttackRiderManeuverPrompt', 'setSweepingAttackTargetModal', 'setSecondaryTargetModal'];
 
-        await resolveAttackDamageStandalone(attack, {}, {
+        const setModalState = vi.fn();
+        await resolveAttackDamageStandalone(makeAttack(), {}, {
             playerStats: makePlayerStats(), campaignName: CAMPAIGN,
             setPopupHtml, rollDamage, setModalState,
         });
 
         const ctx = buildPipelineForAction.mock.results[0].value.run.mock.calls[0][1];
-        for (const setter of ['setDamageTypeChoice', 'setDivineFuryChoice', 'setAttackRiderModal',
-            'setAttackRiderManeuverPrompt', 'setSweepingAttackTargetModal', 'setSecondaryTargetModal']) {
+        for (const setter of MODAL_SETTERS) {
             expect(() => ctx[setter]('choice')).not.toThrow();
         }
         expect(setModalState).not.toHaveBeenCalled();
+        expect(rollDamage).not.toHaveBeenCalled();
+        expect(setPopupHtml).not.toHaveBeenCalled();
+
+        // Omitted-dep consumer shape: choices must still land nowhere, never throw.
+        await expect(resolveAttackDamageStandalone(makeAttack(), {}, {
+            playerStats: makePlayerStats(), campaignName: CAMPAIGN,
+            setPopupHtml, rollDamage,
+        })).resolves.toBeUndefined();
+        const ctxWithoutDep = buildPipelineForAction.mock.results[0].value.run.mock.calls[1][1];
+        for (const setter of MODAL_SETTERS) {
+            expect(() => ctxWithoutDep[setter]('choice')).not.toThrow();
+        }
+        expect(rollDamage).not.toHaveBeenCalled();
+        expect(setPopupHtml).not.toHaveBeenCalled();
     });
 });
 

@@ -1,17 +1,16 @@
-// @maintained-by-ai 2026-10-18
-// Base lane for useCharActionsModalHandlers: the exact 27-key return contract
-// consumed by CharActionModals' destructure, plus the only three confirm routings
-// no family lane owns (verified by grep 2026-10-17): bulwarkOfForce,
-// zealousPresence, psychicWhispers. All other handler routings are owned by the
-// six routing-seam lanes: useCharActionsModalHandlers.{areaEffects,buffs,
-// combatSuperiority,healing,inspiration,oceanicGift}.test.js.
-// Dead-mock purge (#343/#344): bardicInspiration/reactionBonus/oceanicGift and
-// every other service mock is never invoked by these tests and is removed; only
-// modules whose exports the surviving tests observe are mocked, each carrying the
-// keys the live import graph destructures (handle destructured by
-// services/automation/index.js per #318 — runtime-probed by sibling lanes;
-// removing it fails import with "No handle export"). Everything else loads for
-// real — side-effect-free at import, verified by the sibling buffs lane.
+// @maintained-by-ai 2026-11-28
+// Base lane for useCharActionsModalHandlers (a plain closure factory — zero React
+// hooks, so it is called directly): the exact 27-key return contract consumed by
+// CharActionModals' destructure, plus the only three confirm routings no family
+// lane owns: bulwarkOfForce, zealousPresence, psychicWhispers. The other 24 keys
+// are each call-exercised in the six routing-seam lanes useCharActionsModalHandlers.
+// {areaEffects,buffs,combatSuperiority,healing,inspiration,oceanicGift}.test.js
+// (re-verified 2026-11-28). The integration lane useCharActionModals.integration
+// mocks useModalHandlers wholesale, so the REAL key contract exists nowhere else.
+// Dead-mock purge (#343/#344): only modules whose exports these tests observe are
+// mocked; each mock also carries the `handle` key the live import graph destructures
+// via services/automation/index.js (#318 — removing it fails import). Everything
+// else loads for real — side-effect-free at import (verified by the buffs lane).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
 
@@ -134,7 +133,7 @@ describe('useCharActionsModalHandlers', () => {
   });
 
   it.each(UNOWNED_ROUTES.map(route => ({ desc: `${route.name} confirm`, route })))(
-    '$desc: exact positional service passthrough, payload-only popup, modal cleared',
+    '$desc: exact positional passthrough from modalState; popup only on payload; modal cleared once',
     async ({ route }) => {
       const data = modalData(route);
       const { handlers, setPopupHtml, setModalState } = mount(openModal(route));

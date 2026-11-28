@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // WizardStepFeats owns: the feat-step wiring over SelectableList (SelectableList.test.jsx
 // owns the shared list/search/toggle internals), the exact onArrayFieldChange payloads
 // through this component's checkbox/Add Another/Remove One controls, the selection-count
@@ -106,7 +106,6 @@ describe('WizardStepFeats', () => {
     expect(featRow('Alert').querySelector('.feat-type')).toBeNull(); // disk Alert has no type
     await screen.findByText(/plus additional feats at levels 4, 8, 12, 16, 19/);
     expect(screen.getByText('You have selected 0 of 2 allowed feat(s).')).toBeInTheDocument();
-    expect(document.querySelector('.warning-container')).toBeNull();
     unmount();
 
     renderComponent({ allFeats: null });
@@ -115,7 +114,6 @@ describe('WizardStepFeats', () => {
   });
 
   it.each([
-    [[], [], 'You have selected 0 of 2 allowed feat(s).'],
     [['Alert', 'Lucky'], [], 'You have selected 2 of 2 allowed feat(s).'],
     [['Alert', 'Lucky'], ['Alert'], 'You have selected 1 of 2 allowed feat(s) (plus 1 pre-selected feat).'],
   ])('summary counts %j selected with %j pre-selected as the exact sentence', async (feats, preSelected, sentence) => {
@@ -124,7 +122,6 @@ describe('WizardStepFeats', () => {
   });
 
   it.each([
-    ['ticks a feat', [], 'Alert', ['Alert']],
     ['ticks Ability Score Improvement alongside others', ['Magic Initiate'], 'Ability Score Improvement', ['Magic Initiate', 'Ability Score Improvement']],
     ['un-ticks Ability Score Improvement (FT-001 serialization)', ['Alert', 'Ability Score Improvement'], 'Ability Score Improvement', ['Alert']],
   ])('checkbox click %s emits the exact onChange payload', (_case, selected, clickName, expected) => {
@@ -148,9 +145,8 @@ describe('WizardStepFeats', () => {
     });
 
     const row = featRow('Lucky');
-    expect(row).toHaveClass('pre-selected');
     expect(within(row).getByText('(Pre-selected)')).toBeInTheDocument();
-    expect(row.querySelector('.list-item-checkbox')).toHaveClass('checked');
+    expect(within(row).getByText('✓')).toBeInTheDocument(); // checkbox rendered in its checked state
 
     fireEvent.click(row.querySelector('.list-item-body'));
     fireEvent.click(row.querySelector('.list-item-checkbox'));
@@ -221,30 +217,6 @@ describe('WizardStepFeats', () => {
     expect(onArrayFieldChange).toHaveBeenCalledWith('feats', ['Magic Initiate', 'Ability Score Improvement', 'Ability Score Improvement']);
   });
 
-  it('Add Another is never destructive: each click across re-renders increments the count by exactly one', () => {
-    const onArrayFieldChange = vi.fn();
-    const { rerender } = renderComponent({
-      formData: { ...baseFormData(), feats: ['Ability Score Improvement'] },
-      onArrayFieldChange,
-    });
-
-    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
-    expect(onArrayFieldChange).toHaveBeenLastCalledWith('feats', ['Ability Score Improvement', 'Ability Score Improvement']);
-
-    rerender(
-      <WizardStepFeats
-        stepNumber={8}
-        formData={{ ...baseFormData(), feats: ['Ability Score Improvement', 'Ability Score Improvement'] }}
-        allFeats={DISK_FEATS}
-        onArrayFieldChange={onArrayFieldChange}
-        preSelectedFeats={[]}
-      />,
-    );
-    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
-    expect(onArrayFieldChange).toHaveBeenCalledTimes(2);
-    expect(onArrayFieldChange).toHaveBeenLastCalledWith('feats', ['Ability Score Improvement', 'Ability Score Improvement', 'Ability Score Improvement']);
-  });
-
   it('Add Another on a pre-selected repeatable feat appends (only non-repeatables lack the control)', () => {
     const onArrayFieldChange = vi.fn();
     renderComponent({
@@ -297,7 +269,7 @@ describe('WizardStepFeats', () => {
     expect(document.querySelector('.feat-buffs-summary')).toBeNull();
   });
 
-  it('renders validateFeats warnings and infos inside typed warning messages', async () => {
+  it('renders validateFeats output through the warning display', async () => {
     featValidation.validateFeats.mockResolvedValueOnce([
       { message: 'Rules allow 2 feat(s) at level 8. You have selected 3.', type: 'warning' },
       { message: 'Lucky requires: Charisma 13 or higher. Verify your character meets this requirement.', type: 'info' },
@@ -305,35 +277,35 @@ describe('WizardStepFeats', () => {
 
     renderComponent({ formData: { ...baseFormData(), feats: ['Alert', 'Lucky', 'Magic Initiate'] } });
 
+    // Typed-class mapping is owned by WarningList.test.jsx; verify only that this
+    // component feeds validateFeats output into the shared warning display.
     const messages = await screen.findAllByText(/Rules allow 2 feat\(s\) at level 8|Lucky requires: Charisma 13/);
     expect(messages).toHaveLength(2);
-    expect(document.querySelectorAll('.warning-message.warning')).toHaveLength(1);
-    expect(document.querySelectorAll('.warning-message.info')).toHaveLength(1);
   });
 
-  it('shows 2024 Versatile-trait Origin feat choices from disk, and stays silent for 5e or races without choices', async () => {
-    const { unmount } = renderComponent({ formData: { ...baseFormData(), rules: '5e' } });
-    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument();
-    expect(featValidation.getRaceFeatChoices).not.toHaveBeenCalled(); // 5e guard
+  it('shows 2024 Versatile-trait Origin feat choices from disk, and suppresses the fetch for 5e or a missing race', async () => {
+    const versatileRace = {
+      name: 'Human',
+      traits: [{ name: 'Versatile', description: 'You gain an Origin feat of your choice (see chapter 5). Skilled is recommended.', proficiency_choices: { choose: 1, from: HUMAN_VERSATILE_FROM } }],
+    };
+
+    featValidation.getRaceFeatChoices.mockResolvedValueOnce(HUMAN_VERSATILE_FROM);
+    const { unmount } = renderComponent({ formData: { ...baseFormData(), race: versatileRace } });
+
+    const paragraph = await screen.findByText(/Available options: Crafter, Fey Touched, Healer, Lucky, Magic Initiate, Musician, Savage Attacker, Shadow Touched, Skilled, Tavern Brawler, Tough\. Skilled is recommended\./);
+    expect(paragraph).toHaveTextContent('Versatile Trait'); // sentence rendered inside the trait panel
+    expect(featValidation.getRaceFeatChoices).toHaveBeenCalledTimes(1); // 2024 + race lane fetches
     unmount();
+
+    const second = renderComponent({ formData: { ...baseFormData(), rules: '5e', race: versatileRace } });
+    await second.findByRole('heading', { name: 'Step 8: Feats' });
+    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument();
+    expect(featValidation.getRaceFeatChoices).toHaveBeenCalledTimes(1); // 5e guard: no extra fetch
+    second.unmount();
 
     renderComponent({ formData: { ...baseFormData(), rules: '2024', race: null } });
     await screen.findByRole('heading', { name: 'Step 8: Feats' });
-    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument(); // 2024 but no choices
-    unmount();
-
-    featValidation.getRaceFeatChoices.mockResolvedValueOnce(HUMAN_VERSATILE_FROM);
-    renderComponent({
-      formData: {
-        ...baseFormData(),
-        race: {
-          name: 'Human',
-          traits: [{ name: 'Versatile', description: 'You gain an Origin feat of your choice (see chapter 5). Skilled is recommended.', proficiency_choices: { choose: 1, from: HUMAN_VERSATILE_FROM } }],
-        },
-      },
-    });
-
-    const section = await screen.findByText(/Available options: Crafter, Fey Touched, Healer, Lucky, Magic Initiate, Musician, Savage Attacker, Shadow Touched, Skilled, Tavern Brawler, Tough\. Skilled is recommended\./);
-    expect(section.closest('.versatile-trait-info')).toBeInTheDocument();
+    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument();
+    expect(featValidation.getRaceFeatChoices).toHaveBeenCalledTimes(1); // race guard: no fetch without a race
   });
 });

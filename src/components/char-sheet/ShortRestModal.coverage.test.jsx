@@ -1,15 +1,22 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Lane: Memorize Spell swap (CLA-226) internals only. Render/gating of the
+// section entry from automation buckets lives in ShortRestModal.test.jsx;
+// completion flow in ShortRestModal.completionFlow.test.jsx; Natural Recovery in
+// ShortRestModal.naturalRecovery.test.jsx. Nothing here re-derives rest math.
+// 2026-11-28 sweep: dropped 7 dead mocks (empirical bisect — this lane never
+// rolls, completes, opens the ally picker, or touches hit-dice math, so the
+// real modules load untouched); merged the two render-gate faces into one
+// test; armed-leg completion for the disabled-button test; Cancel disambiguated
+// via the section heading instead of a class-name closest().
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
 import { loadSpellData } from '../../services/ui/dataLoader.js';
 import { addEntry } from '../../services/ui/logService.js';
 
-// Lane: Memorize Spell swap (CLA-226) internals only. Render/gating of the
-// Memorize Spell section lives in ShortRestModal.test.jsx; completion flow in
-// ShortRestModal.completionFlow.test.jsx; Natural Recovery in
-// ShortRestModal.naturalRecovery.test.jsx. Nothing here re-derives rest math.
-
+// Only mocks this lane executes: fake runtime store (latch stamping/gating
+// behaves like production), spellbook fixture producer, log sink for
+// assertions. restRules/dice/classFeatures/etc. run REAL — never invoked here.
 const getRuntimeValueMock = vi.fn(() => null);
 const setRuntimeValueMock = vi.fn();
 const setRuntimeBatchMock = vi.fn();
@@ -21,48 +28,12 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeBatch: vi.fn((...args) => setRuntimeBatchMock(...args)),
 }));
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollDice: vi.fn((count, _die) => ({ total: count * 8, rolls: Array(count).fill(8) })),
-}));
-
-// REAL static-data producer for labels (restRules-constants.js passthrough); only the
-// lane's deterministic stand-ins remain mocked.
-vi.mock('../../services/rules/effects/restRules.js', async () => {
-  const constants = await import('../../services/rules/effects/restRules-constants.js');
-  return {
-    getHitDieSize: vi.fn(() => 8),
-    computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
-    getShortRestResourceLabels: vi.fn((playerStats) => constants.getShortRestResourceLabels(playerStats)),
-    applyShortRest: vi.fn(async () => ({})),
-  };
-});
-
-vi.mock('../../services/character/classFeatures.js', () => ({
-  getClassFeatures: vi.fn(() => ({})),
-}));
-
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  evaluateAutoExpression: vi.fn(() => 0),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve(null)),
-}));
-
-vi.mock('../../services/rules/combat/applyHealing.js', () => ({
-  applyHealingToTarget: vi.fn(() => null),
-}));
-
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpellData: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve({})),
-}));
-
-vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: () => <div>mock-creature-selection</div>,
 }));
 
 const mockCampaignName = 'test-campaign';
@@ -133,6 +104,11 @@ async function armSwap(removeName, addName) {
   await act(() => Promise.resolve());
 }
 
+// The modal footer also has a "Cancel" (close) button — scope to the section.
+function memorizeSection() {
+  return within(screen.getByRole('heading', { name: 'Memorize Spell' }).parentElement);
+}
+
 describe('ShortRestModal - Memorize Spell Swap (CLA-226)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -144,18 +120,38 @@ describe('ShortRestModal - Memorize Spell Swap (CLA-226)', () => {
     vi.mocked(loadSpellData).mockResolvedValue(SPELLBOOK);
   });
 
-  it('hides the Memorize Spell section entirely when the wizard has no prepared spells', () => {
-    renderWizard({ spellAbilities: { spells: [] } });
+  it('gates the section faces: hidden with no prepared spells, used-state when opened already latched', () => {
+    const { unmount } = renderWizard({ spellAbilities: { spells: [] } });
     expect(screen.queryByRole('button', { name: /Swap Prepared Spell/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Already used this rest/)).not.toBeInTheDocument();
+    unmount();
+
+    runtimeStore.set('memorizeSpellUsedSinceRest', true);
+    renderWizard();
+    expect(screen.queryByRole('button', { name: /Swap Prepared Spell/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
   });
 
-  it('opens swap mode from the swap button, with Swap disabled until both spells are picked', async () => {
+  it('opens swap mode from the swap button; Swap enables only once both spells are picked', async () => {
     renderWizard();
-    fireEvent.click(screen.getByRole('button', { name: /Swap Prepared Spell/ }));
+    await enterSwapMode();
     expect(screen.getByText(/Remove prepared spell:/)).toBeInTheDocument();
     expect(screen.getByText(/Add from spellbook:/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Swap Spell' })).toBeDisabled();
+
+    // Half-armed legs: either pick alone must not enable.
+    fireEvent.change(screen.getByText(/Remove prepared spell:/).nextElementSibling, { target: { value: 'Fireball' } });
+    await act(() => Promise.resolve());
+    expect(screen.getByRole('button', { name: 'Swap Spell' })).toBeDisabled();
+
+    fireEvent.change(screen.getByText(/Remove prepared spell:/).nextElementSibling, { target: { value: '' } });
+    fireEvent.change(screen.getByText(/Add from spellbook:/).nextElementSibling, { target: { value: 'Mage Armor' } });
+    await act(() => Promise.resolve());
+    expect(screen.getByRole('button', { name: 'Swap Spell' })).toBeDisabled();
+
+    fireEvent.change(screen.getByText(/Remove prepared spell:/).nextElementSibling, { target: { value: 'Fireball' } });
+    await act(() => Promise.resolve());
+    expect(screen.getByRole('button', { name: 'Swap Spell' })).toBeEnabled();
   });
 
   it('offers exactly: prepared lv1+ spells to remove, known unprepared Wizard-list lv1+ spells to add', async () => {
@@ -209,17 +205,10 @@ describe('ShortRestModal - Memorize Spell Swap (CLA-226)', () => {
     expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
   });
 
-  it('shows the used-this-rest state instead of the swap button when opened already latched', () => {
-    runtimeStore.set('memorizeSpellUsedSinceRest', true);
-    renderWizard();
-    expect(screen.queryByRole('button', { name: /Swap Prepared Spell/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
-  });
-
   it('exits swap mode on Cancel with zero runtime writes and clears prior selections', async () => {
     renderWizard();
     await armSwap('Fireball', 'Mage Armor');
-    fireEvent.click(within(screen.getByRole('button', { name: 'Swap Spell' }).closest('.short-rest-dice-row')).getByText('Cancel'));
+    fireEvent.click(memorizeSection().getByRole('button', { name: 'Cancel' }));
     await act(() => Promise.resolve());
 
     expect(screen.queryByText(/Remove prepared spell:/)).not.toBeInTheDocument();

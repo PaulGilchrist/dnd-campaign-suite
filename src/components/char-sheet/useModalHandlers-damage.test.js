@@ -1,4 +1,7 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Damage lane of useModalHandlers (lane split #357): divine fury / generic / modifier /
+// enhanced-unarmed choice-skip handlers + the no-pending gate table. Registry contract and
+// handleMasteryClose live in useModalHandlers.test.js; consumers' wiring is mocked there.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useModalHandlers from './useModalHandlers.js';
 
@@ -91,8 +94,14 @@ describe('useModalHandlers - damage type handlers', () => {
         });
     });
 
-    describe('handleDivineFuryDamageType', () => {
-        it('appends the bonus dice with lowercased type, records the used round, proceeds with combined damage', () => {
+    // Divine Fury and the generic once-per-turn handler share one merge shape: append
+    // 'bonusExpr [chosenType.toLowerCase()]', add totals/rolls, spend one runtime key.
+    // Divine Fury hardcodes its key; the generic handler spends pending.oncePerTurnKey.
+    describe('bonus-dice choice handlers (Divine Fury + generic)', () => {
+        it.each([
+            ['handleDivineFuryDamageType', 'divineFuryChoice', undefined, '_divineFuryUsedRound'],
+            ['handleGenericDamageTypeChoice', 'damageTypeChoice', '_DivineStrike_usedRound', '_DivineStrike_usedRound'],
+        ])('%s appends the bonus dice with lowercased type, records the used round on %s, then proceeds with combined damage', (handlerName, modalKey, oncePerTurnKey, expectedUsedKey) => {
             const pending = {
                 attack: { name: 'Fury of the Gods' },
                 formula: '2d6',
@@ -102,11 +111,12 @@ describe('useModalHandlers - damage type handlers', () => {
                 bonusExpr: '1d6',
                 bonusTotal: 3,
                 bonusRolls: [3],
+                ...(oncePerTurnKey ? { oncePerTurnKey } : {}),
             };
-            const deps = createDeps({ playerStats: { name: 'PaladinOne' }, pendingDamage: pending });
-            useModalHandlers(deps).handleDivineFuryDamageType('Thunder');
-            expect(setRuntimeValue).toHaveBeenCalledWith('PaladinOne', '_divineFuryUsedRound', 4, 'test-campaign');
-            expect(deps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: null });
+            const deps = createDeps({ pendingDamage: pending });
+            useModalHandlers(deps)[handlerName]('Thunder');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', expectedUsedKey, 4, 'test-campaign');
+            expect(deps.setModalState).toHaveBeenCalledWith({ [modalKey]: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith({
                 attack: pending.attack,
@@ -116,63 +126,8 @@ describe('useModalHandlers - damage type handlers', () => {
                 modifier: 1,
             });
         });
-    });
 
-    describe('handleDivineFurySkip', () => {
-        it('proceeds with the untouched original damage and never records a used round', () => {
-            const pending = {
-                attack: { name: 'Fury of the Gods' },
-                formula: '1d8+3',
-                total: 10,
-                rolls: [5, 5],
-                modifier: 3,
-                bonusExpr: '1d8',
-                bonusTotal: 4,
-                bonusRolls: [4],
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDivineFurySkip();
-            expect(deps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: null });
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '1d8+3',
-                total: 10,
-                rolls: [5, 5],
-                modifier: 3,
-            });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('handleGenericDamageTypeChoice', () => {
-        it('appends bonus dice and spends oncePerTurnKey on the current round', () => {
-            const pending = {
-                attack: { name: 'Divine Strike' },
-                formula: '1d8',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-                bonusExpr: '1d8',
-                bonusTotal: 4,
-                bonusRolls: [4],
-                oncePerTurnKey: '_DivineStrike_usedRound',
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleGenericDamageTypeChoice('Thunder');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_DivineStrike_usedRound', 4, 'test-campaign');
-            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '1d8 + 1d8 [thunder]',
-                total: 9,
-                rolls: [5, 4],
-                modifier: 0,
-            });
-        });
-
-        it('still applies combined damage but spends nothing when oncePerTurnKey is absent', () => {
+        it('generic choice still applies combined damage but spends nothing when oncePerTurnKey is absent', () => {
             const pending = {
                 attack: { name: 'Extra Damage' },
                 formula: '1d6',
@@ -197,126 +152,84 @@ describe('useModalHandlers - damage type handlers', () => {
         });
     });
 
-    describe('handleGenericDamageTypeSkip', () => {
-        it('proceeds with the untouched original damage and never records anything', () => {
+    describe('bonus-dice skip handlers (Divine Fury + generic)', () => {
+        it.each([
+            ['handleDivineFurySkip', 'divineFuryChoice', '1d8+3', [5, 5], 3],
+            ['handleGenericDamageTypeSkip', 'damageTypeChoice', '1d6', [5], 0],
+        ])('%s proceeds with the untouched original damage — never peeking the bonus fields — and records no used round', (handlerName, modalKey, formula, rolls, modifier) => {
             const pending = {
-                attack: { name: 'Extra Damage' },
-                formula: '1d6',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
+                attack: { name: 'Skipped Attack' },
+                formula,
+                total: rolls.reduce((a, b) => a + b, 0) + modifier,
+                rolls,
+                modifier,
+                bonusExpr: '1d8',
+                bonusTotal: 4,
+                bonusRolls: [4],
             };
             const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleGenericDamageTypeSkip();
-            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
+            useModalHandlers(deps)[handlerName]();
+            expect(deps.setModalState).toHaveBeenCalledWith({ [modalKey]: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith({
                 attack: pending.attack,
-                formula: '1d6',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
+                formula,
+                total: pending.total,
+                rolls,
+                modifier,
             });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
     describe('handleDamageTypeModifierChoice', () => {
-        it('rewrites only the first formula annotation, mutates attack.damageType, and spends the derived runtime key', () => {
-            const pending = {
+        // Guard-table pair (#1348): two pendings differing ONLY in _damageTypeModifier
+        // presence, fed the SAME multi-annotation formula, must produce DIFFERING outputs.
+        // The bracket rewrite is legal only alongside the modifier spend — absence means
+        // nothing was spent, so the displayed label stays byte-untouched (the pre-fix
+        // defect rewrote '[bludgeoning]' to the chosen type while spending nothing).
+        it('rewrites only the first annotation, lowercases attack.damageType, and spends the derived key ONLY when _damageTypeModifier is present', () => {
+            const formula = '1d12+3 [bludgeoning] + 3d6 [fire]';
+            const makePending = (modifier) => ({
                 attack: { name: 'Unarmed Strike', damageType: 'bludgeoning' },
-                formula: '1d12+3 [bludgeoning] + 3d6 [fire]',
+                formula,
                 total: 31,
                 rolls: [31],
                 modifier: 3,
-                _damageTypeModifier: { name: 'Empowered Strikes' },
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDamageTypeModifierChoice('Radiant');
-            expect(pending.attack.damageType).toBe('radiant');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Empowered_Strikes_usedRound', 4, 'test-campaign');
-            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
+                ...(modifier ? { _damageTypeModifier: modifier } : {}),
+            });
+
+            // Absent modifier: pre-fix defect rewrote the first bracket while nothing was spent.
+            const absent = makePending(null);
+            const depsAbsent = createDeps({ pendingDamage: absent });
+            useModalHandlers(depsAbsent).handleDamageTypeModifierChoice('Radiant');
+            expect(absent.attack.damageType).toBe('bludgeoning');
+            expect(depsAbsent.setPendingDamage).toHaveBeenCalledWith(null);
+            expect(depsAbsent.proceedWithDamage).toHaveBeenCalledWith({
+                attack: absent.attack,
+                formula,
+                total: 31,
+                rolls: [31],
+                modifier: 3,
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+
+            // Present modifier: first annotation only is rewritten, second stays, key spent.
+            const present = makePending({ name: 'Empowered Strikes' });
+            const depsPresent = createDeps({ pendingDamage: present });
+            useModalHandlers(depsPresent).handleDamageTypeModifierChoice('Radiant');
+            expect(present.attack.damageType).toBe('radiant');
+            expect(depsPresent.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
+            expect(depsPresent.setPendingDamage).toHaveBeenCalledWith(null);
+            expect(depsPresent.proceedWithDamage).toHaveBeenCalledWith({
+                attack: present.attack,
                 formula: '1d12+3 [radiant] + 3d6 [fire]',
                 total: 31,
                 rolls: [31],
                 modifier: 3,
             });
-        });
-
-        // Guard-table pair (#1348): two pendings differing ONLY in _damageTypeModifier
-        // presence must produce DIFFERING formula outputs. The bracket rewrite is legal
-        // only alongside the modifier spend (useModalHandlers.js:97-101). Identical
-        // bracketed input '1d8 [slashing]': absent-modifier keeps bytes untouched,
-        // present-modifier rewrites the first annotation to '[cold]'.
-        it('with a bracketed formula and NO _damageTypeModifier leaves formula bytes untouched (no spend, no label mutation)', () => {
-            const pending = {
-                attack: { name: 'Some Attack', damageType: 'slashing' },
-                formula: '1d8 [slashing]',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDamageTypeModifierChoice('cold');
-            expect(pending.attack.damageType).toBe('slashing');
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            // Pre-fix defect mutated this to '1d8 [cold]' while nothing was spent.
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '1d8 [slashing]',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-            });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('with the same bracketed formula and _damageTypeModifier present rewrites the first annotation to [cold] and spends', () => {
-            const pending = {
-                attack: { name: 'Some Attack', damageType: 'slashing' },
-                formula: '1d8 [slashing]',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-                _damageTypeModifier: { name: 'Empowered Strikes' },
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDamageTypeModifierChoice('cold');
-            expect(pending.attack.damageType).toBe('cold');
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Empowered_Strikes_usedRound', 4, 'test-campaign');
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '1d8 [cold]',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-            });
-        });
-
-        it('without _damageTypeModifier leaves damageType untouched and spends nothing', () => {
-            const pending = {
-                attack: { name: 'Some Attack', damageType: 'fire' },
-                formula: '2d6+3',
-                total: 9,
-                rolls: [6, 3],
-                modifier: 3,
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDamageTypeModifierChoice('cold');
-            expect(pending.attack.damageType).toBe('fire');
-            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '2d6+3',
-                total: 9,
-                rolls: [6, 3],
-                modifier: 3,
-            });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
@@ -343,26 +256,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 rolls: [5],
                 modifier: 0,
             });
-        });
-
-        it('without _damageTypeModifier proceeds without any runtime spend', () => {
-            const pending = {
-                attack: { name: 'Some Attack', damageType: 'fire' },
-                formula: '1d8',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-            };
-            const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleDamageTypeModifierSkip();
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
-                attack: pending.attack,
-                formula: '1d8',
-                total: 5,
-                rolls: [5],
-                modifier: 0,
-            });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
@@ -452,23 +345,23 @@ describe('useModalHandlers - damage type handlers', () => {
                 modifier: 'rider-ctx',
             });
         });
+    });
 
-        it('without _attackRider proceeds without any runtime spend', () => {
-            const pending = {
-                attack: { name: 'Unarmed Strike' },
-                formula: '1d4',
-                total: 5,
-                rolls: [5],
-                rider: 'no-rider',
-            };
+    describe('skip handlers with no spendable marker', () => {
+        it.each([
+            ['handleDamageTypeModifierSkip', { attack: { name: 'Some Attack', damageType: 'fire' }, formula: '1d8', total: 5, rolls: [5], modifier: 0 }],
+            ['handleEnhancedUnarmedSkip', { attack: { name: 'Unarmed Strike' }, formula: '1d4', total: 5, rolls: [5], rider: 'no-rider' }],
+        ])('%s proceeds with the untouched payload (rider passthrough as modifier) and spends nothing when the marker is absent', (handlerName, pending) => {
             const deps = createDeps({ pendingDamage: pending });
-            useModalHandlers(deps).handleEnhancedUnarmedSkip();
+            useModalHandlers(deps)[handlerName]();
+            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith({
                 attack: pending.attack,
-                formula: '1d4',
-                total: 5,
-                rolls: [5],
-                modifier: 'no-rider',
+                formula: pending.formula,
+                total: pending.total,
+                rolls: pending.rolls,
+                modifier: pending.rider ?? pending.modifier,
             });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });

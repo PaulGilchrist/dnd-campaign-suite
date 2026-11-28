@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // WM-003 Tactical Mastery CHOICE→RESUME COMPLETION lane at the useAttackDamageResolution
 // seam. The tacticalMaster step pauses the REAL pipeline at _pausedStep:'tacticalMaster'
 // AFTER the weapon damage has already landed (proceedToDamage is upstream: damage:applied
@@ -197,9 +197,8 @@ describe('useAttackDamageResolution — Tactical Mastery choice→resume complet
       },
     });
 
-    // Mastery chain NOT yet run downstream. A macrotask flush proves the prompt waits
-    // indefinitely — no auto-resolve escape hatch (no-game-timers 🔴).
-    expect(stash.ctx._masteryChainCompleted).toBeUndefined();
+    // A macrotask flush proves the prompt waits indefinitely — no auto-resolve
+    // escape hatch (no-game-timers 🔴).
     await tick();
     expect(resumeRef.current?._pausedStep).toBe('tacticalMaster');
     expect(stash.ctx._masteryChainCompleted).toBeUndefined();
@@ -238,8 +237,11 @@ describe('useAttackDamageResolution — Tactical Mastery choice→resume complet
     { scenario: 'damageTypeChoice pauses resume via setPendingDamage handlers, never this gate', _pausedStep: 'damageTypeChoice', _modalType: 'damageTypeChoice' },
     { scenario: 'an unknown step is default-deny', _pausedStep: 'mysteryStep', _modalType: 'tacticalMaster' },
   ])('denies resume and consumes nothing — $scenario', async ({ _pausedStep, _modalType }) => {
-    const stash = { pipeline: { resume: vi.fn() }, ctx: { _tacticalMasterPending: true } };
-    const resumeRef = { current: { _pausedStep, _modalType, _modalProps: {}, pipelineStash: stash } };
+    // Fixture trimmed to the fields the deny path reads (gate reads _pausedStep/
+    // _modalType then returns before touching the stash; the stash itself must exist
+    // to prove the deny is the step check, not the missing-stash guard).
+    const stash = { pipeline: { resume: vi.fn() }, ctx: {} };
+    const resumeRef = { current: { _pausedStep, _modalType, pipelineStash: stash } };
     const deps = makeDeps(resumeRef);
 
     await useAttackDamageResolution(deps).resumeAttackPipeline();
@@ -248,7 +250,7 @@ describe('useAttackDamageResolution — Tactical Mastery choice→resume complet
     expect(deps.rollDamage).not.toHaveBeenCalled();
     expect(deps.setTacticalMasterModal).not.toHaveBeenCalled();
     expect(deps.setModalState).not.toHaveBeenCalled();
-    // Pause intact — the chain waits indefinitely, latch unconsumed.
+    // Pause intact — the chain waits indefinitely.
     expect(resumeRef.current.pipelineStash).toBe(stash);
     expect(resumeRef.current._pausedStep).toBe(_pausedStep);
   });

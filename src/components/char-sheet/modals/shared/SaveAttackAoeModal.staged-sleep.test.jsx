@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0068: Adult Brass Dragon Sleep Breath picker behavior — sleepStaging
 // arms the SP-107 staging seams on a failed save (first fail = Incapacitated
 // staged, NOT Unconscious; zero damage; roll + condition-applied logs).
@@ -115,7 +115,16 @@ function renderSleepCone() {
   );
 }
 
+const loggedEntries = () => addEntry.mock.calls.map(c => c[1]);
+const saveRollLogs = () => loggedEntries().filter(e => e.rollType === 'save');
+const conditionLogs = () => loggedEntries().filter(e => e.type === 'condition' && e.action === 'applied');
+
 describe('MA-0068 Sleep Breath staged picker', () => {
+  // This lane OWNS the damageless 'Saved — takes no damage' prefix face
+  // (per fix#2058 pin-discipline: staged-petrify and staged-paralysis shed
+  // their re-pins to here) and the never-half-damage/never-null picker
+  // discipline. The (rolled … + … = … vs DC) equation suffix belongs to
+  // results-face-equation and is not re-pinned here.
   it('picker copy states the staged sleep ladder, never half-damage/null-damage, inert until Confirm', () => {
     renderSleepCone();
     expect(seenPicker.current.note).toContain('Incapacitated until the end of its next turn');
@@ -124,14 +133,13 @@ describe('MA-0068 Sleep Breath staged picker', () => {
     expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
     expect(seenPicker.current.note).not.toContain('null');
     // Caster excluded; advisory lane stages nothing before Confirm.
-    expect(seenPicker.current.targets).toHaveLength(1);
     expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']);
     expect(stageSleepTargets).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  it('failed NPC save stages Incapacitated via sleepService (CON +2 pinned, no concentration, 100 rounds) — no damage, no Unconscious grant', async () => {
+  it('failed NPC save stages Incapacitated once via sleepService (CON +2 pinned, no concentration, 100 rounds) — no damage, no Unconscious grant', async () => {
     const { getByText, container } = renderSleepCone();
     await waitFor(() => expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']));
     fireEvent.click(getByText('Confirm'));
@@ -140,47 +148,47 @@ describe('MA-0068 Sleep Breath staged picker', () => {
       'test-campaign', 'Adult Brass Dragon 1', ['Thug 1'], 18,
       { saveType: 'Constitution', concentrate: false, label: 'Sleep Breath', logLabel: 'Sleep Breath', unconsciousRounds: 100 },
     ));
-
+    expect(stageSleepTargets).toHaveBeenCalledTimes(1);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
 
-    const entries = addEntry.mock.calls.map(c => c[1]);
-    const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
-    expect(rollLog.saveResult).toBe('failure');
-    expect(rollLog.saveDc).toBe(18);
-    expect(rollLog.rolls).toEqual([2]);
-    expect(rollLog.bonus).toBe(2);
+    // Honest single roll log: nat 2 + constitution +2 = 4 < DC 18 fails.
+    const rollLogs = saveRollLogs();
+    expect(rollLogs).toHaveLength(1);
+    expect(rollLogs[0]).toMatchObject({ targetName: 'Thug 1', saveResult: 'failure', saveDc: 18, rolls: [2], bonus: 2 });
 
-    const conditionLogs = entries.filter(e => e.type === 'condition');
-    expect(conditionLogs).toHaveLength(1);
-    expect(conditionLogs[0].condition).toBe('Incapacitated');
-    expect(conditionLogs[0].characterName).toBe('Thug 1');
-    expect(conditionLogs[0].description).toContain('until the end of its next turn');
-    expect(conditionLogs[0].description).toContain('repeats the save');
-    expect(conditionLogs[0].description).toContain('Unconscious for 10 minutes');
-    // Staged lane never grants Unconscious directly (MA-0063 one-shot superseded).
-    expect(conditionLogs.some(e => e.condition === 'Unconscious')).toBe(false);
+    // One condition grant only (the MA-0063 one-shot spray is superseded):
+    // Incapacitated with the repeat-save ladder prose, 100 rounds → 10 min.
+    const conds = conditionLogs();
+    expect(conds).toHaveLength(1);
+    expect(conds[0]).toMatchObject({ condition: 'Incapacitated', characterName: 'Thug 1' });
+    expect(conds[0].description).toContain('until the end of its next turn');
+    expect(conds[0].description).toContain('repeats the save');
+    expect(conds[0].description).toContain('Unconscious for 10 minutes');
+    // Staged lane never grants Unconscious directly (turn-END owns escalation).
+    expect(conds.some(e => e.condition === 'Unconscious')).toBe(false);
 
     // Result row reads the staged ladder — no null-damage text.
     await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save'));
     expect(container.textContent).not.toContain('null null');
   });
 
-  it('successful save logs the roll but stages nothing', async () => {
-    randomSpy.mockReturnValue(0.99);
+  it('successful save logs one roll, prints the Saved row without leak of staged-fail copy, and stages nothing', async () => {
+    randomSpy.mockReturnValue(0.99); // nat 20 + CON +2 = 22 ≥ DC 18
     const { getByText, container } = renderSleepCone();
-    await waitFor(() => expect(seenPicker.current.targets.length).toBe(1));
+    await waitFor(() => expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']));
     fireEvent.click(getByText('Confirm'));
 
+    // Positive legs first: exactly one honest success roll log, and this
+    // lane's owned damageless 'Saved — takes no damage' prefix face.
+    await waitFor(() => expect(saveRollLogs()).toHaveLength(1));
+    expect(saveRollLogs()[0]).toMatchObject({ targetName: 'Thug 1', saveResult: 'success', saveDc: 18, rolls: [20], bonus: 2 });
     await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage'));
+
+    // Then the absences: nothing staged, no grants, no damage, and the
+    // Saved row never carries the staged-fail ladder copy.
     expect(stageSleepTargets).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-
-    const entries = addEntry.mock.calls.map(c => c[1]);
-    const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
-    expect(rollLog.saveResult).toBe('success');
-    expect(rollLog.saveDc).toBe(18);
-    expect(rollLog.rolls).toEqual([20]);
-    expect(rollLog.bonus).toBe(2);
-    expect(entries.some(e => e.type === 'condition')).toBe(false);
+    expect(conditionLogs()).toHaveLength(0);
+    expect(container.textContent).not.toContain('Incapacitated until the end of its next turn');
   });
 });

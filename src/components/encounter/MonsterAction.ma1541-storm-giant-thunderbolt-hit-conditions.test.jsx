@@ -1,6 +1,4 @@
-// @maintained-by-ai 2026-10-18: 2026-10-18 — trimmed 6→2 tests: tuple-miss disk
-// fingerprint BY NAME (folded: key placement, core legs + prose anchor,
-// decoy noise, clause arm, inert siblings) + sole press identity only.
+// @maintained-by-ai 2026-11-28
 // MA-1541: Storm Giant "Thunderbolt" — prose carries "Hit: 22 (2d12 + 9)
 // Lightning damage, and the target has the Blinded and Deafened conditions until
 // the start of the giant's next turn" but the row shipped WITHOUT hit_conditions,
@@ -10,21 +8,23 @@
 // conditions + attacker-next-turn expiry clock). One-field DATA fix:
 // hit_conditions:["blinded","deafened"] after damage_type_primary (MA-1534
 // Boulder byte-shape twin, MA-1116 lineage). Storm-giant Thunderbolt is ABSENT
-// from handlePlainDamage.hitClause.test.js HIT_CLAUSE_ROWS (:224-282, honest
-// tuple-read 2026-10-18 — thunder-adjacent twins cloud-giant Thundercloud :245
-// and djinni Storm Bolt :257 are different rows), so this file is its sole
-// lane: tuple-miss deltas only — key placement, prose anchor + range (no table
-// field for either), decoy noise fields, clause arm on the disk row, inert
-// siblings — plus the sole MonsterAction press identity ("+14" chip).
-// Pruned with owners (verified by grep 2026-10-18):
-//   generic clause shapes / null arms / full-lane grant / miss flows →
-//     handlePlainDamage.hitClause.test.js (buildHitConditionClause generic
-//     :183-214 + describe.each HIT_CLAUSE_ROWS :284)
+// from handlePlainDamage.hitClause.test.js "monsters.json hit-clause catalogue"
+// (thunder-adjacent twins cloud-giant Thundercloud and djinni Storm Bolt are
+// different rows), so this file is its sole lane: verbatim full-row disk
+// fingerprint (subsumes core legs, prose anchor, range, and the
+// no-save/escape/effect decoy absence), key placement, clause arm on the disk
+// row, inert siblings — plus the sole MonsterAction press identity ("+14" chip).
+// Pruned with owners (verified by describe-block reference 2026-11-28):
+//   generic clause shapes / no-rider null arms / full-lane grant / miss flows /
+//   size gate → handlePlainDamage.hitClause.test.js ("monsters.json hit-clause
+//   catalogue", "rows without a hit rider never arm the lane", "hit-clause miss
+//   flows (generic)", "hit-clause size gate")
 //   chip suppression semantics (attackRowMissingToHit) →
 //     MonsterAction.ma0286-slam-suppression.test.jsx,
 //     MonsterAction.ma1071-pincer-staff-dc0-gate.test.jsx
-//   storm-giant Spellcasting row → MonsterCardModal.ma1591 / ma0611 MA-1543 lock
-//   storm-giant Lightning Storm cylinder row → MonsterCardModal.thunderclap-sphere.test.jsx:201
+//   storm-giant Spellcasting row → MonsterCardModal.ma0611 / ma1591 MA-1543 lock
+//   storm-giant Lightning Storm cylinder row →
+//     MonsterCardModal.thunderclap-sphere.test.jsx
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -38,29 +38,26 @@ const STORM_SWORD = SG.actions.find((a) => a.name === 'Storm Sword');
 const MULTI = SG.actions.find((a) => a.name === 'Multiattack');
 
 describe('MA-1541 storm-giant Thunderbolt — tuple-miss disk fingerprint + press identity', () => {
-  it('disk row: hit_conditions ["blinded","deafened"] after damage_type_primary (last key), core legs + prose anchor byte-unchanged, no save/escape/effect noise, clause arms BOTH conditions, siblings inert', () => {
-    expect(THUNDERBOLT.hit_conditions).toEqual(['blinded', 'deafened']);
+  it('disk row: verbatim full-row fingerprint with hit_conditions ["blinded","deafened"] last after damage_type_primary, no save/escape/effect decoys, clause arms BOTH conditions, siblings inert', () => {
+    expect(THUNDERBOLT).toEqual({
+      name: 'Thunderbolt',
+      description:
+        "Ranged Attack Roll: +14, range 500 ft. Hit: 22 (2d12 + 9) Lightning damage, and the target has the Blinded and Deafened conditions until the start of the giant's next turn.",
+      attack_bonus: 14,
+      range: '500 ft.',
+      damage_dice_primary: '2d12 + 9',
+      damage_type_primary: 'Lightning',
+      hit_conditions: ['blinded', 'deafened'],
+    });
+
+    // Key placement (toEqual cannot see order): the fix slot-locks after
+    // damage_type_primary as the final key (MA-1534/MA-1116 byte shape).
     const keys = Object.keys(THUNDERBOLT);
     expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
     expect(keys[keys.length - 1]).toBe('hit_conditions');
 
-    // Core legs + prose anchor (range and description have NO hitClause tuple field).
-    expect(THUNDERBOLT.attack_bonus).toBe(14);
-    expect(THUNDERBOLT.range).toBe('500 ft.');
-    expect(THUNDERBOLT.damage_dice_primary).toBe('2d12 + 9');
-    expect(THUNDERBOLT.damage_type_primary).toBe('Lightning');
-    expect(THUNDERBOLT.description).toBe(
-      "Ranged Attack Roll: +14, range 500 ft. Hit: 22 (2d12 + 9) Lightning damage, and the target has the Blinded and Deafened conditions until the start of the giant's next turn."
-    );
-
-    // Decoy noise: no save lane, no escape clock, no target effect authored.
-    expect(THUNDERBOLT.save_dc).toBeUndefined();
-    expect(THUNDERBOLT.save_type).toBeUndefined();
-    expect(THUNDERBOLT.save_effect).toBeUndefined();
-    expect(THUNDERBOLT.escape_dc).toBeUndefined();
-    expect(THUNDERBOLT.hit_target_effect).toBeUndefined();
-
-    // Sole buildHitConditionClause run on this row (tuple never reaches it).
+    // Sole buildHitConditionClause run on this row (tuple never reaches it):
+    // both conditions arm, no escape clock, no target effect.
     expect(buildHitConditionClause(THUNDERBOLT)).toEqual({
       conditions: ['blinded', 'deafened'],
       escapeDc: null,
@@ -68,14 +65,15 @@ describe('MA-1541 storm-giant Thunderbolt — tuple-miss disk fingerprint + pres
       targetEffect: null,
     });
 
-    // Siblings stay inert.
+    // The one-field fix landed on Thunderbolt only — attack siblings stay
+    // inert. (The generic no-rider null guard is owned by
+    // handlePlainDamage.hitClause.test.js "rows without a hit rider never
+    // arm the lane".)
     expect(MULTI.hit_conditions).toBeUndefined();
-    expect(buildHitConditionClause(MULTI)).toBeNull();
     expect(STORM_SWORD.hit_conditions).toBeUndefined();
-    expect(buildHitConditionClause(STORM_SWORD)).toBeNull();
   });
 
-  it('press identity: exactly one live "+14" chip, click dispatches Thunderbolt attack with the disk row', () => {
+  it('press identity: exactly one live "+14" chip, click dispatches Thunderbolt attack with the disk row by reference', () => {
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -93,6 +91,7 @@ describe('MA-1541 storm-giant Thunderbolt — tuple-miss disk fingerprint + pres
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+14']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Thunderbolt', 14, expect.objectContaining({ name: 'Thunderbolt' }));
+    expect(onAttack).toHaveBeenCalledWith('Thunderbolt', 14, THUNDERBOLT);
+    expect(onAttack.mock.calls[0][2]).toBe(THUNDERBOLT);
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -96,6 +96,11 @@ const brutalStrike = (...options) => ({
     automation: { options },
 });
 
+// First-listed decoy: the resolver must match on optionName, not position —
+// without this, an `options[0]`-instead-of-`find` mutant survives every
+// single-option row.
+const DECOY = { name: 'Decoy First Option', effect: 'unknown_effect' };
+
 describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
     beforeEach(() => {
         vi.resetAllMocks();
@@ -106,7 +111,7 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
         const { api, deps } = Harness({ resumeRef });
 
         await api.handleAttackRiderOptionSelect('Extra Damage', {
-            maneuver: brutalStrike({ name: 'Extra Damage', effect: 'extra_damage' }),
+            maneuver: brutalStrike(DECOY, { name: 'Extra Damage', effect: 'extra_damage' }),
             targetName: TARGET,
             description: 'Test description',
         });
@@ -158,35 +163,37 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
             option: { name: 'Slow', effect: 'speed_reduction', value: 'half_speed' },
             expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: 'half_speed', duration: 'until_start_of_next_turn' },
             expectedDescription: "Test description Goblin's speed reduced. Selected: Slow.",
+            expectError: true,
         },
-    ])('immediate effect $branch', async ({ option, expectedEffect, expectedDescription }) => {
+    ])('immediate effect $branch', async ({ option, expectedEffect, expectedDescription, expectError }) => {
         const preExisting = { target: 'Orc', source: 'SomeoneElse', effect: 'sanctuary' };
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         getRuntimeValue.mockImplementation((key, prop) => (prop === 'targetEffects' ? [preExisting] : undefined));
         const { api, deps } = Harness();
 
         await api.handleAttackRiderOptionSelect(option.name, {
-            maneuver: brutalStrike(option),
+            maneuver: brutalStrike(DECOY, option),
             targetName: TARGET,
             description: 'Test description',
         });
 
         // Byte-exact round-trip: stored effects preserved, new effect appended last.
         expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [preExisting, expectedEffect], CAMPAIGN);
+        // The log sentence is pinned verbatim here, so write-site → log wiring
+        // (fix#167: any data-driven distance must appear in the audit trail)
+        // is covered by this exact-match alone — no tautological re-derivation
+        // from the row's own literals.
         expect(deps.setPopupHtml).toHaveBeenCalledWith({
             type: 'automation_info',
             name: 'Brutal Strike',
             description: expectedDescription,
         });
-        // fix#158 coupling idiom: whenever the stored value carries a number,
-        // the log MUST report that same number — write site is single source.
-        const storedFeet = String(expectedEffect.value ?? '').match(/(\d+)/)?.[1];
-        if (storedFeet) {
-            expect(expectedDescription).toContain(`${storedFeet} feet`);
-            expect(errorSpy).not.toHaveBeenCalled();
-        } else if (expectedEffect.effect === 'speed_reduction') {
-            expect(expectedDescription).not.toMatch(/\d+ feet/);
+        // Numeric rows must stay silent; the no-parseable-distance row must
+        // raise the loud alarm alongside its general wording (no fabrication).
+        if (expectError) {
             expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('no numeric distance'));
+        } else {
+            expect(errorSpy).not.toHaveBeenCalled();
         }
         errorSpy.mockRestore();
     });

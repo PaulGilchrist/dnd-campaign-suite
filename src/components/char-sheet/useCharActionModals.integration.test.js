@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useCharActionModals from './useCharActionModals.js';
@@ -98,8 +98,10 @@ describe('useCharActionModals — integration', () => {
     useModalHandlers.mockReturnValue(mhResult);
   });
 
-  it('returns exactly the 32 public keys consumers rely on (and never leaks internal args)', () => {
-    const { result } = renderHook(() => useCharActionModals(makeArgs()));
+  it('exposes exactly the 32 public keys consumers rely on, each by same-instance identity', () => {
+    const args = makeArgs();
+    const { result } = renderHook(() => useCharActionModals(args));
+
     // The exact-key set also pins the absence of internal args
     // (setPopupHtml, rollDamage, rollAttack, setTacticalMasterModal, resumeRef).
     expect(Object.keys(result.current).sort()).toEqual([
@@ -136,12 +138,12 @@ describe('useCharActionModals — integration', () => {
       'setModalState',
       'setPendingDamage',
     ]);
-  });
 
-  it('re-exposes every pass-through output by same-instance identity', () => {
-    const args = makeArgs();
-    const { result } = renderHook(() => useCharActionModals(args));
-
+    // Identity delegation for the pass-through keys: a wrapper/copy or a key
+    // bound to the wrong fixture passes the key-set check but fails here.
+    // Not restated here (owned by other lanes): combat-superiority quartet
+    // identity (additional.test.js); modalState merge/clear semantics
+    // (modalState.test.js).
     const expectedIdentity = {
       // caller args handed back untouched
       buildCtx: args.buildCtx,
@@ -163,44 +165,36 @@ describe('useCharActionModals — integration', () => {
     for (const [key, ref] of Object.entries(expectedIdentity)) {
       expect(result.current[key], key).toBe(ref);
     }
-    // Not restated here (owned by other lanes): combat-superiority quartet
-    // identity + positional args (additional.test.js); modalState merge/clear
-    // semantics (modalState.test.js).
   });
 
-  describe.each([
-    ['when mapName is null', null],
-    ['when a map is selected', 'test-map'],
-  ])('%s', (_label, mapName) => {
-    it('dispatches byte-exact args to useAttackDamageResolution', () => {
-      const args = { ...makeArgs(), mapName };
-      const { result } = renderHook(() => useCharActionModals(args));
+  it('dispatches exact args to useAttackDamageResolution (non-null mapName distinguishes a dropped/overridden seam)', () => {
+    const args = { ...makeArgs(), mapName: 'test-map' };
+    const { result } = renderHook(() => useCharActionModals(args));
 
-      const [adrArg] = useAttackDamageResolution.mock.calls[0];
-      // resumeRef is an internal pipeline ref (useState/useRef-owned); its
-      // behavior is pinned by useAttackDamageResolution's own resume tests.
-      const { resumeRef, ...rest } = adrArg;
-      // sharpen (#245): pin the ref CONTAINER shape — a bare function or
-      // dropped seam instead of { current } must fail here, not just nullish.
-      expect('current' in resumeRef).toBe(true);
-      expect(rest).toEqual({
-        playerStats: args.playerStats,
-        campaignName: args.campaignName,
-        mapName,
-        popupHtml: args.popupHtml,
-        setPopupHtml: args.setPopupHtml,
-        rollDamage: args.rollDamage,
-        buildCtx: args.buildCtx,
-        buildCtxSync: args.buildCtxSync,
-        setModalState: result.current.setModalState,
-        modalState: result.current.modalState,
-        setPendingDamage: syncedStore.setter,
-        setTacticalMasterModal: args.setTacticalMasterModal,
-      });
+    const [adrArg] = useAttackDamageResolution.mock.calls[0];
+    // resumeRef is an internal pipeline ref (useState/useRef-owned); its
+    // behavior is pinned by useAttackDamageResolution's own resume tests.
+    const { resumeRef, ...rest } = adrArg;
+    // pin the ref CONTAINER shape — a bare function or dropped seam instead
+    // of { current } must fail here, not just nullish.
+    expect('current' in resumeRef).toBe(true);
+    expect(rest).toEqual({
+      playerStats: args.playerStats,
+      campaignName: args.campaignName,
+      mapName: 'test-map',
+      popupHtml: args.popupHtml,
+      setPopupHtml: args.setPopupHtml,
+      rollDamage: args.rollDamage,
+      buildCtx: args.buildCtx,
+      buildCtxSync: args.buildCtxSync,
+      setModalState: result.current.setModalState,
+      modalState: result.current.modalState,
+      setPendingDamage: syncedStore.setter,
+      setTacticalMasterModal: args.setTacticalMasterModal,
     });
   });
 
-  it('dispatches byte-exact args to useModalHandlers, wiring proceedWithDamage from useAttackDamageResolution', () => {
+  it('dispatches exact args to useModalHandlers, wiring proceedWithDamage from useAttackDamageResolution', () => {
     const args = makeArgs();
     const { result } = renderHook(() => useCharActionModals(args));
 

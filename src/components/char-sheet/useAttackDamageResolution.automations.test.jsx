@@ -1,12 +1,24 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
+// Hook-seam lane: ONE positive dispatch leg per rider trigger-bucket that
+// buildPipelineForAction mounts from playerStats.automation (melee_weapon_hit,
+// first_hit_while_raging, weapon_attack_hit, attack_rider sticky,
+// natural_20_attack_roll, passives 'hit' rider) plus the real-colossus
+// featureRider mount (the featureDamage dispatcher lane drives fake modules
+// only) and the real-pipeline divineFury pause credited to this file by
+// .pausedStates.test.js. Gate internals are step-lane CANON, never re-driven:
+// oncePerTurn same-round skip / upgraded-suppress / modal zero-stamp ->
+// attackRollDamageSteps-automationBonuses; round re-arm -> attackRollBonuses-
+// lunarForm (sole storedRound!==round falsifier); n20 extraDamageType shapes
+// -> attackRollDamageSteps-natural20-celestial; celestial buffless/zero guards
+// -> attackRollBonuses-cla048-celestial-rider; brutal-strike consume bytes ->
+// attackRollBonuses-brutalStrike; Colossus HP gate/latch/key bytes ->
+// steps/features/colossusSlayer. Sibling hook lanes own their triggers:
+// automationDamage (monk/GWM/Frenzy), advancedAutomations (cantrip riders),
+// ctxOverrides, optionSelect, standalone. Only true externals are mocked —
+// diceRoller runs REAL.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
-// Hook-seam lane: generic damage_bonus / attack_rider trigger dispatch through
-// the REAL buildPipelineForAction. Sibling lanes own their triggers:
-// automationDamage (monk/GWM/Frenzy), advancedAutomations (cantrip riders),
-// pausedStates (applyPauseState with a faked pipeline), classFeatures, feats,
-// ctxOverrides. Only true externals are mocked — diceRoller runs REAL.
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
@@ -76,18 +88,17 @@ const statsWith = (actions, passives = []) => ({
 // Buff list that marks the character as raging (rage damage marker).
 const RAGING_BUFFS = [{ damageBonusExpression: '2' }];
 
-function UseAttackDamageResolution(stats, popupHtml = null) {
+function UseAttackDamageResolution(stats) {
     const rollDamage = vi.fn();
     const setModalState = vi.fn();
-    const setPopupHtml = vi.fn();
     const setPendingDamage = vi.fn();
     const resumeRef = { current: null };
     const hook = useAttackDamageResolution({
         playerStats: stats,
         campaignName: CAMPAIGN,
         mapName: null,
-        popupHtml,
-        setPopupHtml,
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
         rollDamage,
         buildCtx: undefined,
         buildCtxSync: vi.fn(() => Promise.resolve({ targetName: 'Goblin' })),
@@ -95,7 +106,7 @@ function UseAttackDamageResolution(stats, popupHtml = null) {
         setPendingDamage,
         resumeRef,
     });
-    return { hook, rollDamage, setModalState, setPopupHtml, setPendingDamage, resumeRef };
+    return { hook, rollDamage, setModalState, setPendingDamage, resumeRef };
 }
 
 // Drain microtasks so proceedWithDamage's buildCtxSync().then() lands.
@@ -143,47 +154,35 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
     });
 
     describe('divine fury (first_hit_while_raging)', () => {
-        const furyAction = (damageType) => ({
+        const furyAction = {
             name: 'Divine Fury', type: 'damage_bonus', trigger: 'first_hit_while_raging',
-            damageExpression: '2d6', damageType, oncePerTurn: true,
-        });
+            damageExpression: '2d6', damageType: 'fire', oncePerTurn: true,
+        };
 
-        it.each([
-            {
-                label: 'rolls inline and stamps _divineFuryUsedRound while raging',
-                damageType: 'fire', usedRound: null,
-                formula: '1d8+3 [slashing] + 2d6 [fire]', total: 23, rolls: [8, 6, 6], stamped: true,
-            },
-            {
-                label: 'skips and leaves the latch untouched when already used this round',
-                damageType: 'fire', usedRound: 1,
-                formula: '1d8+3 [slashing]', total: 11, rolls: [8], stamped: false,
-            },
-        ])('$label', async ({ damageType, usedRound, formula, total, rolls, stamped }) => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === '_divineFuryUsedRound') return usedRound;
-                if (key === 'activeBuffs') return RAGING_BUFFS;
-                return null;
-            });
-            const { hook, rollDamage } = UseAttackDamageResolution(statsWith([furyAction(damageType)]));
+        it('rolls inline while raging and stamps the campaign-keyed once-per-round latch', async () => {
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === 'activeBuffs' ? RAGING_BUFFS : null);
+            const { hook, rollDamage } = UseAttackDamageResolution(statsWith([furyAction]));
 
             await hook.resolveAttackDamage(baseAttack, baseCtx);
             await flush();
 
             expect(rollDamage).toHaveBeenCalledTimes(1);
-            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total, rolls }));
+            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+                formula: '1d8+3 [slashing] + 2d6 [fire]',
+                total: 23,
+                rolls: [8, 6, 6],
+            }));
             expect(latchWrites('_divineFuryUsedRound')).toEqual(
-                stamped ? [[PLAYER, '_divineFuryUsedRound', 1, CAMPAIGN]] : []
+                [[PLAYER, '_divineFuryUsedRound', 1, CAMPAIGN]]
             );
         });
 
         it('"fire or cold" pauses the real pipeline: opens divineFuryChoice, stashes pendingDamage, damage stalls unrolled and unlatched', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return RAGING_BUFFS;
-                return null;
-            });
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === 'activeBuffs' ? RAGING_BUFFS : null);
             const { hook, rollDamage, setModalState, setPendingDamage, resumeRef } = UseAttackDamageResolution(
-                statsWith([furyAction('fire or cold')]),
+                statsWith([{ ...furyAction, damageType: 'fire or cold' }]),
             );
 
             await hook.resolveAttackDamage(baseAttack, baseCtx);
@@ -205,66 +204,27 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
         });
     });
 
-    describe('weapon riders (weaponHitBonuses)', () => {
-        const divineStrike = {
-            name: 'Divine Strike', type: 'damage_bonus', trigger: 'weapon_attack_hit',
-            damageExpression: '1d8', damageType: 'Radiant', oncePerTurn: true,
-        };
+    it('weapon_attack_hit rider mounts from actions and stamps its round latch', async () => {
+        const { hook, rollDamage } = UseAttackDamageResolution(statsWith([
+            { name: 'Divine Strike', type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '1d8', damageType: 'Radiant', oncePerTurn: true },
+        ]));
 
-        it.each([
-            {
-                label: 'applies once and stamps _Divine_Strike_usedRound',
-                actions: [divineStrike], usedRound: null, round: 1,
-                formula: '1d8+3 [slashing] + 1d8 [radiant]', total: 19, stamped: 1,
-            },
-            {
-                label: 'skips when spent this round, latch untouched',
-                actions: [divineStrike], usedRound: 1, round: 1,
-                formula: '1d8+3 [slashing]', total: 11, stamped: false,
-            },
-            {
-                label: 're-arms when the round advances, stamps the new round',
-                actions: [divineStrike], usedRound: 1, round: 2,
-                formula: '1d8+3 [slashing] + 1d8 [radiant]', total: 19, stamped: 2,
-            },
-            {
-                label: 'upgraded rider replaces the base — only 3d8 lands',
-                actions: [
-                    divineStrike,
-                    { name: 'Paladin 17', type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '3d8', damageType: 'Radiant', upgrades: 'Divine Strike' },
-                ],
-                usedRound: null, round: 1,
-                formula: '1d8+3 [slashing] + 3d8 [radiant]', total: 35, stamped: false,
-            },
-        ])('$label', async ({ actions, usedRound, round, formula, total, stamped }) => {
-            getCurrentCombatRound.mockReturnValue(round);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === '_Divine_Strike_usedRound') return usedRound;
-                return null;
-            });
-            const { hook, rollDamage } = UseAttackDamageResolution(statsWith(actions));
+        await hook.resolveAttackDamage(baseAttack, baseCtx);
+        await flush();
 
-            await hook.resolveAttackDamage(baseAttack, baseCtx);
-            await flush();
-
-            expect(rollDamage).toHaveBeenCalledTimes(1);
-            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total }));
-            expect(latchWrites('_Divine_Strike_usedRound')).toEqual(
-                stamped ? [[PLAYER, '_Divine_Strike_usedRound', stamped, CAMPAIGN]] : []
-            );
-            // Absence of the base 1d8 only meaningful when a rider branch ran at all
-            // (positive legs pinned above): proves upgrades-subtraction, not a dead path.
-            if (formula.includes('3d8')) {
-                expect(formula).not.toContain(' + 1d8 [radiant]');
-            }
-        });
+        expect(rollDamage).toHaveBeenCalledTimes(1);
+        expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+            formula: '1d8+3 [slashing] + 1d8 [radiant]',
+            total: 19,
+        }));
+        expect(latchWrites('_Divine_Strike_usedRound')).toEqual(
+            [[PLAYER, '_Divine_Strike_usedRound', 1, CAMPAIGN]]
+        );
     });
 
     it('brutal strike rider lands while _brutalStrikeActive is latched, then both latches clear', async () => {
-        getRuntimeValue.mockImplementation((_name, key) => {
-            if (key === '_brutalStrikeActive') return true;
-            return null;
-        });
+        getRuntimeValue.mockImplementation((_name, key) =>
+            key === '_brutalStrikeActive' ? true : null);
         const { hook, rollDamage } = UseAttackDamageResolution(statsWith([
             { name: 'Brutal Strike', type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '1d6', damageType: 'Radiant' },
         ]));
@@ -272,6 +232,7 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
         await hook.resolveAttackDamage(baseAttack, baseCtx);
         await flush();
 
+        expect(rollDamage).toHaveBeenCalledTimes(1);
         expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
             formula: '1d8+3 [slashing] + 1d6 [radiant]',
             total: 17,
@@ -281,107 +242,63 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
         expect(latchWrites('_brutalStrikeEffects')).toEqual([[PLAYER, '_brutalStrikeEffects', null, CAMPAIGN]]);
     });
 
-    describe('natural 20 riders (Overwhelming Strike)', () => {
-        const n20Action = (extra) => ({
-            name: 'Overwhelming Strike', type: 'damage_bonus', trigger: 'natural_20_attack_roll', ...extra,
-        });
+    it('natural_20 rider mounts and appends the dice bonus with the authored force type', async () => {
+        const { hook, rollDamage } = UseAttackDamageResolution(statsWith([
+            {
+                name: 'Overwhelming Strike', type: 'damage_bonus', trigger: 'natural_20_attack_roll',
+                extraDamageExpression: '2d10', extraDamageType: 'force',
+            },
+        ]));
 
-        // #1035 fix: extraDamageType is consumed at the append site — pre-fix the
-        // label was the dead '[Overwhelming Strike]' name byte for every shape.
-        // Legs are mutually distinguishable (#1348): [force] vs [slashing] labels,
-        // dice vs flat expr.
-        it.each([
-            {
-                label: 'dice expression rolls and appends with the authored force type',
-                action: n20Action({ extraDamageExpression: '2d10', extraDamageType: 'force' }),
-                formula: '1d8+3 [slashing] + 2d10 [force]', total: 31, rolls: [8, 10, 10],
-            },
-            {
-                label: 'increased_ability_score resolves to the flat STR bonus, no roll, force type',
-                action: n20Action({ extraDamageExpression: 'increased_ability_score', extraDamageType: 'force', abilityIncreased: 'Strength' }),
-                formula: '1d8+3 [slashing] + 3 [force]', total: 14, rolls: [8],
-            },
-            {
-                label: 'same_as_attack mirrors the Longsword slashing type onto the flat bonus',
-                action: n20Action({ extraDamageExpression: 'increased_ability_score', extraDamageType: 'same_as_attack', abilityIncreased: 'Strength' }),
-                formula: '1d8+3 [slashing] + 3 [slashing]', total: 14, rolls: [8],
-            },
-            {
-                label: 'missing extraDamageType contributes zero extra (ctx bytes intact)',
-                action: n20Action({ extraDamageExpression: '2d10' }),
-                formula: '1d8+3 [slashing]', total: 11, rolls: [8],
-            },
-        ])('$label on a natural 20', async ({ action, formula, total, rolls }) => {
-            const { hook, rollDamage } = UseAttackDamageResolution(statsWith([action]));
+        await hook.resolveAttackDamage(baseAttack, { ...baseCtx, isNatural20: true });
+        await flush();
 
-            await hook.resolveAttackDamage(baseAttack, { ...baseCtx, isNatural20: true });
-            await flush();
-
-            expect(rollDamage).toHaveBeenCalledTimes(1);
-            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total, rolls }));
-        });
+        expect(rollDamage).toHaveBeenCalledTimes(1);
+        expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+            formula: '1d8+3 [slashing] + 2d10 [force]',
+            total: 31,
+            rolls: [8, 10, 10],
+        }));
     });
 
-    describe('celestial transformation rider (celestialRevelation)', () => {
-        const heavenlyWings = {
-            name: 'Heavenly Wings', type: 'attack_rider', trigger: 'hit',
-            damageExpression: '1d6', damageType: 'radiant', oncePerTurn: true,
-        };
+    it('celestial passives rider mounts from the buff name and stamps its own round latch', async () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
+        const { hook, rollDamage } = UseAttackDamageResolution(statsWith([], [
+            { name: 'Heavenly Wings', type: 'attack_rider', trigger: 'hit', damageExpression: '1d6', damageType: 'radiant', oncePerTurn: true },
+        ]));
 
-        it.each([
-            {
-                label: 'buff active: rider lands and stamps its own round latch',
-                buffs: [{ name: 'Heavenly Wings' }],
-                formula: '1d8+3 [slashing] + 1d6 [radiant]', total: 17, stamped: true,
-            },
-            {
-                label: 'buff inactive: formula stays pure base weapon damage',
-                buffs: [],
-                formula: '1d8+3 [slashing]', total: 11, stamped: false,
-            },
-        ])('$label', async ({ buffs, formula, total, stamped }) => {
-            getActiveBuffs.mockReturnValue(buffs);
-            const { hook, rollDamage } = UseAttackDamageResolution(statsWith([], [heavenlyWings]));
+        await hook.resolveAttackDamage(baseAttack, baseCtx);
+        await flush();
 
-            await hook.resolveAttackDamage(baseAttack, baseCtx);
-            await flush();
-
-            expect(rollDamage).toHaveBeenCalledTimes(1);
-            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total }));
-            expect(latchWrites('_Heavenly_Wings_usedRound')).toEqual(
-                stamped ? [[PLAYER, '_Heavenly_Wings_usedRound', 1, CAMPAIGN]] : []
-            );
-        });
+        expect(rollDamage).toHaveBeenCalledTimes(1);
+        expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+            formula: '1d8+3 [slashing] + 1d6 [radiant]',
+            total: 17,
+        }));
+        expect(latchWrites('_Heavenly_Wings_usedRound')).toEqual(
+            [[PLAYER, '_Heavenly_Wings_usedRound', 1, CAMPAIGN]]
+        );
     });
 
-    describe("Colossus Slayer (Hunter's Prey feature module)", () => {
-        it.each([
-            {
-                label: 'target below max HP: adds 1d8 and stamps the used-round side effect',
-                prey: 'Colossus Slayer', target: { name: 'Goblin', currentHp: 5, maxHp: 15 },
-                formula: '1d8+3 [slashing] + 1d8 [extra]', total: 19, stamped: true,
-            },
-            {
-                label: 'target at full HP: base damage only, latch untouched',
-                prey: 'Colossus Slayer', target: { name: 'Goblin', currentHp: 15, maxHp: 15 },
-                formula: '1d8+3 [slashing]', total: 11, stamped: false,
-            },
-        ])('$label', async ({ prey, target, formula, total, stamped }) => {
-            getRuntimeValue.mockImplementation((_name, key) =>
-                key === "_Hunter's_Prey_choice" ? prey : null);
-            getCombatContext.mockReturnValue(Promise.resolve({ creatures: [] }));
-            getTargetFromAttacker.mockReturnValue(target);
-            const { hook, rollDamage } = UseAttackDamageResolution(basePlayerStats);
+    it('real Colossus Slayer feature module dispatches through the mounted pipeline: adds 1d8 and stamps the used-round latch', async () => {
+        getRuntimeValue.mockImplementation((_name, key) =>
+            key === "_Hunter's_Prey_choice" ? 'Colossus Slayer' : null);
+        getCombatContext.mockReturnValue(Promise.resolve({ creatures: [] }));
+        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp: 5, maxHp: 15 });
+        const { hook, rollDamage } = UseAttackDamageResolution(basePlayerStats);
 
-            await hook.resolveAttackDamage(baseAttack, baseCtx);
-            await flush();
+        await hook.resolveAttackDamage(baseAttack, baseCtx);
+        await flush();
 
-            expect(rollDamage).toHaveBeenCalledTimes(1);
-            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total, rolls: stamped ? [8, 8] : [8] }));
-            expect(latchWrites('_Hunters_Prey_Colossus_UsedRound')).toEqual(
-                stamped ? [[PLAYER, '_Hunters_Prey_Colossus_UsedRound', 1, CAMPAIGN]] : []
-            );
-        });
+        expect(rollDamage).toHaveBeenCalledTimes(1);
+        expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+            formula: '1d8+3 [slashing] + 1d8 [extra]',
+            total: 19,
+            rolls: [8, 8],
+        }));
+        expect(latchWrites('_Hunters_Prey_Colossus_UsedRound')).toEqual(
+            [[PLAYER, '_Hunters_Prey_Colossus_UsedRound', 1, CAMPAIGN]]
+        );
     });
 
     describe('proceedWithDamage logging contract', () => {

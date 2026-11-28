@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-1212/1217/1220: zoneOnly picker CONFIRM through the rapport_spores lane.
 // Rapport-specific semantics pinned here (zone fundamentals live in lair-zone
 // #217, save-less zero-roll guard in lair-darkness #215): the ONLY engine
@@ -8,8 +8,12 @@
 // null, duration until_end_of_zone); caster tracking `_rapport_spores_<caster>`
 // carries duration '1 hour' + affectedNames; log is honest ("no save",
 // "Duration 1 hour — GM-enforced"). NO save prompt, NO rolls, NO damage.
-// Sovereign/sprout rows are disk byte-twins of adult (identical zone object)
-// — run as one parameterized twin lane to prove caster-name derivation.
+// Sovereign/sprout rows are disk byte-twins of adult (byte-locked by
+// MonsterAction.ma1212-rapport-spores-zone-chip.test.jsx), so ONE twin lane
+// runs confirm: it covers the adult test cannot — a caster ABSENT from the
+// mocked board (exclusion no-ops, all 3 granted) with a different name
+// feeding source + tracking-key derivation. Disk row shape and zoneTe
+// derivation are NOT re-pinned here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -111,10 +115,9 @@ beforeEach(() => {
 });
 
 const ADULT = { index: 'myconid-adult', actionIdx: 2, caster: 'Myconid Adult 1' };
-const TWINS = [
-  { index: 'myconid-sovereign', actionIdx: 4, caster: 'Myconid Sovereign 1' },
-  { index: 'myconid-sprout', actionIdx: 1, caster: 'Myconid Sprout 1' },
-];
+// One twin stands for both (disk byte-twins, identical confirm path); sovereign
+// carries a distinct caster name for the source/tracking-key derivation pin.
+const TWIN = { index: 'myconid-sovereign', actionIdx: 4, caster: 'Myconid Sovereign 1' };
 
 describe('MA-1212 rapport_spores zoneOnly confirm: te grant, zero rolls, zero damage', () => {
   it('adult caster is the only exemption — confirm grants dc-null te to every selected creature, writes 1-hour tracking + honest "no save" log, zero prompts/rolls/damage', async () => {
@@ -148,27 +151,25 @@ describe('MA-1212 rapport_spores zoneOnly confirm: te grant, zero rolls, zero da
     expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  // MA-1217/MA-1220: sovereign + sprout are disk byte-twins of adult (identical
-  // zone object). Twin lane: caster is off the mocked board so nothing is
-  // excluded (all 3 granted); source and tracking key derive from caster name.
-  for (const twin of TWINS) {
-    it(`${twin.caster} confirm: all 3 selectable, te/tracking derive from caster name, zero rolls/damage`, async () => {
-      const { getByText } = renderRapportZone(rapportAction(twin), twin.caster);
-      await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
-      fireEvent.click(getByText('Confirm'));
-      const trackingKey = `${twin.caster}._rapport_spores_${twin.caster.replace(/\s+/g, '_')}`;
-      await waitFor(() => expect(runtime.store[trackingKey]).toBeTruthy());
-      const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
-      expect(tes.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-      expect(tes.every(t => t.source === twin.caster && (t.dc ?? null) === null && t.radiusFt === 30 && t.duration === 'until_end_of_zone')).toBe(true);
-      const tracking = runtime.store[trackingKey];
-      expect(tracking).toMatchObject({ saveDc: null, damage: null, radiusFt: 30, duration: '1 hour' });
-      expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-      expect(armedLog().description).toMatch(/no save/);
-      expect(armedLog().description).toMatch(/GM-enforced/);
-      expect(sendSavePrompt).not.toHaveBeenCalled();
-      expect(rollExpression).not.toHaveBeenCalled();
-      expect(applyDamageToTarget).not.toHaveBeenCalled();
-    });
-  }
+  // MA-1217/MA-1220 twin lane: sovereign's caster name is absent from the
+  // mocked board, so excludeNames is a no-op (all 3 selectable) and a NEW
+  // name drives te source + `_rapport_spores_<caster>` tracking key.
+  it(`${TWIN.caster} confirm: caster off-board excludes nothing (all 3 granted), te/tracking derive from caster name, zero prompts/rolls/damage`, async () => {
+    const { getByText } = renderRapportZone(rapportAction(TWIN), TWIN.caster);
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
+    fireEvent.click(getByText('Confirm'));
+    const trackingKey = `${TWIN.caster}._rapport_spores_${TWIN.caster.replace(/\s+/g, '_')}`;
+    await waitFor(() => expect(runtime.store[trackingKey]).toBeTruthy());
+    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
+    expect(tes.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+    expect(tes.every(t => t.source === TWIN.caster && (t.dc ?? null) === null && t.radiusFt === 30 && t.duration === 'until_end_of_zone')).toBe(true);
+    const tracking = runtime.store[trackingKey];
+    expect(tracking).toMatchObject({ saveDc: null, damage: null, radiusFt: 30, duration: '1 hour' });
+    expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+    expect(armedLog().description).toMatch(/no save/);
+    expect(armedLog().description).toMatch(/Duration 1 hour — GM-enforced/);
+    expect(sendSavePrompt).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+  });
 });

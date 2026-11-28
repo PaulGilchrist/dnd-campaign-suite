@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0995: Hobgoblin Warlord "Javelin" — target-effect-ONLY hit lane. The row's
 // OWN Hit clause carries the Speed-decrease rider ("Hit: 11 (2d6 + 4) Piercing
 // damage, and the target's Speed decreases by 10 feet until the start of the
@@ -7,18 +7,25 @@
 // hit_target_effect / hit_condition_roll only). Fix = decoy dropped +
 // hit_target_effect:"speed_reduction" authored at the §215 MA-0542/MA-0733
 // byte-slot (after range, before damage_dice_primary). This lane owns the
-// by-name disk fingerprint + gate order + chip dispatch identity.
-// Owners (verified, NOT re-derived here):
+// by-name disk fingerprint, the javelin slot-lock, and the te-only chip
+// dispatch identity (census-disjoint siblings: Ocean Spear "+2" chip →
+// ma1147, Longbow "+9" chip → ma1680).
+// Owners (verified 2026-11-28 by describe-block, NOT re-derived here):
 // - numerics + clause shape + live grant: handlePlainDamage.hitClause.test.js
-//   HIT_CLAUSE_ROWS:262 ['hobgoblin-warlord','Javelin',6,'2d6 + 4','Piercing',
-//   [],null,'speed_reduction'] + loop :289-301 (pins buildHitConditionClause
-//   te-only clause; te-only arm generic shape :193-199).
+//   describe('monsters.json hit-clause catalogue') HIT_CLAUSE_ROWS row
+//   ['hobgoblin-warlord','Javelin',6,'2d6 + 4','Piercing',[],null,
+//   'speed_reduction'] + describe.each '%s — %s hit-clause lane' lane-shape
+//   pins (buildHitConditionClause te-only clause).
 // - registry te (label/group/fields/defaults.value 10 = RAW −10 ft):
-//   targetEffectDefinitions.test.js:296-302 (MA-0995 whitelist pin); consumer
-//   te.value||10 default: conditionEffectsCompute.test.js:155-158 (MA-0995).
-// - javelin "before damage_dice_primary" byte twin: ma1680 :47-59 slot-lock
-//   (rec #487's ":58-63" twin-block retired; refresh #336S-p3 — ma1680 header :25 concurs).
-// - attackRowMissingToHit truth table: MA-0286 census :89.
+//   targetEffectDefinitions.test.js describe('TARGET_EFFECT_DEFINITIONS
+//   golden census (#820)') speed_reduction row; consumer te.value||10
+//   default: conditionEffectsCompute.test.js describe('computeConditionEffects
+//   — registry te census (bare te, exact diff)') speed_reduction fold.
+// - javelin byte-slot: owned HERE (test 1 slot-lock). ma1680 header defers:
+//   "each twin pins its OWN slot by name" — its old ":58-63"/":47-59"
+//   javelin twin-block restatements are retired.
+// - attackRowMissingToHit truth table: MonsterAction.ma0286-slam-suppression
+//   .test.jsx describe('MA-0286 attackRowMissingToHit truth table').
 // Duration stays attacker-anchored until_start_of_next_turn via
 // applyHitClauseTargetEffect — no invented clock (§37).
 import { render, fireEvent } from '@testing-library/react';

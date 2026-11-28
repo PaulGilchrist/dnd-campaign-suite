@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TargetWithCheckboxesPopup from './TargetWithCheckboxesPopup.jsx';
@@ -7,13 +7,15 @@ import TargetWithCheckboxesPopup from './TargetWithCheckboxesPopup.jsx';
 // checkbox selection state machine (✓ single-target marker, per-target
 // loadTargetData sync/async/reject handling, selection reset on target
 // switch), checkbox multi-select toggle semantics, the two-gate confirm
-// (target AND ≥1 selection), the 'Cast {title}' label default, and the exact
-// { targetName, selections } payload mapping cb.selectionData. Base surface
-// inherited from TargetPopupBase (Escape→onSkip, 'Spell' name fallback,
-// subtitle composition, the 'Cancel' fallback base re-supplies at
-// TargetPopupBase.jsx:7) is not multiplied here — strongest pins live in
-// MultiTargetCountPopup.test.jsx (skip once each) and MagicMissileTargetPopup.test.jsx
-// ('Spell' full-line), pending a dedicated TargetPopupBase spec.
+// (target AND ≥1 selection), the child's 'Cast {title}' fallback (:53), and
+// the exact { targetName, selections } payload mapping cb.selectionData.
+// Base surface inherited from TargetPopupBase is pinned at its owner,
+// TargetPopupBase.test.jsx (spell-name line + subtitle truth table in its
+// 'subtitle derivation' block; default confirm/cancel wiring in 'action
+// buttons and content slots' — including cancel click → onSkip exactly once,
+// so the child's bare onSkip passthrough is not re-multiplied here). The
+// former MultiTargetCountPopup.test.jsx cites were stale: that file does not
+// exist (fix#291 era re-point, 2026-11-28).
 
 const mockSpell = { name: 'Dispel Magic', level: 3 };
 const mockCreatureTargets = ['Goblin', 'Skeleton', 'Orc'];
@@ -37,7 +39,7 @@ function makeProps(overrides = {}) {
     defaultLevel: 3,
     description: 'Choose effects to remove',
     confirmLabel: 'Cast',
-    cancelLabel: 'Nope', // distinct from the 'Cancel' default
+    cancelLabel: 'Nope', // distinct from the base's 'Cancel' default
     loadTargetData: mockLoadTargetData,
     ...overrides,
   };
@@ -52,23 +54,25 @@ describe('TargetWithCheckboxesPopup', () => {
     const { rerender } = render(<TargetWithCheckboxesPopup {...makeProps()} />);
 
     expect(screen.getByRole('heading', { name: 'Remove Effects' })).toBeInTheDocument();
-    // Spell brief pinned as a full line; spell.name ≠ title so attribution is unambiguous.
-    expect(screen.getByText('Dispel Magic').closest('p').textContent.replace(/\s+/g, ' ').trim())
-      .toBe('Dispel Magic \u2014 Level 3 Abjuration');
+    // spell prop reaches the base name line; the byte-exact joined line
+    // ('Dispel Magic — Level 3 Abjuration') is the base's own derivation,
+    // pinned branch-by-branch in TargetPopupBase.test.jsx 'subtitle
+    // derivation' — not re-pinned here.
+    expect(screen.getByText('Dispel Magic')).toBeInTheDocument();
     expect(screen.getByText('Choose effects to remove')).toBeInTheDocument();
     expect(screen.getByText('Target:')).toBeInTheDocument();
     expect(screen.getByText('Goblin')).toBeInTheDocument();
     expect(screen.getByText('Skeleton')).toBeInTheDocument();
     expect(screen.getByText('Orc')).toBeInTheDocument();
-    expect(screen.queryAllByText(/✓/)).toHaveLength(0);
+    expect(screen.queryAllByText(/✓/)).toHaveLength(0); // marker appears only on selection
     expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Nope' })).toBeInTheDocument();
 
-    // This popup's own fallback expression `Cast ${title}` (base would render
-    // 'Confirm', so this is attributable to the child). The 'Cancel' default
-    // is unattributable from here — child :54 `cancelLabel || 'Cancel'` and
-    // base TargetPopupBase.jsx:7 both re-supply the same literal — pinned
-    // directly at its owner, TargetPopupBase.test.jsx:198, not here (fix#291).
+    // This popup's OWN fallback expression `Cast ${title}` (child :53; the
+    // base's 'Confirm' default is pinned at TargetPopupBase.test.jsx 'action
+    // buttons'). Clicking the cancel button is pure base passthrough, likewise
+    // pinned there once — only the child's cancelLabel forwarding is asserted
+    // here (the 'Nope' button above).
     rerender(<TargetWithCheckboxesPopup {...makeProps({ confirmLabel: undefined })} />);
     expect(screen.getByRole('button', { name: 'Cast Remove Effects' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nope' })).toBeInTheDocument(); // cancelLabel still forwarded
@@ -157,33 +161,30 @@ describe('TargetWithCheckboxesPopup', () => {
     expect(screen.queryByText('✓ Hex')).not.toBeInTheDocument();
   });
 
-  it('renders synced, async, and rejected loads — empty results show the default no-items copy', async () => {
+  it('renders synced, async, and rejected loads — empty results show noItemsMessage override or default copy', async () => {
     mockLoadTargetData.mockImplementation((name) => {
       if (name === 'Goblin') return undefined; // sync empty
       if (name === 'Skeleton') return Promise.resolve([effect('s1', 'Hex')]);
       return Promise.reject(new Error('load failed')); // Orc
     });
-    render(<TargetWithCheckboxesPopup {...makeProps()} />);
+    const { rerender } = render(<TargetWithCheckboxesPopup {...makeProps()} />);
     const cast = screen.getByRole('button', { name: 'Cast' });
 
     fireEvent.click(screen.getByText('Goblin'));
-    expect(screen.getByText('No applicable effects found on this target')).toBeInTheDocument();
+    expect(screen.getByText('No applicable effects found on this target')).toBeInTheDocument(); // default copy
 
     fireEvent.click(screen.getByText('Skeleton'));
     await waitFor(() => expect(screen.getByText('Remove Hex')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText('Orc'));
+    fireEvent.click(screen.getByText('Orc')); // rejected load falls back to empty
     await waitFor(() => expect(screen.getByText('No applicable effects found on this target')).toBeInTheDocument());
     expect(screen.queryByText('Remove Hex')).not.toBeInTheDocument();
     expect(cast).toBeDisabled(); // nothing confirmable across any load path
-  });
 
-  it('Cancel button fires onSkip exactly once', () => {
-    // Escape→onSkip is TargetPopupBase surface, pinned with count semantics
-    // in MultiTargetCountPopup.test.jsx — not duplicated here.
-    render(<TargetWithCheckboxesPopup {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Nope' }));
-    expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    expect(mockOnConfirm).not.toHaveBeenCalled();
+    // child :107 `noItemsMessage || default` — the override branch, still on
+    // the Orc empty list, without disturbing the default pin above.
+    rerender(<TargetWithCheckboxesPopup {...makeProps({ noItemsMessage: 'Nothing to strip here' })} />);
+    expect(screen.getByText('Nothing to strip here')).toBeInTheDocument();
+    expect(screen.queryByText('No applicable effects found on this target')).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0063 Sand Cloud picker — the damageless save+zone COMPOSITE seam. This
 // lane owns the asymmetric adjudication other lanes cannot pin together: one
 // mixed confirm where the Blinded condition lands ONLY on failed Constitution
@@ -6,8 +6,10 @@
 // PC badge re-save seam) while the persisting-zone te (`lair_sand_cloud`,
 // source=caster, dc) mirrors over EVERY covered creature including the save
 // success — with ZERO damage on both legs (null formula, dc_success none).
-// Owned elsewhere: zone-arm tracking/log copy (SaveAttackAoeModal.lair-zone),
-// save-less pure arm (#215 lair-darkness), flat-grant log-copy + meta shapes
+// The tracking pin here is the third combination: saveDc 15 + damage null
+// (lair-zone pins 15/'3d6', lair-darkness pins null/null). Owned elsewhere:
+// zone-arm tracking/log copy (SaveAttackAoeModal.lair-zone), save-less pure
+// arm (#215 lair-darkness), flat-grant log-copy + meta shapes
 // (thunderclap-sphere / kraken-toxic-ink), zoneTe data-pins
 // (MonsterCardModal.lair-sand-cloud*). Skip/cancel stays with the
 // creature-selection lane.
@@ -89,81 +91,69 @@ beforeEach(() => {
 });
 afterEach(() => randomSpy.mockRestore());
 
-function renderCloud() {
-  return render(
-    <SaveAttackAoeModal
-      action={ACTION}
-      playerStats={{ name: 'Adult Blue Dragon 1' }}
-      campaignName="test-campaign"
-      range={20}
-      damage={null}
-      damageType=""
-      saveType="Constitution"
-      saveDc={15}
-      dcSuccess="none"
-      titleOverride="20-ft Radius (GM positions tokens; selection advisory)"
-      excludeNames={['Adult Blue Dragon 1']}
-      rangeGateFt={null}
-      zoneTe={ZONE_TE}
-      saveConditions={['blinded']}
-      storeLastAttack={false}
-      onClose={vi.fn()}
-    />
-  );
-}
-
-async function confirmMixedPicker() {
-  const { getByText } = renderCloud();
-  await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
-  fireEvent.click(getByText('Confirm'));
-}
-
 describe('MA-0063 Sand Cloud picker — damageless save + zone composite', () => {
-  it('mixed confirm: Blinded lands ONLY on the failed CON save with dc+ability+source meta; success stays clean, zero damage, one named condition log', async () => {
-    const { getByText } = renderCloud();
+  it('mixed confirm: Blinded + meta land ONLY on the failed CON save (success stays clean) while the zone te mirrors EVERY covered creature — zero damage rolls, zero prompts, honest logs', async () => {
+    const { getByText } = render(
+      <SaveAttackAoeModal
+        action={ACTION}
+        playerStats={{ name: 'Adult Blue Dragon 1' }}
+        campaignName="test-campaign"
+        range={20}
+        damage={null}
+        damageType=""
+        saveType="Constitution"
+        saveDc={15}
+        dcSuccess="none"
+        titleOverride="20-ft Radius (GM positions tokens; selection advisory)"
+        excludeNames={['Adult Blue Dragon 1']}
+        rangeGateFt={null}
+        zoneTe={ZONE_TE}
+        saveConditions={['blinded']}
+        storeLastAttack={false}
+        onClose={vi.fn()}
+      />
+    );
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
+
     // Pre-confirm inertness: picker open, nothing written yet.
     expect(runtime.store['campaign.targetEffects']).toBeFalsy();
     expect(addEntry).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
+
     fireEvent.click(getByText('Confirm'));
 
+    // --- Condition leg: FAILED save only, with re-save meta. ---
     await waitFor(() => expect(runtime.store['Thug 1.activeConditions']).toContain('blinded'));
     expect(runtime.store['Thug 1.activeConditionMeta'].blinded).toMatchObject({ dc: 15, ability: 'con', source: 'Adult Blue Dragon 1' });
-    // The failed-save leg grants zero damage (null formula, dc_success none).
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-
     // Negative leg: the save SUCCESS stays untouched — no condition, no meta.
     expect(runtime.store['Thug 2.activeConditions']).toBeUndefined();
     expect(runtime.store['Thug 2.activeConditionMeta']).toBeUndefined();
 
-    // Exactly ONE condition-applied log, naming the failer + honest advisory copy.
-    const condLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition');
-    expect(condLogs.length).toBe(1);
-    expect(condLogs[0].description).toMatch(/Thug 1 failed the Constitution save \(DC 15\) in Adult Blue Dragon 1's Sand Cloud — Blinded 1 minute/);
-    expect(condLogs[0].description).toMatch(/NPC turn-end auto-repeat and 1-minute expiry GM-enforced/);
-  });
-
-  it('zone te mirrors every covered creature INCLUDING the save success — persistent arm is outcome-independent; zero damage dice rolled, zero prompts', async () => {
-    await confirmMixedPicker();
+    // --- Zone leg: outcome-independent mirror onto BOTH, exactly two tes. ---
     await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
-
+    expect(runtime.store['campaign.targetEffects']).toHaveLength(2);
     const cloudTes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_sand_cloud');
     expect(cloudTes.map(t => t.target).sort()).toEqual(['Thug 1', 'Thug 2']);
     expect(cloudTes.every(t => t.source === 'Adult Blue Dragon 1' && t.dc === 15)).toBe(true);
     // The zone survives the successful save that dodged the condition.
     expect(runtime.store['Thug 2.activeConditions']).toBeUndefined();
 
-    // Tracking: damageless zone WITH a save (dc 15 — distinct from save-less darkness).
+    // Tracking: damageless zone WITH a save (saveDc 15 + damage null — the
+    // combination distinct from lair-zone's 15/'3d6' and darkness' null/null).
     const tracking = runtime.store['Adult Blue Dragon 1._lair_sand_cloud_Adult_Blue_Dragon_1'];
     expect(tracking).toBeTruthy();
     expect(tracking.saveDc).toBe(15);
     expect(tracking.damage).toBeNull();
 
+    // --- Logs: exactly ONE condition log naming the failer; one arm log. ---
+    const condLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition');
+    expect(condLogs.length).toBe(1);
+    expect(condLogs[0].description).toMatch(/Thug 1 failed the Constitution save \(DC 15\) in Adult Blue Dragon 1's Sand Cloud — Blinded 1 minute/);
+    expect(condLogs[0].description).toMatch(/NPC turn-end auto-repeat and 1-minute expiry GM-enforced/);
     const zoneLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('lair_sand_cloud zone armed'));
     expect(zoneLog).toBeTruthy();
 
-    // Honest zero-dice pin: every damage roll attempted carried no formula.
+    // --- Honest zero-damage pin across both legs. ---
     expect(rollExpression.mock.calls.every(([f]) => !f)).toBe(true);
     expect(rollExpressionMaximized).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();

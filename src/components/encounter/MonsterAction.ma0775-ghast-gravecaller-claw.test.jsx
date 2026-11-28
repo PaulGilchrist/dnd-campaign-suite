@@ -1,5 +1,11 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0775/MA-0776 FOLD HOST: Ghast Gravecaller hit_conditions rider pair —
+// Re-audited 2026-11-28: minimal shape confirmed (2 disk byte-shape locks +
+// 2 chip census/dispatch legs, 4 tests) — no cuts, no adds. Header claims
+// re-verified: ghast absent from handlePlainDamage.hitClause.test.js
+// HIT_CLAUSE_ROWS; sole ghast-gravecaller row owner (ma1084 pins lich
+// Paralyzing Touch only; ma1202 comment reference only); dispatch shape
+// matches MonsterAction.jsx onAttack(name, bonus, row).
 // ONE it.each over the TWO live disk rows (Claw actions[1] + Horrific
 // Necrosis actions[2]). Normalized twin-diff (fix#230 recipe): identical
 // assertion shape modulo tokens (name/bonus/dice/type/condition/anchor/index;

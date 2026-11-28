@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // useCharActionsCleave hook seam: the two user-facing handlers plus the dismiss.
 // - handleCleaveAttack: cleave second-target attack/miss resolution, modifier-free
 //   damage, and byte-exact campaign logs.
@@ -86,12 +86,8 @@ describe('useCharActionsCleave', () => {
         it('rolls modifier-free weapon damage on a guaranteed hit and logs the Cleave use', async () => {
             rollExpression.mockReturnValue(CLEAVE_HIT_ROLL);
             const deps = makeDeps();
-            // Same-name enemy entry whose STR attack supplies the ability lookup —
-            // positive leg for playerStats.attacks/abilities resolution (vs the
-            // 'same_as_weapon' row below, where no attack entry exists).
-            const stats = makeStats({ attacks: [{ name: 'Longsword', abilityName: 'Strength' }] });
 
-            const { handleCleaveAttack } = useCharActionsCleave({ ...deps, playerStats: stats });
+            const { handleCleaveAttack } = useCharActionsCleave(deps);
             await handleCleaveAttack('Goblin');
 
             expect(deps.setShowCleaveTargetSelection).toHaveBeenCalledWith(false);
@@ -120,7 +116,6 @@ describe('useCharActionsCleave', () => {
         });
 
         it('auto-misses with 0 damage and logs the miss when no d20 face can reach AC', async () => {
-            rollExpression.mockReturnValue(CLEAVE_HIT_ROLL);
             const deps = makeDeps({
                 storeSeed: {
                     'campaign:lastAttack': {
@@ -136,7 +131,8 @@ describe('useCharActionsCleave', () => {
             const { handleCleaveAttack } = useCharActionsCleave(deps);
             await handleCleaveAttack('Ogre');
 
-            // Positive leg proving the roll happened, gate leg proving damage was gated.
+            // Positive leg proving the attack die rolled, gate leg proving damage was gated.
+            expect(rollD20).toHaveBeenCalledTimes(1);
             expect(rollExpression).not.toHaveBeenCalled();
             expect(deps.rollDamage).toHaveBeenCalledWith({
                 name: 'Longsword (Cleave)',
@@ -162,8 +158,11 @@ describe('useCharActionsCleave', () => {
 
         // ── Seed pins (#334 routing, #1348 face matrix): the attack d20 is now
         // fully seedable through the rollD20 seam. Face+6 (STR 3 + prof 3) drives
-        // hit/miss against a seeded AC; the roll is consumed exactly once per
-        // cleave, ahead of the modifier-free damage roll.
+        // hit/miss against a seeded AC. Rows are mutation-distinguishable only:
+        // the tie pair (>= vs >) plus the off-by-one-just-below-AC miss; the
+        // nat-1 tie-hit row pins that this lane has no manual nat-1 auto-miss.
+        // Full-byte hit/miss payloads are pinned by the two tests above, so rows
+        // here only need objectContaining boundary checks.
         it('consumes the rollD20 lane exactly once per cleave, ahead of the damage roll', async () => {
             const order = [];
             rollD20.mockImplementation(() => { order.push('d20'); return 10; });
@@ -183,10 +182,8 @@ describe('useCharActionsCleave', () => {
 
         it.each([
             // [label, face, ac, expectation]
-            ['nat 20 totals 26 and hits AC 21', 20, 21, 'hit'],
             ['mid-roll totals 18 and ties-hit AC 18', 12, 18, 'hit'],
             ['mid-roll totals 18 and misses AC 19', 12, 19, 'miss'],
-            ['nat 1 totals 7 and misses AC 8', 1, 8, 'miss'],
             // Byte-parity pin vs the old Math.floor(Math.random()*20)+1 inline: the
             // cleave lane has no manual nat-1 auto-miss — the AC comparison is the
             // only gate, and routing preserves it.
@@ -367,11 +364,10 @@ describe('useCharActionsCleave', () => {
             expect(deps.applyMasteryEffect).toHaveBeenCalledWith('Push', deps.playerStats, 'test-campaign', 'Goblin');
         });
 
-        it.each([
-            ['lastAttack has no targetName', { attackName: 'Longsword', damageFormula: '1d8+3', targetName: null }],
-            ['lastAttack is missing entirely', undefined],
-        ])('logs the mastery change but applies nothing when the live lastAttack carries no target — %s', async (_name, lastAttack) => {
-            const deps = makeDeps({ storeSeed: { 'campaign:lastAttack': lastAttack } });
+        // One row is enough: `lastAttack?.targetName` reads null and a missing
+        // object through the identical falsy-target early return.
+        it('logs the mastery change but applies nothing when the live lastAttack carries no target', async () => {
+            const deps = makeDeps({ storeSeed: { 'campaign:lastAttack': undefined } });
 
             const { handleTacticalMasterConfirm } = useCharActionsCleave(deps);
             const result = await handleTacticalMasterConfirm('Vex');

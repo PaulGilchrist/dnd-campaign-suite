@@ -1,11 +1,21 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 /**
  * Hook-seam lane: which class features actually DISPATCH through the real
  * buildPipelineForAction() wiring of resolveAttackDamage (real steps, mocked
- * services). Feature internals are owned by co-located step tests
- * (steps/features/assassinate.test.js, superiorHuntersPrey.test.js,
- * eldritchStrikes.test.js, stalkersFlurry.test.js); stealthAttackCost.js
- * and rendMind.js have NO step test, so they are covered more fully here.
+ * services). Feature internals are byte-locked by co-located step tests and
+ * are NOT re-pinned here — only that the feature fires end-to-end at the
+ * seam and never strands the primary weapon damage:
+ *   - assassinate.test.js owns the CLA-016 gates + bonus/log bytes (the
+ *     zero-sneak-dice gate is skipped here as pure duplication).
+ *   - superiorHuntersPrey(.test|.integration).test.js owns the modal copy
+ *     bytes, the exact log, and onSkip; the seam keeps candidate routing,
+ *     the awaited-spread regression bytes, and the primary-hit landing.
+ *   - eldritchStrikes.test.js owns the verbatim te payload, log bytes, and
+ *     same-round refusal (CLA-109); the seam keeps dispatch + latch shape.
+ *   - stalkersFlurry.test.js owns each resolved-option lane payload; the
+ *     seam keeps one resolved lane plus the pause-before-damage wiring.
+ * stealthAttackCost.js and rendMind.js have NO step test, so they are
+ * covered more fully here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
@@ -254,30 +264,9 @@ describe('useAttackDamageResolution - class features', () => {
             });
             expect(store['_assassinate_usedRound']).toBe(1);
         });
-
-        it('grants no bonus when sneak attack applied no dice this attack (CLA-016 threading)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'TestRogue', hasActed: false, type: 'player' },
-                    { name: 'Goblin', type: 'npc' },
-                ],
-            });
-            mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin', sneakAttackDice: 0 }));
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: assasStats() });
-            await resolveAttackDamage(makeAttack());
-            await tick();
-            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
-            expect(callsForKey('_assassinate_usedRound')).toHaveLength(0);
-            expect(mockRollDamage).toHaveBeenCalledWith({
-                name: 'Rapier',
-                formula: '1d8+5 [piercing]',
-                total: 10,
-                rolls: [5],
-                modifier: 5,
-                context: expect.any(Object),
-            });
-        });
+        // Zero-sneak-dice gate (CLA-016 threading) is byte-owned by
+        // steps/features/assassinate.test.js "returns null when sneak attack
+        // applied no dice this attack" — not re-run through the seam.
     });
 
     describe('Stealth Attack (Supreme Sneak cost deduction)', () => {
@@ -390,7 +379,7 @@ describe('useAttackDamageResolution - class features', () => {
         });
     });
 
-    describe("Superior Hunter's Prey (chooser modal + spread damage at the seam)", () => {
+    describe("Superior Hunter's Prey (chooser + awaited spread damage at the seam)", () => {
         function makeSuperiorHunterStats() {
             return createMockPlayerStats({
                 automation: { actions: [], passives: [{ type: 'superior_hunter_prey' }] },
@@ -409,9 +398,13 @@ describe('useAttackDamageResolution - class features', () => {
 
         const openModal = () => mockSetModalState.mock.calls.map((c) => c[0]?.secondaryTargetModal).find(Boolean);
 
-        it('opens the chooser for the unmarked target and its skip closes it without damage', async () => {
+        // One full seam flow. Modal copy (title/confirmLabel/featureDescription),
+        // exact log bytes, and the onSkip branch are byte-owned by
+        // superiorHuntersPrey.test.js / .integration.test.js — not re-pinned here.
+        it('opens the chooser for the unmarked target, then selection applies awaited 1d6 spread, stamps the latch, and the primary hit already landed', async () => {
             getCombatContext.mockResolvedValue(hunterMarkContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            loadCombatSummary.mockResolvedValue({ some: 'data' });
 
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
             await resolveAttackDamage(makeAttack());
@@ -419,16 +412,11 @@ describe('useAttackDamageResolution - class features', () => {
 
             const modal = openModal();
             expect(modal).toBeDefined();
-            expect(modal.title).toBe("Superior Hunter's Prey — Choose Second Target");
-            expect(modal.confirmLabel).toBe('Deal Damage');
-            expect(modal.featureDescription).toBe("Deal 1d6 Force damage to a creature within 30 feet of the Hunter's Mark target. Once per turn.");
+            // candidate routing at the seam: the marked Goblin is not re-offered
             expect(modal.targets).toEqual([{ name: 'Orc', type: 'npc', maxHp: 30, currentHp: 30 }]);
-            expect(callsForKey('_Superior_Hunters_Prey_UsedRound')).toHaveLength(0);
-
-            modal.onSkip();
-            expect(mockSetModalState).toHaveBeenCalledWith({ secondaryTargetModal: null });
             expect(applyDamageToTarget).not.toHaveBeenCalled();
-            // primary marked hit still lands (Hunter's Mark 1d6 folded in)
+            // primary marked hit lands while the chooser is open
+            // (Hunter's Mark 1d6 folded in)
             expect(mockRollDamage).toHaveBeenCalledWith({
                 name: 'Rapier',
                 formula: '1d8+5 [piercing] + 1d6 [force]',
@@ -437,45 +425,31 @@ describe('useAttackDamageResolution - class features', () => {
                 modifier: 5,
                 context: expect.any(Object),
             });
-        });
 
-        it('selecting a target applies exact 1d6 Force spread and stamps the once-per-turn latch', async () => {
-            getCombatContext.mockResolvedValue(hunterMarkContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            loadCombatSummary.mockResolvedValue({ some: 'data' });
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
-            await resolveAttackDamage(makeAttack());
-            await tick();
-            expect(applyDamageToTarget).not.toHaveBeenCalled();
-
-            await openModal().onTargetSelected('Orc');
+            await modal.onTargetSelected('Orc');
 
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(applyDamageToTarget).toHaveBeenCalledWith(
                 { some: 'data' }, 'Orc', 4, ['Force'],
                 { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'TestRogue' },
             );
+            // Regression pin: the chain must AWAIT the async applyDamageToTarget
+            // — before the fix the ledger/popup streamed finalDamage: undefined.
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 rollType: 'damage',
                 name: "Superior Hunter's Prey",
                 formula: '1d6 [Superior Hunters Prey]',
-                rolls: [4],
                 total: 4,
                 damageType: 'Force',
                 targetName: 'Orc',
-                // FIXED (was honest pin finalDamage: undefined — the step did
-                // NOT await the async applyDamageToTarget, so the ledger logged
-                // undefined; source :72 now awaits, real mock bytes flow through)
                 finalDamage: 10,
             }));
+            // exactly one latch write, value = current round (offer alone burns nothing)
             expect(callsForKey('_Superior_Hunters_Prey_UsedRound')).toEqual([
                 ['TestRogue', '_Superior_Hunters_Prey_UsedRound', 1, 'test-campaign'],
             ]);
             expect(mockSetModalState).toHaveBeenCalledWith({ secondaryTargetModal: null });
-            // FIXED popup spread bytes (were spreadFinalDamage/spreadTarget-
-            // CurrentHp: undefined through the un-awaited Promise): exact
-            // resolved values from the faithful async applyDamage mock.
+            // exact resolved popup bytes from the faithful async applyDamage mock
             const spreadPopup = mockSetPopupHtml.mock.calls
                 .map(([updater]) => (typeof updater === 'function' ? updater({ keep: 1 }) : updater))
                 .find((out) => out && 'spreadTargetName' in out);
@@ -490,30 +464,20 @@ describe('useAttackDamageResolution - class features', () => {
     });
 
     describe('Eldritch Strike (weapon_attack_hit attack_rider without damageExpression)', () => {
-        function makeEldritchStrikeStats(oncePerTurn) {
+        function makeEldritchStrikeStats() {
             return createMockPlayerStats({
                 automation: {
                     actions: [{
                         type: 'attack_rider',
                         trigger: 'weapon_attack_hit',
                         name: 'Eldritch Strike',
-                        oncePerTurn,
+                        oncePerTurn: true,
                         options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
                     }],
                     passives: [],
                 },
             });
         }
-
-        const EXPECTED_TE = {
-            target: 'Goblin',
-            source: 'Eldritch Strike',
-            option: 'Impose Disadvantage',
-            effect: 'impose_disadvantage',
-            value: null,
-            noOpportunityAttacks: false,
-            duration: 'until_start_of_next_turn',
-        };
 
         beforeEach(() => {
             getCombatContext.mockResolvedValue({
@@ -525,37 +489,25 @@ describe('useAttackDamageResolution - class features', () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
         });
 
-        it('writes one exact targetEffect and stamps usedRound once per round', async () => {
-            const store = {};
-            getRuntimeValue.mockImplementation((_name, key) => store[key] ?? null);
-            setRuntimeValue.mockImplementation((_name, key, value) => { store[key] = value; });
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats(true) });
+        // Verbatim te payload, log bytes, same-round refusal (CLA-109) and the
+        // oncePerTurn:false append lane are byte-owned by eldritchStrikes.test.js.
+        // The seam proves only that the rider DISPATCHES through the real
+        // pipeline with the seam-supplied target, and never strands the hit.
+        it('dispatches the rider targetEffect to the campaign store with the once-per-turn latch, and the hit still lands', async () => {
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats() });
             await resolveAttackDamage(makeAttack());
             await tick();
-            expect(store['targetEffects']).toEqual([EXPECTED_TE]);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+                expect.objectContaining({
+                    target: 'Goblin',
+                    source: 'Eldritch Strike',
+                    option: 'Impose Disadvantage',
+                    effect: 'impose_disadvantage',
+                }),
+            ], 'test-campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_Eldritch_Strike_usedRound', 1, 'test-campaign');
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                abilityName: 'Eldritch Strike',
-                targetName: 'Goblin',
-                description: "TestRogue used Eldritch Strike on Goblin, imposing Disadvantage on the target's next saving throw.",
-            }));
-
-            // second hit in the same round: no duplicate effect, no duplicate log
-            await resolveAttackDamage(makeAttack());
-            await tick();
-            expect(store['targetEffects'].filter((te) => te.effect === 'impose_disadvantage')).toHaveLength(1);
-            expect(addEntry.mock.calls.filter((c) => c[1]?.abilityName === 'Eldritch Strike')).toHaveLength(1);
-            expect(callsForKey('_Eldritch_Strike_usedRound')).toHaveLength(1);
-            expect(mockRollDamage).toHaveBeenCalledTimes(2);
-        });
-
-        it('applies the effect without a usedRound latch when oncePerTurn is absent', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats(false) });
-            await resolveAttackDamage(makeAttack());
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [EXPECTED_TE], 'test-campaign');
-            expect(callsForKey('_Eldritch_Strike_usedRound')).toHaveLength(0);
+            expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -589,13 +541,14 @@ describe('useAttackDamageResolution - class features', () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
         });
 
-        it.each([
-            { option: 'Sudden Strike', expectedPending: 1, expectedFrightened: [] },
-            { option: 'Mass Fear', expectedPending: 0, expectedFrightened: [['Bugbear', 'activeConditions', ['frightened'], 'test-campaign']] },
-        ])('resolved option $option dispatches its write and stamps once-per-turn', async ({ option, expectedPending, expectedFrightened }) => {
+        // Per-lane payloads (Mass Fear resolve payload, pendingSuddenStrikeTarget
+        // bytes) are byte-owned by stalkersFlurry.test.js. One resolved lane at
+        // the seam proves option routing dispatches its write, stamps the latch,
+        // and never strands the primary weapon damage.
+        it('resolved option dispatches its write, stamps once-per-turn, and lands primary damage', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'resumeRef') return {};
-                if (key === "_Stalker's_Flurry_option") return option;
+                if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
                 return null;
             });
 
@@ -604,8 +557,9 @@ describe('useAttackDamageResolution - class features', () => {
             await tick();
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', "_Stalker's_Flurry_usedRound", 1, 'test-campaign');
-            expect(setRuntimeValue.mock.calls.filter((c) => c[1] === 'pendingSuddenStrike' && c[2] === true)).toHaveLength(expectedPending);
-            expect(setRuntimeValue.mock.calls.filter((c) => c[1] === 'activeConditions')).toEqual(expectedFrightened);
+            expect(setRuntimeValue.mock.calls.filter((c) => c[1] === 'pendingSuddenStrike' && c[2] === true)).toHaveLength(1);
+            // the other lane stays closed: no Fear condition write
+            expect(callsForKey('activeConditions')).toHaveLength(0);
             // resolved choice never strands the primary weapon damage
             expect(mockRollDamage).toHaveBeenCalledWith({
                 name: 'Rapier',

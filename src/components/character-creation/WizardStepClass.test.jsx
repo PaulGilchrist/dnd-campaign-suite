@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardStepClass from './WizardStepClass.jsx';
@@ -66,6 +66,8 @@ function renderStep({ stepNumber = 6, name = '', ruleset = '5e', allClassesData 
   return { onInputChange };
 }
 
+// Locate a select by its visible field label instead of child order.
+const selectFor = (label) => screen.getByText(label).closest('.form-group').querySelector('select');
 const optionValues = (select) => Array.from(select.querySelectorAll('option')).map((o) => o.value);
 
 describe('WizardStepClass', () => {
@@ -73,11 +75,10 @@ describe('WizardStepClass', () => {
     renderStep();
     // Number mirrors the prop; canonical step numbering is owned by WizardStepNumbering.test.jsx.
     expect(screen.getByText('Step 6: Class')).toBeInTheDocument();
-    expect(screen.getByText('Class *')).toBeInTheDocument();
-    const selects = document.querySelectorAll('select');
-    expect(selects).toHaveLength(1); // 5e never renders an order dropdown
-    expect(optionValues(selects[0])).toEqual(['', 'Barbarian', 'Wizard']);
-    expect(selects[0].querySelector('option[value=""]')).toHaveTextContent('Select a class');
+    const classSelect = selectFor('Class *');
+    expect(document.querySelectorAll('select')).toHaveLength(1); // 5e never renders an order dropdown
+    expect(optionValues(classSelect)).toEqual(['', 'Barbarian', 'Wizard']);
+    expect(classSelect.querySelector('option[value=""]')).toHaveTextContent('Select a class');
     expect(screen.queryByText(/Details$/)).not.toBeInTheDocument();
   });
 
@@ -93,7 +94,7 @@ describe('WizardStepClass', () => {
         onInputChange={onInputChange}
       />
     );
-    fireEvent.change(document.querySelector('select'), { target: { value: 'Wizard' } });
+    fireEvent.change(selectFor('Class *'), { target: { value: 'Wizard' } });
     expect(onInputChange).toHaveBeenCalledWith('class', {
       name: 'Wizard', subclass: { name: '' }, divineOrder: '', primalOrder: '',
     });
@@ -108,7 +109,7 @@ describe('WizardStepClass', () => {
         onInputChange={onInputChange}
       />
     );
-    fireEvent.change(document.querySelector('select'), { target: { value: '' } });
+    fireEvent.change(selectFor('Class *'), { target: { value: '' } });
     expect(onInputChange).toHaveBeenLastCalledWith('class', {
       name: '', subclass: { name: '' }, divineOrder: '', primalOrder: '',
     });
@@ -116,16 +117,14 @@ describe('WizardStepClass', () => {
 
   it.each([
     {
-      className: 'Cleric', ruleset: '2024',
-      label: 'Divine Order *', options: ['', 'Protector', 'Thaumaturge'],
+      className: 'Cleric', label: 'Divine Order *', options: ['', 'Protector', 'Thaumaturge'],
       field: 'divineOrder', value: 'Protector',
     },
     {
-      className: 'Druid', ruleset: '2024',
-      label: 'Primal Order *', options: ['', 'Magician', 'Warden'],
+      className: 'Druid', label: 'Primal Order *', options: ['', 'Magician', 'Warden'],
       field: 'primalOrder', value: 'Warden',
     },
-  ])('2024 $className renders $label with exact options and change payload', ({ className, ruleset, label, options, field, value }) => {
+  ])('2024 $className renders $label with exact options and change payload', ({ className, label, options, field, value }) => {
     const onInputChange = vi.fn();
     render(
       <WizardStepClass
@@ -133,12 +132,12 @@ describe('WizardStepClass', () => {
         formData={{ class: classValue(className) }}
         errors={{}}
         allClassesData={classes2024}
-        ruleset={ruleset}
+        ruleset="2024"
         onInputChange={onInputChange}
       />
     );
     expect(screen.getByText(label)).toBeInTheDocument();
-    const orderSelect = document.querySelectorAll('select')[1];
+    const orderSelect = selectFor(label);
     expect(optionValues(orderSelect)).toEqual(options);
     fireEvent.change(orderSelect, { target: { value } });
     expect(onInputChange).toHaveBeenCalledWith('class', { ...classValue(className), [field]: value });
@@ -152,27 +151,7 @@ describe('WizardStepClass', () => {
 
   it.each([
     {
-      name: 'Barbarian', ruleset: '5e', allClassesData: classes5e,
-      description: 'A fierce warrior of primitive background who can enter a battle rage',
-      info: {
-        'Hit Die': 'd12',
-        'Saving Throws': 'STR, CON',
-        'Proficiencies': 'Light Armor, Medium Armor, Shields, Simple Weapons, Martial Weapons',
-      },
-      absent: ['Tool Proficiencies', 'Weapon Proficiencies'],
-    },
-    {
-      name: 'Wizard', ruleset: '5e', allClassesData: classes5e,
-      description: 'A scholarly magic-user capable of manipulating the structures of reality',
-      info: {
-        'Hit Die': 'd6',
-        'Saving Throws': 'INT, WIS',
-        'Proficiencies': 'Daggers, Quarterstaffs, Darts, Slings',
-      },
-      absent: ['Tool Proficiencies', 'Weapon Proficiencies'],
-    },
-    {
-      name: 'Barbarian', ruleset: '2024', allClassesData: classes2024,
+      name: 'Barbarian',
       description: 'A fierce warrior of primal rage.',
       info: {
         'Primary Ability': 'Strength',
@@ -181,22 +160,22 @@ describe('WizardStepClass', () => {
         'Weapon Proficiencies': 'Simple and Martial weapons',
         'Armor Training': 'Light and Medium armor and Shields',
       },
-      absent: ['Tool Proficiencies'],
+      absent: ['Tool Proficiencies'], // empty-string tool_proficiencies renders nothing
     },
     {
-      name: 'Druid', ruleset: '2024', allClassesData: classes2024,
+      name: 'Druid',
       description: 'Druids belong to ancient orders that call on the forces of nature.',
       info: {
         'Saving Throws': 'Intelligence, Wisdom',
         'Armor Training': 'Light armor and Shields',
-        'Tool Proficiencies': 'Herbalism Kit',
+        'Tool Proficiencies': 'Herbalism Kit', // the non-empty tool branch
       },
       absent: [],
     },
-  ])('$ruleset detail card shows disk fields for $name', ({ name, ruleset, allClassesData, description, info, absent }) => {
-    renderStep({ name, ruleset, allClassesData });
+  ])('2024 detail card shows disk fields for $name', ({ name, description, info, absent }) => {
+    renderStep({ name, ruleset: '2024', allClassesData: classes2024 });
     expect(screen.getByText(`${name} Details`)).toBeInTheDocument();
-    fireEvent.click(document.querySelector('.detail-card-header'));
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
     expect(screen.getByText(description)).toBeInTheDocument();
     for (const [label, value] of Object.entries(info)) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -207,18 +186,31 @@ describe('WizardStepClass', () => {
     }
   });
 
-  // Disk-truth pin (public/data/classes.json, byte-exact via import — not retyped):
-  // 5e `proficiencies` carries mixed armor/shields/weapons/tools, so ClassDetailCard
+  // Disk-truth lock (public/data/classes.json via import — not retyped). 5e
+  // `proficiencies` carries mixed armor/shields/weapons/tools, so ClassDetailCard
   // must render it under the honest flat label 'Proficiencies' (house precedent:
-  // CharSummary.jsx:275 and FeatItemDetails.jsx:50), never 'Weapon Proficiencies'.
-  it.each(['Fighter', 'Cleric', 'Rogue'])('5e %s: disk-mixed proficiencies render under exact label Proficiencies', (name) => {
-    const diskClass = classesDisk5e.find((c) => c.name === name);
-    renderStep({ name, allClassesData: classesDisk5e });
-    fireEvent.click(document.querySelector('.detail-card-header'));
+  // CharSummary.jsx:275 and FeatItemDetails.jsx:50), never split into 'Weapon
+  // Proficiencies'/'Armor Training'/'Tool Proficiencies'. Rogue is the strongest
+  // single witness: its list contains Thieves' Tools. This test also locks the
+  // whole 5e detail-card render path (plain `description` branch, d-prefixed hit
+  // die, joined saving throws), subsuming the former fixture Barbarian/Wizard
+  // legs and the Fighter/Cleric legs that repeated the same path on other data.
+  it('5e detail card renders disk Rogue verbatim: flat Proficiencies label, d-hit-die, joined saves, no 2024-only labels', () => {
+    const diskRogue = classesDisk5e.find((c) => c.name === 'Rogue');
+    expect(diskRogue.proficiencies).toContain("Thieves' Tools"); // premise of the flat-label claim
+    renderStep({ name: 'Rogue', allClassesData: classesDisk5e });
+    expect(screen.getByText('Rogue Details')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
+    expect(screen.getByText('A scoundrel who uses stealth and trickery to overcome obstacles and enemies')).toBeInTheDocument();
+    expect(screen.getByText('d8')).toBeInTheDocument();
+    expect(screen.getByText('DEX, INT')).toBeInTheDocument();
+    expect(screen.getByText('Hit Die')).toBeInTheDocument(); // 5e key hit_die, d-prefixed above
     expect(screen.getByText('Proficiencies')).toBeInTheDocument();
-    expect(screen.getByText(diskClass.proficiencies.join(', '))).toBeInTheDocument();
+    expect(screen.getByText(diskRogue.proficiencies.join(', '))).toBeInTheDocument();
+    expect(screen.queryByText('Hit Point Die')).not.toBeInTheDocument();
     expect(screen.queryByText('Weapon Proficiencies')).not.toBeInTheDocument();
     expect(screen.queryByText('Armor Training')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tool Proficiencies')).not.toBeInTheDocument();
   });
 
   it('toggle button cycles details collapsed → expanded → collapsed', () => {
@@ -236,18 +228,18 @@ describe('WizardStepClass', () => {
   });
 
   it.each([
-    { ruleset: '5e', errorKey: 'class', name: '', allClassesData: classes5e, errorMessage: 'Class is required', selectIndex: 0 },
-    { ruleset: '2024', errorKey: 'divineOrder', name: 'Cleric', allClassesData: classes2024, errorMessage: 'Divine Order is required', selectIndex: 1 },
-    { ruleset: '2024', errorKey: 'primalOrder', name: 'Druid', allClassesData: classes2024, errorMessage: 'Primal Order is required', selectIndex: 1 },
-  ])('renders $errorMessage on the matching select', ({ ruleset, errorKey, name, allClassesData, errorMessage, selectIndex }) => {
+    { errorKey: 'class', label: 'Class *', name: '', ruleset: '5e', allClassesData: classes5e, errorMessage: 'Class is required' },
+    { errorKey: 'divineOrder', label: 'Divine Order *', name: 'Cleric', ruleset: '2024', allClassesData: classes2024, errorMessage: 'Divine Order is required' },
+    { errorKey: 'primalOrder', label: 'Primal Order *', name: 'Druid', ruleset: '2024', allClassesData: classes2024, errorMessage: 'Primal Order is required' },
+  ])('renders $errorMessage on the $label select', ({ ruleset, errorKey, label, name, allClassesData, errorMessage }) => {
     renderStep({ ruleset, name, allClassesData, errors: { [errorKey]: errorMessage } });
     expect(screen.getByText(errorMessage)).toBeInTheDocument();
-    expect(document.querySelectorAll('select')[selectIndex]).toHaveClass('error');
+    expect(selectFor(label)).toHaveClass('error');
   });
 
   it('with empty class data renders only the placeholder and no detail card even for a selected class', () => {
     renderStep({ name: 'Barbarian', allClassesData: [] });
-    const select = document.querySelector('select');
+    const select = selectFor('Class *');
     expect(optionValues(select)).toEqual(['']);
     expect(select.querySelector('option[value=""]')).toHaveTextContent('Select a class');
     expect(screen.queryByText(/Details$/)).not.toBeInTheDocument();

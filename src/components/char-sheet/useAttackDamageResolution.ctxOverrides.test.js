@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -77,32 +77,38 @@ describe('useAttackDamageResolution ctxOverrides: override-vs-derived precedence
         buildPipelineForAction.mockReturnValue({ run: pipelineRun, resume: vi.fn() });
     });
 
-    // resolveDamageContextFlags uses ?? so explicit false/0 overrides must beat
-    // truthy popup-derived values; unknown keys arrive via the raw ...ctxOverrides spread.
+    // Seam contract (useAttackDamageResolution.js:420-450): ctx is built as
+    // { ...resolveDamageContextFlags(overrides, popupHtml, attack), ...ctxOverrides }
+    // — the trailing raw spread re-applies every override verbatim, so overrides
+    // always win at the observable seam and the flag function only matters for
+    // keys the caller did NOT override. Rows below each pin one distinguishable
+    // branch: popup-derived truthy values, popup-derived defaults, or spread
+    // pass-through. (The ?? vs || law is fix#121's normalizeAutoDamage lane,
+    // owned by normalizeAutoDamage.test.js — not observable through this seam.)
     it.each([
         {
-            name: 'popupHtml.isCrit derives hit=true when popupHtml.hit is absent',
+            name: 'popupHtml.isCrit derives hit=true via the isCrit OR-term; absent fields default',
             popupHtml: { isCrit: true },
             attack: LONGSWORD,
             overrides: {},
             expected: { hit: true, isCrit: true, isNatural20: false, targetName: null, isBonusActionAttack: false },
         },
         {
-            name: 'ctxOverrides.hit=false beats popup-derived hit=true (?? not ||)',
+            name: 'popupHtml.hit/isNatural20/targetName derive to ctx when not overridden',
+            popupHtml: { hit: true, isNatural20: true, targetName: 'Orc' },
+            attack: LONGSWORD,
+            overrides: {},
+            expected: { hit: true, isCrit: false, isNatural20: true, targetName: 'Orc' },
+        },
+        {
+            name: 'explicit false overrides beat popup- and attack-derived truths, per-field',
             popupHtml: { hit: true, isCrit: true },
-            attack: LONGSWORD,
-            overrides: { hit: false },
-            expected: { hit: false, isCrit: true },
+            attack: { ...LONGSWORD, type: 'Bonus Action' },
+            overrides: { hit: false, isBonusActionAttack: false },
+            expected: { hit: false, isBonusActionAttack: false, isCrit: true },
         },
         {
-            name: 'ctxOverrides override popup per-field; un-overridden isNatural20 still derived',
-            popupHtml: { hit: false, isCrit: false, targetName: 'Orc', isNatural20: true },
-            attack: LONGSWORD,
-            overrides: { hit: true, isCrit: true, targetName: 'Goblin' },
-            expected: { hit: true, isCrit: true, targetName: 'Goblin', isNatural20: true },
-        },
-        {
-            name: 'null/empty popupHtml defaults every derived flag to false/null/0/1',
+            name: 'null popupHtml and no overrides default every derived flag to false/null/0/1',
             popupHtml: null,
             attack: LONGSWORD,
             overrides: {},
@@ -120,54 +126,16 @@ describe('useAttackDamageResolution ctxOverrides: override-vs-derived precedence
             expected: { isBonusActionAttack: true },
         },
         {
-            name: 'non-bonus attack.type derives isBonusActionAttack=false',
-            popupHtml: null,
-            attack: { ...LONGSWORD, type: 'Action' },
-            overrides: {},
-            expected: { isBonusActionAttack: false },
-        },
-        {
-            name: 'missing attack.type derives isBonusActionAttack=false',
-            popupHtml: null,
-            attack: LONGSWORD,
-            overrides: {},
-            expected: { isBonusActionAttack: false },
-        },
-        {
-            name: 'ctxOverrides.isBonusActionAttack=false beats attack.type "Bonus Action"',
-            popupHtml: null,
-            attack: { ...LONGSWORD, type: 'Bonus Action' },
-            overrides: { isBonusActionAttack: false },
-            expected: { isBonusActionAttack: false },
-        },
-        {
-            name: 'overchannel numeric overrides pass through to ctx',
-            popupHtml: null,
-            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
-            overrides: { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 },
-            expected: { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 },
-        },
-        {
-            name: 'ctxOverrides.empoweredEvocationModifier=4 passes through (and stays 0 without it)',
-            popupHtml: null,
-            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
-            overrides: { empoweredEvocationModifier: 4 },
-            expected: { empoweredEvocationModifier: 4 },
-        },
-        {
-            // fix#121 signed law parity: the ?? default must never floor an
-            // override — a negative INT mod passes through signed.
-            name: 'ctxOverrides.empoweredEvocationModifier=-3 passes through signed',
-            popupHtml: null,
-            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
-            overrides: { empoweredEvocationModifier: -3 },
-            expected: { empoweredEvocationModifier: -3 },
-        },
-        {
-            name: 'arbitrary ctxOverrides keys reach ctx via raw spread',
+            // fix#121 signed parity: a negative INT mod passes through verbatim
+            // (never floored to 0) alongside the other spread keys.
+            name: 'all ctxOverrides keys pass through to ctx verbatim (raw spread)',
             popupHtml: null,
             attack: LONGSWORD,
             overrides: {
+                overchannelActive: true,
+                overchannelUseCount: 2,
+                overchannelSpellLevel: 3,
+                empoweredEvocationModifier: -3,
                 sneakDice: 4,
                 effectiveSneakDice: 4,
                 isMeleeOrUnarmed: true,
@@ -176,6 +144,10 @@ describe('useAttackDamageResolution ctxOverrides: override-vs-derived precedence
                 attackerName: 'Custom Attacker',
             },
             expected: {
+                overchannelActive: true,
+                overchannelUseCount: 2,
+                overchannelSpellLevel: 3,
+                empoweredEvocationModifier: -3,
                 sneakDice: 4,
                 effectiveSneakDice: 4,
                 isMeleeOrUnarmed: true,

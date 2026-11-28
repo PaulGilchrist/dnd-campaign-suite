@@ -1,24 +1,26 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0516 helper lane: Berserk Lashing attack-reaction truth-table owner —
-// attackReactionIdentityRefusal (MonsterCardHelpers.js:2481), attackReactionGate (:2501),
-// attackReactionSlamRow (:2523), attackReactionFoldCheck (:2528, fix#39 strict-presence
-// bonus guard), attackReactionFireCheck (:2551), resolveMonsterAttackReaction (:2588)
-// via the dispatcher attack arm (:2314), registry row (:1399). Disk fixtures BY NAME
-// verbatim (#387): Construct Spirit (Clay)
-// reactions[0]. The folded Slam row (+11 / 1d8+4+5) is summoned-runtime state produced by
-// the MA-0465 caster fold — it exists nowhere on disk, so it is the sanctioned fiction here.
-// Fiction rows (#498 precedent): attack:999 'uses' exhaustion and the round-0 default
-// collision — the only disk row is At Will 999/maxUses 999, so finite-limit exhaustion
-// (reactionMaxUses :2226) and the round>0 latch skip (:2507) are unreachable from disk;
-// these rows pin them. The ?? collision row pins that actualDamage 0 (not null/undefined)
-// hides primaryDamage (:2483) — 0 damage refuses. Dropped legs (owners cited):
-// getGatedMonsterReaction plain-row null discrimination → hellish-rebuke.test.js:87,
-// monsterJinx.test.js:139-141, monsterBurstOfIngenuity.test.js:127,
-// monsterSpellReflection.test.js:161, monsterGuardianProtection.test.js:139; modal chip +
-// handleAttack consumer wiring → MonsterCardModal.jsx:2619 (modal lane owns the seam).
-// Resolve keeps ONE refusal per source branch (gate refusal :2592 via 'trigger', fire-check
-// refusal :2596 via 'target') — the former resolve legs for round-latch, resolved-stamp and
-// unfolded-fold were echo re-runs of this file's own unit tables below.
+// attackReactionIdentityRefusal, attackReactionGate, attackReactionSlamRow,
+// attackReactionFoldCheck (fix#39 strict-presence bonus guard), attackReactionFireCheck,
+// resolveMonsterAttackReaction via the resolveMonsterGatedReaction 'attack' dispatcher
+// arm, and the GATED_MONSTER_REACTIONS 'attack' registry row. Disk fixture locked
+// verbatim FULL ROW via toEqual (re-verified against monsters.json bytes): Construct
+// Spirit (Clay) reactions[0]. The folded Slam row (+11 / 1d8+4+5) is summoned-runtime
+// state produced by the MA-0465 caster fold — it exists nowhere on disk, so it is the
+// sanctioned fiction here. Fiction rows (#498 precedent): attack:999 'uses' exhaustion
+// and the round-0 default collision — the only disk row is At Will 999/maxUses 999, so
+// finite-limit exhaustion (reactionMaxUses) and the round>0 latch skip are unreachable
+// from disk; these rows pin them. The ?? collision row pins that actualDamage 0 (not
+// null/undefined) hides primaryDamage — 0 damage refuses. Dropped legs (owners cited):
+// getGatedMonsterReaction plain-row null discrimination → hellish-rebuke.test.js,
+// monsterJinx.test.js, monsterBurstOfIngenuity.test.js, monsterSpellReflection.test.js,
+// monsterGuardianProtection.test.js; modal chip + handleAttack consumer wiring →
+// MonsterCardModal.jsx (modal lane owns the seam). Resolve keeps ONE refusal per source
+// branch (gate refusal via 'trigger', fire-check refusal via 'target') — the former
+// resolve legs for round-latch, resolved-stamp and unfolded-fold were echo re-runs of
+// this file's own unit tables below. Fold/fire-check tables shed rows whose observable
+// output (reason 'fold') is indistinguishable from a row already pinned there or in
+// their owning table (attackReactionSlamRow null path, fold-guard branch ordering).
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -84,15 +86,19 @@ function makeDeps({ store = {}, last = lastAttack(), cs = csWith(1), armed = { n
 }
 
 describe('MA-0516 disk fixture — Construct Spirit (Clay) Berserk Lashing', () => {
-  it('reactions[0] verbatim + registry arms effect "attack"', () => {
-    expect(LASH_ACTION.name).toBe('Berserk Lashing');
-    expect(LASH_ACTION.automation).toEqual({ type: 'reaction', trigger: 'damage_taken', effect: 'attack', attack: 'Slam' });
-    expect(LASH_ACTION.usage).toBe('At Will');
-    expect(LASH_ACTION.uses).toBe(999);
-    expect(LASH_ACTION.maxUses).toBe(999);
-    expect(LASH_ACTION.reach).toBe('5 ft.');
-    expect(LASH_ACTION.attack_bonus).toBeNull();
-    expect(LASH_ACTION.damage_dice_primary).toBeNull();
+  it('reactions[0] verbatim full row + registry arms effect "attack"', () => {
+    expect(LASH_ACTION).toEqual({
+      name: 'Berserk Lashing',
+      description: 'Trigger: The spirit takes damage from a creature. Response: The spirit makes a Slam attack against that creature if possible, or the spirit moves up to half its Speed toward that creature without provoking Opportunity Attacks.',
+      attack_bonus: null,
+      reach: '5 ft.',
+      damage_dice_primary: null,
+      damage_type_primary: null,
+      usage: 'At Will',
+      uses: 999,
+      maxUses: 999,
+      automation: { type: 'reaction', trigger: 'damage_taken', effect: 'attack', attack: 'Slam' },
+    });
     expect(getGatedMonsterReaction(LASH_ACTION)).toEqual({ effect: 'attack', trigger: 'damage_taken', label: 'Berserk Lashing', icon: 'fa-hand-fist' });
   });
 });
@@ -146,15 +152,13 @@ describe('MA-0516 attackReactionSlamRow + attackReactionFoldCheck — folded sum
     ['missing damage_type defaults Bludgeoning', { name: 'Slam', attack_bonus: 11, damage_dice_primary: '1d8+4+5', damage_type_primary: null }, { attackBonus: 11, formula: '1d8+4+5', damageType: 'Bludgeoning' }],
     ['no Slam row — never a false +0 auto-hit (MA-0286)', null, 'fold'],
     ['unfolded missing attack_bonus (EB-direct join, key ABSENT)', { name: 'Slam', damage_dice_primary: '1d8+4+5' }, 'fold'],
-    ['fix#39 hinge flipped — attack_bonus:null strict-presence guard folds-refuses (was Number(null)=0 +0 auto-hit TRIPWIRE, violates MA-0286 :2518 promise)', { name: 'Slam', attack_bonus: null, damage_dice_primary: '1d8+4+5' }, 'fold'],
-    ["attack_bonus:'' empty string — distinct arm from null AND from authored 0, folds-refuses", { name: 'Slam', attack_bonus: '', damage_dice_primary: '1d8+4+5' }, 'fold'],
-    ["attack_bonus:'   ' whitespace-only — unfolded, folds-refuses", { name: 'Slam', attack_bonus: '   ', damage_dice_primary: '1d8+4+5' }, 'fold'],
+    ['fix#39 hinge flipped — attack_bonus:null strict-presence guard folds-refuses (was Number(null)=0 +0 auto-hit TRIPWIRE, violates the MA-0286 never-bake-a-false-+0 promise)', { name: 'Slam', attack_bonus: null, damage_dice_primary: '1d8+4+5' }, 'fold'],
+    ["attack_bonus:'' empty string — distinct arm from null AND from authored 0, folds-refuses (Number('')=0 would be finite)", { name: 'Slam', attack_bonus: '', damage_dice_primary: '1d8+4+5' }, 'fold'],
     ["attack_bonus:'junk' non-numeric — unfolded, folds-refuses", { name: 'Slam', attack_bonus: 'junk', damage_dice_primary: '1d8+4+5' }, 'fold'],
     ["attack_bonus:'3' numeric-string still folds +3 (pre-fix behavior byte-exact preserved)", { name: 'Slam', attack_bonus: '3', damage_dice_primary: '1d8+4+5' }, { attackBonus: 3, formula: '1d8+4+5', damageType: 'Bludgeoning' }],
     ['attack_bonus:0 authored zero folds +0 (MA-0762 Gas Spore Touch precedent — authored zero is a real bonus, null/empty is not)', { name: 'Slam', attack_bonus: 0, damage_dice_primary: '1d8+4+5' }, { attackBonus: 0, formula: '1d8+4+5', damageType: 'Bludgeoning' }],
     ['unfolded token dice "+spell level"', { name: 'Slam', attack_bonus: 11, damage_dice_primary: '1d8+4+spell level' }, 'fold'],
     ['bonus folded but dice missing', { name: 'Slam', attack_bonus: 11, damage_dice_primary: null }, 'fold'],
-    ['attack_bonus:null AND token dice — bonus guard fires first, folds-refuses', { name: 'Slam', attack_bonus: null, damage_dice_primary: '1d8+4+spell level' }, 'fold'],
   ])('%s', (_label, slamRow, expected) => {
     const fold = attackReactionFoldCheck(slamRow);
     if (expected === 'fold') expect(fold.reason).toBe('fold');
@@ -167,8 +171,7 @@ describe('MA-0516 attackReactionFireCheck — RAW slams THAT creature', () => {
     ['armed target is the triggering attacker — folds spec', { armed: { name: BANDIT } }, null],
     ['armed bystander refuses (RAW targets the attacker)', { armed: { name: 'Knight' } }, 'target'],
     ['no armed target refuses', { armed: null }, 'target'],
-    ['unfolded combatant row refuses before target check', { combatant: { actions: [{ name: 'Slam', attack_bonus: null, damage_dice_primary: '1d8+4+spell level' }] } }, 'fold'],
-    ['combatant without a Slam row refuses', { combatant: { actions: [] } }, 'fold'],
+    ['unfolded combatant row refuses before target check (SlamRow null path owned by the table above)', { combatant: { actions: [{ name: 'Slam', attack_bonus: null, damage_dice_primary: '1d8+4+spell level' }] } }, 'fold'],
   ])('%s', (_label, over, expected) => {
     const spec = attackReactionFireCheck({ action: LASH_ACTION, combatant: foldedCombatant(), armed: { name: BANDIT }, attackerName: BANDIT, monsterName: SPIRIT, ...over });
     if (expected) expect(spec.reason).toBe(expected);
@@ -177,12 +180,13 @@ describe('MA-0516 attackReactionFireCheck — RAW slams THAT creature', () => {
 });
 
 describe('MA-0516 resolveMonsterGatedReaction — attack branch', () => {
-  it('fires the folded Slam at the triggering attacker: latch+spend+stamp awaited BEFORE handleAttack, ability_use logged', async () => {
-    const handleAttack = vi.fn();
-    const { state, logs, order, deps } = makeDeps({ handleAttack });
+  it('fires the folded Slam at the triggering attacker: latch+spend+stamp awaited BEFORE handleAttack routing, ability_use logged', async () => {
+    const { state, logs, order, deps } = makeDeps({
+      handleAttack: vi.fn(() => { order.push('handleAttack'); }),
+    });
     const result = await resolveMonsterGatedReaction({ action: LASH_ACTION, monsterName: SPIRIT, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);
-    expect(handleAttack).toHaveBeenCalledWith('Berserk Lashing (Slam)', 11, {
+    expect(deps.handleAttack).toHaveBeenCalledWith('Berserk Lashing (Slam)', 11, {
       name: 'Berserk Lashing (Slam)',
       damage_dice_primary: '1d8+4+5',
       damage_type_primary: 'Bludgeoning',
@@ -193,6 +197,7 @@ describe('MA-0516 resolveMonsterGatedReaction — attack branch', () => {
       `${SPIRIT}._attack_usedRound`,
       `${SPIRIT}.${MONSTER_REACTION_USES_KEY}`,
       'campaign.lastAttack',
+      'handleAttack',
     ]);
     expect(state[`${SPIRIT}._attack_usedRound`]).toBe(1);
     expect(state[`${SPIRIT}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ attack: 1 });
@@ -206,7 +211,7 @@ describe('MA-0516 resolveMonsterGatedReaction — attack branch', () => {
     expect(spend.description).toContain('1d8+4+5');
   });
 
-  it('gate refusal (:2592) logs berserk_lashing_refused with ZERO writes', async () => {
+  it('gate refusal (resolveMonsterAttackReaction gate arm) logs berserk_lashing_refused with ZERO writes', async () => {
     const handleAttack = vi.fn();
     const { logs, order, deps } = makeDeps({ handleAttack, last: lastAttack({ targetName: 'ElderPaladin' }) });
     const result = await resolveMonsterGatedReaction({ action: LASH_ACTION, monsterName: SPIRIT, campaignName: CAMPAIGN, deps });
@@ -217,7 +222,7 @@ describe('MA-0516 resolveMonsterGatedReaction — attack branch', () => {
     expect(logs[0].description).toContain('(trigger)');
   });
 
-  it('fire-check refusal (:2596) armed bystander — nothing spent, attacker named', async () => {
+  it('fire-check refusal (resolveMonsterAttackReaction fire arm) armed bystander — nothing spent, attacker named', async () => {
     const handleAttack = vi.fn();
     const { logs, order, deps } = makeDeps({ handleAttack, armed: { name: 'Knight' } });
     const result = await resolveMonsterGatedReaction({ action: LASH_ACTION, monsterName: SPIRIT, campaignName: CAMPAIGN, deps });

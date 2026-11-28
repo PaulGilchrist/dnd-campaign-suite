@@ -1,13 +1,16 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // Routing-seam lane: combat-superiority maneuver-choice modal confirms in useCharActionsModalHandlers.
-// Pins arg-gate refusals (isolated falsy legs), byte-exact dispatch payloads + arity to the
-// combatSuperiorityHandler execute* services, popup surfacing on result.payload only,
-// logEntries flush to the campaign log on the bait-and-switch/commander-strike/rally lanes (MN-002/MN-016),
-// and modalState clears.
-// Handler/service internals are owned by combatSuperiorityHandler.test.js,
+// Pins arg-gate refusals (both falsy clauses, all four handlers), byte-exact dispatch payloads +
+// arity to the combatSuperiorityHandler execute* services, popup surfacing on result.payload only,
+// logEntries flush semantics on the payload-present branch (MN-002/MN-016): bait-and-switch,
+// commander-strike and rally forward every entry once, keyed by modalData.campaignName; sweeping
+// attack is the one route with NO flush branch and must stay silent even when the service returns
+// logEntries. Modal clears happen unconditionally after dispatch.
+// Handler/service internals (real grant-entry wording) are owned by combatSuperiorityHandler.test.js,
 // combatSuperiorityChoices.test.js and combatSuperiorityUtils tests; modal UI wiring
 // lives in CharActionModals.inline-choice-modals.test.jsx and
-// CharActionModals.secondary-targets.test.jsx — not restated here.
+// CharActionModals.secondary-targets.test.jsx — not restated here. The 27-key return contract is
+// pinned in useCharActionsModalHandlers.test.js.
 // Mocks: only the routed execute* services + logService are replaced; every other import
 // in the hook's graph loads for real (buffToggle/tempHp/useRuntimeState are never invoked
 // by these four handlers). Mock keys kept to everything automation/index.js destructures
@@ -47,6 +50,7 @@ const {
 
 const CAMPAIGN = 'test-campaign';
 
+// The hook is a plain closure factory (zero React hooks) — safe to call directly.
 function mount() {
   const setPopupHtml = vi.fn();
   const setModalState = vi.fn();
@@ -64,8 +68,17 @@ function stats() {
   return { name: 'TestChar', class: { name: 'Fighter' } };
 }
 
+// Minimal pass-through log entry: the handler must forward it verbatim; the real
+// grant wording inside these entries is owned by the service-side tests.
+const grantEntry = (abilityName) => ({
+  type: 'ability_use',
+  characterName: 'TestChar',
+  abilityName,
+});
+
 // One row per routed maneuver-confirm handler: how to invoke it, which service it must
-// dispatch to with byte-exact args, and which modalState key it must clear.
+// dispatch to with byte-exact args, which modalState key it must clear, and its flush
+// contract on the payload-present branch (entries forwarded -> addEntry legs expected).
 const MANEUVERS = [
   {
     name: 'Sweeping Attack',
@@ -80,6 +93,9 @@ const MANEUVERS = [
       target,
     ],
     clearKey: 'sweepingAttackTargetModal',
+    // This route has no logEntries flush branch — silence even when entries arrive.
+    logEntries: [grantEntry('Sweeping Attack')],
+    expectedFlush: [],
   },
   {
     name: 'Bait and Switch',
@@ -94,6 +110,8 @@ const MANEUVERS = [
       target,
     ],
     clearKey: 'baitAndSwitchChoiceModal',
+    logEntries: [grantEntry('Bait and Switch')],
+    expectedFlush: [grantEntry('Bait and Switch')],
   },
   {
     name: 'Commander Strike',
@@ -108,6 +126,8 @@ const MANEUVERS = [
       target,
     ],
     clearKey: 'commanderStrikeChoiceModal',
+    logEntries: [grantEntry('Commander Strike')],
+    expectedFlush: [grantEntry('Commander Strike')],
   },
   {
     name: 'Rally',
@@ -133,6 +153,9 @@ const MANEUVERS = [
       description: 'Rally description',
     }],
     clearKey: 'rallyChoiceModal',
+    // Two entries: pins forEach multiplicity — one addEntry per entry, none dropped/duplicated.
+    logEntries: [grantEntry('Rally'), grantEntry('Bonus Feat')],
+    expectedFlush: [grantEntry('Rally'), grantEntry('Bonus Feat')],
   },
 ];
 
@@ -141,6 +164,7 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
     vi.clearAllMocks();
   });
 
+  // Gate: `if (!targetName || !modalData) return;` in all four handlers.
   it.each(
     MANEUVERS.flatMap(m => [
       { desc: `${m.name}: empty target`, m, target: '', data: m.data() },
@@ -169,6 +193,7 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
     }
   );
 
+  // False branch of `if (result.payload)`: no popup, no log, but the clear is unconditional.
   it.each(MANEUVERS.map(m => [m]))(
     '$name confirm with no payload logs nothing but still clears the modal',
     async (m) => {
@@ -183,48 +208,20 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
     }
   );
 
-  // MN-002 / MN-016: maneuver grants must reach the campaign log, keyed by the
-  // modalData campaignName — bait-and-switch, commander-strike and rally all
-  // flush logEntries (commander-strike row added with the same-class fix: the
-  // ability_use grant from combatSuperiorityUtils.js executeCommanderStrikeChoice).
-  it.each([
-    {
-      m: MANEUVERS[1],
-      entry: {
-        type: 'ability_use',
-        characterName: 'TestChar',
-        abilityName: 'Bait and Switch',
-        description: 'Bait and Switch: Orc gains +7 AC until the start of TestChar\'s next turn.',
-      },
-    },
-    {
-      m: MANEUVERS[2],
-      entry: {
-        type: 'ability_use',
-        characterName: 'TestChar',
-        abilityName: 'Commander Strike',
-        description: 'Commander Strike: Ally1 will add 12 to their next attack\'s damage roll.',
-      },
-    },
-    {
-      m: MANEUVERS[3],
-      entry: {
-        type: 'ability_use',
-        characterName: 'TestChar',
-        abilityName: 'Rally',
-        description: 'Rally: HexWarlock gains 16 temporary hit points.',
-        d10Roll: 7,
-      },
-    },
-  ])('$m.name confirm flushes logEntries to the campaign log', async ({ m, entry }) => {
-    m.service.mockResolvedValue({ payload: '<p>Applied</p>', logEntries: [entry] });
-    const { handlers, setPopupHtml, setModalState } = mount();
-    const data = m.data(m.target);
-    await m.invoke(handlers, m.target, data);
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, entry);
-    // Exact flush count: one entry in, one addEntry out — no duplicates.
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    expect(setPopupHtml).toHaveBeenCalledWith('<p>Applied</p>');
-    expect(setModalState).toHaveBeenCalledWith({ [m.clearKey]: null });
-  });
+  // MN-002 / MN-016 flush lane on the payload-present branch. Entries are forwarded verbatim,
+  // exactly once each, keyed by the modalData campaignName. The sweeping row pins the route's
+  // missing flush branch; popup + clear are already pinned by the dispatch lane above.
+  it.each(MANEUVERS.map(m => [m]))(
+    '$name confirm forwards each logEntries item once to addEntry(campaignName, entry)',
+    async (m) => {
+      m.service.mockResolvedValue({ payload: '<p>Applied</p>', logEntries: m.logEntries });
+      const { handlers } = mount();
+      const data = m.data(m.target);
+      await m.invoke(handlers, m.target, data);
+      expect(addEntry).toHaveBeenCalledTimes(m.expectedFlush.length);
+      for (const entry of m.expectedFlush) {
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, entry);
+      }
+    }
+  );
 });

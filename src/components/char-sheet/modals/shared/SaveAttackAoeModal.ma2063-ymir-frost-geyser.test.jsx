@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-2063: Ymir "Frost Geyser (Costs 2 Actions)" picker-lane consumer unit — the
 // full-struct fix (save_dc/save_type/damage dice+type/range/save_effect + the honest
 // appended "Success: half damage." clause) on the LIVE Radius picker seam.
@@ -18,9 +18,10 @@
 //       the RAW "Success: half damage." (dc_success UNSET); zero Restrained grant.
 //     The ±fold pins make both faces deterministic regardless of RNG draw order; the
 //     [0.01,0.01,0.99,0.99] seam (2 raw d20s per save) is the belt.
-// costs-2 rides the NAME parse (MA-1883): exactly 2 spent; a 1-remaining pool refuses
-// insufficient-cost honestly. Gate vocabulary (turn/own-turn/exhausted) is pinned by
-// the monsterLegendaryUses.test.js/ma1579/ma1883 service lanes — not re-pinned here.
+// costs-2 rides the NAME parse (MA-1883): only the ROW's own economy facts are pinned
+// here (cost parses to 2, header owns uses:3, siblings stay delegates); the full/dry
+// legendaryExpendGate vocabulary (sufficient, insufficient-cost, turn/own-turn/exhausted)
+// is pinned by the monsterLegendaryUses.test.js/ma1579/ma1883 service lanes — not re-pinned.
 // Glacier Wave (MA-2059 twin) row bytes are owned by monsterRecharge.ma2059 —
 // not re-pinned here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
@@ -30,7 +31,7 @@ import monstersData from '../../../../../public/data/monsters.json';
 
 import { extractConditionsFromSaveEffect } from '../../../../components/encounter/MonsterCardHelpers.js';
 import { extractConditionDurationNote } from '../../../../services/encounters/monsterAbilityUses.js';
-import { legendaryActionCost, legendaryDelegateAction, legendaryExpendGate, legendaryHeaderAction } from '../../../../services/encounters/monsterLegendaryUses.js';
+import { legendaryActionCost, legendaryDelegateAction, legendaryHeaderAction } from '../../../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -86,6 +87,7 @@ vi.mock('./CreatureSelectionModal.jsx', async () => {
 });
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
 const YMIR = monstersData.find(m => m.index === 'ymir');
@@ -127,7 +129,7 @@ function renderGeyser(props = {}) {
       damageType={GEYSER.damage_type_primary}
       saveType={GEYSER.save_type}
       saveDc={GEYSER.save_dc}
-      dcSuccess={GEYSER.dc_success ?? 'half'} // half-default transported (MA-2059 twin)
+      dcSuccess="half" // row authors no dc_success (pinned above) — half-default transported (MA-2059 twin)
       titleOverride="20-ft Radius (GM positions tokens; selection advisory)"
       excludeNames={['Ymir 1']}
       rangeGateFt={null}
@@ -154,8 +156,8 @@ beforeEach(() => {
   ];
 });
 
-describe('MA-2063 disk fingerprint: full struct authored on the row, prose preserved', () => {
-  it('row identity, save core, appended half-clause, absent bait, Radius-20 shape, no delegate master', () => {
+describe('MA-2063 disk fingerprint: full struct + row economy authored on the row, prose preserved', () => {
+  it('save core, appended half-clause, absent bait, Radius-20 shape, no delegate master; costs-2 name-parse + header ownership, siblings stay delegates', () => {
     expect(GEYSER.name).toBe('Frost Geyser (Costs 2 Actions)');
     expect(GEYSER.save_dc).toBe(24);
     expect(GEYSER.save_type).toBe('Dexterity');
@@ -178,19 +180,11 @@ describe('MA-2063 disk fingerprint: full struct authored on the row, prose prese
     // picker shape: "20 ft. radius" prose token → Radius-20 GM-placed; range never mis-shapes.
     expect(sphereRadiusFeet(GEYSER.description)).toBe(20);
     expect(emanationRadiusFeet(GEYSER.range)).toBeNull();
-  });
-
-  it('economy: header owns uses:3; costs-2 rides the NAME parse; 1-left pool refuses insufficient-cost; siblings inert', () => {
+    // row economy facts only — generic costs-2 grammar + gate vocabulary pinned by ma1883/ma1579:
+    expect(YMIR.legendary_actions.length).toBe(4);
     expect(legendaryHeaderAction(YMIR)).toBe(HEADER);
     expect(HEADER.uses).toBe(3);
-    expect(YMIR.legendary_actions.length).toBe(4);
     expect(legendaryActionCost(GEYSER)).toBe(2);
-    const full = legendaryExpendGate({ header: HEADER, storedUses: { max: 3, used: 0 }, round: 2, activeCreatureName: 'Bandit 1', monsterName: 'Ymir 1', latch: null, cost: legendaryActionCost(GEYSER) });
-    expect(full).toEqual({ allowed: true, remaining: 3, max: 3 });
-    const dry = legendaryExpendGate({ header: HEADER, storedUses: { max: 3, used: 2 }, round: 2, activeCreatureName: 'Bandit 1', monsterName: 'Ymir 1', latch: null, cost: legendaryActionCost(GEYSER) });
-    expect(dry.allowed).toBe(false);
-    expect(dry.reason).toBe('insufficient-cost');
-    expect(dry.cost).toBe(2); // 1-remaining < cost-2 — honest refusal, never a 1-credit partial
     // Club/Stomp stay delegates (this row is the only numeric child):
     expect(CLUB.delegates_to).toBe('Glacier Club');
     expect(STOMP.delegates_to).toBe('Stomp');
@@ -210,6 +204,7 @@ describe('MA-2063 picker mixed-confirm: FAIL face lands full 18 Cold AND Restrai
     expect(copy).toMatch(/On a failed save, target takes 4d8 Cold damage\./);
     expect(copy).toMatch(/On a successful save, target takes half damage\./); // dc_success UNSET → half-default IS RAW
     // Pre-confirm inertness: nothing rolled, no damage, no conditions, no grant log.
+    expect(rollExpression).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(grantLogs()).toHaveLength(0);
     expect(Object.keys(runtime.store).filter(k => /activeCondition/.test(k))).toHaveLength(0);
@@ -223,10 +218,12 @@ describe('MA-2063 picker mixed-confirm: FAIL face lands full 18 Cold AND Restrai
     const saveCall = applyDamageToTarget.mock.calls.find(c => c[1] === 'Bandit 2');
     expect(saveCall[2]).toBe(9); // floor(18/2) — half-default matches RAW "Success: half damage."
 
-    // Results UI shows BOTH faces per-target in one panel.
-    const results = document.querySelector('.abjure-results-list').textContent;
-    expect(results).toMatch(/Failed/);
-    expect(results).toMatch(/Saved — takes .*damage \(rolled .*halved\)/);
+    // Results UI: per-target rows — each face pinned to its OWN target and damage
+    // number so a mislabelled face can never hide behind the other row's text.
+    const rowText = name => [...document.querySelectorAll('.abjure-results-list .abjure-result')]
+      .find(r => r.querySelector('strong')?.textContent === name).textContent;
+    expect(rowText('Bandit 1')).toMatch(/^Bandit 1: Failed — takes 18 Cold damage \(rolled .* vs DC 24\)/);
+    expect(rowText('Bandit 2')).toMatch(/^Bandit 2: Saved — takes 9 Cold damage \(rolled .* halved\)/);
 
     // Restrained is fail-ONLY: exactly one grant, on Bandit 1, never Bandit 2.
     expect(runtime.store['Bandit 1.activeConditions']).toEqual(['restrained']);

@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 // MA-0102 lane: Adult Gold Dragon Weakening Breath picker — damageless STR DC 21
 // cone. The picker seam owns: weakening-clause copy (never the MA-0090 "null null
 // damage" / half-damage boilerplate), the RAW "isn't currently affected by this
@@ -175,61 +175,41 @@ describe('MA-0102 Adult Gold Weakening Breath picker', () => {
     expect(seenTargets.current.map(t => t.name)).toEqual(['Acolyte 2']);
   });
 
-  it('mixed confirm: failed STR save grants weakening_breath via the service with honest roll/bonus and parsed 1d6 die; successful save grants nothing; zero damage', async () => {
-    // Two draws per NPC save in target order: Thug 1 rolls 1 (+1 = 2, fails
-    // DC 21), Acolyte 2 rolls 20 (+4 = 24, succeeds).
-    spyRandom([0.01, 0.01, 0.99, 0.99]);
-    const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
-    fireEvent.click(getByText('Confirm'));
+});
 
+// MA-0212: one parameterized mixed-confirm covering both clauses — the parsed
+// per-monster die (1d6 adult / 1d10 ancient) must ride the grant call, the DC
+// is the clause's own, and the success leg resolves exact-at-DC (24 vs DC 24).
+describe.each([
+  { label: 'Adult (1d6 @ DC 21)', attacker: 'Adult Gold Dragon 1', action: WEAKENING, saveDc: 21, die: '1d6' },
+  { label: 'MA-0212 Ancient (1d10 @ DC 24, success exact-at-DC)', attacker: 'Ancient Gold Dragon 1', action: ANCIENT_WEAKENING, saveDc: 24, die: '1d10' },
+])('weakening breath confirm — $label', ({ attacker, action, saveDc, die }) => {
+  it('failed STR save grants weakening_breath via the service with honest roll/bonus and the parsed die; successful save grants nothing; zero damage', async () => {
+    // Two draws per NPC save in target order: Thug 1 rolls 1 (+1, fails either
+    // DC), Acolyte 2 rolls 20 (+4 = 24 — succeeds, exactly DC 24 on ancient).
+    spyRandom([0.01, 0.01, 0.99, 0.99]);
+    const { getByText } = renderBreath({ attacker, action, saveDc });
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
+    expect(document.querySelector('.sp-note-copy').textContent).toMatch(new RegExp(`subtracts ${die} from its damage rolls`));
+
+    fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addTargetResult).toHaveBeenCalledTimes(2));
     // FAIL leg — Thug 1: exactly one grant, full-lowercase 'strength' save
-    // bonus consulted from the creature row, adult clause forwards 1d6.
+    // bonus consulted from the creature row, clause forwards its parsed die.
     expect(grants.current).toHaveLength(1);
     expect(grants.current[0]).toMatchObject({
       campaignName: 'test-campaign',
-      attackerName: 'Adult Gold Dragon 1',
+      attackerName: attacker,
       targetName: 'Thug 1',
       saveType: 'Strength',
-      saveDc: 21,
+      saveDc,
       roll: 1,
       saveBonus: 1,
-      die: '1d6',
+      die,
     });
     // SUCCESS leg — Acolyte 2: resolved as a success row, no grant.
     expect(saveRows()).toEqual([
       expect.objectContaining({ targetName: 'Thug 1', saveResult: 'failure', roll: 1, total: 2, appliedDamage: 0 }),
-      expect.objectContaining({ targetName: 'Acolyte 2', saveResult: 'success', roll: 20, total: 24, appliedDamage: 0 }),
-    ]);
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-  });
-});
-
-// MA-0212: the parsed per-monster die must ride both the picker copy and the
-// grant call — Ancient Gold clause (1d10) forwards die:'1d10' at DC 24.
-describe('MA-0212 weakening breath forwards parsed die', () => {
-  it('ancient clause picker copy and grant forward the parsed 1d10 die; success leg exact-at-DC grants nothing', async () => {
-    // Thug 1 rolls 1 (+1 = 2, fails DC 24); Acolyte 2 rolls 20 (+4 = 24,
-    // exactly DC 24 — succeeds).
-    spyRandom([0.01, 0.01, 0.99, 0.99]);
-    const { getByText } = renderBreath({ attacker: 'Ancient Gold Dragon 1', action: ANCIENT_WEAKENING, saveDc: 24 });
-    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
-    expect(document.querySelector('.sp-note-copy').textContent).toMatch(/subtracts 1d10 from its damage rolls/);
-
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addTargetResult).toHaveBeenCalledTimes(2));
-    expect(grants.current).toHaveLength(1);
-    expect(grants.current[0]).toMatchObject({
-      attackerName: 'Ancient Gold Dragon 1',
-      targetName: 'Thug 1',
-      saveDc: 24,
-      roll: 1,
-      saveBonus: 1,
-      die: '1d10',
-    });
-    expect(saveRows()).toEqual([
-      expect.objectContaining({ targetName: 'Thug 1', saveResult: 'failure', total: 2, appliedDamage: 0 }),
       expect.objectContaining({ targetName: 'Acolyte 2', saveResult: 'success', roll: 20, total: 24, appliedDamage: 0 }),
     ]);
     expect(applyDamageToTarget).not.toHaveBeenCalled();

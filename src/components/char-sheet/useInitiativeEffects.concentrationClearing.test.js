@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
@@ -14,16 +14,15 @@ import useInitiativeEffects from './useInitiativeEffects.js';
 // Project rule honored: concentration stays concentration — every assertion here is
 // event-driven at the initiative seam, never a wall-clock gate.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    // Exactly the four exports live in this import graph: useInitiativeEffects.js:2
-    // and its loaded collaborator boonOfCombatProwess.js:2 import
-    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys.
-    // Dead-mock purge: getStore/useSyncedState/listeners were never read by any
-    // module loaded here (probed exports at useRuntimeState.js:5,21 — useSyncedState
-    // is not even an export of that file).
+    // Exactly the three live bindings in this import graph (bisect-confirmed,
+    // #2070/#2138 getAllStoreKeys retirement): useInitiativeEffects.js:2 imports
+    // getRuntimeValue/setRuntimeValue/setRuntimeBatch; collaborator
+    // boonOfCombatProwess.js:2 imports only getRuntimeValue/setRuntimeValue.
+    // Dead-mock purge: getAllStoreKeys/getStore/useSyncedState/listeners were
+    // never read by any module loaded here.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
-    getAllStoreKeys: vi.fn(() => []),
 }));
 
 // Each factory supplies every named binding useInitiativeEffects.js imports;
@@ -273,10 +272,13 @@ describe('useInitiativeEffects - concentration clearing at the initiative seam',
     });
 
     describe('no-op guards', () => {
+        // Rows are distinct early-return branches in clearConcentrationOnInitiative
+        // (:212-215). The found-but-falsy-concentration branch is NOT repeated here —
+        // edgeCases.test.js "Concentration: rolling creature found with falsy
+        // concentration" is its stronger owner (it also pins the batch fired).
         it.each([
             ['a null combat summary', null],
             ['a combat summary with no creatures key', {}],
-            ['an empty creatures array', { creatures: [] }],
             ['the rolling creature absent from combat', { creatures: [{ name: 'OtherPlayer', concentration: { spell: 'Bane' } }] }],
         ])('persists nothing and clears no effects for %s', (_label, cs) => {
             getCombatSummary.mockReturnValue(cs);

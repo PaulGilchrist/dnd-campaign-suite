@@ -1,10 +1,18 @@
-// @maintained-by-ai 2026-10-18
-// TashasLaughterModal player-saves lane: prompt dispatched to the player,
-// player-chosen failure/success outcomes, Heightened-spell disadvantage flag on
-// the prompt payload (the player client rolls), detail-tolerant resolution, and
-// inertness against stray save-result events. NPC auto-roll adjudication lives in
-// TashasLaughterModal.npc-saves.test.jsx; rendering, selection, maxTargets, skip,
-// and empty-state live in TashasLaughterModal.test.jsx — not repeated here.
+// @maintained-by-ai 2026-11-28
+// TashasLaughterModal player-saves lane: the modal-side player-save seam only.
+// Prompt dispatch at confirm (payload, pending-prompt registration, inertness
+// until the player answers), the Heightened Spell disadvantage flag on the
+// payload (the player client owns the roll), resolution of the player's
+// save-result event through the modal (rows, effect application, tally popup,
+// single close), detail-tolerant resolution, stray-event inertness, and the
+// deferred close when a cast mixes a local NPC roll with a pending player
+// prompt. The shared failure-effect payload bytes (activeConditionMeta,
+// expiration, targetEffect) are pinned by TashasLaughterModal.npc-saves.test.jsx
+// through the same applyLaughterConditionsToTarget helper — referenced
+// shallowly here, never re-pinned. NPC auto-roll adjudication lives in the
+// npc-saves lane; dismiss hygiene in TashasLaughterModal.save-dismissed.test.jsx;
+// rendering, selection, maxTargets, skip, and empty-state in
+// TashasLaughterModal.test.jsx — not repeated here.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TashasLaughterModal from './TashasLaughterModal.jsx';
@@ -92,7 +100,6 @@ const targetEffectWrites = () =>
         .filter(c => c[1] === 'targetEffects' && c[0] === 'campaign')
         .map(c => c[2]);
 
-// Helpers: select the only player row and confirm (one prompt is dispatched)
 function targetRow(name) {
     const rows = [...document.querySelectorAll('.secondary-target-row')];
     const row = rows.find(r => r.textContent.includes(name));
@@ -100,13 +107,30 @@ function targetRow(name) {
     return row;
 }
 
+async function clickRow(name) {
+    await act(async () => {
+        fireEvent.click(targetRow(name));
+    });
+}
+
+async function clickConfirm(count) {
+    await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(`Tasha's Hideous Laughter \\(${count}\\)`) }));
+    });
+}
+
+// Select the only player row and confirm (one prompt is dispatched).
 async function selectPlayerAndConfirm() {
-    await act(async () => {
-        fireEvent.click(targetRow('PlayerAlly'));
-    });
-    await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Tasha's Hideous Laughter \(1\)/ }));
-    });
+    await clickRow('PlayerAlly');
+    await clickConfirm(1);
+}
+
+// Deterministic d20 draws consumed in target order (1 draw per NPC save
+// without disadvantage; issuePlayerSavePrompt also draws once per prompt id).
+// The last seeded value repeats as a fallback so later draws never NaN.
+function seedRolls(draws) {
+    const seq = [...draws];
+    vi.spyOn(Math, 'random').mockImplementation(() => (seq.length > 1 ? seq.shift() : seq[0]));
 }
 
 // Dispatch a save-result for the live prompt. Rolls default to an honest
@@ -171,9 +195,7 @@ describe('TashasLaughterModal - Player Saves', () => {
         await act(async () => {
             fireEvent.click(row.querySelector('input[name="heightenTarget"]'));
         });
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /Tasha's Hideous Laughter \(1\)/ }));
-        });
+        await clickConfirm(1);
 
         // The player client owns the roll — the modal's contract is the flag.
         expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -182,7 +204,7 @@ describe('TashasLaughterModal - Player Saves', () => {
         }));
     });
 
-    it('applies the full failure effect set when the player fails the save', async () => {
+    it('applies the failure from the player\'s answered roll, logs both rows, pops the tally, and closes once', async () => {
         const onClose = vi.fn();
         const setPopupHtml = vi.fn();
         render(<TashasLaughterModal {...makeProps({ onClose, setPopupHtml })} />);
@@ -203,35 +225,19 @@ describe('TashasLaughterModal - Player Saves', () => {
             description: 'PlayerAlly failed WIS save (DC 14, rolled 7 + 1 = 8) and is Prone and Incapacitated.',
         });
 
+        // The shared laughter applier fires (payload bytes owned by the NPC
+        // lane); this branch's contract is that the answered failure lands.
         expect(conditionWritesFor('PlayerAlly')).toHaveLength(1);
         expect(conditionWritesFor('PlayerAlly')[0][2]).toEqual(['prone', 'incapacitated']);
-        const metaWrite = setRuntimeValue.mock.calls.find(
-            c => c[1] === 'activeConditionMeta' && c[0] === 'PlayerAlly',
-        );
-        expect(metaWrite[2]).toEqual({
-            prone: { dc: 14, ability: 'wis' },
-            incapacitated: { dc: 14, ability: 'wis' },
-        });
-        expect(addExpiration).toHaveBeenCalledTimes(1);
-        expect(addExpiration).toHaveBeenCalledWith({
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: 'Wizard1',
             targetName: 'PlayerAlly',
-            effects: [
-                { type: 'condition', condition: 'prone' },
-                { type: 'condition', condition: 'incapacitated' },
-                { type: 'tashas_laughter_expiration' },
-            ],
-            campaignName,
-        });
-        expect(targetEffectWrites()).toHaveLength(1);
-        expect(targetEffectWrites()[0]).toEqual([{
-            target: 'PlayerAlly',
-            effect: 'tashas_hideous_laughter',
-            source: 'Wizard1',
-            dc: 14,
-            duration: 'concentration',
-            conditions: ['prone', 'incapacitated'],
-        }]);
+        }));
+        expect(targetEffectWrites().flat().some(e =>
+            e.effect === 'tashas_hideous_laughter' && e.target === 'PlayerAlly'
+        )).toBe(true);
+
+        // This branch builds its own ledger row and log lines from the detail.
         expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
             targetName: 'PlayerAlly',
             saveResult: 'failure',
@@ -240,8 +246,6 @@ describe('TashasLaughterModal - Player Saves', () => {
             conditions: ['prone', 'incapacitated'],
             appliedDamage: 0,
         });
-        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
-
         const condEntry = entriesOf(e =>
             e.type === 'condition' && e.action === 'applied' && e.characterName === 'PlayerAlly'
         );
@@ -251,8 +255,10 @@ describe('TashasLaughterModal - Player Saves', () => {
             reason: "Tasha's Hideous Laughter",
             note: expect.stringContaining("can't end the Prone condition"),
         });
+        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
 
-        // Popup fires at 0ms, close at 500ms after the last pending prompt resolves.
+        // Popup fires at 0ms, close at 500ms after the last pending prompt
+        // resolves — UI feedback timers only; the game state already landed.
         await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
         expect(setPopupHtml).toHaveBeenCalledWith({
             type: 'automation_info',
@@ -305,9 +311,9 @@ describe('TashasLaughterModal - Player Saves', () => {
         await waitFor(() => {
             expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
-        // Fixed (TashasLaughterModal.jsx:40): a missing bonus coalesces to 0
-        // before the omit-plus guard (house form, savePrompt.js:148 — bonus
-        // coalesced at savePrompt.js:66), so the term is omitted, never "+ undefined".
+        // Missing roll numbers coalesce to 0, and a 0 bonus drops the "+ bonus"
+        // term before interpolation — the description reads "rolled 0 = 0",
+        // never "undefined" (remote answers can arrive without roll numbers).
         expect(saveResultsFor('PlayerAlly')[0]).toMatchObject({
             success: false,
             roll: 0,
@@ -327,20 +333,22 @@ describe('TashasLaughterModal - Player Saves', () => {
         await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
     });
 
-    it.each([
-        { name: 'null detail', detail: null },
-        { name: 'missing promptId', detail: { success: false } },
-        { name: 'unknown promptId', detail: { promptId: 'not-a-real-prompt-id', success: false, roll: 20, total: 25, saveBonus: 5 } },
-    ])('ignores a save-result event with $name and still resolves the live prompt', async ({ detail }) => {
+    it('ignores stray save-result events (null detail, missing or unknown promptId) and still resolves the live prompt', async () => {
         const onClose = vi.fn();
         render(<TashasLaughterModal {...makeProps({ onClose })} />);
         await selectPlayerAndConfirm();
         // A processed result would persist and log synchronously after the guard.
         const persistCallsAtConfirm = persistAndNotify.mock.calls.length;
 
-        await act(async () => {
-            window.dispatchEvent(new CustomEvent('save-result', { detail }));
-        });
+        for (const detail of [
+            null,
+            { success: false },
+            { promptId: 'not-a-real-prompt-id', success: false, roll: 20, total: 25, saveBonus: 5 },
+        ]) {
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('save-result', { detail }));
+            });
+        }
 
         expect(persistAndNotify).toHaveBeenCalledTimes(persistCallsAtConfirm);
         expect(saveResultsFor('PlayerAlly')).toHaveLength(0);
@@ -348,10 +356,53 @@ describe('TashasLaughterModal - Player Saves', () => {
         expect(addTargetResult).not.toHaveBeenCalled();
         expect(onClose).not.toHaveBeenCalled();
 
-        // The stray event must not consume the pending prompt.
+        // The strays must not consume the pending prompt.
         await triggerSaveResult(false);
         await waitFor(() => {
             expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
+    });
+
+    it('holds the close while a player prompt is pending beside a resolved NPC roll, then drains to one tally and one close', async () => {
+        const onClose = vi.fn();
+        const setPopupHtml = vi.fn();
+        seedRolls([0.01]); // Goblin nat 1 + 0 = 1 < DC 14; later draws feed the prompt id
+        try {
+            render(<TashasLaughterModal {...makeProps({ spellSlotLevel: 2, onClose, setPopupHtml })} />);
+            await clickRow('Goblin');
+            await clickRow('PlayerAlly');
+            await clickConfirm(2);
+
+            // The NPC leg resolves at confirm; the player leg parks pending.
+            await waitFor(() => {
+                expect(saveResultsFor('Goblin')).toHaveLength(1);
+            });
+            expect(sendSavePrompt).toHaveBeenCalledTimes(1);
+            // Bounded flush (past the 0ms popup slot): a pending prompt must
+            // schedule no popup and no premature close for the half-resolved cast.
+            await act(async () => {
+                await new Promise(r => setTimeout(r, 60));
+            });
+            expect(setPopupHtml).not.toHaveBeenCalled();
+            expect(onClose).not.toHaveBeenCalled();
+
+            const promptId = sendSavePrompt.mock.calls[0][1].promptId;
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('save-result', {
+                    detail: { promptId, success: true, roll: 15, total: 16, saveBonus: 1 },
+                }));
+            });
+
+            // Drain-to-empty merges both branches into one cross-target tally,
+            // and the cast closes exactly once.
+            await waitFor(() => expect(setPopupHtml).toHaveBeenCalledWith({
+                type: 'automation_info',
+                name: "Tasha's Hideous Laughter",
+                description: '1 creature(s) failed their save and are Prone and Incapacitated: Goblin. 1 creature(s) saved.',
+            }));
+            await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
+        } finally {
+            Math.random.mockRestore();
+        }
     });
 });

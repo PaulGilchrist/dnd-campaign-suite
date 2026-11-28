@@ -1,4 +1,4 @@
-// @maintained-by-ai 2026-10-18
+// @maintained-by-ai 2026-11-28
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MagicInitiateModal, createProps } from './MagicInitiateModal.test-utils.js';
@@ -15,13 +15,19 @@ const optionValues = (select) =>
 
 describe('MagicInitiateModal', () => {
   describe('render and close contract', () => {
-    it('renders header and description, and routes header close and Skip to onClose', () => {
+    it('renders header and description; Close and Skip route to onClose; shell clicks never dismiss', () => {
       const props = createProps();
-      const { unmount } = render(<MagicInitiateModal {...props} />);
+      const { container, unmount } = render(<MagicInitiateModal {...props} />);
 
       expect(screen.getByText('Magic Initiate')).toBeInTheDocument();
       expect(screen.getByText(/Choose a class and select spells from its spell list/)).toBeInTheDocument();
       expect(screen.queryByText(/^Instance \d+/)).not.toBeInTheDocument();
+
+      // Owner decision 15eb96d46 removed overlay-click dismissal app-wide:
+      // clicking the shells (used to hit an overlay onClose) must be inert.
+      fireEvent.click(container.querySelector('.mi-overlay'));
+      fireEvent.click(container.querySelector('.mi-modal'));
+      expect(props.onClose).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByRole('button', { name: 'Close' }));
       expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -33,22 +39,7 @@ describe('MagicInitiateModal', () => {
       const nullSpellProps = createProps({ allSpells: null });
       render(<MagicInitiateModal {...nullSpellProps} />);
       expect(screen.getByText('Magic Initiate')).toBeInTheDocument();
-      expect(screen.getByText(/Choose a class/)).toBeInTheDocument();
-    });
-
-    it('overlay and modal shells carry no dismiss handler — dismissal is button-only', () => {
-      // Owner decision 15eb96d46 removed overlay-click dismissal app-wide.
-      // Structural absence pin (house idiom: MonsterCardModal.legendary-arcane-prowl-sphinx.test.jsx:175):
-      // a real click on a handlerless shell proves nothing, so pin the handler's absence directly.
-      const props = createProps();
-      const { container } = render(<MagicInitiateModal {...props} />);
-
-      const overlay = container.querySelector('.mi-overlay');
-      const modal = container.querySelector('.mi-modal');
-      expect(overlay.getAttribute('onclick')).toBeNull();
-      expect(modal.getAttribute('onclick')).toBeNull();
-      // The only onClose affordances are the header Close and Skip buttons (pinned above).
-      expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1);
+      expect(screen.getByText('Add Another Instance')).toBeInTheDocument();
     });
   });
 
@@ -182,6 +173,8 @@ describe('MagicInitiateModal', () => {
       expect(screen.queryByText('Instance 1: Wizard')).not.toBeInTheDocument();
       expect(screen.getByText('Instance 1: Sorcerer')).toBeInTheDocument();
       expect(screen.getByText('Shield')).toBeInTheDocument();
+      // Negative leg of the >1 gate: the last remaining instance offers no Remove.
+      expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
     });
   });
 });
